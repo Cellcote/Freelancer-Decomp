@@ -14,6 +14,9 @@ ipch/
 # DirectX 8.1 SDK (download it yourself, see README.md)
 dx8/
 
+# CMake build trees (CMakePresets.json)
+/build/
+
 # Build outputs (rebuilt from src/)
 bin/*.exe
 bin/*.dll

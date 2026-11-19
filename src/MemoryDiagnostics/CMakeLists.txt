@@ -1,0 +1,14 @@
+# CMake build of MemoryDiagnostics.vcxproj (see cmake/Freelancer.cmake). Keep the source list in the .vcxproj's
+# order: it is the link order, and with it the static-initialisation order.
+
+fl_add_module(MemoryDiagnostics EXE UNICODE NO_WPO NO_INCREMENTAL WARNING_LEVEL 4
+  ITEM_DEFAULTS DebugInformationFormat ProgramDatabase
+  SOURCES
+    main.cpp
+    diagnostics.cpp
+)
+
+target_compile_definitions(MemoryDiagnostics PRIVATE UNICODE _UNICODE)
+target_compile_options(MemoryDiagnostics PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/utf-8>)
+fl_link(MemoryDiagnostics
+  LIBS user32.lib gdi32.lib advapi32.lib shell32.lib ole32.lib comdlg32.lib psapi.lib)

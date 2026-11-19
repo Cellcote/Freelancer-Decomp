@@ -26,6 +26,10 @@ English: [README.md](README.md). Документация: [docs/ru/README.md](d
    msbuild src\Freelancer.sln -t:Build -p:Configuration=Release -p:Platform=Win32
    ```
 
+   Или через CMake и Ninja, из x86 Developer Command Prompt: `cmake --preset release`, затем
+   `cmake --build --preset release`. Собираются те же бинарники в тот же `bin\`; см.
+   [docs/cmake.md](docs/cmake.md) (на английском).
+
 Результат попадает в `bin\`, где уже лежат файлы конфигурации (`DACOM.INI`, `freelancer.ini`,
 `FLConfigDatabase.txt`, `NewPlayer.fl`, `MPNewCharacter.fl`). Запускать `bin\freelancer.exe`
 **из папки `bin`** (пути к библиотекам и данным отсчитываются от неё).

@@ -25,6 +25,10 @@ Russian: [README.ru.md](README.ru.md). Documentation: [docs/README.md](docs/READ
    msbuild src\Freelancer.sln -t:Build -p:Configuration=Release -p:Platform=Win32
    ```
 
+   Or with CMake and Ninja, from an x86 Developer Command Prompt: `cmake --preset release` then
+   `cmake --build --preset release`. It builds the same binaries into the same `bin\`; see
+   [docs/cmake.md](docs/cmake.md).
+
 The output goes to `bin\`, which already holds the runtime configuration (`DACOM.INI`,
 `freelancer.ini`, `FLConfigDatabase.txt`, `NewPlayer.fl`, `MPNewCharacter.fl`). Run
 `bin\freelancer.exe` **from the `bin` directory** (the library and data paths are relative to it).

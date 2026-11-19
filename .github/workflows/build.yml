@@ -125,3 +125,68 @@ jobs:
             bin/*.fl
           if-no-files-found: error
           retention-days: 14
+
+  cmake:
+    name: CMake parity (Release|Win32)
+    # Builds Release with MSBuild and with CMake into the same bin\ (so that every path the
+    # linker records is the same), then compares the two: command line by command line and
+    # binary by binary (.github/scripts/build_parity.py).
+    runs-on: windows-2022
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache DirectX 8.1 SDK
+        id: dx8-cache
+        uses: actions/cache@v4
+        with:
+          path: dx8
+          key: dx8-sdk-${{ env.DX8_SDK_MD5 }}
+
+      - name: Fetch DirectX 8.1 SDK headers and libraries
+        if: steps.dx8-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $env:RUNNER_TEMP 'dx81sdk_full.exe'
+          curl.exe --fail --location --retry 3 --silent --show-error -o $exe $env:DX8_SDK_URL
+          $md5 = (Get-FileHash -Algorithm MD5 $exe).Hash.ToLowerInvariant()
+          if ($md5 -ne $env:DX8_SDK_MD5) { throw "DX8 SDK checksum mismatch: $md5" }
+          $tmp = Join-Path $env:RUNNER_TEMP 'dx8x'
+          New-Item -ItemType Directory -Force $tmp | Out-Null
+          tar -xf $exe -C $tmp DXF/DXSDK/include DXF/DXSDK/lib
+          if ($LASTEXITCODE -ne 0) { throw "tar failed with exit code $LASTEXITCODE" }
+          New-Item -ItemType Directory -Force dx8 | Out-Null
+          Move-Item (Join-Path $tmp 'DXF/DXSDK/include') dx8/include
+          Move-Item (Join-Path $tmp 'DXF/DXSDK/lib') dx8/lib
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Build with MSBuild
+        run: >-
+          msbuild src\Freelancer.sln -t:Build -m -nologo -v:minimal
+          -p:Configuration=Release -p:Platform=Win32
+
+      - name: Set the MSBuild binaries aside
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory bin-msbuild | Out-Null
+          Move-Item bin\*.exe, bin\*.dll, bin\*.pdb, bin\*.lib, bin\*.exp bin-msbuild
+
+      - name: Build with CMake
+        shell: cmd
+        run: |
+          for /f "usebackq delims=" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set "VSDIR=%%i"
+          call "%VSDIR%\VC\Auxiliary\Build\vcvarsall.bat" x86 || exit /b 1
+          cmake --version || exit /b 1
+          cmake --preset release || exit /b 1
+          cmake --build --preset release || exit /b 1
+
+      - name: Compare command lines
+        run: python .github/scripts/build_parity.py commands --repo . --cmake-build build/release
+
+      - name: Compare binaries
+        if: success() || failure()
+        run: |
+          python -m pip install --quiet pefile
+          python .github/scripts/build_parity.py binaries bin-msbuild bin
