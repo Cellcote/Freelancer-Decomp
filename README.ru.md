@@ -49,6 +49,7 @@ English: [README.md](README.md). Документация: [docs/ru/README.md](d
 | `FreelancerWidescreenSupport` | 1 | Широкоформатные режимы экрана (Hor+) и раскладка HUD |
 | `FreelancerWalkMode` | 1 | Ходьба Трентом по помещениям баз ([docs/ru/walk_mode.md](docs/ru/walk_mode.md)) |
 | `FreelancerRp9` | 0 | `RP9.dll` — рендер на Direct3D 9 с объёмными туманностями ([docs/ru/re/rp9.md](docs/ru/re/rp9.md)); нужен [DirectX SDK (June 2010)](https://www.microsoft.com/en-us/download/details.aspx?id=6812) и `DirectX9` в `bin\DACOM.INI` |
+| `FreelancerHighResTimer` | 0 | Разрешение таймера 1 мс: ограничитель кадров больше не держит быстрые кадры на ~64 fps (меняет темп кадров относительно retail) |
 | `FreelancerBetaLabel` | 0 | Надпись «Beta» в углу экрана |
 | `FreelancerEnableTickProfile` | 0 | Экранный профайлер кадра |
 

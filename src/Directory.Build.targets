@@ -45,6 +45,12 @@
       <PreprocessorDefinitions>FREELANCER_WALK_MODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
+  <!-- Port-only 1 ms timer resolution: only the client (freelancer.exe) reads the define. -->
+  <ItemDefinitionGroup Condition="'$(FreelancerHighResTimer)'=='1' and '$(MSBuildProjectName)'=='freelancer'">
+    <ClCompile>
+      <PreprocessorDefinitions>FREELANCER_HIGH_RES_TIMER;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup Condition="'$(MSBuildProjectName)'=='Common' or '$(MSBuildProjectName)'=='freelancer'">
     <PropertyPageSchema Include="$(MSBuildThisFileDirectory)Freelancer.Diagnostics.xml">
       <Context>PropertySheet</Context>

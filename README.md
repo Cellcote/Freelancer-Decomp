@@ -47,6 +47,7 @@ property page *Freelancer diagnostics*), or `/p:<Name>=0|1` on the MSBuild comma
 | `FreelancerWidescreenSupport` | 1 | Widescreen (Hor+) display modes and HUD layout |
 | `FreelancerWalkMode` | 1 | Walking through base rooms as Trent ([docs/walk_mode.md](docs/walk_mode.md)) |
 | `FreelancerRp9` | 0 | `RP9.dll`, a Direct3D 9 renderer with volumetric nebulae ([docs/re/rp9.md](docs/re/rp9.md)); needs the [DirectX SDK (June 2010)](https://www.microsoft.com/en-us/download/details.aspx?id=6812) and `DirectX9` in `bin\DACOM.INI` |
+| `FreelancerHighResTimer` | 0 | 1 ms timer resolution, so the frame limiter no longer holds fast frames at about 64 fps (changes frame pacing against retail) |
 | `FreelancerBetaLabel` | 0 | The "Beta" label in the corner of the screen |
 | `FreelancerEnableTickProfile` | 0 | On-screen frame profiler |
 

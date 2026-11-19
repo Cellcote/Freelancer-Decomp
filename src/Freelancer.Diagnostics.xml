@@ -40,4 +40,10 @@
     <EnumValue Name="0" DisplayName="Off" />
     <EnumValue Name="1" DisplayName="On" />
   </EnumProperty>
+  <EnumProperty Name="FreelancerHighResTimer" DisplayName="1 ms timer resolution"
+                Category="Features" Default="0"
+                Description="Not in the original game: the client calls timeBeginPeriod(1) around its main loop, so the frame limiter's Sleep(1) waits about 1 ms instead of a whole 15.6 ms timer tick and fast frames are no longer held at about 64 fps (FREELANCER_HIGH_RES_TIMER, client only). Changes frame pacing against retail. Off builds the retail behaviour. After changing it, save this property sheet and rebuild the solution.">
+    <EnumValue Name="0" DisplayName="Off" />
+    <EnumValue Name="1" DisplayName="On" />
+  </EnumProperty>
 </Rule>

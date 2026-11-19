@@ -11,6 +11,9 @@
     <FreelancerRp9 Condition="'$(FreelancerRp9)'==''">0</FreelancerRp9>
     <!-- Port-only walk mode in base rooms (docs/walk_mode.md), FREELANCER_WALK_MODE; off by default. -->
     <FreelancerWalkMode Condition="'$(FreelancerWalkMode)'==''">0</FreelancerWalkMode>
+    <!-- Port-only 1 ms timer resolution for the client's frame limiter, FREELANCER_HIGH_RES_TIMER;
+         off by default (changes frame pacing vs retail, docs/re/deviations.md). -->
+    <FreelancerHighResTimer Condition="'$(FreelancerHighResTimer)'==''">0</FreelancerHighResTimer>
     <PlatformToolset>v143</PlatformToolset>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
     <CharacterSet>MultiByte</CharacterSet>

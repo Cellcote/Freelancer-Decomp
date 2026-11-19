@@ -800,6 +800,15 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE /*prev*/, LPSTR cmd, int /*show
 
             RegisterAcceleratorGroup("IDR_ALWAYS_PRESENT"); // FUN_00577490
 
+#if defined(FREELANCER_HIGH_RES_TIMER)
+            // DEVIATION (deviations.md "Client: 1 ms timer resolution behind
+            // FREELANCER_HIGH_RES_TIMER"): retail never calls timeBeginPeriod, so the Sleep(1) in
+            // the frame limiter (FUN_0042d770) waits a whole default timer tick (~15.6 ms) and fast
+            // frames are paced at ~64 fps instead of the 1/fps-cap minimum. Changes frame pacing
+            // (and with it every dt), so it is off by default. The OS drops the request at exit
+            // even when the loop is left by an exception.
+            timeBeginPeriod(1);
+#endif
             for (;;)
             {
                 UpdateClientTiming();                              // FUN_005b2360
@@ -809,6 +818,9 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE /*prev*/, LPSTR cmd, int /*show
                 if (ClientPresentAllowed())                        // DAT_00615ba8
                     TickClientFrame(DeltaSeconds);                 // FUN_005b2890
             }
+#if defined(FREELANCER_HIGH_RES_TIMER)
+            timeEndPeriod(1);
+#endif
         }
     }
     __except (ClientWinMainFilter())

@@ -270,3 +270,13 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 **Retail.** `WinMain` starts with `CreateMutexA(NULL, FALSE, "FreelancerClient")` (.text:005b2f87..005b2fac); a null handle or `GetLastError() == ERROR_ALREADY_EXISTS` (0xb7) jumps to the exit (LAB_005b3385) and returns 1, so only one client runs per machine.
 **Port.** The same code, compiled only when `FL_SINGLE_INSTANCE` is defined. Nothing defines it, so by default the client creates no mutex and any number of instances start.
 **Why.** The owner tests multiplayer by running several local clients against one FLServer.
+
+## Client: 1 ms timer resolution behind FREELANCER_HIGH_RES_TIMER
+
+> **Status:** OPEN (opt-in port-only feature, off by default)
+> **Owner:** freelancer.exe (`src/freelancer/Client/main.cpp`, `WinMain`, retail FUN_005b2f50, `#if defined(FREELANCER_HIGH_RES_TIMER)` around the main loop)
+> **Removal condition:** only on the owner's instruction; with `FreelancerHighResTimer=0` (the default) the client is the retail code unchanged.
+
+**Retail.** The frame timer `FUN_0042d770` (`src/freelancer/Client/client_timing.cpp`, `TickFrameTimer`) loops `Sleep(1)` until the frame has lasted `1 / DAT_00610a0c` seconds (200 fps cap by default, 5 ms). Nothing in freelancer.exe calls `timeBeginPeriod`, so on current Windows each `Sleep(1)` waits a whole default timer tick (~15.6 ms): a frame that finishes in under 5 ms ends up at ~15.6 ms, about 64 fps.
+**Port.** With `FREELANCER_HIGH_RES_TIMER` (the `FreelancerHighResTimer` property in `src/Freelancer.Diagnostics.props`, command line `/p:FreelancerHighResTimer=1`) `WinMain` calls `timeBeginPeriod(1)` before the main loop and `timeEndPeriod(1)` after it, so `Sleep(1)` waits about 1 ms and the 1/fps-cap minimum is what limits fast frames. The limiter loop itself is unchanged. Windows 11 ignores the request while the window is minimized or fully occluded, so pacing falls back to the default tick there.
+**Why.** Smoother, higher frame rates on fast machines. It changes frame pacing and with it every frame's dt (simulation step sizes, animation and effect timing), so it cannot be on by default in a retail-compatible build.
