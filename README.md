@@ -50,6 +50,17 @@ property page *Freelancer diagnostics*), or `/p:<Name>=0|1` on the MSBuild comma
 | `FreelancerBetaLabel` | 0 | The "Beta" label in the corner of the screen |
 | `FreelancerEnableTickProfile` | 0 | On-screen frame profiler |
 
+### Warnings, formatting and static analysis
+
+- First-party code builds at warning level 4 (`/W4`); warnings from headers included with `<...>`
+  (CRT, STL, Windows SDK, MFC, DirectX) are suppressed. Warnings are not errors. CI shows a summary
+  per warning and per project on the run page.
+- `.clang-format` describes the code style. The tree is not reformatted in bulk: CI checks only the
+  lines a pull request changes. Format your changes with `git clang-format origin/master`
+  (clang-format 19).
+- `.clang-tidy` lists bug-finding checks. To run them as part of the build, pass
+  `/p:FreelancerClangTidy=1`; this needs the *C++ Clang tools for Windows* component.
+
 ## Repository layout
 
 ```

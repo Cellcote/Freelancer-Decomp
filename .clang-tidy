@@ -1,0 +1,31 @@
+# Static analysis for first-party code. Opt-in: build with /p:FreelancerClangTidy=1 (Visual
+# Studio's clang-tidy code analysis, needs the "C++ Clang tools for Windows" component).
+#
+# Checks are chosen for finding bugs, not for rewriting code. Left out on purpose:
+#  - modernize-*, cppcoreguidelines-owning-memory and the like: they suggest smart pointers,
+#    std containers and other changes that alter retail layout or ownership (not allowed
+#    while the port stays retail-compatible, see docs/re/refactoring.md).
+#  - bugprone-branch-clone: retail often has identical branches; the port reproduces them.
+#  - bugprone-easily-swappable-parameters, bugprone-narrowing-conversions,
+#    bugprone-reserved-identifier, bugprone-implicit-widening-of-multiplication-result:
+#    too noisy for a port that keeps retail signatures, widths and names.
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-branch-clone,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-reserved-identifier,
+  -bugprone-implicit-widening-of-multiplication-result,
+  -bugprone-macro-parentheses,
+  clang-analyzer-core.*,
+  clang-analyzer-cplusplus.*,
+  clang-analyzer-deadcode.*,
+  clang-analyzer-unix.Malloc,
+  misc-redundant-expression,
+  misc-misplaced-const,
+  readability-misleading-indentation
+WarningsAsErrors: ''
+HeaderFilterRegex: '.*'
+SystemHeaders: false
+FormatStyle: file

@@ -129,6 +129,7 @@ jobs:
           -p:Configuration=Release -p:Platform=Win32
           -p:UseMultiToolTask=true -p:EnforceProcessCountAcrossBuilds=true
           -clp:PerformanceSummary -bl:msbuild.binlog
+          "-flp1:logfile=msbuild-warnings.log;warningsonly"
 
       - name: Upload build log
         if: always()
@@ -137,6 +138,26 @@ jobs:
           name: ${{ matrix.side == 'base' && 'msbuild-binlog-base' || 'msbuild-binlog' }}
           path: msbuild.binlog
           retention-days: 7
+
+      # /W4 warnings are reported, not fatal: the summary shows the counts per warning and
+      # per project on the run page, the full list is uploaded beside the binaries. Only for
+      # the PR side: the base side's checkout may predate the summary script.
+      - name: Summarise warnings
+        if: always() && matrix.side == 'pr'
+        shell: pwsh
+        run: |
+          if (Test-Path msbuild-warnings.log) {
+            python .github/scripts/warning_summary.py msbuild-warnings.log . >> $env:GITHUB_STEP_SUMMARY
+          }
+
+      - name: Upload warnings log
+        if: always() && matrix.side == 'pr'
+        uses: actions/upload-artifact@v4
+        with:
+          name: msbuild-warnings
+          path: msbuild-warnings.log
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4
@@ -237,3 +258,30 @@ jobs:
               throw "FLRegress output differs from the base commit. If the change is intended, add the label 'regress: expected change'."
             }
           }
+
+  format:
+    name: clang-format (changed lines)
+    # Only the lines a pull request touches are checked; the tree is not bulk-reformatted
+    # (see .clang-format). Fix locally with: git clang-format origin/master
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install clang-format
+        run: pipx install clang-format==19.1.7
+
+      - name: Check formatting of changed lines
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          base=$(git merge-base "origin/$BASE_REF" HEAD)
+          if ! git clang-format --binary "$(command -v clang-format)" --diff "$base" HEAD -- src > format.diff; then
+            cat format.diff
+            echo "::error::Changed lines are not clang-formatted. Run: git clang-format $base"
+            exit 1
+          fi
+          cat format.diff
