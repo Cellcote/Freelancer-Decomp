@@ -45,6 +45,13 @@
       <PreprocessorDefinitions>FREELANCER_WALK_MODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
+  <!-- clang-tidy through Visual Studio's code analysis (FreelancerClangTidy, Directory.Build.props).
+       The vendored libraries are not analysed, and Microsoft's own /analyze stays off. -->
+  <PropertyGroup Condition="'$(FreelancerClangTidy)'=='1' and '$(MSBuildProjectName)'!='zlib' and '$(MSBuildProjectName)'!='qhull'">
+    <RunCodeAnalysis>true</RunCodeAnalysis>
+    <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
+    <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
+  </PropertyGroup>
   <ItemGroup Condition="'$(MSBuildProjectName)'=='Common' or '$(MSBuildProjectName)'=='freelancer'">
     <PropertyPageSchema Include="$(MSBuildThisFileDirectory)Freelancer.Diagnostics.xml">
       <Context>PropertySheet</Context>
