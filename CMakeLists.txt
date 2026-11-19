@@ -23,7 +23,7 @@ set(FL_PROJECTS
   Resources/resources Resources/InfoCards Resources/MiscText Resources/NameResources
   Resources/EquipResources Resources/OfferBribeResources Resources/MiscTextInfo2
   Resources/serverresources
-  FLServer MemoryDiagnostics)
+  FLServer MemoryDiagnostics FLRegress)
 foreach(_project IN LISTS FL_PROJECTS)
   add_subdirectory(src/${_project})
 endforeach()
