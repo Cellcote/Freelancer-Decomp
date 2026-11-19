@@ -92,7 +92,7 @@ CL_NO_OUTPUT = re.compile(
     re.I,
 )
 # Output file names (case matters: /Fp<file> is not /fp:precise).
-CL_FILE_NAMES = re.compile(r"^/(Fo|Fd|Fa|Fp|Fe|Fi|Fm|FR|Fr)")
+CL_FILE_NAMES = re.compile(r"^/(Fo|Fd|Fa|Fp|Fe|Fi|Fm|FR|Fr|fo)")
 # Families of cl options where the last one on the command line wins.
 CL_FAMILIES = [
     ("optimization", r"^/O[12dsx]$"),
@@ -168,7 +168,7 @@ def msbuild_commands(repo, config):
     """Commands MSBuild ran, from the tlogs of src/obj/<project>/<config>."""
     projects = {}
     for vcx in glob.glob(os.path.join(repo, "src", "**", "*.vcxproj"), recursive=True):
-        projects[os.path.splitext(os.path.basename(vcx))[0].lower()] = os.path.dirname(vcx)
+        projects[os.path.splitext(os.path.basename(vcx))[0].lower()] = os.path.abspath(os.path.dirname(vcx))
     cl, rc, link, lib = {}, {}, {}, {}
     for tlog in glob.glob(os.path.join(repo, "src", "obj", "*", config, "*.tlog", "*.command.*.tlog")):
         project = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(tlog)))).lower()
@@ -182,13 +182,20 @@ def msbuild_commands(repo, config):
                     cl[norm_path(src)] = dict(parsed, project=project)
             elif kind == "rc":
                 for src in inputs:
-                    rc[norm_path(src)] = dict(parse_cl(args, base), project=project)
+                    rc[norm_path(src)] = dict(parse_cl(args, base), project=project,
+                                              base=norm_path(base) if base else None)
             elif kind == "link" or kind.startswith("lib"):
                 parsed = parse_link(args, base)
                 if not parsed["objects"]:
                     parsed["objects"] = [stem(p) for p in inputs if p.lower().endswith(".obj")]
                     parsed["resources"] = [stem(p) for p in inputs if p.lower().endswith(".res")]
-                (link if kind == "link" else lib)[parsed["output"]] = dict(parsed, project=project)
+                table = link if kind == "link" else lib
+                prev = table.get(parsed["output"])
+                if prev and kind != "link":
+                    # lib.exe is run once per batch of objects; one archive.
+                    parsed["objects"] = prev["objects"] + parsed["objects"]
+                    parsed["options"] |= prev["options"]
+                table[parsed["output"]] = dict(parsed, project=project)
     return cl, rc, link, lib
 
 
@@ -263,6 +270,8 @@ def ninja_builds(path):
 def cmake_commands(build_dir):
     cl, rc, link, lib = {}, {}, {}, {}
     for e in json.load(open(os.path.join(build_dir, "compile_commands.json"), encoding="utf-8")):
+        if not e["file"].lower().endswith((".c", ".cpp")):
+            continue  # rc commands are read from build.ninja below
         args = e.get("arguments") or split_command_line(e["command"])
         cl[norm_path(e["file"])] = dict(parse_cl(args[1:], e["directory"]), project=None)
     for rule, outputs, inputs, var in ninja_builds(os.path.join(build_dir, "build.ninja")):
@@ -271,7 +280,7 @@ def cmake_commands(build_dir):
                                                 var.get("FLAGS", "")]))
             for src in inputs:
                 rc[norm_path(src)] = dict(parse_cl(args, build_dir), project=None)
-        elif re.match(r"CXX_(SHARED_LIBRARY|EXECUTABLE|MODULE)_LINKER__", rule):
+        elif re.match(r"C(XX)?_(SHARED_LIBRARY|EXECUTABLE|MODULE)_LINKER__", rule):
             flags = split_command_line(var.get("LINK_FLAGS", ""))
             if "SHARED_LIBRARY" in rule:
                 flags.append("/DLL")
@@ -305,6 +314,13 @@ def compare_compiles(kind, a, b, report):
             only_a = {k: v for k, v in x["defines"].items() if y["defines"].get(k) != v}
             only_b = {k: v for k, v in y["defines"].items() if x["defines"].get(k) != v}
             msgs.append("defines MSBuild-only %s, CMake-only %s" % (only_a, only_b))
+        if kind == "rc":
+            # rc tlogs are upper-cased. MSBuild runs rc in the project directory; CMake passes
+            # that directory as /I instead (relative ICON / #include names resolve the same).
+            here = x.get("base")
+            for z in (x, y):
+                z["options"] = {o.lower() for o in z["options"]}
+                z["includes"] = [i for i in z["includes"] if i != here]
         # The INCLUDE environment (Windows SDK, VC, DX8 appended) is not on either command line;
         # MSBuild passes the project's own dirs, CMake the same ones.
         if x["includes"] != y["includes"]:
@@ -331,8 +347,12 @@ def compare_links(kind, a, b, report):
             failed = True
             continue
         x, y, msgs = a[out], b[out], []
-        if x["objects"] != y["objects"]:
-            msgs.append("object order differs\n    MSBuild %s\n    CMake   %s" % (x["objects"], y["objects"]))
+        # The .tlog lists the objects sorted, not in link order: compare them as a set. CMake
+        # links them in the .vcxproj's item order, as MSBuild does.
+        if sorted(x["objects"]) != sorted(y["objects"]):
+            msgs.append("objects MSBuild-only %s, CMake-only %s"
+                        % (sorted(set(x["objects"]) - set(y["objects"])),
+                           sorted(set(y["objects"]) - set(x["objects"]))))
         if sorted(x["resources"]) != sorted(y["resources"]):
             msgs.append("resources MSBuild %s, CMake %s" % (x["resources"], y["resources"]))
         if x["libs"] != y["libs"]:

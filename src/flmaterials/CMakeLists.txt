@@ -9,5 +9,5 @@ fl_add_module(flmaterials DLL
     flmaterials.rc
 )
 
-target_include_directories(flmaterials PRIVATE ../include)
+fl_includes(flmaterials ../include)
 fl_link(flmaterials LIBS dacom.lib REFERENCES dacom)

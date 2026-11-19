@@ -18,8 +18,8 @@ fl_add_module(qhull LIB NO_SDL WARNING_LEVEL 1
 )
 
 # qhull 2002.1 (vendored under vendor/), see qhull.vcxproj and vendor/COPYING.txt.
-target_compile_definitions(qhull PRIVATE _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_DEPRECATE)
-target_include_directories(qhull PRIVATE vendor)
+fl_defines(qhull _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_DEPRECATE)
+fl_includes(qhull vendor)
 target_compile_options(qhull PRIVATE
   /wd4013 /wd4018 /wd4028 /wd4090 /wd4101 /wd4113 /wd4131 /wd4133 /wd4142 /wd4152 /wd4189
   /wd4244 /wd4267 /wd4305 /wd4306 /wd4700 /wd4701 /wd4996)

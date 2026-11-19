@@ -7,5 +7,5 @@ fl_add_module(system DLL
     system.rc
 )
 
-target_include_directories(system PRIVATE ../include)
+fl_includes(system ../include)
 fl_link(system LIBS dacom.lib REFERENCES dacom)

@@ -212,7 +212,7 @@ fl_add_module(Common DLL NO_SDL IMPORTS_DIAGNOSTICS_PROPS
 
 # /sdl makes the compiler give every dllexport class an exported __autoclassinit2 member; retail
 # Common.dll exports none (NO_SDL).
-target_compile_definitions(Common PRIVATE COMMON_EXPORTS)
+fl_defines(Common COMMON_EXPORTS)
 target_compile_options(Common PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/wd4251 /wd4275>)
 fl_item(../IVP/ivp_compact_builder/ivp_surface_builder_pointsoup.cpp
   INCLUDE_DIRECTORIES ../qhull/vendor)

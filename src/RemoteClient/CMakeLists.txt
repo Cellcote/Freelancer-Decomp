@@ -12,8 +12,8 @@ fl_add_module(RemoteClient DLL NO_SDL
     ../RemoteCommon/remote_server_channel_codecs.cpp
 )
 
-target_include_directories(RemoteClient PRIVATE ../include)
-target_compile_definitions(RemoteClient PRIVATE FL_SERVER REMOTECLIENT_EXPORTS _WINDOWS _USRDLL)
+fl_includes(RemoteClient ../include)
+fl_defines(RemoteClient FL_SERVER REMOTECLIENT_EXPORTS _WINDOWS _USRDLL)
 fl_link(RemoteClient
   LIBS kernel32.lib user32.lib dacom.lib Common.lib Server.lib rpclocal.lib DALib.lib
   REFERENCES Server dacom Common DALib rpclocal)

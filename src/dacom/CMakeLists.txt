@@ -6,3 +6,5 @@ fl_add_module(dacom DLL DEF dacom.def
     dacom.cpp
     dacom.rc
 )
+
+fl_link(dacom)

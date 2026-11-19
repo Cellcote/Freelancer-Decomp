@@ -20,7 +20,7 @@ fl_add_module(Server DLL NO_SDL
     server_basedb.cpp
 )
 
-target_compile_definitions(Server PRIVATE _WINDOWS _USRDLL SERVER_EXPORTS)
+fl_defines(Server _WINDOWS _USRDLL SERVER_EXPORTS)
 fl_link(Server
   LIBS kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib
        ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib Common.lib

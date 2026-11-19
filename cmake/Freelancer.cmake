@@ -138,6 +138,17 @@ foreach(_lang C CXX)
   set(CMAKE_${_lang}_CREATE_CONSOLE_EXE "")
 endforeach()
 
+# rc: MSBuild's ResourceCompile defaults (Culture 0x0409). CMake applies no target compile
+# options to rc, so they go here.
+set(CMAKE_RC_FLAGS "/l0x0409 /nologo")
+
+# UACExecutionLevel AsInvoker: MSBuild writes it for DLLs as well as exes.
+set(FL_MANIFESTUAC "/MANIFESTUAC:level='asInvoker' uiAccess='false'")
+
+# EnableDpiAwareness for MFC projects (FLServer): the manifest of the toolset in use.
+get_filename_component(_fl_vctools "${CMAKE_CXX_COMPILER}/../../../.." ABSOLUTE)
+set(FL_DPIAWARE_MANIFEST "${_fl_vctools}/include/manifest/dpiaware.manifest")
+
 # RuntimeLibrary (Directory.Build.props): /MD, /MDd for Debug and DebugASan.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<${_fl_cfg_debuglibs}:Debug>DLL")
 # /Zi or /ZI is an item setting here (see _fl_item_options), not a target one.
@@ -370,6 +381,10 @@ function(fl_add_module name kind)
 
   if(kind STREQUAL "RESOURCE_DLL")
     _fl_resource_dll(${name})
+    # ResourceDll.props: the imported .rc scripts are UTF-8; the host ANSI code page would
+    # corrupt punctuation and non-ASCII names. rc takes no per-target options from CMake, so
+    # this is the directory's CMAKE_RC_FLAGS (one resource DLL per directory).
+    set(CMAKE_RC_FLAGS "${CMAKE_RC_FLAGS} /c65001" PARENT_SCOPE)
     return()
   endif()
 
@@ -417,9 +432,10 @@ function(fl_add_module name kind)
     /external:W3 /Gd /analyze- /FC /errorReport:prompt)
   target_compile_options(${name} PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:${_cl}>")
 
-  # rc: /l 0x0409 (Culture), the project directory, and the CharacterSet/MFC defines.
-  target_compile_options(${name} PRIVATE "$<$<COMPILE_LANGUAGE:RC>:/l0x0409;/nologo>")
-  target_compile_definitions(${name} PRIVATE "$<$<COMPILE_LANGUAGE:RC>:${_charset}>")
+  # rc gets no project defines or include dirs from MSBuild, only its own ResourceCompile
+  # settings (CMAKE_RC_FLAGS below). MSBuild runs rc in the project directory, which is where a
+  # script's relative file names (ICON "res\\x.ico") are found; Ninja runs it in the build tree,
+  # so that directory is passed as /I instead.
   target_include_directories(${name} PRIVATE "$<$<COMPILE_LANGUAGE:RC>:${CMAKE_CURRENT_SOURCE_DIR}>")
 
   set(_wpo "$<AND:${_fl_cfg_release},$<NOT:$<BOOL:${A_NO_WPO}>>>")
@@ -436,15 +452,13 @@ function(fl_add_module name kind)
   else()
     set(_subsystem WINDOWS)
   endif()
+  # LinkIncremental: MSBuild writes /INCREMENTAL in Debug and nothing in Release (where /OPT:REF
+  # turns incremental linking off anyway); DebugASan and LinkIncremental=false projects get
+  # /INCREMENTAL:NO.
   if(A_NO_INCREMENTAL)
     set(_incremental /INCREMENTAL:NO)
   else()
-    set(_incremental "$<IF:${_fl_cfg_debug},/INCREMENTAL,/INCREMENTAL:NO>")
-  endif()
-  if(kind STREQUAL "EXE")
-    set(_uac "/MANIFESTUAC:level='asInvoker' uiAccess='false'")
-  else()
-    set(_uac "/MANIFESTUAC:NO")
+    set(_incremental "$<${_fl_cfg_debug}:/INCREMENTAL>" "$<${_fl_cfg_asan}:/INCREMENTAL:NO>")
   endif()
   if(A_NO_SAFESEH)
     set(_safeseh /SAFESEH:NO)
@@ -453,8 +467,16 @@ function(fl_add_module name kind)
   endif()
   target_link_options(${name} PRIVATE
     /MANIFEST "$<${_wpo}:/LTCG:incremental>" /NXCOMPAT /DYNAMICBASE /DEBUG /MACHINE:X86
-    ${_safeseh} ${_incremental} /SUBSYSTEM:${_subsystem} "${_uac}" /ERRORREPORT:PROMPT /NOLOGO
-    /TLBID:1)
+    "$<${_wpo}:/OPT:REF;/OPT:ICF>" ${_safeseh} ${_incremental} /SUBSYSTEM:${_subsystem}
+    "${FL_MANIFESTUAC}" /ERRORREPORT:PROMPT /NOLOGO /TLBID:1)
+  if(A_MFC)
+    # MSBuild gives an MFC application the toolset's DPI-awareness manifest.
+    if(EXISTS "${FL_DPIAWARE_MANIFEST}")
+      target_sources(${name} PRIVATE "${FL_DPIAWARE_MANIFEST}")
+    else()
+      message(WARNING "${FL_DPIAWARE_MANIFEST} not found: ${name} is built without it")
+    endif()
+  endif()
   # AdditionalLibraryDirectories: $(OutDir) for every project (Directory.Build.props).
   target_link_directories(${name} PRIVATE "${FL_BIN_DIR}")
 
@@ -472,14 +494,11 @@ endfunction()
 # Resource-only DLLs: src\Resources\ResourceDll.props (no code, no CRT, no entry point).
 function(_fl_resource_dll name)
   set_property(TARGET ${name} PROPERTY LINKER_LANGUAGE CXX)
-  # The .rc scripts are UTF-8 (/c65001).
-  target_compile_options(${name} PRIVATE /l0x0409 /nologo /c65001)
-  target_compile_definitions(${name} PRIVATE _MBCS)
   target_include_directories(${name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
   target_link_options(${name} PRIVATE
     /MANIFEST /NXCOMPAT /DYNAMICBASE /MACHINE:X86 /NOENTRY /NODEFAULTLIB
-    "$<${_fl_cfg_release}:/SAFESEH>" "$<IF:${_fl_cfg_debug},/INCREMENTAL,/INCREMENTAL:NO>"
-    /SUBSYSTEM:WINDOWS /MANIFESTUAC:NO /ERRORREPORT:PROMPT /NOLOGO /TLBID:1)
+    "$<${_fl_cfg_release}:/SAFESEH>" "$<${_fl_cfg_debug}:/INCREMENTAL>"
+    /SUBSYSTEM:WINDOWS "${FL_MANIFESTUAC}" /ERRORREPORT:PROMPT /NOLOGO /TLBID:1)
   target_link_libraries(${name} PRIVATE ${FL_DEFAULT_LIBS})
 endfunction()
 
@@ -558,4 +577,19 @@ function(fl_dev_ini_post_build name)
   else()
     message(STATUS "AddressSanitizer runtime DLLs not found next to ${CMAKE_CXX_COMPILER}")
   endif()
+endfunction()
+
+# fl_defines(<name> <defines...>) / fl_includes(<name> <dirs...>): the project's ClCompile
+# PreprocessorDefinitions / AdditionalIncludeDirectories. They reach cl only: MSBuild's rc gets
+# its own ResourceCompile settings.
+function(fl_defines name)
+  target_compile_definitions(${name} PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:${ARGN}>")
+endfunction()
+function(fl_includes name)
+  set(_dirs)
+  foreach(_dir IN LISTS ARGN)
+    get_filename_component(_dir "${_dir}" ABSOLUTE)
+    list(APPEND _dirs "${_dir}")
+  endforeach()
+  target_include_directories(${name} PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:${_dirs}>")
 endfunction()

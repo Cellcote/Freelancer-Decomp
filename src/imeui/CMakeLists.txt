@@ -14,5 +14,5 @@ fl_add_module(imeui DLL
     imeui.rc
 )
 
-target_compile_definitions(imeui PRIVATE IMEUI_EXPORTS)
+fl_defines(imeui IMEUI_EXPORTS)
 fl_link(imeui LIBS imm32.lib user32.lib gdi32.lib advapi32.lib ole32.lib)

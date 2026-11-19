@@ -13,5 +13,5 @@ fl_add_module(RendComp DLL
     RendComp.rc
 )
 
-target_include_directories(RendComp PRIVATE ../include)
+fl_includes(RendComp ../include)
 fl_link(RendComp LIBS dacom.lib REFERENCES dacom)

@@ -22,6 +22,6 @@ fl_add_module(rpclocal DLL
     rpc_packet_dump.cpp
 )
 
-target_include_directories(rpclocal PRIVATE ../include)
-target_compile_definitions(rpclocal PRIVATE _WINDOWS _USRDLL RPCLOCAL_EXPORTS)
+fl_includes(rpclocal ../include)
+fl_defines(rpclocal _WINDOWS _USRDLL RPCLOCAL_EXPORTS)
 fl_link(rpclocal LIBS kernel32.lib user32.lib Common.lib REFERENCES dacom Common)

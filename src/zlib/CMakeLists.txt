@@ -24,7 +24,7 @@ fl_add_module(zlib DLL NO_SDL DEF zlib.def
     zlib.rc
 )
 
-target_compile_definitions(zlib PRIVATE ZLIB_WINAPI _CRT_NONSTDC_NO_DEPRECATE)
-target_include_directories(zlib PRIVATE vendor vendor/minizip)
+fl_defines(zlib ZLIB_WINAPI _CRT_NONSTDC_NO_DEPRECATE)
+fl_includes(zlib vendor vendor/minizip)
 target_compile_options(zlib PRIVATE $<$<COMPILE_LANGUAGE:C>:/wd4244 /wd4267 /wd4996>)
 fl_link(zlib)

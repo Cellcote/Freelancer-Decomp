@@ -14,7 +14,7 @@ fl_add_module(DALib DLL NO_SDL
     DALib.rc
 )
 
-target_compile_definitions(DALib PRIVATE DALIB_EXPORTS ZLIB_WINAPI)
+fl_defines(DALib DALIB_EXPORTS ZLIB_WINAPI)
 # %(AdditionalIncludeDirectories);..\zlib\vendor: after src\include, not before it.
-target_include_directories(DALib PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${FL_SRC_DIR}/include> ../zlib/vendor)
+fl_includes(DALib ${FL_SRC_DIR}/include ../zlib/vendor)
 fl_link(DALib LIBS dacom.lib zlib.lib winmm.lib REFERENCES dacom zlib)

@@ -44,7 +44,7 @@ All of this lives in `cmake/Freelancer.cmake`:
 
 - **CMake's own MSVC defaults are cleared** (`/DNDEBUG`, `/D_WINDOWS`, `/GR`, `/Ob2`,
   `/subsystem:console`, the `<target>_EXPORTS` define). MSBuild's v143 defaults are written out
-  explicitly instead: `/Oy-`, `/Zc:inline`, `/sdl`, `/GL` + `/LTCG:incremental`, `/SAFESEH`,
+  explicitly instead: `/Oy-`, `/Zc:inline`, `/sdl`, `/GL` + `/LTCG:incremental` + `/OPT:REF /OPT:ICF`, `/SAFESEH`, the `asInvoker` manifest on DLLs too,
   `_WINDLL`, `_MBCS`, and the rest. Release defines no `NDEBUG`, just as in the solution.
 - **Item metadata replaces project settings**, as in MSBuild. Per-file settings such as
   `alchemy_math.cpp`'s `/fp:fast /Oi`, or no `/GL` on `ThornControlCalls.cpp`, are resolved per

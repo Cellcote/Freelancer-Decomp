@@ -7,5 +7,5 @@ fl_add_module(ximage DLL
     ximage.rc
 )
 
-target_include_directories(ximage PRIVATE ../include)
+fl_includes(ximage ../include)
 fl_link(ximage LIBS dacom.lib user32.lib REFERENCES dacom)

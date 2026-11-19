@@ -8,7 +8,7 @@ fl_add_module(RP8 DLL NO_SAFESEH
     RP8.rc
 )
 
-target_include_directories(RP8 PRIVATE ../include)
+fl_includes(RP8 ../include)
 # DX8.1 SDK d3dx8.lib objects carry -defaultlib:libci (the VC6 single-threaded iostream library),
 # which no current toolset ships; RP8 does not use iostreams. The SDK's lib dir comes before the
 # Windows SDK's (its ddraw.lib), as AdditionalLibraryDirectories. d3dx8.lib has no SafeSEH tables.
