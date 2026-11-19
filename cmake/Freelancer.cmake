@@ -420,6 +420,7 @@ function(fl_add_module name kind)
   list(APPEND _defs ${_charset})
   if(A_MFC)
     list(APPEND _defs _AFXDLL)
+    set_property(TARGET ${name} PROPERTY FL_MFC TRUE)
   endif()
   target_compile_definitions(${name} PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:${_defs}>")
 
@@ -429,7 +430,7 @@ function(fl_add_module name kind)
     "$<${_fl_cfg_asan}:/fsanitize=address>"
     /GS /Zc:wchar_t /Zc:forScope /Zc:inline
     "$<$<COMPILE_LANGUAGE:CXX>:/std:c++17>"
-    /external:W3 /Gd /analyze- /FC /errorReport:prompt)
+    /external:W${A_WARNING_LEVEL} /Gd /analyze- /FC)
   target_compile_options(${name} PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:${_cl}>")
 
   # rc gets no project defines or include dirs from MSBuild, only its own ResourceCompile
@@ -529,7 +530,12 @@ function(fl_link name)
       list(APPEND _items "${_lib}")
     endif()
   endforeach()
-  list(APPEND _items ${FL_DEFAULT_LIBS})
+  # An MFC project gets no default libraries from MSBuild: the MFC headers name the ones they
+  # need (#pragma comment(lib)), in their own order.
+  get_target_property(_mfc ${name} FL_MFC)
+  if(NOT _mfc)
+    list(APPEND _items ${FL_DEFAULT_LIBS})
+  endif()
   foreach(_ref IN LISTS A_REFERENCES)
     if(NOT TARGET "${_ref}")
       message(FATAL_ERROR "fl_link(${name}): ${_ref} is not a project")

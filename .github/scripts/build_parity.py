@@ -186,15 +186,20 @@ def msbuild_commands(repo, config):
                                               base=norm_path(base) if base else None)
             elif kind == "link" or kind.startswith("lib"):
                 parsed = parse_link(args, base)
-                if not parsed["objects"]:
-                    parsed["objects"] = [stem(p) for p in inputs if p.lower().endswith(".obj")]
-                    parsed["resources"] = [stem(p) for p in inputs if p.lower().endswith(".res")]
+                # The command line leaves out what MSBuild passes through its input list: the
+                # objects and the import libraries of project references.
+                objs = [stem(p) for p in inputs if p.lower().endswith(".obj")]
+                parsed["objects"] = sorted(set(parsed["objects"]) | set(objs))
+                parsed["resources"] = sorted(set(parsed["resources"]) | {stem(p) for p in inputs if p.lower().endswith(".res")})
+                parsed["input_libs"] = {os.path.basename(p.replace("\\", "/")).lower()
+                                        for p in inputs if p.lower().endswith(".lib")}
                 table = link if kind == "link" else lib
                 prev = table.get(parsed["output"])
-                if prev and kind != "link":
-                    # lib.exe is run once per batch of objects; one archive.
-                    parsed["objects"] = prev["objects"] + parsed["objects"]
+                if prev:
+                    # Several tlog entries for one output (lib.exe batches, relinks): merge.
+                    parsed["objects"] = sorted(set(prev["objects"]) | set(parsed["objects"]))
                     parsed["options"] |= prev["options"]
+                    parsed["input_libs"] |= prev["input_libs"]
                 table[parsed["output"]] = dict(parsed, project=project)
     return cl, rc, link, lib
 
@@ -355,8 +360,14 @@ def compare_links(kind, a, b, report):
                            sorted(set(y["objects"]) - set(x["objects"]))))
         if sorted(x["resources"]) != sorted(y["resources"]):
             msgs.append("resources MSBuild %s, CMake %s" % (x["resources"], y["resources"]))
-        if x["libs"] != y["libs"]:
-            msgs.append("library order differs\n    MSBuild %s\n    CMake   %s" % (x["libs"], y["libs"]))
+        # MSBuild's command line names AdditionalDependencies (+ the defaults) in order; project
+        # reference libraries only show up among its inputs. CMake must name the former in the
+        # same order and may add only the latter.
+        named = [l for l in y["libs"] if l in x["libs"]]
+        extra = [l for l in y["libs"] if l not in x["libs"] and l not in x.get("input_libs", set())]
+        if named != x["libs"] or extra:
+            msgs.append("libraries differ\n    MSBuild %s (+ inputs %s)\n    CMake   %s"
+                        % (x["libs"], sorted(x.get("input_libs", ())), y["libs"]))
         ox = {o.upper() for o in x["options"]}
         oy = {o.upper() for o in y["options"]}
         if ox != oy:
