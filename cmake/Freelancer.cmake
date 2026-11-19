@@ -421,6 +421,15 @@ function(fl_add_module name kind)
   if(A_MFC)
     list(APPEND _defs _AFXDLL)
     set_property(TARGET ${name} PROPERTY FL_MFC TRUE)
+    # MFC's inline headers record their own path (__FILE__, with /FC) in the binary. MSBuild's
+    # include path spells the directory "atlmfc\include", vcvarsall's INCLUDE "ATLMFC\include":
+    # put MSBuild's spelling first (it is second in MSBuild's list, after VC\include, and the
+    # two directories share no header names).
+    file(TO_NATIVE_PATH "${_fl_vctools}/atlmfc/include" _atlmfc)
+    set_property(TARGET ${name} PROPERTY CXX_COMPILER_LAUNCHER
+      "${CMAKE_COMMAND}" -E env
+      "--modify" "INCLUDE=path_list_prepend:${_atlmfc}"
+      "--modify" "INCLUDE=path_list_append:${FL_DX8_DIR}/include")
   endif()
   target_compile_definitions(${name} PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:${_defs}>")
 
