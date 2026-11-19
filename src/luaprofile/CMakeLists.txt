@@ -26,7 +26,8 @@ fl_add_module(luaprofile DLL
     luaprofile.rc
 )
 
-fl_includes(luaprofile ../include lua32/include lua32/src)
+# ..\include is Directory.Build.props' src\include, which MSBuild keeps in its last place.
+fl_includes(luaprofile lua32/include lua32/src)
 target_compile_options(luaprofile PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:/wd4996>)
 # The Lua 3.2 sources (every .c item): C, without /sdl, with their own warnings off.
 get_target_property(_lua luaprofile SOURCES)

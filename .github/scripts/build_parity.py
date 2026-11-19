@@ -204,9 +204,11 @@ def msbuild_commands(repo, config):
     return cl, rc, link, lib
 
 
+# /MANIFESTINPUT: CMake hands the same manifest to mt.exe as a source instead; the embedded
+# manifest is compared in the binaries.
 LINK_NO_OUTPUT = re.compile(
     r"^/(NOLOGO|ERRORREPORT:.*|OUT:.*|PDB:.*|IMPLIB:.*|ManifestFile:.*|LTCGOUT:.*|PGD:.*|ILK:.*|"
-    r"LIBPATH:.*|VERSION:0\.0|MANIFEST:EMBED.*)$",
+    r"LIBPATH:.*|VERSION:0\.0|MANIFEST:EMBED.*|MANIFESTINPUT:.*)$",
     re.I,
 )
 
@@ -457,6 +459,10 @@ def masked(data, start, ranges):
     return bytes(data)
 
 
+def printable(b):
+    return "".join(chr(c) if 32 <= c < 127 else "." for c in b)
+
+
 def pe_summary(path):
     import pefile
 
@@ -471,7 +477,7 @@ def pe_summary(path):
     for s in pe.sections:
         raw = s.get_data()
         sections.append((s.Name.rstrip(b"\0").decode("latin-1"), s.Misc_VirtualSize,
-                         s.Characteristics, masked(raw, s.PointerToRawData, ranges)))
+                         s.Characteristics, masked(raw, s.PointerToRawData, ranges), s.VirtualAddress))
     imports = []
     for entry in getattr(pe, "DIRECTORY_ENTRY_IMPORT", []):
         for imp in entry.imports:
@@ -508,9 +514,19 @@ def cmd_binaries(ns):
         else:
             for x, y in zip(sa, sb):
                 if x[3] != y[3]:
-                    n = sum(1 for i in range(min(len(x[3]), len(y[3]))) if x[3][i] != y[3][i])
-                    first = next((i for i in range(min(len(x[3]), len(y[3]))) if x[3][i] != y[3][i]), None)
-                    msgs.append("section %s: %d bytes differ (first at +0x%x)" % (x[0], n, first or 0))
+                    diff = [i for i in range(min(len(x[3]), len(y[3]))) if x[3][i] != y[3][i]]
+                    msgs.append("section %s: %d bytes differ (first at +0x%x)" % (x[0], len(diff), diff[0] if diff else 0))
+                    shown = []
+                    for i in diff:
+                        if shown and i - shown[-1] < 32:
+                            continue
+                        shown.append(i)
+                        if len(shown) > 4:
+                            break
+                        lo = max(0, i - 16)
+                        msgs.append("\n    rva 0x%x\n      MSBuild %s |%s|\n      CMake   %s |%s|"
+                                    % (x[4] + i, x[3][lo:lo + 48].hex(" "), printable(x[3][lo:lo + 48]),
+                                       y[3][lo:lo + 48].hex(" "), printable(y[3][lo:lo + 48])))
         if ia != ib:
             msgs.append("imports differ: MSBuild-only %s, CMake-only %s"
                         % (sorted(set(ia) - set(ib))[:10], sorted(set(ib) - set(ia))[:10]))

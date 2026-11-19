@@ -253,8 +253,9 @@ fl_add_module(freelancer EXE EXPORTS NO_SDL IMPORTS_DIAGNOSTICS_PROPS
 
 # FREELANCER_EXPORTS: the 69 names retail FreeLancer.exe exports itself. /sdl would add exported
 # __autoclassinit2 members retail does not have (NO_SDL).
-target_include_directories(freelancer PRIVATE
-  $<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT_SOURCE_DIR}/../include ${CMAKE_CURRENT_SOURCE_DIR}/../Content ${CMAKE_CURRENT_SOURCE_DIR}/../imeui>)
+# ..\include is also Directory.Build.props' src\include, which comes last: MSBuild keeps the last
+# of two equal entries, so the order cl sees is Content, imeui, include.
+fl_includes(freelancer ../Content ../imeui)
 target_compile_definitions(freelancer PRIVATE $<$<COMPILE_LANGUAGE:CXX>:FREELANCER_EXPORTS>)
 target_include_directories(freelancer PRIVATE $<$<COMPILE_LANGUAGE:RC>:${CMAKE_CURRENT_SOURCE_DIR}/resources>)
 
