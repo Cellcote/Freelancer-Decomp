@@ -2327,11 +2327,37 @@ void FRp9Vb::ReleaseGpu()
     Gpu = nullptr;
 }
 
+// Port-only side table (not in retail): lets DrawIndexedPrimitiveVb skip re-copying an index
+// list that is already in the scratch IB. The asteroid field (freelancer.exe FUN_00522a60) draws
+// every cube with the same +0xa8 indices, so retail copied the identical list once per cube and
+// wrapped the 0x4000-index ring with a DISCARD every few cubes. G_Rp9IbLockSerial counts every
+// LockRange and every ReleaseIbGpu on any index buffer; while it is unchanged since the last copy,
+// nothing can have overwritten, discarded or recreated that region, so drawing from it again hands
+// the device the very same index values. The shadow copy proves the source bytes still match. The
+// triangles, their order and every other state call stay as in retail; only the ring offset of the
+// repeated draws differs, which is not observable in the picture.
+static unsigned long G_Rp9IbLockSerial = 0;
+
+struct FRp9ScratchIbReuse
+{
+    const FDirectX9* Owner;
+    IDirect3DIndexBuffer9* Gpu;
+    const void* Src;
+    unsigned int Count;
+    unsigned int Start;
+    unsigned long Serial;
+    bool bShadowValid;
+    unsigned short Shadow[0x4000]; // the scratch IB capacity (create_buffers)
+};
+
+static FRp9ScratchIbReuse G_Rp9ScratchIbReuse;
+
 // The same release block inlined for index buffers (destroy_buffers 06d09a70, destroy_ib
 // 06d1312b, resize_ib 06d1327b/06d133a2): Gpu (+4) set -> if +8 {+8 = 0; Unlock (+0x30)};
 // Release; Gpu = 0.
 static void ReleaseIbGpu(FRp9Ib* Wrapper)
 {
+    ++G_Rp9IbLockSerial; // port-only: invalidates G_Rp9ScratchIbReuse
     if (Wrapper->Gpu == nullptr)
         return;
     if (Wrapper->LockedBits != nullptr)
@@ -2422,6 +2448,7 @@ void FRp9StreamCache::SelectIndices(FRp9Ib* Buffer, unsigned int InBaseVertex)
 HRESULT FRp9Ib::LockRange(unsigned int Start, unsigned int Count, void** OutBits,
                            unsigned int* OutStart, unsigned char bSysLock)
 {
+    ++G_Rp9IbLockSerial; // port-only: invalidates G_Rp9ScratchIbReuse
     if (Gpu == nullptr)
         return E_FAIL;
     if (Count > Capacity)
@@ -5283,14 +5310,41 @@ GENRESULT DACOM_API FDirectX9::DrawIndexedPrimitiveVb(unsigned long Prim, void* 
     FRp9Ib* Scratch = &ScratchIb_;
     void* LockedBits = nullptr;
     unsigned int LockOffset = 0;
-    // RP8 byte [+0x128] bit1 = SwapFlags_ USE_SYSLOCK.
-    const HRESULT LockHr = Scratch->LockRange(0, IndexCount, &LockedBits, &LockOffset,
-                                       (unsigned char)((SwapFlags_ >> 1) & 1));
-    if (LockHr >= 0)
+    HRESULT LockHr = S_OK;
+    // Port-only (G_Rp9ScratchIbReuse): the same list already sits untouched in the ring, so the
+    // draw below reads identical index values from it without a second lock and copy.
+    FRp9ScratchIbReuse& Reuse = G_Rp9ScratchIbReuse;
+    if (Reuse.bShadowValid && Reuse.Owner == this && Reuse.Gpu == Scratch->Gpu &&
+        Reuse.Serial == G_Rp9IbLockSerial && Reuse.Src == Indices && Reuse.Count == IndexCount &&
+        memcmp(Reuse.Shadow, Indices, IndexCount * 2u) == 0)
     {
-        memcpy(LockedBits, Indices, IndexCount * 2u);
-        Scratch->LockedBits = nullptr;
-        Scratch->Gpu->Unlock();
+        LockOffset = Reuse.Start;
+    }
+    else
+    {
+        // RP8 byte [+0x128] bit1 = SwapFlags_ USE_SYSLOCK.
+        LockHr = Scratch->LockRange(0, IndexCount, &LockedBits, &LockOffset,
+                                    (unsigned char)((SwapFlags_ >> 1) & 1));
+        if (LockHr >= 0)
+        {
+            memcpy(LockedBits, Indices, IndexCount * 2u);
+            Scratch->LockedBits = nullptr;
+            Scratch->Gpu->Unlock();
+            // Shadow only a list drawn twice in a row from the same source, so one-off draws
+            // pay no extra copy.
+            const bool bRepeat = Reuse.Owner == this && Reuse.Src == Indices &&
+                                 Reuse.Count == IndexCount;
+            Reuse.Owner = this;
+            Reuse.Gpu = Scratch->Gpu;
+            Reuse.Src = Indices;
+            Reuse.Count = IndexCount;
+            Reuse.Start = LockOffset;
+            Reuse.Serial = G_Rp9IbLockSerial;
+            Reuse.bShadowValid =
+                bRepeat && IndexCount <= sizeof(Reuse.Shadow) / sizeof(Reuse.Shadow[0]);
+            if (Reuse.bShadowValid)
+                memcpy(Reuse.Shadow, Indices, IndexCount * 2u);
+        }
     }
     Result = LockHr;
     if (Result < 0)
