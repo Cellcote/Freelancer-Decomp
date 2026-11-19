@@ -833,6 +833,24 @@ unsigned char FMeshArchetype::Skin(FLodHolder* Holder, FDeformVbDesc* Vb, unsign
     if (EnsurePartVertexBuffer(Vb, VertexBuffer, ParseTag, Capacity) == 0)
         return 0;
     Vb->Listing.BaseVertex = 0;
+    // Port-only fast path: without bForce the only writes below are the vertices whose dirty
+    // byte is set, so with none set retail locks the whole static VB, writes nothing and
+    // unlocks again -- a lock that can wait on the GPU for no change. That happens whenever
+    // SetLod's DeformRate tick marks a part whose bones did not move. Skipping the lock pair
+    // leaves the buffer bytes, BaseVertex (the static lock always reports 0, set just above),
+    // SkinnedVertexCount (0) and the return value (1) as retail has them. The scan reads the
+    // shared mesh's dirty bytes rather than this call's own marks, so stale marks left by an
+    // earlier early return still take retail's path. A lost or reset buffer never gets here:
+    // its failed SelectVb in DrawPartLive forces bForce, which always takes retail's path.
+    if (bForce == 0)
+    {
+        const unsigned char* const Marks = FaceFlags;
+        unsigned int Scan = 0;
+        while (Scan < (unsigned int)VertexCount && Marks[Scan] == 0)
+            Scan += 1;
+        if (Scan == (unsigned int)VertexCount)
+            return 1;
+    }
     if (VertexBuffer->LockVb(Vb->Listing.VertexBuffer,
                              (unsigned int*)(&Vb->Listing.BaseVertex),
                              (void**)(&Locked),
