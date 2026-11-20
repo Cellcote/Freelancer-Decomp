@@ -34,13 +34,13 @@ installation of Freelancer (see [Local layout](#local-layout)).
 | Game data and logic | [common](re/common.md) · [common_archetype](re/common_archetype.md) · [common_physys](re/common_physys.md) · [content](re/content.md) · [mission script format](re/content_mission_script.md) · [mission opcodes](re/content_mission_opcodes.md) |
 | Client executable | [freelancer](re/freelancer.md) · [freelancer_cliobj](re/freelancer_cliobj.md) · [equip_fx_factory](re/equip_fx_factory.md) · [dealer_equip_stats](re/dealer_equip_stats.md) · [options_screen](re/options_screen.md) · [hd_edition](hd_edition.md) (widescreen) · [walk_mode](walk_mode.md) (port-only walking in bases; `FreelancerWalkMode`) |
 | Server / network | [server](re/server.md) (Server.dll, FLServer, SP connection, remote DLLs) · [rpclocal](re/rpclocal.md) (local RPC packet protocol) |
-| Build and CRT | [crt_compat](re/crt_compat.md) (modern CRT/STL vs. the retail VC6 runtime) · [refactoring](re/refactoring.md) (code rules) |
+| Build and CRT | [building](building.md) (the CMake build) · [crt_compat](re/crt_compat.md) (modern CRT/STL vs. the retail VC6 runtime) · [refactoring](re/refactoring.md) (code rules) |
 
 ## Local layout
 
 ```
 Freelancer\
-  src\        Visual Studio solution (Freelancer.sln) — all project source code
+  src\        all source code, one folder (and CMakeLists.txt) per module
   bin\        Release output + the dev *.ini files (source of truth for the INI files)
   bin_debug\  Debug output       binasan\  DebugASan output
   EXE\        gundll.dll (in git, loaded); your retail binaries and Ghidra listings (not in git;
@@ -56,10 +56,12 @@ loaded; the only retail DLLs loaded at runtime are `EBUEula.dll` and `EXE\gundll
 
 ## Building
 
-Requires Visual Studio 2022 (MSVC v143, Win32 target) and the DirectX 8 SDK headers (`dx8\`).
+Requires Visual Studio 2022 (MSVC v143, Win32 target, with its CMake and Ninja) and the DirectX 8
+SDK (`dx8\`). From an x86 Developer Command Prompt at the repo root ([building.md](building.md)):
 
 ```
-MSBuild.exe src\Freelancer.sln -t:Build -p:Configuration=Debug -v:minimal
+cmake --preset debug
+cmake --build --preset debug
 ```
 
 | Configuration | Output directory |

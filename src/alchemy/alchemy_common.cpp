@@ -357,7 +357,7 @@ namespace AlchemyImpl
     // camera-facing axis). Recovering this needs no change to
     // FAlchemy::DrawNodes, its signature, or any file outside this one: the
     // pointer already round-trips through this unsigned long bit-for-bit on
-    // this project's Win32 target (alchemy.vcxproj) — it was only ever
+    // this project's Win32 target (src/alchemy/CMakeLists.txt) — it was only ever
     // stored as a plain integer because nothing previously dereferenced it.
     unsigned long G_DrawCookie = 0;            // DAT_06257908
     unsigned long G_DrawCounters[9] = {};      // DAT_062578e4

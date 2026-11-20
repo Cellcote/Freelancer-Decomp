@@ -1,6 +1,6 @@
 # Ресурсы PE (string / HTML / VERSIONINFO)
 
-Клиентские тексты (IDS, infocard HTML, версии) хранятся в ресурсных DLL без кода, которые мы пересобираем из дампов retail. Документ объясняет, откуда берутся исходники, как соблюдается кодировка и что в solution является ресурсным проектом. Реализация — `src/Resources/` (`import_decompiled_rc.py`, `ResourceDll.props`).
+Клиентские тексты (IDS, infocard HTML, версии) хранятся в ресурсных DLL без кода, которые мы пересобираем из дампов retail. Документ объясняет, откуда берутся исходники, как соблюдается кодировка и какие модули сборки ресурсные. Реализация — `src/Resources/` (`import_decompiled_rc.py`) и `cmake/Freelancer.cmake` (`fl_add_module(... RESOURCE_DLL)`).
 
 Клиентские IDS живут в отдельных DLL без кода: `LoadLibrary("resources.dll")` из WinMain, затем `[Resources]` в `freelancer.ini` (`LoadResourcesFromIni`). Lookup: `FindResourceExA(RT_STRING / RT_HTML)`.
 
@@ -13,9 +13,9 @@ Ghidra dump: `EXE/Disasm/DecompiledResources/<module>/<module>.rc` (+ sidecar HT
 ## Кодировка
 
 Импортёр читает экспортированный `.rc` с учётом BOM и записывает наш скрипт в
-UTF-8. `ResourceDll.props` задаёт `rc.exe /c65001` для всех ресурсных DLL и всех
+UTF-8. `fl_add_module(... RESOURCE_DLL)` задаёт `rc.exe /c65001` для всех ресурсных DLL и всех
 конфигураций. Генерируемые скрипты также содержат `#pragma code_page(65001)`,
-поскольку кодные проекты не подключают эту property sheet.
+поскольку скрипты кодных модулей эту опцию не получают.
 
 Не-ASCII escape-последовательности Resource Hacker обозначают значения символов:
 например, `\xFC` в названии Saarbrücken — U+00FC. Импортёр записывает такие
@@ -31,9 +31,7 @@ UTF-8. `ResourceDll.props` задаёт `rc.exe /c65001` для всех рес�
 идентификаторов от retail-PE: совпадение с исходниками проверяет сохранность кодировки,
 а не полную эквивалентность этих данных retail.
 
-## Solution
-
-Solution плоский (папки в VS создаются вручную; не называть папку `Resources` — VS путает её с проектом `resources`).
+## Модули
 
 - **Ресурсные DLL** (`src/Resources/`, `/NOENTRY`) → `bin\`: `resources`, `InfoCards`, `MiscText`, `NameResources`, `EquipResources`, `OfferBribeResources`, `MiscTextInfo2`, `serverresources`.
 - **Код:** DLL + `Common.lib` + exe. У кодных модулей, где был dump, свой `.rc` (VERSIONINFO; у Common ещё debug MENU/DIALOGEX, VERSIONINFO снят чтобы не дублировать exe).
@@ -44,7 +42,9 @@ Solution плоский (папки в VS создаются вручную; н�
 `serverresources`: бинарный `RT_TOOLBAR` (type 241 + `.bin`) rc.exe не ест как скрипт TOOLBAR — ресурс пропущен, остальное в DLL.
 
 Набор импортируемых модулей задан `CODE_MAP`, `RESOURCE_ONLY` и `SKIP_DUMP` в
-импортёре; наличие проекта в solution само по себе не означает импорт ресурсов.
+импортёре; наличие модуля в сборке само по себе не означает импорт ресурсов. Новой ресурсной
+DLL импортёр пишет `CMakeLists.txt`; её папку нужно добавить в `FL_PROJECTS` корневого
+`CMakeLists.txt`.
 
 ## Граница ответственности
 

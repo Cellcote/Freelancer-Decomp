@@ -10,7 +10,7 @@
 // `FSTP float ptr` is a float.
 //
 // All leaves are ported (cmn-ivp2c / cmn-ivp2d). This file joins
-// Common.vcxproj together with the switch-over of 06352cf0 / 06352b90.
+// src/Common/CMakeLists.txt together with the switch-over of 06352cf0 / 06352b90.
 
 #include "ivp_mindist_minimize.h"
 

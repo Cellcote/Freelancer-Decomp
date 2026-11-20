@@ -41,7 +41,7 @@ Freelancer Decomp — это переписанный с нуля по исхо�
 
 ```
 Freelancer\
-  src\        Visual Studio solution (Freelancer.sln) — all project source code
+  src\        all source code, one folder (and CMakeLists.txt) per module
   bin\        Release output + the dev *.ini files (source of truth for the INI files)
   bin_debug\  Debug output       binasan\  DebugASan output
   EXE\        gundll.dll (in git, loaded); your retail binaries and Ghidra listings (not in git;
@@ -58,10 +58,12 @@ Freelancer\
 
 ## Сборка
 
-Требуются Visual Studio 2022 (MSVC v143, цель Win32) и заголовки DirectX 8 SDK (`dx8\`).
+Требуются Visual Studio 2022 (MSVC v143, цель Win32, с её CMake и Ninja) и DirectX 8 SDK (`dx8\`).
+Из x86 Developer Command Prompt в корне репозитория ([building.md](../building.md), на английском):
 
 ```
-MSBuild.exe src\Freelancer.sln -t:Build -p:Configuration=Debug -v:minimal
+cmake --preset debug
+cmake --build --preset debug
 ```
 
 | Конфигурация | Выходной каталог |

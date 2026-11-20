@@ -17,13 +17,18 @@ Russian: [README.ru.md](README.ru.md). Documentation: [docs/README.md](docs/READ
    [DirectX 8.1 SDK (Final)](https://archive.org/details/dx81sdk_full), install or extract it, and
    copy its `include` and `lib` folders into a `dx8` folder at the repository root (so that
    `dx8\include\d3d8.h` and `dx8\lib\d3d8.lib` exist). Only the headers and libraries are used;
-   another location can be given with `/p:Dx8SdkDir=<path>`.
-4. **Build the Release configuration** of `src\Freelancer.sln` (`Release|Win32`) in Visual Studio,
-   or from a Developer Command Prompt:
+   another location can be given with `-DDx8SdkDir=<path>`.
+4. **Build the Release configuration** from an **x86** Developer Command Prompt
+   (`vcvarsall.bat x86`), at the repository root:
 
    ```
-   msbuild src\Freelancer.sln -t:Build -p:Configuration=Release -p:Platform=Win32
+   cmake --preset release
+   cmake --build --preset release
    ```
+
+   Or open the repository folder in Visual Studio (*File > Open > Folder*) and pick the `release`
+   preset. The presets `debug` and `debugasan` build into `bin_debug\` and `binasan\`. See
+   [docs/building.md](docs/building.md).
 
 The output goes to `bin\`, which already holds the runtime configuration (`DACOM.INI`,
 `freelancer.ini`, `FLConfigDatabase.txt`, `NewPlayer.fl`, `MPNewCharacter.fl`). Run
@@ -34,15 +39,16 @@ The output goes to `bin\`, which already holds the runtime configuration (`DACOM
 - Visual Studio 2022 (platform toolset v143) with the *Desktop development with C++* workload,
   the *C++ MFC for latest v143 build tools (x86 & x64)* component (used by `FLServer`) and a
   Windows 10/11 SDK. Everything builds as 32-bit (`Win32`).
+- CMake 3.27 or later and Ninja (both come with Visual Studio's *C++ CMake tools for Windows*).
 - Debug builds (`bin_debug\`) also need Python 3 on `PATH`: a post-build step copies the runtime
   configuration from `bin\`.
 
 ### Optional features
 
-Port-only features are build switches in `src/Freelancer.Diagnostics.props` (also on the VS
-property page *Freelancer diagnostics*), or `/p:<Name>=0|1` on the MSBuild command line:
+Port-only features are build switches, set with `-D<Name>=0|1` when configuring (for example
+`cmake --preset release -DFreelancerRp9=1`):
 
-| Property | Default | What it does |
+| Switch | Default | What it does |
 |---|---|---|
 | `FreelancerWidescreenSupport` | 1 | Widescreen (Hor+) display modes and HUD layout |
 | `FreelancerWalkMode` | 1 | Walking through base rooms as Trent ([docs/walk_mode.md](docs/walk_mode.md)) |
@@ -53,7 +59,8 @@ property page *Freelancer diagnostics*), or `/p:<Name>=0|1` on the MSBuild comma
 ## Repository layout
 
 ```
-src\          Visual Studio solution (Freelancer.sln) — all source code
+src\          all source code, one folder (and CMakeLists.txt) per module
+cmake\        the shared build settings (Freelancer.cmake)
 bin\          Release output + the runtime configuration files
 DATA_EXTRA\   the port's own data (RP9 shaders, volumetric.ini), next to the game's DATA
 EBUEula.dll   retail EULA dialog, loaded as ..\EBUEula.dll with ..\EULA.rtf (as the retail game)
