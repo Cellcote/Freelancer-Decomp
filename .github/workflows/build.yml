@@ -693,3 +693,46 @@ jobs:
               Select-String -Pattern '^\s*[0-9a-f]{2} |Last event|Access violation|ExceptionAddress|exception|^\w+!|\.(cpp|h)' |
               Select-Object -First 80 | ForEach-Object { Write-Host $_.Line }
           }
+
+      # Diagnostic, report-only: the x64 runs sometimes cannot load x86math.dll and Content.dll
+      # (LoadLibrary returns null). First a plain LoadLibraryEx of each x64 DLL in a clean process,
+      # with the Windows error; then FLRegress under cdb with the loader's own log turned on
+      # (show loader snaps), filtered to the errors and to first-chance exceptions with a stack.
+      - name: x64 DLL load diagnostics
+        if: always() && steps.regress_x64.outcome != 'skipped'
+        continue-on-error: true
+        timeout-minutes: 10
+        shell: pwsh
+        working-directory: bin_x64
+        env:
+          FL_HIGH_MEMORY: '1'
+        run: |
+          Add-Type -Namespace Diag -Name Native -MemberDefinition @'
+          [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+          public static extern System.IntPtr LoadLibraryExW(string Name, System.IntPtr File, uint Flags);
+          '@
+          Write-Host '=== LoadLibraryEx in a clean process'
+          foreach ($dll in 'dacom.dll', 'x86math.dll', 'common.dll', 'server.dll', 'Content.dll') {
+            $path = Join-Path (Get-Location).Path $dll
+            if (-not (Test-Path $path)) { Write-Host "$dll`: not found"; continue }
+            $module = [Diag.Native]::LoadLibraryExW($path, [IntPtr]::Zero, 0x8) # ALTERED_SEARCH_PATH
+            $err = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+            if ($module -eq [IntPtr]::Zero) { Write-Host "$dll`: FAILED, error $err" }
+            else { Write-Host ("{0}: loaded at 0x{1:x}" -f $dll, $module.ToInt64()) }
+          }
+
+          $cdb = 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe'
+          if (-not (Test-Path $cdb)) { Write-Host 'cdb not found'; exit 0 }
+          $ifeo = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\FLRegress.exe'
+          New-Item -Path $ifeo -Force | Out-Null
+          New-ItemProperty -Path $ifeo -Name GlobalFlag -PropertyType DWord -Value 2 -Force | Out-Null # +sls
+          try {
+            Write-Host '=== FLRegress under cdb, loader snaps'
+            & $cdb -lines -G -c 'sxe -c "kn 25;gc" av; sxe -c "kn 25;gc" c0000142; g; q' `
+              .\FLRegress.exe --out regress_diag.txt --timeout 60 2>&1 |
+              Select-String -Pattern 'ERROR|WARNING:|failed|Status: 0x[cC]|first chance|^\s*[0-9a-f]{2} [0-9a-f`]+ |x86math|Content\.dll' |
+              Where-Object { $_.Line -notmatch 'LdrpLoadDllInternal - (ENTER|RETURN): .*Status: 0x00000000' } |
+              Select-Object -First 150 | ForEach-Object { Write-Host $_.Line }
+          } finally {
+            Remove-Item -Path $ifeo -Recurse -Force
+          }
