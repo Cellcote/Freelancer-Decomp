@@ -14,7 +14,12 @@ param(
     [int]$Seconds = 150,
     [string]$Arguments = '-w',
     # Run the client under the 32-bit cdb and print the stack of an unhandled access violation.
-    [switch]$UnderCdb
+    [switch]$UnderCdb,
+    # Timed input, ';'-separated "<seconds>:<action>":
+    #   snap              a detailed (128x48) thumbnail of the client area
+    #   click:<fx>,<fy>   left click at that fraction of the client area
+    #   key:<vk>          press and release a virtual key (decimal; 27 Escape, 13 Enter, 32 Space)
+    [string]$Steps = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -44,7 +49,37 @@ public static class Probe
 
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT { public int Left, Top, Right, Bottom; }
+    [StructLayout(LayoutKind.Sequential)]
+    public struct POINT { public int X, Y; }
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hwnd, out RECT rect);
+    [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr hwnd, out RECT rect);
+    [DllImport("user32.dll")] public static extern bool ClientToScreen(IntPtr hwnd, ref POINT p);
+    [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] public static extern void mouse_event(uint flags, int dx, int dy, uint data, UIntPtr extra);
+
+    // The client area in screen coordinates: x, y, width, height.
+    public static int[] ClientArea(IntPtr hwnd)
+    {
+        RECT r; POINT p = new POINT();
+        if (!GetClientRect(hwnd, out r) || !ClientToScreen(hwnd, ref p)) return null;
+        return new int[] { p.X, p.Y, r.Right - r.Left, r.Bottom - r.Top };
+    }
+
+    // A click as the client sees one: the OS cursor moves (WM_MOUSEMOVE re-activates the
+    // DirectInput mouse, whose software cursor then jumps to the OS pointer), a small relative
+    // move for the DirectInput buffer, then the left button.
+    public static void Click(int x, int y)
+    {
+        SetCursorPos(x, y);
+        System.Threading.Thread.Sleep(150);
+        mouse_event(0x0001, 1, 0, 0, UIntPtr.Zero);
+        System.Threading.Thread.Sleep(50);
+        mouse_event(0x0001, -1, 0, 0, UIntPtr.Zero);
+        System.Threading.Thread.Sleep(150);
+        mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
+        System.Threading.Thread.Sleep(100);
+        mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
+    }
 
     public static string Text(IntPtr hwnd)
     {
@@ -81,7 +116,7 @@ public static class Probe
 
     // A grey-scale sample of the screen: mean, fraction of non-black pixels, distinct coarse
     // colours, and a 64x20 ASCII thumbnail. The bitmap is never written anywhere.
-    public static string Sample(int x, int y, int w, int h)
+    public static string Sample(int x, int y, int w, int h, int cols, int rows)
     {
         if (w <= 0 || h <= 0) return "empty rectangle";
         using (System.Drawing.Bitmap bmp = new System.Drawing.Bitmap(w, h))
@@ -89,7 +124,6 @@ public static class Probe
             using (System.Drawing.Graphics g = System.Drawing.Graphics.FromImage(bmp))
                 g.CopyFromScreen(x, y, 0, 0, new System.Drawing.Size(w, h));
             const string ramp = " .:-=+*#%@";
-            int cols = 64, rows = 20;
             StringBuilder art = new StringBuilder();
             double sum = 0; long lit = 0, n = 0;
             HashSet<int> colours = new HashSet<int>();
@@ -128,20 +162,19 @@ function Log([string]$Text) {
     Write-Host ('[{0,6:F1}s] {1}' -f $script:clock.Elapsed.TotalSeconds, $Text)
 }
 
-function Sample-Screen([IntPtr]$Window) {
-    $rect = New-Object Probe+RECT
-    if ($Window -ne [IntPtr]::Zero -and [Probe]::GetWindowRect($Window, [ref]$rect) -and
-        ($rect.Right - $rect.Left) -gt 32) {
-        $x = [Math]::Max(0, $rect.Left); $y = [Math]::Max(0, $rect.Top)
-        $w = $rect.Right - $x; $h = $rect.Bottom - $y
-        $what = "game window"
+function Sample-Screen([IntPtr]$Window, [int]$Cols = 64, [int]$Rows = 20) {
+    $area = $(if ($Window -ne [IntPtr]::Zero) { [Probe]::ClientArea($Window) } else { $null })
+    if ($area -and $area[2] -gt 32) {
+        $x = [Math]::Max(0, $area[0]); $y = [Math]::Max(0, $area[1])
+        $w = $area[2]; $h = $area[3]
+        $what = "client area"
     } else {
         $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
         $x = 0; $y = 0; $w = $screen.Width; $h = $screen.Height
         $what = "whole screen"
     }
     try {
-        $sample = [Probe]::Sample($x, $y, $w, $h)
+        $sample = [Probe]::Sample($x, $y, $w, $h, $Cols, $Rows)
         if ($sample -eq $script:lastSample) { Log "screen ($what): unchanged" }
         else { Log ("screen ($what): " + $sample); $script:lastSample = $sample }
     }
@@ -184,7 +217,13 @@ $gamePid = $(if ($UnderCdb) { 0 } else { $proc.Id })
 $seen = @{}
 $gameWindow = [IntPtr]::Zero
 $nextSample = 5
-$nextEscape = 30
+$spewPath = Join-Path $env:LOCALAPPDATA 'Freelancer\FLSpew.txt'
+$spewLines = 0
+$queue = New-Object System.Collections.Generic.List[object]
+foreach ($step in ($Steps -split ';' | Where-Object { $_.Trim() })) {
+    $at, $action = $step.Trim() -split ':', 2
+    $queue.Add(@{ At = [double]$at; Action = $action })
+}
 while (-not $proc.HasExited -and $script:clock.Elapsed.TotalSeconds -lt $Seconds) {
     if ($gamePid -eq 0) {
         $game = Get-Process -Name freelancer -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -219,25 +258,53 @@ while (-not $proc.HasExited -and $script:clock.Elapsed.TotalSeconds -lt $Seconds
         }
     }
 
+    # New FLSpew.txt lines, as the game writes them.
+    if (Test-Path $spewPath) {
+        try {
+            $stream = [System.IO.File]::Open($spewPath, 'Open', 'Read', 'ReadWrite')
+            $reader = New-Object System.IO.StreamReader($stream)
+            $all = $reader.ReadToEnd() -split "`r?`n"
+            $reader.Close()
+            for ($i = $spewLines; $i -lt $all.Count - 1; $i++) {
+                if ($all[$i] -notmatch 'Adding material map|AddLibrary|LoadSystemComponents') { Log "spew: $($all[$i])" }
+            }
+            $spewLines = [Math]::Max($spewLines, $all.Count - 1)
+        } catch { }
+    }
+
     $t = $script:clock.Elapsed.TotalSeconds
     if ($t -ge $nextSample) {
-        $proc.Refresh()
-        Log ("process: cpu {0:F1}s, working set {1:N0} KB, threads {2}, responding {3}, foreground is game {4}" -f `
-            $proc.TotalProcessorTime.TotalSeconds, ($proc.WorkingSet64 / 1KB), $proc.Threads.Count,
-            $proc.Responding, ([Probe]::GetForegroundWindow() -eq $gameWindow))
+        $game = $(if ($gamePid) { Get-Process -Id $gamePid -ErrorAction SilentlyContinue } else { $null })
+        if ($game) {
+            Log ("game: cpu {0:F1}s, working set {1:N0} KB, threads {2}, responding {3}, foreground {4}" -f `
+                $game.TotalProcessorTime.TotalSeconds, ($game.WorkingSet64 / 1KB), $game.Threads.Count,
+                $game.Responding, ([Probe]::GetForegroundWindow() -eq $gameWindow))
+        }
         Sample-Screen $gameWindow
         $nextSample = $t + 15
     }
-    # Escape skips the intro movies; keybd_event goes through the real input queue.
-    if ($t -ge $nextEscape -and $gameWindow -ne [IntPtr]::Zero) {
-        Log 'input: Escape'
+
+    while ($queue.Count -gt 0 -and $t -ge $queue[0].At -and $gameWindow -ne [IntPtr]::Zero) {
+        $action = $queue[0].Action
+        $queue.RemoveAt(0)
         $null = [Probe]::SetForegroundWindow($gameWindow)
-        [Probe]::keybd_event($VK_ESCAPE, 0, 0, [UIntPtr]::Zero)
-        Start-Sleep -Milliseconds 50
-        [Probe]::keybd_event($VK_ESCAPE, 0, $KEYEVENTF_KEYUP, [UIntPtr]::Zero)
-        $nextEscape = $t + 20
+        if ($action -eq 'snap') {
+            Sample-Screen $gameWindow 128 48
+        } elseif ($action -like 'click:*') {
+            $fx, $fy = ($action.Substring(6) -split ',') | ForEach-Object { [double]$_ }
+            $area = [Probe]::ClientArea($gameWindow)
+            $x = [int]($area[0] + $fx * $area[2]); $y = [int]($area[1] + $fy * $area[3])
+            Log "input: click at ($fx, $fy) = screen ($x, $y)"
+            [Probe]::Click($x, $y)
+        } elseif ($action -like 'key:*') {
+            $vk = [byte]$action.Substring(4)
+            Log "input: key $vk"
+            [Probe]::keybd_event($vk, 0, 0, [UIntPtr]::Zero)
+            Start-Sleep -Milliseconds 60
+            [Probe]::keybd_event($vk, 0, $KEYEVENTF_KEYUP, [UIntPtr]::Zero)
+        }
     }
-    Start-Sleep -Milliseconds 500
+    Start-Sleep -Milliseconds 300
 }
 
 if ($UnderCdb -and (Test-Path $cdbOut)) {
