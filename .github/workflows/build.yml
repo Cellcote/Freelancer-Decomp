@@ -696,8 +696,9 @@ jobs:
 
       # Diagnostic, report-only: the x64 runs sometimes cannot load x86math.dll and Content.dll
       # (LoadLibrary returns null). First a plain LoadLibraryEx of each x64 DLL in a clean process,
-      # with the Windows error; then FLRegress under cdb with the loader's own log turned on
-      # (show loader snaps), filtered to the errors and to first-chance exceptions with a stack.
+      # with the Windows error; then, with the loader's own log turned on (show loader snaps),
+      # that Content.dll load and three FLDedicated starts under cdb, filtered to the loader's
+      # errors and to exceptions with a stack.
       - name: x64 DLL load diagnostics
         if: always() && steps.regress_x64.outcome != 'skipped'
         continue-on-error: true
@@ -723,16 +724,34 @@ jobs:
 
           $cdb = 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe'
           if (-not (Test-Path $cdb)) { Write-Host 'cdb not found'; exit 0 }
-          $ifeo = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\FLRegress.exe'
-          New-Item -Path $ifeo -Force | Out-Null
-          New-ItemProperty -Path $ifeo -Name GlobalFlag -PropertyType DWord -Value 2 -Force | Out-Null # +sls
+          # Loader snaps (GlobalFlag 0x2) through Image File Execution Options, removed afterwards.
+          # Kept: the loader's ERROR lines, our two DLLs' load results, exceptions and their stacks.
+          $keep = '- ERROR|unable to load|failed to load mission|ready for log in|first chance|second chance|^\s*[0-9a-f]{2} [0-9a-f`(]'
+          $commands = 'sxe -c "kn 25;gc" av; sxe -c "kn 25;gc" eh; sxe -c "kn 25;gc" c0000142; g; q'
+          $images = 'FLDedicated.exe', 'pwsh.exe'
+          $ifeoRoot = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options'
+          foreach ($image in $images) {
+            New-Item -Path "$ifeoRoot\$image" -Force | Out-Null
+            New-ItemProperty -Path "$ifeoRoot\$image" -Name GlobalFlag -PropertyType DWord -Value 2 -Force | Out-Null
+          }
           try {
-            Write-Host '=== FLRegress under cdb, loader snaps'
-            & $cdb -lines -G -c 'sxe -c "kn 25;gc" av; sxe -c "kn 25;gc" c0000142; g; q' `
-              .\FLRegress.exe --out regress_diag.txt --timeout 60 2>&1 |
-              Select-String -Pattern 'ERROR|WARNING:|failed|Status: 0x[cC]|first chance|^\s*[0-9a-f]{2} [0-9a-f`]+ |x86math|Content\.dll' |
-              Where-Object { $_.Line -notmatch 'LdrpLoadDllInternal - (ENTER|RETURN): .*Status: 0x00000000' } |
-              Select-Object -First 150 | ForEach-Object { Write-Host $_.Line }
+            Set-Content -Path load_content.ps1 -Value @'
+          Add-Type -Namespace Diag -Name Native -MemberDefinition '[DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] public static extern System.IntPtr LoadLibraryExW(string Name, System.IntPtr File, uint Flags);'
+          $module = [Diag.Native]::LoadLibraryExW((Join-Path $PWD 'Content.dll'), [IntPtr]::Zero, 0x8)
+          Write-Host ("Content.dll: module 0x{0:x}, error {1}" -f $module.ToInt64(), [Runtime.InteropServices.Marshal]::GetLastWin32Error())
+          '@
+            Write-Host '=== Content.dll in a clean process, under cdb'
+            & $cdb -lines -G -c $commands pwsh.exe -NoProfile -File load_content.ps1 2>&1 |
+              Select-String -Pattern "$keep|Content\.dll" |
+              Where-Object { $_.Line -notmatch 'Break instruction' } |
+              Select-Object -First 60 | ForEach-Object { Write-Host $_.Line }
+            foreach ($attempt in 1..3) {
+              Write-Host "=== FLDedicated under cdb, attempt $attempt"
+              & $cdb -lines -G -c $commands .\FLDedicated.exe --name CI --port 2302 --run-for 5 2>&1 |
+                Select-String -Pattern $keep |
+                Where-Object { $_.Line -notmatch 'Break instruction' } |
+                Select-Object -First 60 | ForEach-Object { Write-Host $_.Line }
+            }
           } finally {
-            Remove-Item -Path $ifeo -Recurse -Force
+            foreach ($image in $images) { Remove-Item -Path "$ifeoRoot\$image" -Recurse -Force }
           }
