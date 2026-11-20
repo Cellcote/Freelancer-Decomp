@@ -140,7 +140,11 @@ function Sample-Screen([IntPtr]$Window) {
         $x = 0; $y = 0; $w = $screen.Width; $h = $screen.Height
         $what = "whole screen"
     }
-    try { Log ("screen ($what): " + [Probe]::Sample($x, $y, $w, $h)) }
+    try {
+        $sample = [Probe]::Sample($x, $y, $w, $h)
+        if ($sample -eq $script:lastSample) { Log "screen ($what): unchanged" }
+        else { Log ("screen ($what): " + $sample); $script:lastSample = $sample }
+    }
     catch { Log "screen ($what): capture failed: $($_.Exception.Message)" }
 }
 
@@ -201,10 +205,14 @@ while (-not $proc.HasExited -and $script:clock.Elapsed.TotalSeconds -lt $Seconds
         }
         if ($class -eq 'Freelancer') { $gameWindow = $h }
         # The EULA dialog (EBUEula.dll): press its Accept button.
-        if ($visible -and $title -like '*License Agreement*') {
+        # The client's own "Critical Warning" boxes (e.g. no sound device: "continue without
+        # sound?"): press Yes, the answer that keeps the game going.
+        $answer = $(if ($title -like '*License Agreement*') { '&Accept' }
+                    elseif ($title -like '*Critical Warning*') { '&Yes' } else { $null })
+        if ($visible -and $answer) {
             foreach ($c in [Probe]::Children($h)) {
-                if ([Probe]::Text($c) -eq '&Accept') {
-                    Log 'EULA: pressing Accept'
+                if ([Probe]::Text($c) -eq $answer) {
+                    Log "dialog '$title': pressing $answer"
                     $null = [Probe]::SendMessage($c, $BM_CLICK, [IntPtr]::Zero, [IntPtr]::Zero)
                 }
             }
