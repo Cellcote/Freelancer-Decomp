@@ -520,7 +520,7 @@ jobs:
       - name: Run the client
         shell: powershell
         run: .github\scripts\client_probe.ps1 -Bin bin -Seconds 210 -UnderCdb `
-          -Steps '20:snap; 24:click:0.12,0.33; 29:snap; 45:key:27; 60:key:27; 75:key:27; 90:snap; 130:snap; 180:snap'
+          -Steps '20:snap; 22:move:0.17,0.30; 26:snap; 28:click:0.17,0.30; 34:snap; 50:snap; 65:key:27; 80:key:27; 95:snap; 130:snap; 180:snap'
 
   # DPNet, the port's own DirectPlay 8 protocol implementation (docs/dpnet.md): portable C++
   # with its own tests, built on Linux (GCC, with sanitizers) and Windows (MSVC, 32 and 64 bit).

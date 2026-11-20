@@ -17,7 +17,8 @@ param(
     [switch]$UnderCdb,
     # Timed input, ';'-separated "<seconds>:<action>":
     #   snap              a detailed (128x48) thumbnail of the client area
-    #   click:<fx>,<fy>   left click at that fraction of the client area
+    #   move:<fx>,<fy>    move the mouse to that fraction of the client area
+    #   click:<fx>,<fy>   move there and left click (the button held for 1.5 s)
     #   key:<vk>          press and release a virtual key (decimal; 27 Escape, 13 Enter, 32 Space)
     [string]$Steps = ''
 )
@@ -68,16 +69,23 @@ public static class Probe
     // A click as the client sees one: the OS cursor moves (WM_MOUSEMOVE re-activates the
     // DirectInput mouse, whose software cursor then jumps to the OS pointer), a small relative
     // move for the DirectInput buffer, then the left button.
-    public static void Click(int x, int y)
+    // Slow on purpose: with software rendering a frame can take hundreds of milliseconds,
+    // and a press shorter than a frame may never be seen.
+    public static void Move(int x, int y)
     {
         SetCursorPos(x, y);
-        System.Threading.Thread.Sleep(150);
-        mouse_event(0x0001, 1, 0, 0, UIntPtr.Zero);
-        System.Threading.Thread.Sleep(50);
-        mouse_event(0x0001, -1, 0, 0, UIntPtr.Zero);
-        System.Threading.Thread.Sleep(150);
+        System.Threading.Thread.Sleep(700);
+        mouse_event(0x0001, 2, 0, 0, UIntPtr.Zero);
+        System.Threading.Thread.Sleep(400);
+        mouse_event(0x0001, -2, 0, 0, UIntPtr.Zero);
+        System.Threading.Thread.Sleep(700);
+    }
+
+    public static void Click(int x, int y)
+    {
+        Move(x, y);
         mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
-        System.Threading.Thread.Sleep(100);
+        System.Threading.Thread.Sleep(1500);
         mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
     }
 
@@ -290,12 +298,13 @@ while (-not $proc.HasExited -and $script:clock.Elapsed.TotalSeconds -lt $Seconds
         $null = [Probe]::SetForegroundWindow($gameWindow)
         if ($action -eq 'snap') {
             Sample-Screen $gameWindow 128 48
-        } elseif ($action -like 'click:*') {
-            $fx, $fy = ($action.Substring(6) -split ',') | ForEach-Object { [double]$_ }
+        } elseif ($action -like 'click:*' -or $action -like 'move:*') {
+            $verb, $where = $action -split ':', 2
+            $fx, $fy = ($where -split ',') | ForEach-Object { [double]$_ }
             $area = [Probe]::ClientArea($gameWindow)
             $x = [int]($area[0] + $fx * $area[2]); $y = [int]($area[1] + $fy * $area[3])
-            Log "input: click at ($fx, $fy) = screen ($x, $y)"
-            [Probe]::Click($x, $y)
+            Log "input: $verb at ($fx, $fy) = screen ($x, $y)"
+            if ($verb -eq 'click') { [Probe]::Click($x, $y) } else { [Probe]::Move($x, $y) }
         } elseif ($action -like 'key:*') {
             $vk = [byte]$action.Substring(4)
             Log "input: key $vk"
