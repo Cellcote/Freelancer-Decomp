@@ -6,7 +6,7 @@
 
 // Port-only (no retail counterpart): the client side of the Direct3D 9 render extensions.
 // See render_ex.h and docs/re/rp9.md, "Ex extensions".
-// Compiled only with FREELANCER_RP9 (src/Directory.Build.props).
+// Compiled only with FREELANCER_RP9 (cmake/Freelancer.cmake).
 #ifdef FREELANCER_RP9
 #include "render_ex.h"
 

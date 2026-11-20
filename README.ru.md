@@ -18,17 +18,18 @@ English: [README.md](README.md). Документация: [docs/ru/README.md](d
    [DirectX 8.1 SDK (Final)](https://archive.org/details/dx81sdk_full), установить или распаковать
    его и скопировать папки `include` и `lib` в папку `dx8` в корне репозитория (должны существовать
    `dx8\include\d3d8.h` и `dx8\lib\d3d8.lib`). Используются только заголовки и библиотеки; другое
-   место можно указать через `/p:Dx8SdkDir=<путь>`.
-4. **Собрать конфигурацию Release** решения `src\Freelancer.sln` (`Release|Win32`) в Visual Studio
-   или из Developer Command Prompt:
+   место можно указать через `-DDx8SdkDir=<путь>`.
+4. **Собрать конфигурацию Release** из **x86** Developer Command Prompt (`vcvarsall.bat x86`), в
+   корне репозитория:
 
    ```
-   msbuild src\Freelancer.sln -t:Build -p:Configuration=Release -p:Platform=Win32
+   cmake --preset release
+   cmake --build --preset release
    ```
 
-   Или через CMake и Ninja, из x86 Developer Command Prompt: `cmake --preset release`, затем
-   `cmake --build --preset release`. Собираются те же бинарники в тот же `bin\`; см.
-   [docs/cmake.md](docs/cmake.md) (на английском).
+   Или открыть папку репозитория в Visual Studio (*Файл > Открыть > Папка*) и выбрать пресет
+   `release`. Пресеты `debug` и `debugasan` собирают в `bin_debug\` и `binasan\`. См.
+   [docs/building.md](docs/building.md) (на английском).
 
 Результат попадает в `bin\`, где уже лежат файлы конфигурации (`DACOM.INI`, `freelancer.ini`,
 `FLConfigDatabase.txt`, `NewPlayer.fl`, `MPNewCharacter.fl`). Запускать `bin\freelancer.exe`
@@ -39,16 +40,17 @@ English: [README.md](README.md). Документация: [docs/ru/README.md](d
 - Visual Studio 2022 (platform toolset v143) с нагрузкой *Разработка классических приложений на
   C++*, компонентом *C++ MFC для последних средств сборки v143 (x86 и x64)* (нужен `FLServer`) и
   Windows 10/11 SDK. Всё собирается 32-битным (`Win32`).
+- CMake 3.27 или новее и Ninja (оба входят в компонент Visual Studio *Инструменты CMake C++ для
+  Windows*).
 - Для Debug-сборок (`bin_debug\`) нужен ещё Python 3 в `PATH`: шаг после сборки копирует
   конфигурацию из `bin\`.
 
 ### Необязательные возможности
 
-Возможности, которых нет в оригинале, включаются свойствами сборки в
-`src/Freelancer.Diagnostics.props` (они же — на странице свойств VS *Freelancer diagnostics*) или
-`/p:<Имя>=0|1` в командной строке MSBuild:
+Возможности, которых нет в оригинале, включаются переключателями сборки `-D<Имя>=0|1` при
+конфигурации (например, `cmake --preset release -DFreelancerRp9=1`):
 
-| Свойство | По умолчанию | Что делает |
+| Переключатель | По умолчанию | Что делает |
 |---|---|---|
 | `FreelancerWidescreenSupport` | 1 | Широкоформатные режимы экрана (Hor+) и раскладка HUD |
 | `FreelancerWalkMode` | 1 | Ходьба Трентом по помещениям баз ([docs/ru/walk_mode.md](docs/ru/walk_mode.md)) |
@@ -59,7 +61,8 @@ English: [README.md](README.md). Документация: [docs/ru/README.md](d
 ## Структура репозитория
 
 ```
-src\          решение Visual Studio (Freelancer.sln) — весь исходный код
+src\          весь исходный код, по папке (и CMakeLists.txt) на модуль
+cmake\        общие настройки сборки (Freelancer.cmake)
 bin\          результат Release-сборки + файлы конфигурации
 DATA_EXTRA\   собственные данные порта (шейдеры RP9, volumetric.ini) рядом с DATA игры
 EBUEula.dll   retail-диалог лицензии, грузится как ..\EBUEula.dll вместе с ..\EULA.rtf (как в оригинале)

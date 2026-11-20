@@ -1,22 +1,19 @@
-# Freelancer Decomp: CMake build next to src\Freelancer.sln.
+# Freelancer Decomp: the build. Every module in src\ is defined with fl_add_module() and the
+# helpers below; this file holds the compiler, resource-compiler and linker options they share.
 #
-# This module re-creates, flag for flag, what MSBuild (platform toolset v143) passes to cl, rc,
-# lib and link for the projects in src\. MSBuild's own defaults (Microsoft.Cpp.Default.props,
-# Microsoft.Cl.Common.props, Microsoft.Link.Common.props) are written out here explicitly,
-# because CMake's MSVC defaults differ: CMake adds /DNDEBUG, /D_WINDOWS, /GR, /Ob2,
-# <target>_EXPORTS and /subsystem:console, and drops /Oy-, /Zc:inline, /SAFESEH and /sdl,
-# none of which match. src\Directory.Build.props and src\Directory.Build.targets are the
-# MSBuild side of everything below.
-#
-# .github/scripts/build_parity.py compares the two builds command line by command line and
-# binary by binary; CI runs it on every push.
+# The options are spelled out in full rather than taken from CMake's MSVC defaults, which do not
+# fit: CMake would add /DNDEBUG, /D_WINDOWS, /GR, /Ob2, <target>_EXPORTS and /subsystem:console,
+# and leave out /Oy-, /Zc:inline, /sdl, /SAFESEH and /OPT:REF. The set here is the one of the
+# Visual Studio solution this build replaced (v143), checked equal binary for binary before the
+# solution was removed (pull request #11), so the modules keep the retail layout and exports the
+# code relies on (docs/re/crt_compat.md).
 
 include_guard(GLOBAL)
 
 set(FL_SRC_DIR "${PROJECT_SOURCE_DIR}/src")
 
 # ---------------------------------------------------------------------------------------------
-# Configurations: the three of Freelancer.sln, with MSBuild's output directories.
+# Configurations and their output directories.
 # ---------------------------------------------------------------------------------------------
 set(FL_CONFIGS Release Debug DebugASan)
 get_property(_fl_multi GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
@@ -32,8 +29,8 @@ else()
   endif()
 endif()
 
-# Repo-root siblings of src\, as Directory.Build.props: every ..\DATA / ..\EXE path the game
-# resolves from its exe directory works from all three.
+# Repo-root siblings of src\: every ..\DATA / ..\EXE path the game resolves from its exe
+# directory works from all three.
 set(FL_BIN_DIR "${PROJECT_SOURCE_DIR}/$<IF:$<CONFIG:Debug>,bin_debug,$<IF:$<CONFIG:DebugASan>,binasan,bin>>")
 
 set(_fl_cfg_debug "$<CONFIG:Debug>")
@@ -42,8 +39,8 @@ set(_fl_cfg_release "$<CONFIG:Release>")
 set(_fl_cfg_debuglibs "$<CONFIG:Debug,DebugASan>")
 
 # ---------------------------------------------------------------------------------------------
-# Toolchain checks: everything is 32-bit MSVC, and the Visual Studio generators are out because
-# they would hand the flags back to MSBuild (which then adds its own defaults on top).
+# Toolchain checks: everything is 32-bit MSVC. The Visual Studio generators are out: they turn
+# the options into MSBuild properties, and MSBuild adds its own defaults on top.
 # ---------------------------------------------------------------------------------------------
 if(NOT MSVC OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   message(FATAL_ERROR "Freelancer builds with MSVC (cl.exe) only.")
@@ -53,12 +50,12 @@ if(NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
                       "(vcvarsall.bat x86), or use the presets in CMakePresets.json.")
 endif()
 if(CMAKE_GENERATOR MATCHES "^Visual Studio")
-  message(FATAL_ERROR "Use the Ninja generator (see CMakePresets.json); the Visual Studio solution "
-                      "is src\\Freelancer.sln.")
+  message(FATAL_ERROR "Use the Ninja generator (see CMakePresets.json; Visual Studio's "
+                      "File > Open > Folder uses it too).")
 endif()
 
 # ---------------------------------------------------------------------------------------------
-# SDK locations and build switches, under the same names as the MSBuild properties.
+# SDK locations and the port-only build switches.
 # ---------------------------------------------------------------------------------------------
 set(Dx8SdkDir "${PROJECT_SOURCE_DIR}/dx8" CACHE PATH "DirectX 8.1 SDK (holds include/ and lib/)")
 set(Dx9SdkDir "$ENV{DXSDK_DIR}" CACHE PATH "DirectX SDK (June 2010), RP9 only")
@@ -70,51 +67,26 @@ if(NOT EXISTS "${FL_DX8_DIR}/include/d3d8.h" OR NOT EXISTS "${FL_DX8_DIR}/lib/d3
                       "lib/d3d8.lib). Copy it to dx8/ at the repo root or pass -DDx8SdkDir=<path>.")
 endif()
 
-# The switches of src\Freelancer.Diagnostics.props (the VS property page). The sheet stays the one
-# place that sets them: it is read here, and -D<Name>=0|1 overrides it like /p:<Name>=0|1 does.
-set(_fl_switches FreelancerEnableTickProfile FreelancerBetaLabel FreelancerWidescreenSupport
-                 FreelancerRp9 FreelancerWalkMode)
-# src\Directory.Build.props: the value for projects that do not import the sheet.
-set(_fl_default_FreelancerEnableTickProfile 0)
-set(_fl_default_FreelancerBetaLabel 0)
-set(_fl_default_FreelancerWidescreenSupport 1)
-set(_fl_default_FreelancerRp9 0)
-set(_fl_default_FreelancerWalkMode 0)
-file(READ "${FL_SRC_DIR}/Freelancer.Diagnostics.props" _fl_props)
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${FL_SRC_DIR}/Freelancer.Diagnostics.props")
-foreach(_name IN LISTS _fl_switches)
-  if(_fl_props MATCHES "<${_name}>([01])</${_name}>")
-    set(_fl_sheet_${_name} "${CMAKE_MATCH_1}")
-  else()
-    message(FATAL_ERROR "src/Freelancer.Diagnostics.props does not set ${_name}")
+# Port-only features (none of them is in the retail game), -D<Name>=0|1.
+set(_fl_switches
+  FreelancerEnableTickProfile 0 "On-screen frame profiler (FREELANCER_ENABLE_TICK_PROFILE)"
+  FreelancerBetaLabel 0 "The 'Beta 2' label in the corner of the screen (FREELANCER_BETA_LABEL)"
+  FreelancerWidescreenSupport 1 "Widescreen (Hor+) display modes and HUD (FREELANCER_WIDESCREEN_SUPPORT), 0 builds retail's 4:3 client"
+  FreelancerRp9 0 "RP9.dll, the Direct3D 9 renderer, and the client's hooks (FREELANCER_RP9), needs the DirectX SDK (June 2010)"
+  FreelancerWalkMode 1 "Walking through base rooms (FREELANCER_WALK_MODE, docs/walk_mode.md)")
+while(_fl_switches)
+  list(POP_FRONT _fl_switches _name _default _doc)
+  set(${_name} ${_default} CACHE STRING "${_doc}")
+  set_property(CACHE ${_name} PROPERTY STRINGS 0 1)
+  if(NOT ${_name} MATCHES "^[01]$")
+    message(FATAL_ERROR "${_name} must be 0 or 1 (got '${${_name}}')")
   endif()
-  set(${_name} "" CACHE STRING "0 or 1; empty takes src/Freelancer.Diagnostics.props")
-  set_property(CACHE ${_name} PROPERTY STRINGS "" 0 1)
-  if(NOT ${_name} STREQUAL "" AND NOT ${_name} MATCHES "^[01]$")
-    message(FATAL_ERROR "${_name} must be 0, 1 or empty (got '${${_name}}')")
-  endif()
-endforeach()
-
-# fl_switch(<out> <name> <imports_sheet>): the value MSBuild evaluates for a project that does
-# (Common, freelancer, RP9) or does not import Freelancer.Diagnostics.props.
-function(fl_switch out name imports_sheet)
-  if(NOT ${name} STREQUAL "")
-    set(${out} "${${name}}" PARENT_SCOPE)
-  elseif(imports_sheet)
-    set(${out} "${_fl_sheet_${name}}" PARENT_SCOPE)
-  else()
-    set(${out} "${_fl_default_${name}}" PARENT_SCOPE)
-  endif()
-endfunction()
-
-foreach(_name IN LISTS _fl_switches)
-  fl_switch(_value ${_name} TRUE)
-  message(STATUS "${_name}=${_value}")
-endforeach()
+  message(STATUS "${_name}=${${_name}}")
+endwhile()
 
 # ---------------------------------------------------------------------------------------------
 # Global flags: cleared, so that only what fl_add_module() sets reaches the tools. Normal
-# variables shadow the cache, so -DCMAKE_CXX_FLAGS=... cannot quietly make the builds differ.
+# variables shadow the cache, so -DCMAKE_CXX_FLAGS=... cannot quietly change the options.
 # ---------------------------------------------------------------------------------------------
 foreach(_lang C CXX RC)
   set(CMAKE_${_lang}_FLAGS "")
@@ -132,50 +104,47 @@ foreach(_kind EXE SHARED MODULE STATIC)
   endforeach()
 endforeach()
 
-# The subsystem comes from fl_add_module (/SUBSYSTEM:WINDOWS or CONSOLE, as MSBuild writes it).
+# The subsystem comes from fl_add_module (/SUBSYSTEM:WINDOWS or CONSOLE).
 foreach(_lang C CXX)
   set(CMAKE_${_lang}_CREATE_WIN32_EXE "")
   set(CMAKE_${_lang}_CREATE_CONSOLE_EXE "")
 endforeach()
 
-# rc: MSBuild's ResourceCompile defaults (Culture 0x0409). CMake applies no target compile
-# options to rc, so they go here.
+# rc: default language 0x0409. CMake applies no target compile options to rc, so they go here.
 set(CMAKE_RC_FLAGS "/l0x0409 /nologo")
 
-# UACExecutionLevel AsInvoker: MSBuild writes it for DLLs as well as exes.
+# asInvoker in every module's manifest, DLLs included.
 set(FL_MANIFESTUAC "/MANIFESTUAC:level='asInvoker' uiAccess='false'")
 
-# EnableDpiAwareness for MFC projects (FLServer): the manifest of the toolset in use.
+# DPI awareness for the MFC application (FLServer): the manifest of the toolset in use.
 get_filename_component(_fl_vctools "${CMAKE_CXX_COMPILER}/../../../.." ABSOLUTE)
 set(FL_DPIAWARE_MANIFEST "${_fl_vctools}/include/manifest/dpiaware.manifest")
 
-# RuntimeLibrary (Directory.Build.props): /MD, /MDd for Debug and DebugASan.
+# /MD, /MDd for Debug and DebugASan.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<${_fl_cfg_debuglibs}:Debug>DLL")
 # /Zi or /ZI is an item setting here (see _fl_item_options), not a target one.
 set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "")
 
 # The DirectX 8.1 headers go after the Windows SDK, not before it (the SDK's basetsd.h must win
-# over the DX8 one): MSBuild appends them to IncludePath, i.e. to the INCLUDE environment of cl.
-# A /I option would search them first, so cl is started through `cmake -E env` with the same
-# INCLUDE edit. Directory.Build.targets does this for every project.
+# over the DX8 one). A /I option would be searched first, so they are appended to cl's INCLUDE
+# environment instead: cl is started through `cmake -E env`.
 set(FL_DX8_INCLUDE_LAUNCHER
     "${CMAKE_COMMAND}" -E env "--modify" "INCLUDE=path_list_append:${FL_DX8_DIR}/include")
 set(CMAKE_C_COMPILER_LAUNCHER ${FL_DX8_INCLUDE_LAUNCHER})
 set(CMAKE_CXX_COMPILER_LAUNCHER ${FL_DX8_INCLUDE_LAUNCHER})
 
 # ---------------------------------------------------------------------------------------------
-# Compile settings that a .vcxproj item may override (ClCompile metadata). MSBuild resolves each
-# one per source file: the item's value, else the project's ItemDefinitionGroup, else the
-# default; one cl option comes out of it. Appending a per-file option to a project-wide one is
-# not the same (/RTC1 with /O2 is an error, /GL cannot be taken back), so these options are set
-# on every source file, never on the target. The names are the MSBuild metadata names.
+# Compile settings a single source file may override (fl_item), resolved per file: the file's
+# value, else the module's (ITEM_DEFAULTS, NO_SDL, NO_WPO), else the default below; one cl option
+# comes out of each. Appending a per-file option to a module-wide one would not do (/RTC1 with
+# /O2 is an error, /GL cannot be taken back), so these options are set on every source file,
+# never on the target.
 # ---------------------------------------------------------------------------------------------
 set(_fl_item_keys Optimization IntrinsicFunctions FloatingPointModel EnableEnhancedInstructionSet
                   BasicRuntimeChecks DebugInformationFormat SupportJustMyCode
                   WholeProgramOptimization SDLCheck)
 
-# MSBuild's value for a configuration before any project or item setting (Microsoft.Cl.Common.props
-# for v143 / Win32, with WholeProgramOptimization=true in Release and Directory.Build.props).
+# The default of a setting in a configuration.
 function(_fl_item_default out key cfg)
   # UseDebugLibraries: true for Debug and DebugASan.
   set(_debuglibs TRUE)
@@ -201,7 +170,7 @@ function(_fl_item_default out key cfg)
       set(_v Default)
     endif()
   elseif(key STREQUAL "DebugInformationFormat")
-    # /ZI is the Win32 default with UseDebugLibraries; DebugASan's /Zi is set in _fl_finalize.
+    # /ZI (edit and continue) in Debug; DebugASan's /Zi is set in _fl_finalize.
     if(_debuglibs)
       set(_v EditAndContinue)
     else()
@@ -257,9 +226,9 @@ function(_fl_item_option out key value)
 endfunction()
 
 # fl_item(<files...> [<Key> <Value>]... [INCLUDE_DIRECTORIES <dirs...>])
-#   ClCompile metadata of single items, e.g.
+#   Settings of single source files, e.g.
 #   fl_item(alchemy_math.cpp Optimization MaxSpeed BasicRuntimeChecks Default)
-#   INCLUDE_DIRECTORIES is the item's AdditionalIncludeDirectories.
+#   INCLUDE_DIRECTORIES are searched before the module's.
 function(fl_item)
   set(_files)
   set(_args ${ARGN})
@@ -287,8 +256,8 @@ endfunction()
 # Applied once the project's CMakeLists.txt is done, so that fl_item() calls after
 # fl_add_module() count.
 function(_fl_finalize name)
-  # Directory.Build.props: src\include after the project's own AdditionalIncludeDirectories
-  # (they are prepended to it). A project that puts it earlier names it itself (DALib).
+  # src\include after the module's own include directories. A module that wants it earlier
+  # names it itself (DALib).
   target_include_directories(${name} PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:${FL_SRC_DIR}/include>")
 
   get_target_property(_sources ${name} SOURCES)
@@ -305,7 +274,7 @@ function(_fl_finalize name)
         if(_t_set)
           get_property(_v TARGET ${name} PROPERTY FL_${_key})
         endif()
-        # Directory.Build.targets, after the projects: DebugASan has no /RTC and /Zi.
+        # AddressSanitizer does not go with /RTC or /ZI.
         if(_cfg STREQUAL "DebugASan" AND _key STREQUAL "BasicRuntimeChecks")
           set(_v Default)
         elseif(_cfg STREQUAL "DebugASan" AND _key STREQUAL "DebugInformationFormat")
@@ -327,26 +296,25 @@ endfunction()
 
 # ---------------------------------------------------------------------------------------------
 # fl_add_module(<name> <DLL|EXE|LIB|RESOURCE_DLL>
-#               [OUTPUT_NAME <name>]       TargetName, when it is not the project name
-#               [NO_SDL]                   <SDLCheck>false</SDLCheck>
-#               [NO_WPO]                   no <WholeProgramOptimization>true (Release /GL, /LTCG)
-#               [UNICODE]                  <CharacterSet>Unicode (default MultiByte)
-#               [MFC]                      <UseOfMfc>Dynamic
-#               [CONSOLE]                  <SubSystem>Console (default Windows)
-#               [NO_SAFESEH]               <ImageHasSafeExceptionHandlers>false
-#               [NO_INCREMENTAL]           <LinkIncremental>false in every configuration
+#               [OUTPUT_NAME <name>]       file name, when it is not <name>
+#               [NO_SDL]                   no /sdl: it gives every dllexport class an exported
+#                                          __autoclassinit2 that the retail module does not export
+#               [NO_WPO]                   no Release /GL and /LTCG
+#               [UNICODE]                  _UNICODE/UNICODE (default _MBCS)
+#               [MFC]                      the shared MFC DLL (_AFXDLL)
+#               [CONSOLE]                  console subsystem (default windows)
+#               [NO_SAFESEH]               /SAFESEH:NO (a linked library has no SafeSEH tables)
+#               [NO_INCREMENTAL]           /INCREMENTAL:NO in every configuration
 #               [EXPORTS]                  an exe that exports names (and so has an import library)
-#               [IMPORTS_DIAGNOSTICS_PROPS] the project imports Freelancer.Diagnostics.props
 #               [WARNING_LEVEL <n>]        default 3
-#               [DEF <file.def>]           ModuleDefinitionFile
-#               [ITEM_DEFAULTS <Key> <Value>...]  ClCompile ItemDefinitionGroup (see fl_item)
-#               SOURCES <files...>)        compile items in the .vcxproj's order (= link order)
-#
-# The <name> is the .vcxproj name; MSBuild's $(MSBuildProjectName) checks use it.
+#               [DEF <file.def>]           module-definition file
+#               [ITEM_DEFAULTS <Key> <Value>...]  module-wide fl_item settings
+#               SOURCES <files...>)        in link order: the order of the objects decides the
+#                                          order of static initialisation (.CRT$XCU)
 # ---------------------------------------------------------------------------------------------
 function(fl_add_module name kind)
   cmake_parse_arguments(PARSE_ARGV 2 A
-    "NO_SDL;NO_WPO;UNICODE;MFC;CONSOLE;NO_SAFESEH;NO_INCREMENTAL;IMPORTS_DIAGNOSTICS_PROPS;EXPORTS"
+    "NO_SDL;NO_WPO;UNICODE;MFC;CONSOLE;NO_SAFESEH;NO_INCREMENTAL;EXPORTS"
     "OUTPUT_NAME;WARNING_LEVEL;DEF" "SOURCES;ITEM_DEFAULTS")
   if(A_UNPARSED_ARGUMENTS)
     message(FATAL_ERROR "fl_add_module(${name}): unknown arguments ${A_UNPARSED_ARGUMENTS}")
@@ -364,15 +332,14 @@ function(fl_add_module name kind)
   else()
     message(FATAL_ERROR "fl_add_module(${name}): unknown kind ${kind}")
   endif()
-  # CMake would define <name>_EXPORTS in a DLL or an exe with exports; MSBuild defines no such
-  # symbol.
+  # No <name>_EXPORTS define: the export macros use their own (COMMON_EXPORTS, ...).
   set_property(TARGET ${name} PROPERTY DEFINE_SYMBOL "")
   if(A_OUTPUT_NAME)
     set_property(TARGET ${name} PROPERTY OUTPUT_NAME "${A_OUTPUT_NAME}")
   endif()
 
-  # OutDir: bin\ (bin_debug\, binasan\) for the module, its import library and its PDB, as
-  # MSBuild. Intermediate files stay in the CMake build tree.
+  # bin\ (bin_debug\, binasan\) for the module, its import library and its PDB, next to the
+  # runtime configuration. Intermediate files stay in the build tree.
   set_target_properties(${name} PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${FL_BIN_DIR}"
     LIBRARY_OUTPUT_DIRECTORY "${FL_BIN_DIR}"
@@ -381,14 +348,14 @@ function(fl_add_module name kind)
 
   if(kind STREQUAL "RESOURCE_DLL")
     _fl_resource_dll(${name})
-    # ResourceDll.props: the imported .rc scripts are UTF-8; the host ANSI code page would
-    # corrupt punctuation and non-ASCII names. rc takes no per-target options from CMake, so
+    # The imported .rc scripts are UTF-8; the host ANSI code page would corrupt punctuation and
+    # non-ASCII names. rc takes no per-target options from CMake, so
     # this is the directory's CMAKE_RC_FLAGS (one resource DLL per directory).
     set(CMAKE_RC_FLAGS "${CMAKE_RC_FLAGS} /c65001" PARENT_SCOPE)
     return()
   endif()
 
-  # Project-wide ClCompile settings that items may override.
+  # Module-wide settings that single files may override.
   if(A_NO_SDL)
     set_property(TARGET ${name} PROPERTY FL_SDLCheck false)
   endif()
@@ -403,11 +370,11 @@ function(fl_add_module name kind)
   # DEFER evaluates its arguments when it runs: bake the name in now.
   cmake_language(EVAL CODE "cmake_language(DEFER CALL _fl_finalize [[${name}]])")
 
-  # Preprocessor: Directory.Build.props, Directory.Build.targets and the implicit MSBuild ones
-  # (_WINDLL for a DynamicLibrary, _MBCS / _UNICODE;UNICODE from CharacterSet, _AFXDLL from
-  # UseOfMfc=Dynamic). No NDEBUG and no _WINDOWS: MSBuild adds neither.
-  fl_switch(_tick FreelancerEnableTickProfile ${A_IMPORTS_DIAGNOSTICS_PROPS})
-  set(_defs WIN32 _CRT_SECURE_NO_WARNINGS "FREELANCER_ENABLE_TICK_PROFILE=${_tick}"
+  # No NDEBUG in Release: asserts stay on. _ITERATOR_DEBUG_LEVEL=1 keeps the std containers
+  # retail-sized in Release (a proxy pointer where VC6's STL kept its allocator; level 0 would
+  # shift every field after a container by 4, see the layout asserts in src/include). Debug's
+  # level 2 has the same layout.
+  set(_defs WIN32 _CRT_SECURE_NO_WARNINGS "FREELANCER_ENABLE_TICK_PROFILE=${FreelancerEnableTickProfile}"
             "$<${_fl_cfg_release}:_ITERATOR_DEBUG_LEVEL=1>" "$<${_fl_cfg_asan}:FL_ASAN>")
   if(kind STREQUAL "DLL")
     list(APPEND _defs _WINDLL)
@@ -421,19 +388,13 @@ function(fl_add_module name kind)
   if(A_MFC)
     list(APPEND _defs _AFXDLL)
     set_property(TARGET ${name} PROPERTY FL_MFC TRUE)
-    # MFC's inline headers record their own path (__FILE__, with /FC) in the binary. MSBuild's
-    # include path spells the directory "atlmfc\include", vcvarsall's INCLUDE "ATLMFC\include":
-    # put MSBuild's spelling first (it is second in MSBuild's list, after VC\include, and the
-    # two directories share no header names).
-    file(TO_NATIVE_PATH "${_fl_vctools}/atlmfc/include" _atlmfc)
-    set_property(TARGET ${name} PROPERTY CXX_COMPILER_LAUNCHER
-      "${CMAKE_COMMAND}" -E env
-      "--modify" "INCLUDE=path_list_prepend:${_atlmfc}"
-      "--modify" "INCLUDE=path_list_append:${FL_DX8_DIR}/include")
   endif()
   target_compile_definitions(${name} PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:${_defs}>")
 
-  # The rest of the cl options MSBuild passes (the per-item ones come from _fl_finalize).
+  # The other cl options (the per-file ones come from _fl_finalize). /arch:IA32 is set per file:
+  # x87 code as the VC6-built retail modules. Retail leaves FPU_PRESERVE off, so Direct3D 8
+  # drops the main thread's x87 precision to 24-bit and never restores it; x87 code inherits
+  # that, SSE2 code would keep 53-bit doubles where retail has 24-bit.
   set(_cl
     /W${A_WARNING_LEVEL} /WX- /diagnostics:column /Oy- /Gm- /EHsc
     "$<${_fl_cfg_asan}:/fsanitize=address>"
@@ -442,10 +403,8 @@ function(fl_add_module name kind)
     /external:W${A_WARNING_LEVEL} /Gd /analyze- /FC)
   target_compile_options(${name} PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:${_cl}>")
 
-  # rc gets no project defines or include dirs from MSBuild, only its own ResourceCompile
-  # settings (CMAKE_RC_FLAGS below). MSBuild runs rc in the project directory, which is where a
-  # script's relative file names (ICON "res\\x.ico") are found; Ninja runs it in the build tree,
-  # so that directory is passed as /I instead.
+  # rc gets none of the module's defines or include dirs. Ninja runs it in the build tree, so the
+  # module's directory is passed as /I for the scripts' relative file names (ICON "res\\x.ico").
   target_include_directories(${name} PRIVATE "$<$<COMPILE_LANGUAGE:RC>:${CMAKE_CURRENT_SOURCE_DIR}>")
 
   set(_wpo "$<AND:${_fl_cfg_release},$<NOT:$<BOOL:${A_NO_WPO}>>>")
@@ -455,16 +414,12 @@ function(fl_add_module name kind)
     return()
   endif()
 
-  # link: Release is /INCREMENTAL:NO with /SAFESEH; Debug links incrementally; DebugASan does not
-  # (Directory.Build.targets).
   if(A_CONSOLE)
     set(_subsystem CONSOLE)
   else()
     set(_subsystem WINDOWS)
   endif()
-  # LinkIncremental: MSBuild writes /INCREMENTAL in Debug and nothing in Release (where /OPT:REF
-  # turns incremental linking off anyway); DebugASan and LinkIncremental=false projects get
-  # /INCREMENTAL:NO.
+  # Debug links incrementally; Release does not (/OPT:REF), DebugASan cannot.
   if(A_NO_INCREMENTAL)
     set(_incremental /INCREMENTAL:NO)
   else()
@@ -480,14 +435,14 @@ function(fl_add_module name kind)
     "$<${_wpo}:/OPT:REF;/OPT:ICF>" ${_safeseh} ${_incremental} /SUBSYSTEM:${_subsystem}
     "${FL_MANIFESTUAC}" /ERRORREPORT:PROMPT /NOLOGO /TLBID:1)
   if(A_MFC)
-    # MSBuild gives an MFC application the toolset's DPI-awareness manifest.
+    # The toolset's DPI-awareness manifest.
     if(EXISTS "${FL_DPIAWARE_MANIFEST}")
       target_sources(${name} PRIVATE "${FL_DPIAWARE_MANIFEST}")
     else()
       message(WARNING "${FL_DPIAWARE_MANIFEST} not found: ${name} is built without it")
     endif()
   endif()
-  # AdditionalLibraryDirectories: $(OutDir) for every project (Directory.Build.props).
+  # The output directory is on the library path (import libraries named by file).
   target_link_directories(${name} PRIVATE "${FL_BIN_DIR}")
 
   if(A_DEF)
@@ -496,12 +451,12 @@ function(fl_add_module name kind)
     set_property(TARGET ${name} APPEND PROPERTY LINK_DEPENDS "${_def}")
   endif()
   if(A_EXPORTS)
-    # An exe with exports gets an import library next to it, as MSBuild.
+    # An exe with exports gets an import library next to it.
     set_property(TARGET ${name} PROPERTY ENABLE_EXPORTS ON)
   endif()
 endfunction()
 
-# Resource-only DLLs: src\Resources\ResourceDll.props (no code, no CRT, no entry point).
+# Resource-only DLLs (no code, no CRT, no entry point).
 function(_fl_resource_dll name)
   set_property(TARGET ${name} PROPERTY LINKER_LANGUAGE CXX)
   target_include_directories(${name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -512,20 +467,18 @@ function(_fl_resource_dll name)
   target_link_libraries(${name} PRIVATE ${FL_DEFAULT_LIBS})
 endfunction()
 
-# The CoreLibraryDependencies MSBuild puts in place of %(AdditionalDependencies).
+# The default Windows libraries every module links after its own.
 set(FL_DEFAULT_LIBS kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib
                     shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib)
 
-# fl_link(<name> [LIBS <AdditionalDependencies...>] [REFERENCES <projects...>])
+# fl_link(<name> [LIBS <libraries...>] [REFERENCES <modules...>])
 #
-# LIBS is the project's AdditionalDependencies before %(AdditionalDependencies), in order: an
-# entry that names a project (dacom.lib, Common.lib, ...) links that project's import library,
-# anything else is a system or SDK library. MSBuild then adds the default libraries and the
-# import library of every ProjectReference not already named; REFERENCES lists the project
-# references.
+# LIBS in order: an entry that names a module (dacom.lib, Common.lib, ...) links that module's
+# import library, anything else is a system or SDK library. Then come the default libraries,
+# then the import library of every module in REFERENCES not already named.
 #
 # The link order of libraries decides which one resolves a symbol two of them define, so it is
-# kept exactly: project libraries go in as files ($<TARGET_LINKER_FILE>), which CMake leaves in
+# kept exactly: module libraries go in as files ($<TARGET_LINKER_FILE>), which CMake leaves in
 # place, where linking the targets would let CMake reorder them by dependency. The build order
 # comes from add_dependencies, the relink from LINK_DEPENDS.
 function(fl_link name)
@@ -539,8 +492,8 @@ function(fl_link name)
       list(APPEND _items "${_lib}")
     endif()
   endforeach()
-  # An MFC project gets no default libraries from MSBuild: the MFC headers name the ones they
-  # need (#pragma comment(lib)), in their own order.
+  # An MFC module gets no default libraries: the MFC headers name the ones they need
+  # (#pragma comment(lib)), in their own order.
   get_target_property(_mfc ${name} FL_MFC)
   if(NOT _mfc)
     list(APPEND _items ${FL_DEFAULT_LIBS})
@@ -566,14 +519,14 @@ function(fl_link name)
   target_link_libraries(${name} PRIVATE ${_libs})
 endfunction()
 
-# A ProjectReference with LinkLibraryDependencies=false: build order only.
+# Build order only: <name> needs <modules> built (and linked) first, but does not link them.
 function(fl_order_after name)
   add_dependencies(${name} ${ARGN})
 endfunction()
 
-# Debug / DebugASan of the client: the dev *.ini of bin\ copied into the output directory with
-# the bin\ paths rewritten, and for DebugASan the AddressSanitizer runtime DLLs
-# (Directory.Build.targets).
+# Debug / DebugASan of the client: the dev *.ini of bin\ (and NewPlayer.fl, from which PlayerDB
+# creates Restart.fl beside the exe) copied into the output directory with the bin\ paths
+# rewritten, and for DebugASan the AddressSanitizer runtime DLLs.
 function(fl_dev_ini_post_build name)
   find_package(Python3 COMPONENTS Interpreter)
   if(NOT Python3_Interpreter_FOUND)
@@ -594,9 +547,8 @@ function(fl_dev_ini_post_build name)
   endif()
 endfunction()
 
-# fl_defines(<name> <defines...>) / fl_includes(<name> <dirs...>): the project's ClCompile
-# PreprocessorDefinitions / AdditionalIncludeDirectories. They reach cl only: MSBuild's rc gets
-# its own ResourceCompile settings.
+# fl_defines(<name> <defines...>) / fl_includes(<name> <dirs...>): the module's own defines and
+# include directories, for cl only (rc gets none).
 function(fl_defines name)
   target_compile_definitions(${name} PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:${ARGN}>")
 endfunction()

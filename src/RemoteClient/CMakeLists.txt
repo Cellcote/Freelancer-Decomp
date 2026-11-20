@@ -1,5 +1,5 @@
-# CMake build of RemoteClient.vcxproj (see cmake/Freelancer.cmake). Keep the source list in the .vcxproj's
-# order: it is the link order, and with it the static-initialisation order.
+# See cmake/Freelancer.cmake. The source list is the link order, and with it the order of
+# static initialisation.
 
 fl_add_module(RemoteClient DLL NO_SDL
   SOURCES
@@ -12,6 +12,7 @@ fl_add_module(RemoteClient DLL NO_SDL
     ../RemoteCommon/remote_server_channel_codecs.cpp
 )
 
+# NO_SDL: retail exports no __autoclassinit2 members.
 fl_includes(RemoteClient ../include)
 fl_defines(RemoteClient FL_SERVER REMOTECLIENT_EXPORTS _WINDOWS _USRDLL)
 fl_link(RemoteClient

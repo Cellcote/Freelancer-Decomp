@@ -1,4 +1,4 @@
-# RP9 post-build step of the CMake build (RP9.vcxproj's PostBuildEvent): extract d3dx9_43.dll
+# RP9 post-build step: extract d3dx9_43.dll
 # from the DirectX SDK (June 2010) redist cab into the output directory, once.
 #   cmake -DEXPAND=<expand.exe> -DCAB=<Jun2010_d3dx9_43_x86.cab> -DOUT=<dir> -P extract_d3dx9.cmake
 if(EXISTS "${OUT}/d3dx9_43.dll")

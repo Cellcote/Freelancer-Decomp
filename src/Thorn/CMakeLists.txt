@@ -1,5 +1,5 @@
-# CMake build of Thorn.vcxproj (see cmake/Freelancer.cmake). Keep the source list in the .vcxproj's
-# order: it is the link order, and with it the static-initialisation order.
+# See cmake/Freelancer.cmake. The source list is the link order, and with it the order of
+# static initialisation.
 
 fl_add_module(Thorn DLL
   SOURCES
@@ -47,4 +47,6 @@ set_property(SOURCE ${_lua} APPEND PROPERTY COMPILE_OPTIONS
   /wd4013 /wd4101 /wd4189 /wd4244 /wd4267
   /wd4311 /wd4312 /wd4057 /wd4131 /wd4127 /wd4456 /wd4701 /wd4702 /wd4706 /wd4996)
 
+# Thorn.dll goes to bin\ like every module; bin\DACOM.INI names it by absolute path so that
+# DllPath does not load EXE\Thorn.dll. Never copy it into EXE\.
 fl_link(Thorn LIBS dacom.lib REFERENCES dacom)

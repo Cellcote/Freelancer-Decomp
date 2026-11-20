@@ -1,5 +1,5 @@
-# CMake build of NameResources.vcxproj (see cmake/Freelancer.cmake). Keep the source list in the .vcxproj's
-# order: it is the link order, and with it the static-initialisation order.
+# See cmake/Freelancer.cmake. The source list is the link order, and with it the order of
+# static initialisation.
 
 fl_add_module(NameResources RESOURCE_DLL
   SOURCES

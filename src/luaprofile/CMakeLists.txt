@@ -1,5 +1,5 @@
-# CMake build of luaprofile.vcxproj (see cmake/Freelancer.cmake). Keep the source list in the .vcxproj's
-# order: it is the link order, and with it the static-initialisation order.
+# See cmake/Freelancer.cmake. The source list is the link order, and with it the order of
+# static initialisation.
 
 fl_add_module(luaprofile DLL
   SOURCES
@@ -26,7 +26,6 @@ fl_add_module(luaprofile DLL
     luaprofile.rc
 )
 
-# ..\include is Directory.Build.props' src\include, which MSBuild keeps in its last place.
 fl_includes(luaprofile lua32/include lua32/src)
 target_compile_options(luaprofile PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:/wd4996>)
 # The Lua 3.2 sources (every .c item): C, without /sdl, with their own warnings off.

@@ -1,7 +1,5 @@
-# Freelancer Decomp: CMake build, next to the Visual Studio solution src/Freelancer.sln.
-#
-# It builds the same modules, from the same sources, with the same cl / rc / lib / link options
-# as MSBuild, into the same bin\ (bin_debug\, binasan\). See docs/cmake.md.
+# Freelancer Decomp: builds every module of the game from src\ into bin\ (bin_debug\,
+# binasan\). See docs/building.md.
 #
 #   cmake --preset release
 #   cmake --build --preset release

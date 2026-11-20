@@ -1,7 +1,7 @@
-# CMake build of Common.vcxproj (see cmake/Freelancer.cmake). Keep the source list in the .vcxproj's
-# order: it is the link order, and with it the static-initialisation order.
+# See cmake/Freelancer.cmake. The source list is the link order, and with it the order of
+# static initialisation.
 
-fl_add_module(Common DLL NO_SDL IMPORTS_DIAGNOSTICS_PROPS
+fl_add_module(Common DLL NO_SDL
   SOURCES
     common_tractorarm.cpp
     common_flashlightsetinfo.cpp

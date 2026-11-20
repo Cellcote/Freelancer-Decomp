@@ -1,5 +1,5 @@
-# CMake build of rpclocal.vcxproj (see cmake/Freelancer.cmake). Keep the source list in the .vcxproj's
-# order: it is the link order, and with it the static-initialisation order.
+# See cmake/Freelancer.cmake. The source list is the link order, and with it the order of
+# static initialisation.
 
 fl_add_module(rpclocal DLL
   SOURCES
@@ -24,4 +24,10 @@ fl_add_module(rpclocal DLL
 
 fl_includes(rpclocal ../include)
 fl_defines(rpclocal _WINDOWS _USRDLL RPCLOCAL_EXPORTS)
+# Common: retail rpclocal.dll imports COMMON.DLL (FmtStr::flatten, FmtStr::unflatten, ~FmtStr and
+# FmtStr::Val::get_flattened_size, IAT slots .rdata:06db30dc / 06db3008 / 06db3094 / 06db30e0);
+# Common.dll does not import rpclocal.dll, so there is no cycle. dacom: retail imports
+# DACOM.DLL::FDUMP (ordinal 13, IAT slot .rdata:06db311c), called from 06d86b0f, 06d86b40,
+# 06d86b70, 06d86be0 (debug-only channel-3 cases of FUN_06d86a70) and 06d8f265
+# (IServerImpl::Startup, LoadLibrary failure).
 fl_link(rpclocal LIBS kernel32.lib user32.lib Common.lib REFERENCES dacom Common)

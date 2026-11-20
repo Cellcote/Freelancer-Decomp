@@ -1,7 +1,7 @@
-# CMake build of freelancer.vcxproj (see cmake/Freelancer.cmake). Keep the source list in the .vcxproj's
-# order: it is the link order, and with it the static-initialisation order.
+# See cmake/Freelancer.cmake. The source list is the link order, and with it the order of
+# static initialisation.
 
-fl_add_module(freelancer EXE EXPORTS NO_SDL IMPORTS_DIAGNOSTICS_PROPS
+fl_add_module(freelancer EXE EXPORTS NO_SDL
   SOURCES
     Client/client_state.cpp
     Client/voice_profiles.cpp
@@ -178,6 +178,10 @@ fl_add_module(freelancer EXE EXPORTS NO_SDL IMPORTS_DIAGNOSTICS_PROPS
     Client/hud_widescreen.cpp
     Client/jump_effect.cpp
     Client/best_path.cpp
+    # Static-init order (retail XC table): the material cache (client_cliobj.cpp, slot
+    # 0x0060f0bc) is built before the VisEffect map (vis_effect_arch.cpp, slot 0x0060f19c), so
+    # ~FVisEffectArch (FUN_0042edb0) still finds it at exit. MSVC runs .CRT$XCU in link order,
+    # which is this order: keep vis_effect_arch.cpp after client_cliobj.cpp.
     Client/client_cliobj.cpp
     Client/vis_effect_arch.cpp
     Client/client_mesh_load.cpp
@@ -251,19 +255,19 @@ fl_add_module(freelancer EXE EXPORTS NO_SDL IMPORTS_DIAGNOSTICS_PROPS
     resources/freelancer.rc
 )
 
-# FREELANCER_EXPORTS: the 69 names retail FreeLancer.exe exports itself. /sdl would add exported
-# __autoclassinit2 members retail does not have (NO_SDL).
-# ..\include is also Directory.Build.props' src\include, which comes last: MSBuild keeps the last
-# of two equal entries, so the order cl sees is Content, imeui, include.
+# FREELANCER_EXPORTS selects the declarations freelancer.exe exports itself (retail FreeLancer.exe
+# carries a 69-name export table, no .def): see the export macros in src/include/rpc_iclient.h and
+# src/include/common_exports.h. NO_SDL: the exe must export exactly the names retail exports.
+# dalib_net.h (DirectPlay8 classes the exe exports like retail) needs dplay8.h of the DX8 SDK.
 fl_includes(freelancer ../Content ../imeui)
 target_compile_definitions(freelancer PRIVATE $<$<COMPILE_LANGUAGE:CXX>:FREELANCER_EXPORTS>)
 target_include_directories(freelancer PRIVATE $<$<COMPILE_LANGUAGE:RC>:${CMAKE_CURRENT_SOURCE_DIR}/resources>)
 
-# Port-only switches (Directory.Build.targets: the client reads them).
-fl_switch(_beta FreelancerBetaLabel TRUE)
-fl_switch(_wide FreelancerWidescreenSupport TRUE)
-fl_switch(_rp9 FreelancerRp9 TRUE)
-fl_switch(_walk FreelancerWalkMode TRUE)
+# Port-only switches: only the client reads them.
+set(_beta ${FreelancerBetaLabel})
+set(_wide ${FreelancerWidescreenSupport})
+set(_rp9 ${FreelancerRp9})
+set(_walk ${FreelancerWalkMode})
 target_compile_definitions(freelancer PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
   $<$<BOOL:${_beta}>:FREELANCER_BETA_LABEL=1>
   $<$<BOOL:${_wide}>:FREELANCER_WIDESCREEN_SUPPORT>

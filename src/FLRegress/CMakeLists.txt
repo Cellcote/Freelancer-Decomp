@@ -1,5 +1,6 @@
-# CMake build of FLRegress.vcxproj (see cmake/Freelancer.cmake): the port-only headless
-# regression harness. Keep the source list in the .vcxproj's order.
+# FLRegress.exe: port-only headless regression harness (no retail counterpart). It starts
+# Server.dll as the single-player client does and dumps the game state to a text file.
+# See cmake/Freelancer.cmake.
 
 fl_add_module(FLRegress EXE CONSOLE
   SOURCES

@@ -1,5 +1,5 @@
-# CMake build of qhull.vcxproj (see cmake/Freelancer.cmake). Keep the source list in the .vcxproj's
-# order: it is the link order, and with it the static-initialisation order.
+# See cmake/Freelancer.cmake. The source list is the link order, and with it the order of
+# static initialisation.
 
 fl_add_module(qhull LIB NO_SDL WARNING_LEVEL 1
   SOURCES
@@ -17,7 +17,12 @@ fl_add_module(qhull LIB NO_SDL WARNING_LEVEL 1
     vendor/user.c
 )
 
-# qhull 2002.1 (vendored under vendor/), see qhull.vcxproj and vendor/COPYING.txt.
+# qhull 2002.1 (vendored under vendor/), the classic non-reentrant global-qh_qh API. Retail
+# Common.dll links an older "ipion 99/07/10" qhull (2.6 era): several functions differ from 2002.1.
+# The vendored source is modified only where it was aligned with the retail listing: the error
+# sink (FUN_06356960 instead of fprintf(qh ferr) at the retail sites, each marked with its retail
+# address), qh_new_qhull / qh_errexit / qh_errprint / qh_printlists, qh_VERSION and qh_CPUclock.
+# See vendor/COPYING.txt for the Qhull license and required attribution.
 fl_defines(qhull _CRT_SECURE_NO_WARNINGS _CRT_NONSTDC_NO_DEPRECATE)
 fl_includes(qhull vendor)
 target_compile_options(qhull PRIVATE

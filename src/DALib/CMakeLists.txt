@@ -1,5 +1,5 @@
-# CMake build of DALib.vcxproj (see cmake/Freelancer.cmake). Keep the source list in the .vcxproj's
-# order: it is the link order, and with it the static-initialisation order.
+# See cmake/Freelancer.cmake. The source list is the link order, and with it the order of
+# static initialisation.
 
 fl_add_module(DALib DLL NO_SDL
   SOURCES
@@ -14,7 +14,8 @@ fl_add_module(DALib DLL NO_SDL
     DALib.rc
 )
 
+# NO_SDL: retail DALib.dll exports no __autoclassinit2 (dalib_net.h's dllexport classes).
 fl_defines(DALib DALIB_EXPORTS ZLIB_WINAPI)
-# %(AdditionalIncludeDirectories);..\zlib\vendor: after src\include, not before it.
+# zlib's headers after src\include, not before it.
 fl_includes(DALib ${FL_SRC_DIR}/include ../zlib/vendor)
 fl_link(DALib LIBS dacom.lib zlib.lib winmm.lib REFERENCES dacom zlib)

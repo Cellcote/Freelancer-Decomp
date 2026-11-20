@@ -9,9 +9,9 @@
 (`kRp9ComponentName`, приоритет `0x40000000`). Потребители (exe, Shading, flmaterials, alchemy,
 Deformable2, RendComp, ximage) не меняются: они ищут интерфейсы по IID.
 
-Сборка — свойство `FreelancerRp9` (`src/Directory.Build.props`, `src/Freelancer.Diagnostics.props`,
-страница свойств VS «Features»), по умолчанию `0`. При `0` `RP9.vcxproj` превращается в пустой
-Utility-проект (нет `RP9.dll`, DirectX SDK June 2010 не нужен), а клиентские хуки Ex
+Сборка — переключатель `FreelancerRp9` (`cmake -DFreelancerRp9=1`, `cmake/Freelancer.cmake`), по
+умолчанию `0`. При `0` `src/RP9/CMakeLists.txt` не создаёт цель (нет `RP9.dll`, DirectX SDK
+June 2010 не нужен), а клиентские хуки Ex
 (`render_ex.*`, `nebula_volume.*` и их вызовы в `cli_asteroid`, `cli_nebula`, `client_gameobj`,
 `engine_init`, `main`, `space_scene_obj_draw`, `star_sphere`, `star_sys`) стоят под
 `#ifdef FREELANCER_RP9` — клиент совпадает с master. При `1` собираются оба.
@@ -33,8 +33,8 @@ Utility-проект (нет `RP9.dll`, DirectX SDK June 2010 не нужен), 
 ## Сборка и зависимости
 
 - `d3d9.h` / `d3d9.lib` — Windows SDK. D3DX9 и DxErr — DirectX SDK June 2010
-  (`$(Dx9SdkDir)`, по умолчанию `$(DXSDK_DIR)`). Его `Include` добавляется в **конец**
-  `IncludePath` (там лежит старый `d3d9.h`); `d3dx9.lib` и `DxErr.lib` линкуются полным путём,
+  (`Dx9SdkDir`, по умолчанию `%DXSDK_DIR%`). Его `Include` добавляется в **конец**
+  `INCLUDE` компилятора (там лежит старый `d3d9.h`); `d3dx9.lib` и `DxErr.lib` линкуются полным путём,
   `Lib\x86` в путь библиотек не ставится (там старый `d3d9.lib`).
 - `RP_DIRECT3D9` включает D3D9-ветку `render/d3d8_min.h`: вместо `d3d8.h` — `<d3d9.h>`,
   `D3DLIGHT8 = D3DLIGHT9`, `D3DMATERIAL8 = D3DMATERIAL9` (раскладки совпадают, static_assert).

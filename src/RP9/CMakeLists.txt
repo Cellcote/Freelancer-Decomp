@@ -1,8 +1,7 @@
-# CMake build of RP9.vcxproj (see cmake/Freelancer.cmake): the port-only Direct3D 9 renderer,
-# built only with FreelancerRp9=1 (docs/re/rp9.md). With 0, RP9.vcxproj is an empty Utility
-# project, and there is no target here.
+# RP9.dll: the port-only Direct3D 9 renderer (docs/re/rp9.md), built only with FreelancerRp9=1,
+# which also turns on the client's hooks. See cmake/Freelancer.cmake.
 
-fl_switch(_rp9 FreelancerRp9 TRUE)
+set(_rp9 ${FreelancerRp9})
 if(NOT _rp9)
   return()
 endif()
@@ -13,7 +12,7 @@ if(FL_DX9_DIR STREQUAL "" OR NOT EXISTS "${FL_DX9_DIR}/Include/d3dx9.h")
                       "-DDx9SdkDir=... (looked for '${FL_DX9_DIR}/Include/d3dx9.h').")
 endif()
 
-fl_add_module(RP9 DLL IMPORTS_DIAGNOSTICS_PROPS
+fl_add_module(RP9 DLL
   SOURCES
     RP9.cpp
     RP9Ex.cpp
@@ -26,7 +25,7 @@ target_include_directories(RP9 PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${CMAKE_CURRENT
 target_compile_definitions(RP9 PRIVATE $<$<COMPILE_LANGUAGE:CXX>:RP_DIRECT3D9>)
 
 # d3d9.h / d3d9.lib come from the Windows SDK. The June 2010 Include dir also ships an older
-# d3d9.h, so it goes after the Windows SDK (and before the DX8 headers, as in MSBuild); its
+# d3d9.h, so it goes after the Windows SDK (and before the DX8 headers); its
 # Lib\x86 is not searched (it holds an old d3d9.lib too): d3dx9.lib and DxErr.lib are linked by
 # full path.
 set_property(TARGET RP9 PROPERTY CXX_COMPILER_LAUNCHER
@@ -41,7 +40,8 @@ fl_link(RP9
   REFERENCES dacom)
 
 # The 32-bit D3DX9 runtime next to the exe: SysWOW64 has no d3dx9_43.dll. Extracted once from
-# the June 2010 redist cab, with Windows' expand.exe by full path.
+# the June 2010 redist cab, with Windows' expand.exe by full path: from a Git Bash/MSYS shell a
+# bare "expand" is coreutils' (/usr/bin/expand), which fails.
 file(TO_NATIVE_PATH "$ENV{SystemRoot}/System32/expand.exe" _expand)
 file(TO_NATIVE_PATH "${FL_DX9_DIR}/Redist/Jun2010_d3dx9_43_x86.cab" _cab)
 add_custom_command(TARGET RP9 POST_BUILD

@@ -1,4 +1,4 @@
-# Visual Studio / MSBuild
+# Visual Studio (Open Folder state, old solution builds)
 src/.vs/
 src/**/obj/
 obj/
