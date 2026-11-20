@@ -636,7 +636,7 @@ jobs:
           # Required: the server comes up and a retail client's DirectPlay joins it. Reported
           # only: a clean shutdown (docs/x64.md: engine handles held in 32-bit fields).
           $log = Get-Content -Raw dedicated_out.txt
-          if (-not $log.Contains('Server running, ready for log in.')) { throw 'the x64 server did not come up' }
+          if (-not $log.Contains('Server running, ready for log in.')) { throw ('the x64 server did not come up (exit code 0x{0:x8})' -f $proc.ExitCode) }
           if ($check -ne 0) { throw "DPNetCheck failed (exit code $check)" }
           if ($proc.ExitCode -ne 0 -or -not $log.Contains('Server stopped.')) {
             Write-Host ("::warning::x64 FLDedicated did not shut down cleanly (exit code 0x{0:x8})" -f $proc.ExitCode)
@@ -694,64 +694,37 @@ jobs:
               Select-Object -First 80 | ForEach-Object { Write-Host $_.Line }
           }
 
-      # Diagnostic, report-only: the x64 runs sometimes cannot load x86math.dll and Content.dll
-      # (LoadLibrary returns null). First a plain LoadLibraryEx of each x64 DLL in a clean process,
-      # with the Windows error; then, with the loader's own log turned on (show loader snaps),
-      # that Content.dll load and three FLDedicated starts under cdb, filtered to the loader's
-      # errors and to exceptions with a stack.
-      - name: x64 DLL load diagnostics
-        if: always() && steps.regress_x64.outcome != 'skipped'
+      # Diagnostic, report-only: the x64 FLDedicated sometimes dies early in startup, and x86math.dll
+      # and Content.dll then fail to load (an exception in a DLL's startup code fails the load).
+      # Six starts under cdb on the normal heap, with the loader's own log on (show loader snaps,
+      # through Image File Execution Options, removed afterwards). Every first-chance access
+      # violation prints a stack, so one caught by the loader shows up too.
+      - name: x64 startup diagnostics
+        if: always() && steps.dedicated_x64.outcome != 'skipped'
         continue-on-error: true
         timeout-minutes: 10
         shell: pwsh
         working-directory: bin_x64
         env:
           FL_HIGH_MEMORY: '1'
+          _NO_DEBUG_HEAP: '1'
         run: |
-          Add-Type -Namespace Diag -Name Native -MemberDefinition @'
-          [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-          public static extern System.IntPtr LoadLibraryExW(string Name, System.IntPtr File, uint Flags);
-          '@
-          Write-Host '=== LoadLibraryEx in a clean process'
-          foreach ($dll in 'dacom.dll', 'x86math.dll', 'common.dll', 'server.dll', 'Content.dll') {
-            $path = Join-Path (Get-Location).Path $dll
-            if (-not (Test-Path $path)) { Write-Host "$dll`: not found"; continue }
-            $module = [Diag.Native]::LoadLibraryExW($path, [IntPtr]::Zero, 0x8) # ALTERED_SEARCH_PATH
-            $err = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
-            if ($module -eq [IntPtr]::Zero) { Write-Host "$dll`: FAILED, error $err" }
-            else { Write-Host ("{0}: loaded at 0x{1:x}" -f $dll, $module.ToInt64()) }
-          }
-
           $cdb = 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe'
           if (-not (Test-Path $cdb)) { Write-Host 'cdb not found'; exit 0 }
-          # Loader snaps (GlobalFlag 0x2) through Image File Execution Options, removed afterwards.
-          # Kept: the loader's ERROR lines, our two DLLs' load results, exceptions and their stacks.
+          $env:_NT_SYMBOL_PATH = (Get-Location).Path
           $keep = '- ERROR|unable to load|failed to load mission|ready for log in|first chance|second chance|^\s*[0-9a-f]{2} [0-9a-f`(]'
-          $commands = 'sxe -c "kn 25;gc" av; sxe -c "kn 25;gc" eh; sxe -c "kn 25;gc" c0000142; g; q'
-          $images = 'FLDedicated.exe', 'pwsh.exe'
-          $ifeoRoot = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options'
-          foreach ($image in $images) {
-            New-Item -Path "$ifeoRoot\$image" -Force | Out-Null
-            New-ItemProperty -Path "$ifeoRoot\$image" -Name GlobalFlag -PropertyType DWord -Value 2 -Force | Out-Null
-          }
+          $ifeo = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\FLDedicated.exe'
+          New-Item -Path $ifeo -Force | Out-Null
+          New-ItemProperty -Path $ifeo -Name GlobalFlag -PropertyType DWord -Value 2 -Force | Out-Null
           try {
-            Set-Content -Path load_content.ps1 -Value @'
-          Add-Type -Namespace Diag -Name Native -MemberDefinition '[DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] public static extern System.IntPtr LoadLibraryExW(string Name, System.IntPtr File, uint Flags);'
-          $module = [Diag.Native]::LoadLibraryExW((Join-Path $PWD 'Content.dll'), [IntPtr]::Zero, 0x8)
-          Write-Host ("Content.dll: module 0x{0:x}, error {1}" -f $module.ToInt64(), [Runtime.InteropServices.Marshal]::GetLastWin32Error())
-          '@
-            Write-Host '=== Content.dll in a clean process, under cdb'
-            & $cdb -lines -G -c $commands pwsh.exe -NoProfile -File load_content.ps1 2>&1 |
-              Select-String -Pattern "$keep|Content\.dll" |
-              Where-Object { $_.Line -notmatch 'Break instruction' } |
-              Select-Object -First 60 | ForEach-Object { Write-Host $_.Line }
-            foreach ($attempt in 1..3) {
+            foreach ($attempt in 1..6) {
               Write-Host "=== FLDedicated under cdb, attempt $attempt"
-              & $cdb -lines -G -c $commands .\FLDedicated.exe --name CI --port 2302 --run-for 5 2>&1 |
+              & $cdb -lines -G -c 'sxe -c "kn 30;gc" av; g; q' .\FLDedicated.exe --name CI --port 2302 --run-for 3 2>&1 |
                 Select-String -Pattern $keep |
                 Where-Object { $_.Line -notmatch 'Break instruction' } |
                 Select-Object -First 60 | ForEach-Object { Write-Host $_.Line }
             }
           } finally {
-            foreach ($image in $images) { Remove-Item -Path "$ifeoRoot\$image" -Recurse -Force }
+            Remove-Item -Path $ifeo -Recurse -Force
           }
+          exit 0
