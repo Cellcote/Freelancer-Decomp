@@ -12,7 +12,9 @@
 param(
     [string]$Bin = 'bin',
     [int]$Seconds = 150,
-    [string]$Arguments = '-w'
+    [string]$Arguments = '-w',
+    # Run the client under the 32-bit cdb and print the stack of an unhandled access violation.
+    [switch]$UnderCdb
 )
 
 $ErrorActionPreference = 'Stop'
@@ -160,16 +162,31 @@ foreach ($dll in 'd3d8.dll', 'd3d9.dll', 'dsound.dll', 'dinput8.dll', 'dinput.dl
 $binPath = (Resolve-Path $Bin).Path
 Write-Host "== Starting $binPath\freelancer.exe $Arguments for up to $Seconds s =="
 $script:clock = [System.Diagnostics.Stopwatch]::StartNew()
-$proc = Start-Process -FilePath (Join-Path $binPath 'freelancer.exe') -ArgumentList $Arguments `
-    -WorkingDirectory $binPath -PassThru
+$cdbOut = Join-Path $env:RUNNER_TEMP 'client_cdb.txt'
+if ($UnderCdb) {
+    $cdb = 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x86\cdb.exe'
+    $env:_NT_SYMBOL_PATH = $binPath
+    $proc = Start-Process -FilePath $cdb -WorkingDirectory $binPath -PassThru -NoNewWindow `
+        -RedirectStandardOutput $cdbOut -ArgumentList @('-lines', '-G',
+            '-c', '"sxd -c2 \".ecxr;r;kn 40;q\" av; g; q"',
+            (Join-Path $binPath 'freelancer.exe'), $Arguments)
+} else {
+    $proc = Start-Process -FilePath (Join-Path $binPath 'freelancer.exe') -ArgumentList $Arguments `
+        -WorkingDirectory $binPath -PassThru
+}
 $null = $proc.Handle
+$gamePid = $(if ($UnderCdb) { 0 } else { $proc.Id })
 
 $seen = @{}
 $gameWindow = [IntPtr]::Zero
 $nextSample = 5
 $nextEscape = 30
 while (-not $proc.HasExited -and $script:clock.Elapsed.TotalSeconds -lt $Seconds) {
-    foreach ($h in [Probe]::TopWindows([uint32]$proc.Id)) {
+    if ($gamePid -eq 0) {
+        $game = Get-Process -Name freelancer -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($game) { $gamePid = $game.Id; Log "freelancer.exe is process $gamePid" }
+    }
+    foreach ($h in [Probe]::TopWindows([uint32]$gamePid)) {
         $title = [Probe]::Text($h)
         $class = [Probe]::Class($h)
         $visible = [Probe]::IsWindowVisible($h)
@@ -215,6 +232,12 @@ while (-not $proc.HasExited -and $script:clock.Elapsed.TotalSeconds -lt $Seconds
     Start-Sleep -Milliseconds 500
 }
 
+if ($UnderCdb -and (Test-Path $cdbOut)) {
+    if (-not $proc.HasExited) { Get-Process -Name freelancer -ErrorAction SilentlyContinue | Stop-Process -Force; $null = $proc.WaitForExit(20000) }
+    Write-Host "== cdb ($cdbOut) =="
+    Get-Content $cdbOut | Select-String -NotMatch -Pattern '^ModLoad:|^\*\*\*|^\s*$|Symbol search path|Executable search path' |
+        Select-Object -Last 120 | ForEach-Object { Write-Host $_.Line }
+}
 if ($proc.HasExited) {
     Log ("freelancer.exe exited by itself with code {0} (0x{0:x8})" -f $proc.ExitCode)
 } else {

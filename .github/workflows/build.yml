@@ -506,7 +506,7 @@ jobs:
 
       - name: Run the client
         shell: powershell
-        run: .github\scripts\client_probe.ps1 -Bin bin -Seconds 150
+        run: .github\scripts\client_probe.ps1 -Bin bin -Seconds 150 -UnderCdb
 
   # DPNet, the port's own DirectPlay 8 protocol implementation (docs/dpnet.md): portable C++
   # with its own tests, built on Linux (GCC, with sanitizers) and Windows (MSVC, 32 and 64 bit).
