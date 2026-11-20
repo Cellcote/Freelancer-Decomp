@@ -12,6 +12,10 @@ on:
         description: Make FLRegress crash on purpose, to test the crash report and issue path
         type: boolean
         default: false
+      client_probe:
+        description: Experiment - run the unmodified client on the runner and report how far it gets
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -474,6 +478,35 @@ jobs:
           foreach ($line in 'Server running, ready for log in.', 'Server stopped.') {
             if (-not $log.Contains($line)) { throw "missing from the log: $line" }
           }
+
+  # Experiment (manual runs only): how far does the unmodified freelancer.exe get on a runner
+  # with no GPU, no sound card and nobody at the keyboard? See .github/scripts/client_probe.ps1.
+  client-probe:
+    name: Client probe (experiment)
+    if: github.event_name == 'workflow_dispatch' && inputs.client_probe
+    needs: [build, data]
+    runs-on: windows-2022
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore game data
+        uses: actions/cache/restore@v4
+        with:
+          path: DATA
+          key: fl-data-${{ env.FL_ISO_MD5 }}-v1
+          fail-on-cache-miss: true
+
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: freelancer-release-win32
+          path: bin
+
+      - name: Run the client
+        shell: powershell
+        run: .github\scripts\client_probe.ps1 -Bin bin -Seconds 150
 
   # DPNet, the port's own DirectPlay 8 protocol implementation (docs/dpnet.md): portable C++
   # with its own tests, built on Linux (GCC, with sanitizers) and Windows (MSVC, 32 and 64 bit).
