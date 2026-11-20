@@ -25,29 +25,30 @@
 //    IServerImpl::CharacterSelect; its tail (.text:06d4aa85 .. .text:06d4b1fa)
 //    is PlayerData_LoadSelectedCharacter below.
 
-#include "../include/common_pub.h"
-#include "../include/common_server.h"          // Players (PlayerDB::operator[])
-#include "../include/common_server_playerdb.h"
-#include "../include/server_savegame.h"
-#include "../include/server_savefile.h"        // FLS1, account paths, last saved path
-#include "../include/common_net.h"             // IsMPServer
-#include "../include/common_universe.h"
-#include "../include/common_archetype.h"
-#include "../include/common_cobject.h"         // SubObjectID::EquipIdMaker
-#include "../include/common_goods.h"           // Loadout::ReadEquipLine / ReadCargoLine
-#include "../include/common_ini.h"             // INI_Reader, StringAlloc, RefreshLoadingProgress
-#include "../include/common_misc.h"            // HexToWide, safe_strcpy
-#include "../include/common_id.h"              // CreateID, MakeLocationID, ID_String
-#include "../include/common_csys.h"            // EulerMatrix
-#include "../include/common_reputation.h"      // Reputation::*, CostumeDescriptions
-#include "../include/common_text.h"            // FmtStr
-#include "../include/common_newchar.h"         // NewChar::TheDB
-#include "../include/common_server_types.h"    // SCreateCharacterInfo
-#include "../include/dacom.h"                  // FDUMP
-#include "../include/rpc_iclient.h"            // IClient slots 91 / 92 / 97 / 98
-#include "../include/msvcrt_compat.h"          // MsvcrtAtoi (retail MSVCRT.DLL atoi wraps)
+#include "common_pub.h"
+#include "common_server.h"          // Players (PlayerDB::operator[])
+#include "common_server_playerdb.h"
+#include "server_savegame.h"
+#include "server_savefile.h"        // FLS1, account paths, last saved path
+#include "common_net.h"             // IsMPServer
+#include "common_universe.h"
+#include "common_archetype.h"
+#include "common_cobject.h"         // SubObjectID::EquipIdMaker
+#include "common_goods.h"           // Loadout::ReadEquipLine / ReadCargoLine
+#include "common_ini.h"             // INI_Reader, StringAlloc, RefreshLoadingProgress
+#include "common_misc.h"            // HexToWide, safe_strcpy
+#include "common_id.h"              // CreateID, MakeLocationID, ID_String
+#include "common_csys.h"            // EulerMatrix
+#include "common_reputation.h"      // Reputation::*, CostumeDescriptions
+#include "common_text.h"            // FmtStr
+#include "common_newchar.h"         // NewChar::TheDB
+#include "common_server_types.h"    // SCreateCharacterInfo
+#include "dacom.h"                  // FDUMP
+#include "rpc_iclient.h"            // IClient slots 91 / 92 / 97 / 98
+#include "msvcrt_compat.h"          // MsvcrtAtoi (retail MSVCRT.DLL atoi wraps)
 
 #include <windows.h>
+#include "../include/platform.h"
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -711,7 +712,7 @@ bool __cdecl PlayerData_SaveGame(PlayerData& Slot, char const* Name,
             sprintf(Candidate, "Save%04x", static_cast<int>(static_cast<short>(Seed))); // MOVSX
             char Probe[0x104];
             _makepath(Probe, nullptr, AccountDir, Candidate, "fl");
-            if (GetFileAttributesA(Probe) == INVALID_FILE_ATTRIBUTES &&
+            if (Platform::PathAttributes(Probe) == Platform::kInvalidAttributes &&
                 GetLastError() == ERROR_FILE_NOT_FOUND) {
                 FileName.assign(Candidate, strlen(Candidate));
                 break;
@@ -753,7 +754,7 @@ bool __cdecl PlayerData_MissionSave(PlayerData& Slot, unsigned int DescripStrId)
 
     // .text:06d4c7e9 -- CopyFileA(last written path, dest, FALSE); its BOOL is
     // what AL carries out.
-    return CopyFileA(GServerLastSavePath, Destination, FALSE) != 0;
+    return Platform::FileCopy(GServerLastSavePath, Destination, false);
 }
 
 // ===========================================================================
@@ -1130,7 +1131,7 @@ bool __cdecl PlayerData_CreateNewCharacter(PlayerData& Slot, SCreateCharacterInf
         if (Writer.Open(Path)) {
             // .text:06d4ba0b .. .text:06d4ba5d -- the template beside the exe.
             char ModulePath[0x104];
-            GetModuleFileNameA(nullptr, ModulePath, 0x104);
+            Platform::ModulePath(nullptr, ModulePath, 0x104);
             char Drive[_MAX_DRIVE];
             char Dir[0x104];
             _splitpath(ModulePath, Drive, Dir, nullptr, nullptr);

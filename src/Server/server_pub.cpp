@@ -4,38 +4,39 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-#include "../include/common_server.h"
-#include "../include/common_pathfind.h" // PathfindManager (pub::AI::SubmitState)
-#include "../include/common_id.h"
-#include "../include/common_goods.h"
-#include "../include/common_universe.h"
-#include "../include/common_archetype.h"
-#include "../include/common_reputation.h"
-#include "../include/common_iface.h"
-#include "../include/common_cobjdb.h"
-#include "../include/common_csys.h"
-#include "../include/common_cobject.h"
-#include "../include/common_server_playerdb.h"
-#include "../include/server_exports.h"
-#include "../include/server_basedb.h"
-#include "../include/server_cobject.h"
-#include "../include/common_physys.h"
-#include "../include/server_gameobject.h"
-#include "../include/server_cship.h"
-#include "../include/server_sysdb.h"
-#include "../include/common_misc.h"
-#include "../include/common_net.h"      // IsMPServer (AdjustCash's gate)
-#include "../include/common_newchar.h"   // RtcSlider::get_slider (pub::GF::GetRtcPerformanceSlider)
-#include "../include/DALib.h"            // DALib::Engine (pub::FindHardpoint releases the archetype handle)
-#include "../include/readfile.h"         // IFileSystem::GetFileSysPath (+0x84, pub::BuildBaseReader)
-#include "../include/x86math.h"      // I3DMathEngine::MatrixToQuaternion (pub::Player::SetCamera)
-#include "../include/server_createinfo.h" // Server_Acquire3DMathEngine (FUN_06d5ff70)
-#include "../include/rpc_iclient.h"
-#include "../include/rpc_iclient_args.h" // FPayloadServerSetDirective (pub::AI::SubmitDirective)
-#include "../include/server_savefile.h"   // SaveGame_Writer / ISave / Server_FLS1Transform
-#include "../include/server_savegame.h"   // pub::Save -> PlayerData_AutoSave / PlayerData_MissionSave
-#include "../include/common_casteroid.h"
+#include "common_server.h"
+#include "common_pathfind.h" // PathfindManager (pub::AI::SubmitState)
+#include "common_id.h"
+#include "common_goods.h"
+#include "common_universe.h"
+#include "common_archetype.h"
+#include "common_reputation.h"
+#include "common_iface.h"
+#include "common_cobjdb.h"
+#include "common_csys.h"
+#include "common_cobject.h"
+#include "common_server_playerdb.h"
+#include "server_exports.h"
+#include "server_basedb.h"
+#include "server_cobject.h"
+#include "common_physys.h"
+#include "server_gameobject.h"
+#include "server_cship.h"
+#include "server_sysdb.h"
+#include "common_misc.h"
+#include "common_net.h"      // IsMPServer (AdjustCash's gate)
+#include "common_newchar.h"   // RtcSlider::get_slider (pub::GF::GetRtcPerformanceSlider)
+#include "DALib.h"            // DALib::Engine (pub::FindHardpoint releases the archetype handle)
+#include "readfile.h"         // IFileSystem::GetFileSysPath (+0x84, pub::BuildBaseReader)
+#include "x86math.h"      // I3DMathEngine::MatrixToQuaternion (pub::Player::SetCamera)
+#include "server_createinfo.h" // Server_Acquire3DMathEngine (FUN_06d5ff70)
+#include "rpc_iclient.h"
+#include "rpc_iclient_args.h" // FPayloadServerSetDirective (pub::AI::SubmitDirective)
+#include "server_savefile.h"   // SaveGame_Writer / ISave / Server_FLS1Transform
+#include "server_savegame.h"   // pub::Save -> PlayerData_AutoSave / PlayerData_MissionSave
+#include "common_casteroid.h"
 #include <windows.h>
+#include "../include/platform.h"
 #include <cstdint>
 #include <new>
 #include <cmath>
@@ -558,7 +559,7 @@ SERVER_API HINSTANCE __cdecl DLL_LoadLibrary(const char* DllPath) {
         _makepath(Joined, nullptr, GDllPath, DllPath, nullptr);
         _fullpath(FullPath, Joined, 0x104);
     }
-    HMODULE Module = LoadLibraryA(FullPath);
+    HMODULE Module = Platform::ModuleLoad(FullPath);
     if (Module == nullptr) {
         FDUMP(0x100002, "%s(%d) : *** WARNING: failed to load mission DLL '%s'\n",
               "E:\\FL\\Scratch\\Source\\Server\\dlls.cpp", 0x1de, FullPath);
@@ -1316,7 +1317,7 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
     {
         SYSTEMTIME SysTime;
         FILETIME FileTime;
-        GetLocalTime(&SysTime);
+        Platform::LocalTime(&SysTime);
         SystemTimeToFileTime(&SysTime, &FileTime);
         char TstampBuf[64];
         sprintf_s(TstampBuf, "%u,%u", FileTime.dwHighDateTime, FileTime.dwLowDateTime);

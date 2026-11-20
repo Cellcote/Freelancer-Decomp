@@ -5,21 +5,22 @@
 // Author: Giperion.
 
 #include <windows.h>
+#include "../include/platform.h"
 #define RPCLOCAL_EXPORTS
 #define REMOTESERVER_INSTANCE_DEFINITION
-#include "../include/rpc_iserver.h"
+#include "rpc_iserver.h"
 #undef REMOTESERVER_INSTANCE_DEFINITION
-#include "../include/common_server.h"
-#include "../include/rpc_iclient.h"
-#include "../include/freelancer_client.h"
-#include "../include/common_misc.h" // SinglePlayer
+#include "common_server.h"
+#include "rpc_iclient.h"
+#include "freelancer_client.h"
+#include "common_misc.h" // SinglePlayer
 // CollisionGroupDesc's complete definition (ch2 0x48, IClient::SendServerSetCollisionGroups).
-#include "../include/common_archetype.h"
-#include "../include/dalib_net.h"
-#include "../include/rpc_packet.h"
-#include "../include/rpc_packet_codec.h"
-#include "../include/rpc_server_channel_codec.h" // Canonical hardpoint dictionary builder.
-#include "../include/msvcrt_compat.h"
+#include "common_archetype.h"
+#include "dalib_net.h"
+#include "rpc_packet.h"
+#include "rpc_packet_codec.h"
+#include "rpc_server_channel_codec.h" // Canonical hardpoint dictionary builder.
+#include "msvcrt_compat.h"
 #include "rpc_server_channel_receive_private.h"
 
 #include <list>
@@ -27,7 +28,7 @@
 #include <cstdlib>
 #include <cwchar>
 
-#include "../include/rpc_iclient_args.h"
+#include "rpc_iclient_args.h"
 
 namespace
 {
@@ -45,11 +46,11 @@ namespace
     // FUN_06bd1000: the caller's SStartupInfo owns the client-module path.
     IClient* LoadClientModule(const char* ModulePath)
     {
-        GClientModule = LoadLibraryA(ModulePath);
+        GClientModule = Platform::ModuleLoad(ModulePath);
         if (GClientModule != nullptr) {
-            FGetClientInterface ClientGetter = reinterpret_cast<FGetClientInterface>(GetProcAddress(GClientModule, "GetClientInterface"));
+            FGetClientInterface ClientGetter = reinterpret_cast<FGetClientInterface>(Platform::ModuleSymbol(GClientModule, "GetClientInterface"));
             GLoadedClient = ClientGetter();
-            FGetChatClientInterface ChatGetter = reinterpret_cast<FGetChatClientInterface>(GetProcAddress(GClientModule, "GetChatClientInterface"));
+            FGetChatClientInterface ChatGetter = reinterpret_cast<FGetChatClientInterface>(Platform::ModuleSymbol(GClientModule, "GetChatClientInterface"));
             GLoadedChatClient = ChatGetter();
         }
         return GLoadedClient;
@@ -59,7 +60,7 @@ namespace
     void UnloadClientModule()
     {
         if (GClientModule != nullptr) {
-            FreeLibrary(GClientModule);
+            Platform::ModuleFree(GClientModule);
             GClientModule = nullptr;
             GLoadedClient = nullptr;
             GLoadedChatClient = nullptr;
@@ -121,7 +122,7 @@ bool FRemoteServerImpl::Startup(const SStartupInfo& Info)
             }
         }
     }
-    InitializeCriticalSection(&CriticalSection);
+    Platform::LockInit(&CriticalSection);
     return bResult;
 }
 
@@ -138,7 +139,7 @@ void FRemoteServerImpl::Shutdown()
     if (Serializer != nullptr) {
         Serializer->Release();
     }
-    DeleteCriticalSection(&CriticalSection);
+    Platform::LockDelete(&CriticalSection);
     UnloadClientModule();
 }
 
@@ -185,7 +186,7 @@ void FRemoteServerClient::OnConnect(long Result)
 {
     if (Result != 0) {
         typedef void (__cdecl* FHandleConnectError)(long);
-        FHandleConnectError Handler = reinterpret_cast<FHandleConnectError>(GetProcAddress(GetModuleHandleA(nullptr), "HandleConnectError"));
+        FHandleConnectError Handler = reinterpret_cast<FHandleConnectError>(Platform::ModuleSymbol(Platform::ModuleFind(nullptr), "HandleConnectError"));
         Handler(Result);
     }
 }

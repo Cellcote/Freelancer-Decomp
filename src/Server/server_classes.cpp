@@ -4,35 +4,36 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-#include "../include/common_server.h"
-#include "../include/common_net.h"
-#include "../include/common_physys.h"
-#include "../include/common_ivp_real_object.h" // IVP_Real_Object +0x1c/+0xa4 (StarSystem_MpCollisionFilter)
-#include "../include/common_cequip.h" // TractorArm
-#include "../include/common_casteroid.h" // CmnAsteroid::CAsteroidSystem (SrvAsteroidSystem AddRef/Release/get_sys_id)
-#include "../include/common_id.h"
-#include "../include/common_server_playerdb.h"
-#include "../include/server_savegame.h" // PlayerData_CreateNewCharacter (retail FUN_06d4b790)
-#include "../include/server_savefile.h" // Server_AccountDirName / Server_GetAccountsRoot (FUN_06d49f60)
-#include "../include/common_ini.h"
-#include "../include/common_misc.h"
-#include "../include/x86math.h" // I3DMathEngine
-#include "../include/common_universe.h"
-#include "../include/common_reputation.h"
-#include "../include/server_sysdb.h"
-#include "../include/server_gameobject.h" // GameObject's +0x154..+0x160 slots (StarSystem::remove_player/unload)
-#include "../include/common_cobjdb.h"  // IObjDB::GetZoneDb (SrvAsteroid_UpdateSystem, FUN_06d03480)
-#include "../include/DALib.h"          // DALib::Data (SrvAsteroid's GetFileSysPath calls)
-#include "../include/readfile.h"       // IFileSystem::GetFileSysPath (+0x84), create_restart_file
-#include "../include/server_createinfo.h"
-#include "../include/server_characterset.h" // CCharacterSet (FUN_06d499c0)
-#include "../include/common_goods.h"    // AmbientScriptProperties (server_basedb.h uses it by value)
-#include "../include/server_basedb.h"
-#include "../include/rpc_iclient.h"
-#include "../include/rpc_iclient_args.h" // FServerSetReputationInfo / FPayloadServerActivateObject (add_player MP walk)
-#include "../include/md5hash.h"      // MD5HASH_API: Server exports its implicit members like retail
+#include "common_server.h"
+#include "common_net.h"
+#include "common_physys.h"
+#include "common_ivp_real_object.h" // IVP_Real_Object +0x1c/+0xa4 (StarSystem_MpCollisionFilter)
+#include "common_cequip.h" // TractorArm
+#include "common_casteroid.h" // CmnAsteroid::CAsteroidSystem (SrvAsteroidSystem AddRef/Release/get_sys_id)
+#include "common_id.h"
+#include "common_server_playerdb.h"
+#include "server_savegame.h" // PlayerData_CreateNewCharacter (retail FUN_06d4b790)
+#include "server_savefile.h" // Server_AccountDirName / Server_GetAccountsRoot (FUN_06d49f60)
+#include "common_ini.h"
+#include "common_misc.h"
+#include "x86math.h" // I3DMathEngine
+#include "common_universe.h"
+#include "common_reputation.h"
+#include "server_sysdb.h"
+#include "server_gameobject.h" // GameObject's +0x154..+0x160 slots (StarSystem::remove_player/unload)
+#include "common_cobjdb.h"  // IObjDB::GetZoneDb (SrvAsteroid_UpdateSystem, FUN_06d03480)
+#include "DALib.h"          // DALib::Data (SrvAsteroid's GetFileSysPath calls)
+#include "readfile.h"       // IFileSystem::GetFileSysPath (+0x84), create_restart_file
+#include "server_createinfo.h"
+#include "server_characterset.h" // CCharacterSet (FUN_06d499c0)
+#include "common_goods.h"    // AmbientScriptProperties (server_basedb.h uses it by value)
+#include "server_basedb.h"
+#include "rpc_iclient.h"
+#include "rpc_iclient_args.h" // FServerSetReputationInfo / FPayloadServerActivateObject (add_player MP walk)
+#include "md5hash.h"      // MD5HASH_API: Server exports its implicit members like retail
 #include <windows.h>
 #include <mmsystem.h>
+#include "../include/platform.h"
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
@@ -411,7 +412,7 @@ static void InitServerAccount(CPlayerAccount& ServerAccount, unsigned int& OutSe
             if (fopen_s(&File, CfgPath, "wb") != 0 || File == nullptr) {
                 return;
             }
-            srand(timeGetTime());
+            srand(Platform::TimerMs());
             unsigned int Salt = ((unsigned int)rand() << 16) | ((unsigned int)rand() & 0xffff);
             unsigned int IdA = ((unsigned int)rand() << 16) | ((unsigned int)rand() & 0xffff);
             unsigned int IdB = ((unsigned int)rand() << 16) | ((unsigned int)rand() & 0xffff);
@@ -490,7 +491,7 @@ static void LoadCheatMessage() {
     }
 
     char ModulePath[260];
-    GetModuleFileNameA(nullptr, ModulePath, sizeof(ModulePath));
+    Platform::ModulePath(nullptr, ModulePath, sizeof(ModulePath));
 
     char Drive[4], Dir[260];
     _splitpath(ModulePath, Drive, Dir, nullptr, nullptr);
@@ -715,7 +716,7 @@ void PlayerData_ReportCheat(PlayerData& Slot, int Reason) {
     FILE* Log = fopen(LogPath, "a+");
     if (Log != nullptr) {
         SYSTEMTIME Now;
-        GetLocalTime(&Now);
+        Platform::LocalTime(&Now);
         fprintf(Log, "%d/%d/%d %.2d:%.2d:%.2d Possible cheating detected (",
                 (unsigned int)Now.wMonth, (unsigned int)Now.wDay, (unsigned int)Now.wYear,
                 (unsigned int)Now.wHour, (unsigned int)Now.wMinute, (unsigned int)Now.wSecond);
@@ -3506,7 +3507,7 @@ bool PlayerDB::create_restart_file(const char* AccountDir) {
     }
 
     char TemplatePath[0x104];
-    GetModuleFileNameA(nullptr, TemplatePath, 0x104);                       // .text:06d537b2
+    Platform::ModulePath(nullptr, TemplatePath, 0x104);                     // .text:06d537b2
     char Drive[4];
     char Dir[0x100];
     _splitpath(TemplatePath, Drive, Dir, nullptr, nullptr);                 // .text:06d537ce
