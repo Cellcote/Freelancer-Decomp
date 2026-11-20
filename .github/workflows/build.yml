@@ -826,6 +826,24 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      # Diagnostic: full crash dumps of the x64 programs, read by the "x64 crash dumps" step.
+      - name: x64 crash dump setup
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $folder = Join-Path (Resolve-Path bin_x64) 'dumps'
+          New-Item -ItemType Directory -Path $folder -Force | Out-Null
+          foreach ($image in 'FLDedicated.exe', 'FLRegress.exe') {
+            $key = "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\$image"
+            New-Item -Path $key -Force | Out-Null
+            New-ItemProperty -Path $key -Name DumpFolder -PropertyType ExpandString -Value $folder -Force | Out-Null
+            New-ItemProperty -Path $key -Name DumpType -PropertyType DWord -Value 2 -Force | Out-Null
+            New-ItemProperty -Path $key -Name DumpCount -PropertyType DWord -Value 10 -Force | Out-Null
+          }
+
+      # The x64 server hosts through DPNet (docs/dpnet.md); DPNetCheck joins it with Microsoft's
+
       # The x64 server hosts through DPNet (docs/dpnet.md); DPNetInteropTest joins it with Microsoft's
       # DirectPlay 8 client, as a retail Freelancer client does.
       - name: FLDedicated x64 (DPNet), start, join with Microsoft's client, run and stop
@@ -924,36 +942,25 @@ jobs:
 
       # Diagnostic, report-only: the x64 FLDedicated sometimes dies early in startup, and x86math.dll
       # and Content.dll then fail to load (an exception in a DLL's startup code fails the load).
-      # Six starts under cdb on the normal heap, with the loader's own log on (show loader snaps,
-      # through Image File Execution Options, removed afterwards). Every first-chance access
-      # violation prints a stack, so one caught by the loader shows up too.
-      - name: x64 startup diagnostics
+      # It does not happen under a debugger, so Windows Error Reporting writes a full dump of any
+      # x64 FLDedicated / FLRegress crash (LocalDumps, set before the runs), and this step prints
+      # the exception and stack from each dump. The dumps hold game data and are not uploaded.
+      - name: x64 crash dumps
         if: always() && steps.dedicated_x64.outcome != 'skipped'
         continue-on-error: true
-        timeout-minutes: 10
         shell: pwsh
         working-directory: bin_x64
-        env:
-          FL_HIGH_MEMORY: '1'
-          _NO_DEBUG_HEAP: '1'
         run: |
+          $dumps = Get-ChildItem -Path dumps -Filter *.dmp -ErrorAction SilentlyContinue
+          Write-Host "dumps: $(@($dumps).Count)"
           $cdb = 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe'
           if (-not (Test-Path $cdb)) { Write-Host 'cdb not found'; exit 0 }
           $env:_NT_SYMBOL_PATH = (Get-Location).Path
-          $keep = '- ERROR|unable to load|failed to load mission|ready for log in|first chance|second chance|^\s*[0-9a-f]{2} [0-9a-f`(]'
-          $ifeo = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\FLDedicated.exe'
-          New-Item -Path $ifeo -Force | Out-Null
-          New-ItemProperty -Path $ifeo -Name GlobalFlag -PropertyType DWord -Value 2 -Force | Out-Null
-          try {
-            foreach ($attempt in 1..6) {
-              Write-Host "=== FLDedicated under cdb, attempt $attempt"
-              & $cdb -lines -G -c 'sxe -c "kn 30;gc" av; g; q' .\FLDedicated.exe --name CI --port 2302 --run-for 3 2>&1 |
-                Select-String -Pattern $keep |
-                Where-Object { $_.Line -notmatch 'Break instruction' } |
-                Select-Object -First 60 | ForEach-Object { Write-Host $_.Line }
-            }
-          } finally {
-            Remove-Item -Path $ifeo -Recurse -Force
+          foreach ($dump in @($dumps)) {
+            Write-Host "=== $($dump.Name)"
+            & $cdb -lines -z $dump.FullName -c '.lastevent; .ecxr; kn 40; q' 2>&1 |
+              Select-String -Pattern '^\s*[0-9a-f]{2} |Last event|Access violation|exception|ExceptionAddress|^\w+!|\.(cpp|h)' |
+              Select-Object -First 80 | ForEach-Object { Write-Host $_.Line }
           }
           exit 0
 
