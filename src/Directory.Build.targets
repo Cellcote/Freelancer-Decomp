@@ -141,7 +141,8 @@
     </ClCompile>
     <ClCompile Update="..\IVP\**\*.cpp;common_misc.cpp;common_mpcritsec.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <ForcedIncludeFiles></ForcedIncludeFiles>
+      <!-- Only Directory.Build.props's forced include, without fl_pch.h. -->
+      <ForcedIncludeFiles>fl_layout.h</ForcedIncludeFiles>
     </ClCompile>
   </ItemGroup>
 </Project>
