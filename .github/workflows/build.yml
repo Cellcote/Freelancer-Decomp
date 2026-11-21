@@ -943,15 +943,17 @@ jobs:
       # Diagnostic, report-only: the x64 FLDedicated sometimes dies early in startup, and x86math.dll
       # and Content.dll then fail to load (an exception in a DLL's startup code fails the load).
       # It does not happen under a debugger, so Windows Error Reporting writes a full dump of any
-      # x64 FLDedicated / FLRegress crash (LocalDumps, set before the runs), and this step prints
-      # the exception and stack from each dump. The dumps hold game data and are not uploaded.
+      # x64 FLDedicated crash (LocalDumps, set before the runs). FLRegress has its own crash
+      # handler, which writes its dump under crashes and ends the process before Windows sees the
+      # crash. This step prints the exception and stack from the dumps in both folders. The dumps
+      # hold game data and are not uploaded.
       - name: x64 crash dumps
         if: always() && steps.dedicated_x64.outcome != 'skipped'
         continue-on-error: true
         shell: pwsh
         working-directory: bin_x64
         run: |
-          $dumps = Get-ChildItem -Path dumps -Filter *.dmp -ErrorAction SilentlyContinue
+          $dumps = @('dumps', 'crashes') | ForEach-Object { Get-ChildItem -Path $_ -Filter *.dmp -ErrorAction SilentlyContinue }
           Write-Host "dumps: $(@($dumps).Count)"
           $cdb = 'C:\Program Files (x86)\Windows Kits\10\Debuggers\x64\cdb.exe'
           if (-not (Test-Path $cdb)) { Write-Host 'cdb not found'; exit 0 }
