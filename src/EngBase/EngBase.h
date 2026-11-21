@@ -13,6 +13,7 @@
 #include "luaprofile.h"
 #include "engine/engbase.h"
 #include "x86math.h"
+#include "x64_low_arena.h"
 
 #include <cstddef>
 #include <list>
@@ -444,6 +445,9 @@ using FAnimNameMap = std::map<unsigned long, FAnimNameEntry>;
 class FAnimScript
 {
 public:
+    // Port-only: Common keeps the handle in a 32-bit field (Archetype::Root::AnimIndex), so
+    // on x64 it stays below 2 GB (x64_low_arena.h). Nothing on Win32.
+    FL_LOW_ARENA_NEW
     // LAB_06612df0 (vtable +0x00): OR EAX,-1 / RET 0xC -- two arguments ignored, answers -1.
     // The same body is also referenced from 06629714 (ICF fold); its name is not recovered.
     virtual unsigned long DACOM_API RejectOperation(void* ArgA, void* ArgB); // formerly Slot00
