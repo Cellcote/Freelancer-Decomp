@@ -7,7 +7,8 @@
 #pragma once
 
 // Public Common.dll ABI since 2026-10-14; included as "ivp_physics/ivp_controller.h" through
-// the src/IVP include root (formerly src/IVP/ivp_physics/ivp_controller.h). Common exports
+// the src/IVP include root. Formerly declared in src/include/common_ivp_controller.h: replace
+// that include with "ivp_physics/ivp_controller.h". Common exports
 // classes built on these bases (CRemotePhysicsController : IVP_Controller_Golem,
 // PhySys::Controller, the engine controllers) and Server.dll dynamic_casts
 // CObject::GolemController (IVP_Controller*) at .text:06d4d672, so the hierarchy is a

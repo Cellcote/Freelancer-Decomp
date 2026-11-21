@@ -1,7 +1,7 @@
 # Индекс типов с виртуальными методами
 
 Сгенерировано `tools/abi.py build` — руками не править.
-`public` = объявлен в `src/include/` (виден всем проектам через `Directory.Build.props`); `private` = виден только своему модулю.
+`public` = часть межпроектного ABI: объявлен в `src/include/` или в заголовке IVP, который Common.dll экспортирует другим DLL (`src/IVP/ivp_physics/ivp_controller.h`, `src/IVP/ivp_physics/ivp_real_object.h`; `src/IVP` в include path всех проектов через `Directory.Build.props`, но остальные заголовки IVP — `private (Common)`); `private` = виден только своему модулю.
 «Своих» — объявленные в самом типе; «всего» — с унаследованными слотами (т.е. `всего*4` = размер vtable в байтах).
 
 | Тип | Своих | Всего | Где объявлен | Видимость | База |

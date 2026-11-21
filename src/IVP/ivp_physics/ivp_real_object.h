@@ -8,7 +8,8 @@
 
 // Common.dll's IVP object hierarchy (IVP_Object .. IVP_Real_Object, IVP_Polygon, IVP_Ball).
 // Public Common.dll ABI since 2026-10-14; included as "ivp_physics/ivp_real_object.h" through
-// the src/IVP include root (formerly src/IVP/ivp_physics/ivp_real_object.h). Server.dll reads
+// the src/IVP include root. Formerly declared in src/include/common_ivp_real_object.h: replace
+// that include with "ivp_physics/ivp_real_object.h". Server.dll reads
 // IVP_Real_Object fields directly (StarSystem_MpCollisionFilter 06d06c30: client_data +0xa4,
 // first_child +0x1c; the mine push 06cf3c03: core +0x98), and the client's collision filter
 // LAB_005544e0 reads client_data, so the layout is a cross-DLL contract.
