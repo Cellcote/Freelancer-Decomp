@@ -1,0 +1,89 @@
+name: Build benchmark (temporary)
+
+on:
+  workflow_dispatch:
+
+env:
+  DX8_SDK_URL: https://archive.org/download/dx81sdk_full/dx81sdk_full.exe
+  DX8_SDK_MD5: 28533018267fa278bb1c603a67d86d2f
+
+jobs:
+  bench:
+    name: Bench ${{ matrix.rep }}
+    runs-on: windows-2022
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        rep: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Cache DirectX 8.1 SDK
+        id: dx8-cache
+        uses: actions/cache@v4
+        with:
+          path: dx8
+          key: dx8-sdk-${{ env.DX8_SDK_MD5 }}
+
+      - name: Fetch DirectX 8.1 SDK headers and libraries
+        if: steps.dx8-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $env:RUNNER_TEMP 'dx81sdk_full.exe'
+          curl.exe --fail --location --retry 3 --silent --show-error -o $exe $env:DX8_SDK_URL
+          $md5 = (Get-FileHash -Algorithm MD5 $exe).Hash.ToLowerInvariant()
+          if ($md5 -ne $env:DX8_SDK_MD5) { throw "DX8 SDK checksum mismatch: $md5" }
+          $tmp = Join-Path $env:RUNNER_TEMP 'dx8x'
+          New-Item -ItemType Directory -Force $tmp | Out-Null
+          tar -xf $exe -C $tmp DXF/DXSDK/include DXF/DXSDK/lib
+          if ($LASTEXITCODE -ne 0) { throw "tar failed with exit code $LASTEXITCODE" }
+          New-Item -ItemType Directory -Force dx8 | Out-Null
+          Move-Item (Join-Path $tmp 'DXF/DXSDK/include') dx8/include
+          Move-Item (Join-Path $tmp 'DXF/DXSDK/lib') dx8/lib
+          if (-not (Test-Path dx8/include/d3d8.h) -or -not (Test-Path dx8/lib/d3d8.lib)) {
+            throw 'DX8 SDK layout not as expected'
+          }
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Benchmark
+        shell: pwsh
+        run: |
+          $cpu = (Get-CimInstance Win32_Processor | Select-Object -First 1).Name
+          Write-Host "CPU: $cpu, logical cores: $env:NUMBER_OF_PROCESSORS"
+          $base = '96dd979c38547491bbceac92813ac3e4cf04f553'
+          $pch = 'a4c3ba1'
+          $common = @('-m', '-nologo', '-v:minimal', '-p:Configuration=Release', '-p:Platform=Win32',
+                      '-p:UseMultiToolTask=true', '-p:EnforceProcessCountAcrossBuilds=true')
+          $runs = @(
+            @{ name = 'A master, one pass'; rev = $base; two = $false },
+            @{ name = 'C PCH, one pass'; rev = $pch; two = $false },
+            @{ name = 'B master, two passes'; rev = $base; two = $true },
+            @{ name = 'D PCH, two passes'; rev = $pch; two = $true },
+            @{ name = 'A master, one pass (again)'; rev = $base; two = $false },
+            @{ name = 'C PCH, one pass (again)'; rev = $pch; two = $false }
+          )
+          $results = @()
+          foreach ($r in $runs) {
+            git checkout -q --force $r.rev
+            git clean -xdfq -e dx8
+            $sw = [Diagnostics.Stopwatch]::StartNew()
+            if ($r.two) {
+              msbuild src\Freelancer.sln -t:BuildCompile -p:BuildProjectReferences=false @common | Out-Null
+              if ($LASTEXITCODE -ne 0) { throw "$($r.name): compile pass failed" }
+              $mid = $sw.Elapsed.TotalSeconds
+            }
+            msbuild src\Freelancer.sln -t:Build @common | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "$($r.name): build failed" }
+            $t = [math]::Round($sw.Elapsed.TotalSeconds)
+            $line = "{0,-30} {1,5}s" -f $r.name, $t
+            if ($r.two) { $line += "  (compile pass {0}s)" -f [math]::Round($mid) }
+            Write-Host $line
+            $results += $line
+          }
+          "CPU: $cpu" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          $results | ForEach-Object { "    $_" } | Out-File -Append $env:GITHUB_STEP_SUMMARY
