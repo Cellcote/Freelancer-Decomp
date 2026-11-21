@@ -81,17 +81,25 @@ jobs:
 
       - uses: microsoft/setup-msbuild@v2
 
+      # Two passes, compile then link, as in build.yml (which says why).
       - name: Build
-        run: >-
-          msbuild src\Freelancer.sln -t:Build -m -nologo -v:minimal
-          -p:Configuration=${{ matrix.configuration }} -p:Platform=${{ matrix.platform }}
-          -p:UseMultiToolTask=true -p:EnforceProcessCountAcrossBuilds=true
-          -clp:PerformanceSummary -bl:msbuild.binlog
+        shell: pwsh
+        env:
+          FL_BUILD_ARGS: >-
+            -m -nologo -v:minimal
+            -p:Configuration=${{ matrix.configuration }} -p:Platform=${{ matrix.platform }}
+            -clp:PerformanceSummary
+        run: |
+          $common = $env:FL_BUILD_ARGS -split '\s+' | Where-Object { $_ }
+          msbuild src\Freelancer.sln -t:BuildCompile -p:BuildProjectReferences=false @common -bl:msbuild-compile.binlog
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          msbuild src\Freelancer.sln -t:Build @common -bl:msbuild.binlog
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: msbuild-binlog-${{ matrix.configuration }}-${{ matrix.platform }}
-          path: msbuild.binlog
+          path: msbuild*.binlog
           retention-days: 7

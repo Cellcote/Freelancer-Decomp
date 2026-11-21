@@ -175,28 +175,40 @@ jobs:
 
       - uses: microsoft/setup-msbuild@v2
 
-      # MultiToolTask runs each source file as its own compiler process, and
-      # EnforceProcessCountAcrossBuilds caps those processes across all projects at the core
-      # count. Idle cores then pick up files from any project, so the projects on the critical
-      # path (Common, freelancer) are not stuck behind small single-threaded libraries.
-      # Neither changes the compiler or linker options.
+      # Two passes. The first compiles every project at once (BuildCompile, and no project
+      # references, so no project waits for another); the second is the normal build, which
+      # finds every object up to date and only links, in dependency order. In one pass a project
+      # starts compiling only once every project it references has linked, so freelancer's 245
+      # files waited behind Common's compile and link. Nothing in the tree generates sources,
+      # so the compile pass needs nothing another project builds. Neither pass changes the
+      # compiler or linker options. MultiToolTask and its process cap are on in
+      # Directory.Build.props; they are passed here too for the base side, whose checkout may
+      # predate that.
       # The PR side builds RPGPU on both platforms (FreelancerRpGpu is off by default on Win32)
       # and fails if vcpkg is missing rather than skipping it. The base side only feeds the
       # Win32 FLRegress and RpcCodecTest comparisons, which RPGPU is not part of.
       - name: Build
-        run: >-
-          msbuild src\Freelancer.sln -t:Build -m -nologo -v:minimal
-          -p:Configuration=Release -p:Platform=${{ matrix.platform }}
-          ${{ matrix.side == 'pr' && '-p:FreelancerRpGpu=1 -p:FreelancerRequireVcpkg=true' || '' }}
-          -p:UseMultiToolTask=true -p:EnforceProcessCountAcrossBuilds=true
-          -clp:PerformanceSummary -bl:msbuild.binlog
+        shell: pwsh
+        env:
+          FL_BUILD_ARGS: >-
+            -m -nologo -v:minimal
+            -p:Configuration=Release -p:Platform=${{ matrix.platform }}
+            ${{ matrix.side == 'pr' && '-p:FreelancerRpGpu=1 -p:FreelancerRequireVcpkg=true' || '' }}
+            -p:UseMultiToolTask=true -p:EnforceProcessCountAcrossBuilds=true
+            -clp:PerformanceSummary
+        run: |
+          $common = $env:FL_BUILD_ARGS -split '\s+' | Where-Object { $_ }
+          msbuild src\Freelancer.sln -t:BuildCompile -p:BuildProjectReferences=false @common -bl:msbuild-compile.binlog
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          msbuild src\Freelancer.sln -t:Build @common -bl:msbuild.binlog
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload build log
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.side == 'base' && 'msbuild-binlog-base' || (matrix.platform == 'x64' && 'msbuild-binlog-x64' || 'msbuild-binlog') }}
-          path: msbuild.binlog
+          path: msbuild*.binlog
           retention-days: 7
 
       - name: Upload x64 binaries
