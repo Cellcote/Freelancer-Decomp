@@ -2013,7 +2013,7 @@ static bool DeliverSetReputation(const FPacketBase* Packet, IClient* Client, ICh
     }
 
     const FRpcRelationList* List =
-        reinterpret_cast<const FRpcRelationList*>(Packet->Payload() + 0x28);
+        &reinterpret_cast<const FPayloadServerSetReputation*>(Packet->Payload())->Relations;
     // 06d81490..06d81497 FUN_06d927e0(packet, &local): the packet's list is copied into a
     // stack list -- its dummy read untested (06d927e1..06d927e5; the packet constructor
     // always builds it, 06d9d30c..06d9d31a), a fresh new(8) per value, and NULL VALUES
@@ -2130,7 +2130,7 @@ static bool DeliverSetGroupFeelings(const FPacketBase* Packet, IClient* Client,
     strncpy(Info.Name, Wire.Name, Wire.NameSize);
 
     const FRpcRelationList* List =
-        reinterpret_cast<const FRpcRelationList*>(Packet->Payload() + 0x08);
+        &reinterpret_cast<const FPayloadServerSetGroupFeelings*>(Packet->Payload())->Relations;
     // 06d815fa..06d81601 FUN_06d91d20(packet, &local): the packet's list is copied into a
     // stack list -- its dummy read untested (06d91d21..06d91d25; the packet constructor
     // always builds it, 06d9c59f), a fresh new(8) per value, NULL VALUES SKIPPED

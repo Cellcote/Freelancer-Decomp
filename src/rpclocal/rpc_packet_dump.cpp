@@ -133,7 +133,9 @@ void RpcDumpServerLoginResponse(const FPacketBase& Packet, std::ostream& Out) {
 //   06d93315 JZ LAB_06d93342        <- writes nothing at all when the count is zero
 // ---------------------------------------------------------------------------
 void RpcDumpServerCharacterInfo(const FPacketBase& Packet, std::ostream& Out) {
-    const unsigned int Count = Packet.PayloadDwords()[3];     // 06d93310  packet+0x2c
+    // 06d93310  packet+0x2c, the record list's size
+    const unsigned int Count =
+        reinterpret_cast<const FPayloadServerCharacterInfo*>(Packet.Payload())->Records.Size;
     if (Count == 0) {
         return;                                               // 06d93315
     }

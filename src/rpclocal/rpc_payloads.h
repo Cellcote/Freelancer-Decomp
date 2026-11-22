@@ -55,6 +55,7 @@
 
 class IClient;
 class IChatClient;
+struct FRpcEquipWireHandle;   // rpc_containers.h
 
 // ===========================================================================
 // Argument slots
@@ -392,7 +393,7 @@ FL_LAYOUT_ASSERT(sizeof(FPayloadCommonTractorObjects) == 0x18, "TRACTOROBJECTS p
 // +0x04) and 0x06d8c081 (a dword at +0x08), and read back by caseD_3d at 0x06d82a64
 // and 0x06d82a7d. Registry size 0x2c.
 struct FPayloadServerRemoteObjectCargoUpdate {
-    unsigned int EquipHandle;    // +0x00, owned by the packet
+    FRpcEquipWireHandle* EquipHandle; // +0x00, owned by the packet
     unsigned char Field_0x04;    // +0x04  TODO: semantics unproven (a mode/flag byte)
     unsigned char Pad_0x05[3];   // +0x05
     unsigned int Field_0x08;     // +0x08  TODO: semantics unproven (an object id)

@@ -599,12 +599,13 @@ static bool MarshalSaveGame(FPacketBase* Packet, const RpcArg* Args, unsigned in
             RpcCopyIntoPacketBlock(Description, static_cast<unsigned int>(RpcWideBytes(Count))));
         StoredCount = Count;
     }
-    RpcPayloadWrite(Packet, 0x200, Block);
-    return RpcPayloadWrite(Packet, 0x204, StoredCount);
+    RpcPayloadWrite(Packet, offsetof(FPayloadClientSaveGame, Description), Block);
+    return RpcPayloadWrite(Packet, offsetof(FPayloadClientSaveGame, DescriptionCount), StoredCount);
 }
 
 static bool DeliverSaveGame(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const wchar_t* Description = RpcPayloadRead<wchar_t*>(Packet, 0x200);
+    const wchar_t* Description =
+        RpcPayloadRead<wchar_t*>(Packet, offsetof(FPayloadClientSaveGame, Description));
     Server->SaveGame(*reinterpret_cast<const CHARACTER_ID*>(Packet->Payload()), Description, SessionId);
     return true;
 }
