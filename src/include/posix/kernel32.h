@@ -21,6 +21,7 @@
 
 #include <cerrno>
 #include <cstdint>
+#include <cstdlib>
 #include <map>
 #include <mutex>
 #include <string>
@@ -525,6 +526,30 @@ inline BOOL VirtualFree(LPVOID Block, SIZE_T Size, DWORD Type)
         PosixWin32::LastError() = ERROR_INVALID_PARAMETER;
         return FALSE;
     }
+    return TRUE;
+}
+
+// ---------------------------------------------------------------------------------------------
+// The process heap: the C library's malloc and free (one heap, as the process heap is).
+// ---------------------------------------------------------------------------------------------
+
+#define HEAP_ZERO_MEMORY 0x00000008
+
+inline HANDLE GetProcessHeap()
+{
+    return reinterpret_cast<HANDLE>(static_cast<std::uintptr_t>(0x4));
+}
+inline LPVOID HeapAlloc(HANDLE, DWORD Flags, SIZE_T Size)
+{
+    void* const Block = (Flags & HEAP_ZERO_MEMORY) != 0 ? std::calloc(1, Size != 0 ? Size : 1)
+                                                        : std::malloc(Size != 0 ? Size : 1);
+    if (Block == nullptr)
+        PosixWin32::LastError() = ERROR_NOT_ENOUGH_MEMORY;
+    return Block;
+}
+inline BOOL HeapFree(HANDLE, DWORD, LPVOID Block)
+{
+    std::free(Block);
     return TRUE;
 }
 

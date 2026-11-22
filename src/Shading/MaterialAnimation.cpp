@@ -559,7 +559,7 @@ GENRESULT DACOM_API FMaterialAnimation::UnloadAnimationGroup(void* Arg)
 GENRESULT DACOM_API FMaterialAnimation::CreateAnimationInstance(int /*Unused*/, void* Query, IImaInstance** OutInstance)
 {
     // LAB_06ec7190..7275: lookup miss leaves the caller's output untouched.
-    const FlULong Crc = *(const FlULong*)((const unsigned char*)Query + 4);
+    const FlULong Crc = static_cast<const FMaterialCrcQuery*>(Query)->Crc; // query+4 on Win32
     size_t MapIndex = 0;
     while (MapIndex < CrcMap.size() && CrcMap[MapIndex].Crc != Crc)
         ++MapIndex;

@@ -868,7 +868,7 @@ void FTextureLibrary::DestroyEntry(FTextureEntry* Entry)
         return;
     // Frames select borrowed children. Only the canonical record owns its handle.
     if (Entry->GpuHandle != 0)
-        PipeDestroyTexture(Pipeline, (void*)Entry->GpuHandle);
+        PipeDestroyTexture(Pipeline, LowArena::Decode<void>((FlLong)Entry->GpuHandle));
     delete Entry;
 }
 
@@ -1120,7 +1120,8 @@ namespace
                 if (Mapping != -1)
                 {
                     if (View != nullptr)
-                        FileSystem->UnmapFileView((FlULong)View);
+                        // The file system does not read the view argument.
+                        FileSystem->UnmapFileView((FlULong)(std::uintptr_t)View);
                     FileSystem->CloseFile(Mapping);
                 }
                 FileSystem->CloseFile(File);
@@ -1335,7 +1336,8 @@ namespace
                 {
                     if (View != nullptr)
                     {
-                        FileSystem->UnmapFileView((FlULong)View);
+                        // The file system does not read the view argument.
+                        FileSystem->UnmapFileView((FlULong)(std::uintptr_t)View);
                         View = nullptr;
                     }
                     FileSystem->CloseFile(Mapping);
@@ -1552,7 +1554,7 @@ GENRESULT FTextureLibrary::LoadTextureRecord(IFileSystem* RootFileSystem, FFileS
     }
     if (Handle != nullptr && Result >= 0)
     {
-        if (!CreateTextureRecord((FlULong)Handle, ChildName, Out, bRetain))
+        if (!CreateTextureRecord((FlULong)LowArena::Encode(Handle), ChildName, Out, bRetain))
         {
             Pipeline->DestroyTexture(Handle);
             Result = GR_GENERIC;

@@ -3,8 +3,10 @@
 
 // PORT(macOS): a module that uses LowArena, built twice (arena_probe_a, arena_probe_b) for
 // module_tests: a block one module allocates and encodes must decode in the other, and a block
-// one frees must come back from the other's next allocation (one arena per process, dacom's).
+// one frees must come back from the other's next allocation (one arena per process, dacom's),
+// and a HandleValue id one module makes must name the same object in the other.
 
+#include "handle_value.h"
 #include "x64_low_arena.h"
 
 #define FL_PROBE_JOIN2(A, B) A##B
@@ -29,4 +31,14 @@ extern "C" int FL_PROBE(Read)(FlLong Encoded)
 extern "C" void FL_PROBE(Free)(FlLong Encoded)
 {
     LowArena::Free(LowArena::Decode<int>(Encoded), 48);
+}
+
+// The HandleValue id of Object, and the object an id names.
+extern "C" FlULong FL_PROBE(Id)(const void* Object)
+{
+    return HandleValue::Of(Object);
+}
+extern "C" const void* FL_PROBE(Object)(FlULong Id)
+{
+    return HandleValue::ObjectOf(Id);
 }

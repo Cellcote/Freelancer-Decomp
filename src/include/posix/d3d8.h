@@ -1,0 +1,329 @@
+// Freelancer Decomp: a reimplementation of the Freelancer (2003) game client and engine,
+// faithful to the behaviour of the original game.
+
+// PORT(macOS): a stand-in for the DirectX 8 SDK's <d3d8.h> on macOS and Linux (src/include/posix,
+// non-Windows only): the Direct3D 8 names the client modules use, with the SDK's values and
+// layouts, so their code stays as it is. There is no Direct3D here: the render pipeline the
+// names reach is RPGPU's (SDL_GPU), which speaks the same numbers (render/rp_types.h, whose
+// render-state table these D3DRS_ values are generated from). The D3D interfaces themselves
+// (IDirect3D8, IDirect3DTexture8) are declared only.
+
+#pragma once
+
+#if defined(_WIN32)
+#error "posix/d3d8.h is the stand-in for macOS and Linux; Windows uses the DirectX 8 SDK"
+#endif
+
+#include <windows.h>
+
+#include "render/rp_types.h"
+
+#define D3D_SDK_VERSION 220
+
+typedef DWORD D3DCOLOR;
+#define D3DCOLOR_ARGB(a, r, g, b)                                                                  \
+    ((D3DCOLOR)((((a) & 0xff) << 24) | (((r) & 0xff) << 16) | (((g) & 0xff) << 8) | ((b) & 0xff)))
+#define D3DCOLOR_XRGB(r, g, b) D3DCOLOR_ARGB(0xff, r, g, b)
+
+typedef struct _D3DCOLORVALUE
+{
+    float r;
+    float g;
+    float b;
+    float a;
+} D3DCOLORVALUE;
+
+typedef struct _D3DVECTOR
+{
+    float x;
+    float y;
+    float z;
+} D3DVECTOR;
+
+typedef enum _D3DLIGHTTYPE
+{
+    D3DLIGHT_POINT = 1,
+    D3DLIGHT_SPOT = 2,
+    D3DLIGHT_DIRECTIONAL = 3,
+    D3DLIGHT_FORCE_DWORD = 0x7fffffff
+} D3DLIGHTTYPE;
+
+typedef struct _D3DLIGHT8
+{
+    D3DLIGHTTYPE Type;
+    D3DCOLORVALUE Diffuse;
+    D3DCOLORVALUE Specular;
+    D3DCOLORVALUE Ambient;
+    D3DVECTOR Position;
+    D3DVECTOR Direction;
+    float Range;
+    float Falloff;
+    float Attenuation0;
+    float Attenuation1;
+    float Attenuation2;
+    float Theta;
+    float Phi;
+} D3DLIGHT8;
+
+typedef struct _D3DMATERIAL8
+{
+    D3DCOLORVALUE Diffuse;
+    D3DCOLORVALUE Ambient;
+    D3DCOLORVALUE Specular;
+    D3DCOLORVALUE Emissive;
+    float Power;
+} D3DMATERIAL8;
+
+// The same bytes cross the render interface as RPGPU's types (rp_types.h).
+static_assert(sizeof(D3DLIGHT8) == sizeof(FRpLight), "D3DLIGHT8 is FRpLight's layout");
+static_assert(sizeof(D3DMATERIAL8) == sizeof(FRpMaterial), "D3DMATERIAL8 is FRpMaterial's layout");
+
+typedef enum _D3DRENDERSTATETYPE
+{
+    D3DRS_ZENABLE = 0x7,
+    D3DRS_FILLMODE = 0x8,
+    D3DRS_SHADEMODE = 0x9,
+    D3DRS_LINEPATTERN = 0xA,
+    D3DRS_ZWRITEENABLE = 0xE,
+    D3DRS_ALPHATESTENABLE = 0xF,
+    D3DRS_LASTPIXEL = 0x10,
+    D3DRS_SRCBLEND = 0x13,
+    D3DRS_DESTBLEND = 0x14,
+    D3DRS_CULLMODE = 0x16,
+    D3DRS_ZFUNC = 0x17,
+    D3DRS_ALPHAREF = 0x18,
+    D3DRS_ALPHAFUNC = 0x19,
+    D3DRS_DITHERENABLE = 0x1A,
+    D3DRS_ALPHABLENDENABLE = 0x1B,
+    D3DRS_FOGENABLE = 0x1C,
+    D3DRS_SPECULARENABLE = 0x1D,
+    D3DRS_ZVISIBLE = 0x1E,
+    D3DRS_FOGCOLOR = 0x22,
+    D3DRS_FOGTABLEMODE = 0x23,
+    D3DRS_FOGSTART = 0x24,
+    D3DRS_FOGEND = 0x25,
+    D3DRS_FOGDENSITY = 0x26,
+    D3DRS_EDGEANTIALIAS = 0x28,
+    D3DRS_ZBIAS = 0x2F,
+    D3DRS_RANGEFOGENABLE = 0x30,
+    D3DRS_STENCILENABLE = 0x34,
+    D3DRS_STENCILFAIL = 0x35,
+    D3DRS_STENCILZFAIL = 0x36,
+    D3DRS_STENCILPASS = 0x37,
+    D3DRS_STENCILFUNC = 0x38,
+    D3DRS_STENCILREF = 0x39,
+    D3DRS_STENCILMASK = 0x3A,
+    D3DRS_STENCILWRITEMASK = 0x3B,
+    D3DRS_TEXTUREFACTOR = 0x3C,
+    D3DRS_WRAP0 = 0x80,
+    D3DRS_WRAP1 = 0x81,
+    D3DRS_WRAP2 = 0x82,
+    D3DRS_WRAP3 = 0x83,
+    D3DRS_WRAP4 = 0x84,
+    D3DRS_WRAP5 = 0x85,
+    D3DRS_WRAP6 = 0x86,
+    D3DRS_WRAP7 = 0x87,
+    D3DRS_CLIPPING = 0x88,
+    D3DRS_LIGHTING = 0x89,
+    D3DRS_AMBIENT = 0x8B,
+    D3DRS_FOGVERTEXMODE = 0x8C,
+    D3DRS_COLORVERTEX = 0x8D,
+    D3DRS_LOCALVIEWER = 0x8E,
+    D3DRS_NORMALIZENORMALS = 0x8F,
+    D3DRS_DIFFUSEMATERIALSOURCE = 0x91,
+    D3DRS_SPECULARMATERIALSOURCE = 0x92,
+    D3DRS_AMBIENTMATERIALSOURCE = 0x93,
+    D3DRS_EMISSIVEMATERIALSOURCE = 0x94,
+    D3DRS_VERTEXBLEND = 0x97,
+    D3DRS_CLIPPLANEENABLE = 0x98,
+    D3DRS_SOFTWAREVERTEXPROCESSING = 0x99,
+    D3DRS_POINTSIZE = 0x9A,
+    D3DRS_POINTSIZE_MIN = 0x9B,
+    D3DRS_POINTSPRITEENABLE = 0x9C,
+    D3DRS_POINTSCALEENABLE = 0x9D,
+    D3DRS_POINTSCALE_A = 0x9E,
+    D3DRS_POINTSCALE_B = 0x9F,
+    D3DRS_POINTSCALE_C = 0xA0,
+    D3DRS_MULTISAMPLEANTIALIAS = 0xA1,
+    D3DRS_MULTISAMPLEMASK = 0xA2,
+    D3DRS_PATCHEDGESTYLE = 0xA3,
+    D3DRS_PATCHSEGMENTS = 0xA4,
+    D3DRS_DEBUGMONITORTOKEN = 0xA5,
+    D3DRS_POINTSIZE_MAX = 0xA6,
+    D3DRS_INDEXEDVERTEXBLENDENABLE = 0xA7,
+    D3DRS_COLORWRITEENABLE = 0xA8,
+    D3DRS_TWEENFACTOR = 0xAA,
+    D3DRS_BLENDOP = 0xAB,
+    D3DRS_POSITIONORDER = 0xAC,
+    D3DRS_NORMALORDER = 0xAD,
+    D3DRS_FORCE_DWORD = 0x7fffffff
+} D3DRENDERSTATETYPE;
+
+typedef enum _D3DTEXTURESTAGESTATETYPE
+{
+    D3DTSS_COLOROP = 1,
+    D3DTSS_COLORARG1 = 2,
+    D3DTSS_COLORARG2 = 3,
+    D3DTSS_ALPHAOP = 4,
+    D3DTSS_ALPHAARG1 = 5,
+    D3DTSS_ALPHAARG2 = 6,
+    D3DTSS_BUMPENVMAT00 = 7,
+    D3DTSS_BUMPENVMAT01 = 8,
+    D3DTSS_BUMPENVMAT10 = 9,
+    D3DTSS_BUMPENVMAT11 = 10,
+    D3DTSS_TEXCOORDINDEX = 11,
+    D3DTSS_ADDRESSU = 13,
+    D3DTSS_ADDRESSV = 14,
+    D3DTSS_BORDERCOLOR = 15,
+    D3DTSS_MAGFILTER = 16,
+    D3DTSS_MINFILTER = 17,
+    D3DTSS_MIPFILTER = 18,
+    D3DTSS_MIPMAPLODBIAS = 19,
+    D3DTSS_MAXMIPLEVEL = 20,
+    D3DTSS_MAXANISOTROPY = 21,
+    D3DTSS_BUMPENVLSCALE = 22,
+    D3DTSS_BUMPENVLOFFSET = 23,
+    D3DTSS_TEXTURETRANSFORMFLAGS = 24,
+    D3DTSS_ADDRESSW = 25,
+    D3DTSS_COLORARG0 = 26,
+    D3DTSS_ALPHAARG0 = 27,
+    D3DTSS_RESULTARG = 28,
+    D3DTSS_FORCE_DWORD = 0x7fffffff
+} D3DTEXTURESTAGESTATETYPE;
+
+typedef enum _D3DTEXTUREFILTERTYPE
+{
+    D3DTEXF_NONE = 0,
+    D3DTEXF_POINT = 1,
+    D3DTEXF_LINEAR = 2,
+    D3DTEXF_ANISOTROPIC = 3,
+    D3DTEXF_FLATCUBIC = 4,
+    D3DTEXF_GAUSSIANCUBIC = 5,
+    D3DTEXF_FORCE_DWORD = 0x7fffffff
+} D3DTEXTUREFILTERTYPE;
+
+typedef enum _D3DBLEND
+{
+    D3DBLEND_ZERO = 1,
+    D3DBLEND_ONE = 2,
+    D3DBLEND_SRCCOLOR = 3,
+    D3DBLEND_INVSRCCOLOR = 4,
+    D3DBLEND_SRCALPHA = 5,
+    D3DBLEND_INVSRCALPHA = 6,
+    D3DBLEND_DESTALPHA = 7,
+    D3DBLEND_INVDESTALPHA = 8,
+    D3DBLEND_DESTCOLOR = 9,
+    D3DBLEND_INVDESTCOLOR = 10,
+    D3DBLEND_SRCALPHASAT = 11,
+    D3DBLEND_BOTHSRCALPHA = 12,
+    D3DBLEND_BOTHINVSRCALPHA = 13,
+    D3DBLEND_FORCE_DWORD = 0x7fffffff
+} D3DBLEND;
+
+typedef enum _D3DBLENDOP
+{
+    D3DBLENDOP_ADD = 1,
+    D3DBLENDOP_SUBTRACT = 2,
+    D3DBLENDOP_REVSUBTRACT = 3,
+    D3DBLENDOP_MIN = 4,
+    D3DBLENDOP_MAX = 5,
+    D3DBLENDOP_FORCE_DWORD = 0x7fffffff
+} D3DBLENDOP;
+
+typedef enum _D3DCMPFUNC
+{
+    D3DCMP_NEVER = 1,
+    D3DCMP_LESS = 2,
+    D3DCMP_EQUAL = 3,
+    D3DCMP_LESSEQUAL = 4,
+    D3DCMP_GREATER = 5,
+    D3DCMP_NOTEQUAL = 6,
+    D3DCMP_GREATEREQUAL = 7,
+    D3DCMP_ALWAYS = 8,
+    D3DCMP_FORCE_DWORD = 0x7fffffff
+} D3DCMPFUNC;
+
+typedef enum _D3DCULL
+{
+    D3DCULL_NONE = 1,
+    D3DCULL_CW = 2,
+    D3DCULL_CCW = 3,
+    D3DCULL_FORCE_DWORD = 0x7fffffff
+} D3DCULL;
+
+typedef enum _D3DPRIMITIVETYPE
+{
+    D3DPT_POINTLIST = 1,
+    D3DPT_LINELIST = 2,
+    D3DPT_LINESTRIP = 3,
+    D3DPT_TRIANGLELIST = 4,
+    D3DPT_TRIANGLESTRIP = 5,
+    D3DPT_TRIANGLEFAN = 6,
+    D3DPT_FORCE_DWORD = 0x7fffffff
+} D3DPRIMITIVETYPE;
+
+typedef enum _D3DVERTEXBLENDFLAGS
+{
+    D3DVBF_DISABLE = 0,
+    D3DVBF_1WEIGHTS = 1,
+    D3DVBF_2WEIGHTS = 2,
+    D3DVBF_3WEIGHTS = 3,
+    D3DVBF_TWEENING = 255,
+    D3DVBF_0WEIGHTS = 256
+} D3DVERTEXBLENDFLAGS;
+
+typedef enum _D3DFORMAT
+{
+    D3DFMT_UNKNOWN = 0,
+    D3DFMT_R8G8B8 = 20,
+    D3DFMT_A8R8G8B8 = 21,
+    D3DFMT_X8R8G8B8 = 22,
+    D3DFMT_R5G6B5 = 23,
+    D3DFMT_X1R5G5B5 = 24,
+    D3DFMT_A1R5G5B5 = 25,
+    D3DFMT_A4R4G4B4 = 26,
+    D3DFMT_A8 = 28,
+    D3DFMT_L8 = 50,
+    D3DFMT_DXT1 = 0x31545844,
+    D3DFMT_DXT3 = 0x33545844,
+    D3DFMT_DXT5 = 0x35545844,
+    D3DFMT_FORCE_DWORD = 0x7fffffff
+} D3DFORMAT;
+
+typedef enum _D3DRESOURCETYPE
+{
+    D3DRTYPE_SURFACE = 1,
+    D3DRTYPE_VOLUME = 2,
+    D3DRTYPE_TEXTURE = 3,
+    D3DRTYPE_VOLUMETEXTURE = 4,
+    D3DRTYPE_CUBETEXTURE = 5,
+    D3DRTYPE_VERTEXBUFFER = 6,
+    D3DRTYPE_INDEXBUFFER = 7,
+    D3DRTYPE_FORCE_DWORD = 0x7fffffff
+} D3DRESOURCETYPE;
+
+#define D3DFVF_XYZ 0x002
+#define D3DFVF_XYZRHW 0x004
+#define D3DFVF_XYZB1 0x006
+#define D3DFVF_XYZB2 0x008
+#define D3DFVF_XYZB3 0x00a
+#define D3DFVF_NORMAL 0x010
+#define D3DFVF_PSIZE 0x020
+#define D3DFVF_DIFFUSE 0x040
+#define D3DFVF_SPECULAR 0x080
+#define D3DFVF_TEX0 0x000
+#define D3DFVF_TEX1 0x100
+#define D3DFVF_TEX2 0x200
+#define D3DFVF_TEXCOUNT_SHIFT 8
+
+#define D3DCLEAR_TARGET 0x00000001
+#define D3DCLEAR_ZBUFFER 0x00000002
+#define D3DCLEAR_STENCIL 0x00000004
+
+// Declared only: the D3D objects never exist here.
+struct IDirect3D8;
+struct IDirect3DTexture8;
+struct _D3DCAPS8;
+typedef struct _D3DCAPS8 D3DCAPS8;
+struct _D3DPRESENT_PARAMETERS_;
+typedef struct _D3DPRESENT_PARAMETERS_ D3DPRESENT_PARAMETERS;

@@ -29,6 +29,7 @@
 #include "posix/msvc_crt.h"
 
 #include <climits>
+#include <cstdarg>
 #include <csignal>
 #include <cstdint>
 #include <cstdio>
@@ -244,6 +245,37 @@ inline int MessageBoxA(HWND, LPCSTR Text, LPCSTR Caption, UINT Type)
     default:
         return IDOK;
     }
+}
+
+// wsprintfA: user32's sprintf, which writes at most 1024 characters with the terminator (and
+// has no floating-point conversions, which its callers do not use). The length written.
+inline int wsprintfA(LPSTR Buffer, LPCSTR Format, ...)
+{
+    va_list Args;
+    va_start(Args, Format);
+    int const Length = std::vsnprintf(Buffer, 1024, Format, Args);
+    va_end(Args);
+    return Length < 0 ? 0 : (Length > 1023 ? 1023 : Length);
+}
+
+// SetRect / SetRectEmpty / IsRectEmpty.
+inline BOOL SetRect(LPRECT Rect, int Left, int Top, int Right, int Bottom)
+{
+    if (Rect == nullptr)
+        return FALSE;
+    Rect->left = Left;
+    Rect->top = Top;
+    Rect->right = Right;
+    Rect->bottom = Bottom;
+    return TRUE;
+}
+inline BOOL SetRectEmpty(LPRECT Rect)
+{
+    return SetRect(Rect, 0, 0, 0, 0);
+}
+inline BOOL IsRectEmpty(const RECT* Rect)
+{
+    return Rect == nullptr || Rect->right <= Rect->left || Rect->bottom <= Rect->top;
 }
 
 // No message loop yet (M3): nothing to post to.

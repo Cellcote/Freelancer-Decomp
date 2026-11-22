@@ -303,16 +303,26 @@ without the Windows API. Milestones:
   Windows sizes, the platform layer's structures under their Windows names, the MSVC CRT names
   with MSVC's behaviour (`posix/msvc_crt.h`), and small Win32 calls with an obvious meaning here.
   Larger APIs go through `Platform::` at the call site. `FL_POSIX_DLLMAIN` runs a module's
-  `DllMain` as it loads. So far: dacom, zlib, x86math, system, ReadFile, luaprofile and Thorn,
+  `DllMain` as it loads. So far: dacom, zlib, x86math, system, ReadFile, luaprofile, Thorn, EngBase, ximage and
+  Shading,
   loaded and checked by `src/PortTests/module_tests.cpp`. The POSIX handles are small numbers in a table, as Windows
   kernel handles are, so a file handle survives retail's 32-bit fields there too
   (`Platform::HandleToValue` / `HandleFromValue`, as HandleToULong / LongToHandle). The kernel32
   file, mapping and memory calls the retail code makes directly are in `posix/kernel32.h`. A
   retail 32-bit parameter that carries a pointer no caller passes (ReadFile's locked callback,
   its `OVERLAPPED` in `Read`) is refused on 64-bit builds rather than cut.
-  EngBase is next, with an audit of its own: besides the instance handles (LowArena, so
-  `Encode` / `Decode`), its animation channels pass stack frames, channel data and sinks through
-  retail's 32-bit fields, which need a decision each.
+  EngBase follows (its instances, archetype handles and typed channels are LowArena blocks
+  with `Encode` / `Decode` at every 32-bit field; the contract is at the top of
+  `engine/engbase.h`). Its stack frame in a bind header, the name cookie and the event keys are
+  HandleValue ids, which only EngBase reads back. The modules that call EngBase (Common,
+  Deformable2, the client) follow the same contract as they are ported: their casts of
+  instances to 32 bits become `Encode`.
+  HandleValue's table is one per process on macOS and Linux too (held by dacom, as the arena),
+  for ids that cross modules: a material property's string or component sits in a 32-bit
+  payload (`ShadingPayloadOf` / `ShadingPayloadTo`, render/shading.h). The render modules
+  compile against a stand-in `<d3d8.h>` (`src/include/posix`): the Direct3D 8 names with the
+  SDK's values and layouts, the render states generated from `render/rp_types.h`; there is no
+  Direct3D, the names reach RPGPU. The pipeline's texture handles are LowArena blocks.
 - **M3:** an SDL window to the main menu, drawn by RPGPU through Metal, without sound.
 - **M4:** audio, input and gameplay.
 

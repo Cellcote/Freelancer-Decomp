@@ -7,6 +7,7 @@
 // code is the number of failures.
 
 #include "dacom.h"
+#include "engine/engbase.h"
 #include "platform.h"
 #include "readfile.h"
 
@@ -113,6 +114,46 @@ void TestReadFile(ICOManager* Manager)
     std::system(("rm -rf '" + Root + "'").c_str());
 }
 
+// EngBase's engine: a compound archetype and an instance of it, which are LowArena blocks
+// whose encoded values key the engine's maps (the root-instance map walked here).
+void TestEngine(ICOManager* Manager)
+{
+    AGGDESC Desc = {8, "Engine"};
+    IEngine* Engine = nullptr;
+    Check(Manager->CreateInstance(&Desc, (void**)(&Engine)) == GR_OK && Engine != nullptr,
+          "EngBase makes an Engine");
+    if (Engine == nullptr)
+        return;
+    FEngineName Name = {nullptr, 0}; // no CRC: the engine names it (anonymous compound)
+    void* const Archetype = Engine->CreateCompoundArchetype(&Name);
+    Check(Archetype != nullptr && Archetype != G_InvalidEngineHandle, "CreateCompoundArchetype");
+    bool const bArchetype = Archetype != nullptr && Archetype != G_InvalidEngineHandle;
+    void* const Parent = bArchetype ? Engine->CreateInstance(Archetype, nullptr) : nullptr;
+    void* const Child = bArchetype ? Engine->CreateInstance(Archetype, nullptr) : nullptr;
+    bool const bInstances = Parent != nullptr && Parent != G_InvalidEngineHandle &&
+                            Child != nullptr && Child != G_InvalidEngineHandle;
+    Check(bInstances, "CreateInstance");
+    if (bInstances)
+    {
+        Check(Engine->GetInstanceArchetype(Parent) == Archetype, "the instance's archetype");
+        // A joint makes Parent a root: the root map holds it under its encoded key.
+        FlULong const Payload[G_EngineJointPayloadDwords] = {};
+        Check(Engine->CreateJoint(Parent, Child, Payload) == 1, "CreateJoint");
+        Check(Engine->GetInstanceParent(Child) == Parent, "the child's parent");
+        Check(Engine->FindMappedInstance(G_InvalidEngineHandle) == Parent,
+              "the root-instance map gives the parent back (its encoded key decodes)");
+        Check(Engine->FindMappedInstance(Parent) == G_InvalidEngineHandle, "one root instance");
+        Check(Engine->DestroyJoint(Parent, Child) == 1 &&
+                  Engine->FindMappedInstance(G_InvalidEngineHandle) == G_InvalidEngineHandle,
+              "DestroyJoint takes the root out of the map");
+        Engine->DestroyInstance(Child);
+        Engine->DestroyInstance(Parent);
+    }
+    if (Archetype != nullptr && Archetype != G_InvalidEngineHandle)
+        Engine->ReleaseHandle(Archetype);
+    Engine->Release();
+}
+
 int __cdecl CountComponent(IDAComponent* Factory, const char* Name, void*, void* Context)
 {
     if (Factory != nullptr && Name != nullptr)
@@ -140,6 +181,9 @@ int main(int argc, char** argv)
     Check(LuaProfile != nullptr, "luaprofile.dll loads");
     Platform::Module const Thorn = Platform::ModuleLoad((Folder + "Thorn.dll").c_str());
     Check(Thorn != nullptr, "Thorn.dll loads");
+    Platform::Module const EngBase = Platform::ModuleLoad((Folder + "EngBase.dll").c_str());
+    Check(EngBase != nullptr, "EngBase.dll loads");
+    Check(Platform::ModuleLoad((Folder + "ximage.dll").c_str()) != nullptr, "ximage.dll loads");
 
     Platform::Module const Dacom = Platform::ModuleFind((Folder + "dacom.dylib").c_str()) != nullptr
                                        ? Platform::ModuleFind((Folder + "dacom.dylib").c_str())
@@ -161,6 +205,23 @@ int main(int argc, char** argv)
         Count = 0;
         Manager->EnumerateComponents("IScriptEngine", &CountComponent, &Count);
         Check(Count >= 1, "Thorn's DllMain registered its script engine");
+        for (const char* Component :
+             {"Engine", "Animation", "Hardpoint", "ChannelArchetype", "BigImage"})
+        {
+            Count = 0;
+            Manager->EnumerateComponents(Component, &CountComponent, &Count);
+            Check(Count == 1, "EngBase's and ximage's DllMains registered their components");
+        }
+        // Shading registers the material, texture-library and batcher components as it loads.
+        int Before = 0;
+        Manager->EnumerateComponents(nullptr, &CountComponent, &Before);
+        Check(Platform::ModuleLoad((Folder + "Shading.dll").c_str()) != nullptr,
+              "Shading.dll loads");
+        int After = 0;
+        Manager->EnumerateComponents(nullptr, &CountComponent, &After);
+        Check(After > Before, "Shading's DllMain registered its components");
+        if (EngBase != nullptr)
+            TestEngine(Manager);
         if (Files != nullptr)
             TestReadFile(Manager);
         Manager->Release();
@@ -188,6 +249,16 @@ int main(int argc, char** argv)
               "a LowArena block encoded in one module decodes in another");
         FreeB(Made);
         Check(MakeA(7) == Made, "a block freed in one module is reused by another");
+    }
+    auto const IdA =
+        reinterpret_cast<FlULong (*)(const void*)>(Platform::ModuleSymbol(ProbeA, "Probe_a_Id"));
+    auto const ObjectB = reinterpret_cast<const void* (*)(FlULong)>(
+        Platform::ModuleSymbol(ProbeB, "Probe_b_Object"));
+    if (IdA != nullptr && ObjectB != nullptr)
+    {
+        static int const Named = 0;
+        Check(ObjectB(IdA(&Named)) == &Named,
+              "a HandleValue id made in one module names the object in another");
     }
 
     // SearchPathA finds a module by its Windows name (DACOM's AddLibrary looks it up so).
