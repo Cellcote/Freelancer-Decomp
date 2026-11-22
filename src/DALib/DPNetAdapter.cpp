@@ -9,7 +9,8 @@
 // guards FServer. The application's message handler is called with the lock held, on whichever
 // thread is inside FServer (the network thread, or the caller of SendTo, DestroyClient or
 // Close). DALib's handler only queues messages under its own locks and never calls back into
-// the server, so that is safe for it.
+// the server, so that is safe for it. A handler on the network thread may still Close the
+// server or drop the last reference: NetLoop then finishes the teardown once it unwinds.
 
 #define NOMINMAX
 #include <winsock2.h>
@@ -517,7 +518,19 @@ namespace
         {
             const LONG Left = InterlockedDecrement(&Refs);
             if (Left == 0)
-                delete this;
+            {
+                // Dropped by a message handler on the network thread: NetLoop is still inside this
+                // object, and deletes it once it unwinds.
+                if (OnNetThread())
+                {
+                    Close(0);
+                    bDeleteOnExit = true;
+                }
+                else
+                {
+                    delete this;
+                }
+            }
             return (ULONG)Left;
         }
 
@@ -529,6 +542,9 @@ namespace
             std::lock_guard<std::recursive_mutex> Guard(Lock);
             if (MessageHandler != nullptr)
                 return DPNERR_ALREADYINITIALIZED;
+            // A Close from a message handler that NetLoop has not finished yet.
+            if (Server != nullptr)
+                return DPNERR_ALREADYCLOSING;
             Winsock.emplace();
             if (!Winsock->bStarted)
             {
@@ -679,6 +695,16 @@ namespace
                     return DPNERR_UNINITIALIZED;
                 if (Server != nullptr && Server->IsHosting())
                     Server->Close(NowMs());
+                // From a message handler on the network thread, NetLoop is inside FServer below
+                // us: it can neither wait for the players nor free FServer. The handler is called
+                // no more, and NetLoop tears down once it unwinds.
+                if (OnNetThread())
+                {
+                    MessageHandler = nullptr;
+                    HandlerContext = nullptr;
+                    bStop = true;
+                    return S_OK;
+                }
             }
             // The network thread carries the goodbyes out; wait for the last player to go.
             const DWORD Start = GetTickCount();
@@ -695,12 +721,7 @@ namespace
             }
             StopThread();
             std::lock_guard<std::recursive_mutex> Guard(Lock);
-            Server.reset();
-            CloseSocket();
-            // As in dpnet.dll, a closed object must be initialized again before it is used.
-            MessageHandler = nullptr;
-            HandlerContext = nullptr;
-            Winsock.reset();
+            Teardown();
             return S_OK;
         }
         STDMETHOD(DestroyClient)(DPNID Player, const void* Data, DWORD Size, DWORD) override
@@ -999,15 +1020,44 @@ namespace
                 }
                 Server->Tick(NowMs());
             }
+
+            // Close stopped the loop. If it ran inside a handler on this thread, it left the rest
+            // to us; after a Close from another thread this changes nothing.
+            bool bDelete = false;
+            {
+                std::lock_guard<std::recursive_mutex> Guard(Lock);
+                Teardown();
+                bDelete = bDeleteOnExit;
+            }
+            if (bDelete)
+            {
+                NetThread.detach();
+                delete this;
+            }
+        }
+
+        // Under Lock.
+        void Teardown()
+        {
+            Server.reset();
+            CloseSocket();
+            // As in dpnet.dll, a closed object must be initialized again before it is used.
+            MessageHandler = nullptr;
+            HandlerContext = nullptr;
+            Winsock.reset();
+        }
+
+        bool OnNetThread() const
+        {
+            return NetThread.joinable() && NetThread.get_id() == std::this_thread::get_id();
         }
 
         void StopThread()
         {
+            // Never on the network thread: Close and Release leave that case to NetLoop.
             bStop = true;
-            if (NetThread.joinable() && NetThread.get_id() != std::this_thread::get_id())
+            if (NetThread.joinable())
                 NetThread.join();
-            else if (NetThread.joinable())
-                NetThread.detach();
         }
 
         void Shutdown()
@@ -1031,6 +1081,7 @@ namespace
         uint32_t LocalTriedAt = 0;
         std::thread NetThread;
         std::atomic<bool> bStop{false};
+        bool bDeleteOnExit = false;
         std::map<DPNHANDLE, DPNet::FBytes> ReceiveBuffers;
         DPNHANDLE NextBufferHandle = 1;
     };
