@@ -242,15 +242,18 @@ namespace
 
         // Handles are small numbers, as Windows kernel handles: they survive a 32-bit field.
         Platform::Handle const Small = Platform::EventCreate(true, true);
-        std::uint32_t const Stored = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(Small));
-        Platform::Handle const Restored = reinterpret_cast<Platform::Handle>(static_cast<std::uintptr_t>(Stored));
+        std::uint32_t const Stored =
+            static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(Small));
+        Platform::Handle const Restored =
+            reinterpret_cast<Platform::Handle>(static_cast<std::uintptr_t>(Stored));
         Check(reinterpret_cast<std::uintptr_t>(Small) % 4 == 0 && Restored == Small &&
                   Platform::WaitOne(Restored, 0) == Platform::kWaitSignaled,
               "a handle round-trips through 32 bits");
         Platform::CloseHandle(Small);
         Check(Platform::WaitOne(Small, 0) == Platform::kWaitFailed && !Platform::CloseHandle(Small),
               "a closed handle names nothing");
-        Check(Platform::WaitOne(reinterpret_cast<Platform::Handle>(std::uintptr_t{0x7FFF0}), 0) == Platform::kWaitFailed,
+        Check(Platform::WaitOne(reinterpret_cast<Platform::Handle>(std::uintptr_t{0x7FFF0}), 0) ==
+                  Platform::kWaitFailed,
               "a made-up handle names nothing");
 
         // A thread whose handle closes first still runs to its end.

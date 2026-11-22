@@ -2761,7 +2761,10 @@ extern "C" int __cdecl DacomStricmp(const char* A, const char* B)
 #if !defined(_WIN32)
 // PORT(macOS): dacom.def exports DacomStricmp as "stricmp"; a .dylib/.so has no export list to
 // rename it, so the name is a function of its own here.
-extern "C" int stricmp(const char* A, const char* B) { return DacomStricmp(A, B); }
+extern "C" int stricmp(const char* A, const char* B)
+{
+    return DacomStricmp(A, B);
+}
 
 // PORT(macOS): the process's LowArena (x64_low_arena.h). Every game module links dacom, so the
 // offsets one module encodes decode the same in another.

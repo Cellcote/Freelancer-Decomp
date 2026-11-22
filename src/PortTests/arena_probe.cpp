@@ -20,7 +20,13 @@ extern "C" FlLong FL_PROBE(Make)(int Value)
 }
 
 // The value in an encoded block.
-extern "C" int FL_PROBE(Read)(FlLong Encoded) { return *LowArena::Decode<int>(Encoded); }
+extern "C" int FL_PROBE(Read)(FlLong Encoded)
+{
+    return *LowArena::Decode<int>(Encoded);
+}
 
 // Frees an encoded block.
-extern "C" void FL_PROBE(Free)(FlLong Encoded) { LowArena::Free(LowArena::Decode<int>(Encoded), 48); }
+extern "C" void FL_PROBE(Free)(FlLong Encoded)
+{
+    LowArena::Free(LowArena::Decode<int>(Encoded), 48);
+}

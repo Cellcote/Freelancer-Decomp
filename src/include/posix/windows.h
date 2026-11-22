@@ -203,7 +203,9 @@ typedef POINT* LPPOINT;
 #define HIWORD(Value) ((WORD)((((DWORD_PTR)(Value)) >> 16) & 0xFFFF))
 #define LOBYTE(Value) ((BYTE)(((DWORD_PTR)(Value)) & 0xFF))
 #define HIBYTE(Value) ((BYTE)((((DWORD_PTR)(Value)) >> 8) & 0xFF))
-#define MAKELONG(Low, High) ((LONG)(((WORD)((DWORD_PTR)(Low) & 0xFFFF)) | ((DWORD)((WORD)((DWORD_PTR)(High) & 0xFFFF))) << 16))
+#define MAKELONG(Low, High)                                                                        \
+    ((LONG)(((WORD)((DWORD_PTR)(Low) & 0xFFFF)) | ((DWORD)((WORD)((DWORD_PTR)(High) & 0xFFFF)))    \
+                                                      << 16))
 
 #include "posix/kernel32.h" // the file, mapping and memory calls (uses the types above)
 
@@ -230,7 +232,8 @@ inline void OutputDebugStringA(LPCSTR Text)
 // answer is the one that carries on (IDIGNORE for abort/retry/ignore, IDOK or IDYES otherwise).
 inline int MessageBoxA(HWND, LPCSTR Text, LPCSTR Caption, UINT Type)
 {
-    std::fprintf(stderr, "[%s] %s\n", Caption != nullptr ? Caption : "", Text != nullptr ? Text : "");
+    std::fprintf(stderr, "[%s] %s\n", Caption != nullptr ? Caption : "",
+                 Text != nullptr ? Text : "");
     switch (Type & 0x0F)
     {
     case 0x02: // MB_ABORTRETRYIGNORE
@@ -247,7 +250,10 @@ inline int MessageBoxA(HWND, LPCSTR Text, LPCSTR Caption, UINT Type)
 inline void PostQuitMessage(int) {}
 
 // Thread attach and detach calls are never made here, so there is nothing to turn off.
-inline BOOL DisableThreadLibraryCalls(HMODULE) { return TRUE; }
+inline BOOL DisableThreadLibraryCalls(HMODULE)
+{
+    return TRUE;
+}
 
 // SearchPathA with a Path list (';'-separated folders): the first folder that holds FileName,
 // without regard to case. A module's Windows name (system.dll) also finds the module this
@@ -255,8 +261,8 @@ inline BOOL DisableThreadLibraryCalls(HMODULE) { return TRUE; }
 // (Platform::ModuleLoad) to load. FilePart may be nullptr. The length written, or the size
 // needed when Buffer is too small, or 0 when it is not found. A null Path (the system's search
 // order) looks in the current folder only. Extension is not supported (callers pass nullptr).
-inline DWORD SearchPathA(LPCSTR Path, LPCSTR FileName, LPCSTR Extension, DWORD BufferLength, LPSTR Buffer,
-                         LPSTR* FilePart)
+inline DWORD SearchPathA(LPCSTR Path, LPCSTR FileName, LPCSTR Extension, DWORD BufferLength,
+                         LPSTR Buffer, LPSTR* FilePart)
 {
     (void)Extension;
     if (FileName == nullptr)
@@ -275,9 +281,11 @@ inline DWORD SearchPathA(LPCSTR Path, LPCSTR FileName, LPCSTR Extension, DWORD B
         if (Candidate.back() != '\\' && Candidate.back() != '/')
             Candidate += '\\';
         Candidate += FileName;
-        auto IsFile = [](std::string const& Name) {
+        auto IsFile = [](std::string const& Name)
+        {
             DWORD const Attributes = Platform::PathAttributes(Name.c_str());
-            return Attributes != Platform::kInvalidAttributes && (Attributes & Platform::kAttributeDirectory) == 0;
+            return Attributes != Platform::kInvalidAttributes &&
+                   (Attributes & Platform::kAttributeDirectory) == 0;
         };
         if (!IsFile(Candidate))
         {
@@ -335,8 +343,14 @@ inline DWORD GetFileVersionInfoSizeA(LPCSTR, LPDWORD Handle)
         *Handle = 0;
     return 0;
 }
-inline BOOL GetFileVersionInfoA(LPCSTR, DWORD, DWORD, LPVOID) { return FALSE; }
-inline BOOL VerQueryValueA(LPCVOID, LPCSTR, LPVOID*, UINT*) { return FALSE; }
+inline BOOL GetFileVersionInfoA(LPCSTR, DWORD, DWORD, LPVOID)
+{
+    return FALSE;
+}
+inline BOOL VerQueryValueA(LPCVOID, LPCSTR, LPVOID*, UINT*)
+{
+    return FALSE;
+}
 
 // ---------------------------------------------------------------------------------------------
 // DllMain
@@ -344,14 +358,14 @@ inline BOOL VerQueryValueA(LPCVOID, LPCSTR, LPVOID*, UINT*) { return FALSE; }
 
 namespace PosixWin32
 {
-    // The module that holds Address (a borrowed handle, as GetModuleHandleA's).
-    inline HMODULE ModuleOf(void const* Address)
-    {
-        Dl_info Info;
-        if (dladdr(Address, &Info) == 0 || Info.dli_fname == nullptr)
-            return nullptr;
-        return Platform::ModuleFind(Info.dli_fname);
-    }
+// The module that holds Address (a borrowed handle, as GetModuleHandleA's).
+inline HMODULE ModuleOf(void const* Address)
+{
+    Dl_info Info;
+    if (dladdr(Address, &Info) == 0 || Info.dli_fname == nullptr)
+        return nullptr;
+    return Platform::ModuleFind(Info.dli_fname);
+}
 }
 
 // Runs Entry (a module's DllMain) with DLL_PROCESS_ATTACH when the module loads and
@@ -360,13 +374,19 @@ namespace PosixWin32
 // CRT does the same before DllMain on Windows). The loader initialises a module's dependencies
 // first, as Windows does. A module's other source files must not depend on DllMain having run
 // during their own static initialisation.
-#define FL_POSIX_DLLMAIN(Entry)                                                                     \
-    namespace                                                                                       \
-    {                                                                                               \
-        struct FPosixDllMain                                                                        \
-        {                                                                                           \
-            HMODULE Module = PosixWin32::ModuleOf((void const*)&Entry);                             \
-            FPosixDllMain() { Entry(Module, DLL_PROCESS_ATTACH, nullptr); }                         \
-            ~FPosixDllMain() { Entry(Module, DLL_PROCESS_DETACH, nullptr); }                        \
-        } GPosixDllMain;                                                                            \
+#define FL_POSIX_DLLMAIN(Entry)                                                                    \
+    namespace                                                                                      \
+    {                                                                                              \
+    struct FPosixDllMain                                                                           \
+    {                                                                                              \
+        HMODULE Module = PosixWin32::ModuleOf((void const*)&Entry);                                \
+        FPosixDllMain()                                                                            \
+        {                                                                                          \
+            Entry(Module, DLL_PROCESS_ATTACH, nullptr);                                            \
+        }                                                                                          \
+        ~FPosixDllMain()                                                                           \
+        {                                                                                          \
+            Entry(Module, DLL_PROCESS_DETACH, nullptr);                                            \
+        }                                                                                          \
+    } GPosixDllMain;                                                                               \
     }
