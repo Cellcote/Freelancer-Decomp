@@ -76,7 +76,15 @@ if(NOT FL_WINDOWS)
     if(kind STREQUAL "DLL")
       # dacom.dylib, not libdacom.dylib: Platform::ModuleLoad finds "dacom.dll" under that name.
       set_property(TARGET ${name} PROPERTY PREFIX "")
+      if(NOT APPLE)
+        # A module's calls to its own functions bind to them, as in a Windows DLL (and as macOS's
+        # two-level namespace does): ELF would otherwise let a same-named function of another
+        # module win, e.g. every module's DllMain (FL_POSIX_DLLMAIN).
+        target_link_options(${name} PRIVATE -Wl,-Bsymbolic-functions)
+      endif()
     endif()
+    # dlopen / dlsym (the platform layer's modules) are in libdl before glibc 2.34.
+    target_link_libraries(${name} PRIVATE ${CMAKE_DL_LIBS})
     set_target_properties(${name} PROPERTIES
       RUNTIME_OUTPUT_DIRECTORY "${FL_BIN_DIR}"
       LIBRARY_OUTPUT_DIRECTORY "${FL_BIN_DIR}"

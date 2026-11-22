@@ -3,6 +3,8 @@
 
 add_executable(port_tests port_tests.cpp)
 target_compile_features(port_tests PRIVATE cxx_std_20)
+# dlopen / dlsym are in libdl before glibc 2.34.
+target_link_libraries(port_tests PRIVATE ${CMAKE_DL_LIBS})
 target_include_directories(port_tests PRIVATE ${CMAKE_SOURCE_DIR}/src/include)
 # fl_layout.h is forced into every source, as in the Windows build.
 target_compile_options(port_tests PRIVATE -include ${CMAKE_SOURCE_DIR}/src/include/fl_layout.h
@@ -13,6 +15,7 @@ add_test(NAME port_tests COMMAND port_tests)
 # checks that their DllMains ran, and ReadFile's DOS file system on this disk. Built against the stand-in <windows.h> (src/include/posix), as they are.
 add_executable(module_tests module_tests.cpp)
 target_compile_features(module_tests PRIVATE cxx_std_20)
+target_link_libraries(module_tests PRIVATE ${CMAKE_DL_LIBS})
 target_include_directories(module_tests PRIVATE ${CMAKE_SOURCE_DIR}/src/include/posix
                            ${CMAKE_SOURCE_DIR}/src/include)
 target_compile_options(module_tests PRIVATE -include ${CMAKE_SOURCE_DIR}/src/include/fl_layout.h

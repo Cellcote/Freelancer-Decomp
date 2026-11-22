@@ -154,6 +154,15 @@ int main(int argc, char** argv)
     auto const Stricmp = reinterpret_cast<int (*)(const char*, const char*)>(Platform::ModuleSymbol(Dacom, "stricmp"));
     Check(Stricmp != nullptr && Stricmp("Freelancer", "FREELANCER") == 0, "dacom exports stricmp");
 
+    // SearchPathA finds a module by its Windows name (DACOM's AddLibrary looks it up so).
+    char Found[1024] = {};
+    char* FilePart = nullptr;
+    DWORD const FoundLength = SearchPathA(Folder.c_str(), "SYSTEM.DLL", nullptr, sizeof(Found), Found, &FilePart);
+    Check(FoundLength > 0 && FilePart != nullptr && Platform::ModuleFind(Found) != nullptr,
+          "SearchPathA finds system.dll as the module this platform built");
+    Check(SearchPathA(Folder.c_str(), "nothing.dll", nullptr, sizeof(Found), Found, nullptr) == 0,
+          "SearchPathA: a missing module");
+
     // The MSVC CRT stand-ins (posix/msvc_crt.h) the modules use.
     char Drive[_MAX_DRIVE], Directory[_MAX_DIR], Name[_MAX_FNAME], Extension[_MAX_EXT];
     _splitpath("C:\\Freelancer\\EXE\\dacom.dll", Drive, Directory, Name, Extension);
