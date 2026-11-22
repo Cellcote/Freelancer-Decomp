@@ -327,36 +327,75 @@ void CRemoteClientProxy::OnConnect(FlLong Result)
     RemoteClientGetServer()->OnConnect(ClientId);
 }
 
+namespace {
+// PORT(deviation) REMOTE-PACKET-HARDENING: packet types a retail multiplayer client never
+// sends. Retail decodes each one and then logs it, ignores it, or hands it to a handler
+// that is not built for a remote caller. The port drops them before decoding.
+bool IsUnsentClientPacket(unsigned int Channel, unsigned int Opcode) {
+    if (Channel == 1)
+        // SET_MISSION_LOG: sent only in single player (nn_story_star.cpp, 0x004ba0f4,
+        // 0x004ba1a0, 0x004ba3e5).
+        return Opcode == 0x19;
+    switch (Opcode) {
+    case 0x1E: // SAVEGAME: the save page only exists in single player (nn_pause.cpp)
+    // The DBG packets have no client sender; retail logs "encountered in release mode".
+    case 0x22: // DBGCREATESHIP
+    case 0x23: // DBGLOADSYSTEM
+    case 0x25: // DBGDESTROYOBJECT
+    case 0x2D: // DBGCONSOLE
+    case 0x2E: // DBGFREESYSTEM
+    case 0x30: // DBGRELOCATE_SHIP
+    case 0x24: // DOCK: single player only (space_state.cpp, 0x0054a79a)
+    case 0x27: // TRADERESPONSE: no client sender
+    case 0x37: // COMMCOMPLETE: single player only (hud_comm.cpp)
+        return true;
+    default:
+        return false;
+    }
+}
+}
+
 void CRemoteClientProxy::OnReceive(unsigned char* Data, FlULong Size)
 {
-    int Remaining = static_cast<int>(Size);
-    if (Data == nullptr || Remaining <= 0)
+    // Retail (06b3932d) loops while bytes remain, but advances the cursor by the 2-byte header
+    // only, never past the decoded body, and lets an odd remainder reach Decode as -1 (an
+    // unsigned 0xffffffff size). It also decodes every registered type, including the
+    // server-to-client (channel 2) packets.
+    // PORT(deviation) REMOTE-PACKET-HARDENING: a retail client sends exactly one channel-1 or
+    // channel-3 packet per message (RemoteServer PushToServer, 06bd9ac0), and DALib answers
+    // 1-byte pings before this is called. So: one header, one decode, and anything else
+    // disconnects. Trailing bytes after the packet are ignored; retail would have decoded
+    // them as another packet.
+    if (Data == nullptr || Size == 0)
+        return;
+    if (Size < 2) {
+        Disconnect();
+        return;
+    }
+
+    unsigned short Header;
+    memcpy(&Header, Data, sizeof(Header));
+    const unsigned int Channel = Header >> 8;
+    const unsigned int Opcode = Header & 0xff;
+    if (Channel != 1 && Channel != 3) {
+        Disconnect();
+        return;
+    }
+    if (IsUnsentClientPacket(Channel, Opcode))
         return;
 
-    unsigned char* Cursor = Data;
-    do
-    {
-        unsigned short Header;
-        memcpy(&Header, Cursor, sizeof(Header));
-        unsigned int Channel = Header >> 8;
-        unsigned int Opcode = Header & 0xff;
-        Cursor += 2;
-        Remaining -= 2;
+    FPacketBase* Packet = nullptr;
+    unsigned int DecodedSize = 0;
+    Client.Serializer->Allocate(Channel, Opcode, &Packet);
+    if (Packet == nullptr ||
+        Packet->Decode(Data + 2, static_cast<unsigned int>(Size) - 2u, &DecodedSize) != 0) {
+        // As in retail, a packet that failed to decode is not released: a failed Decode can
+        // leave owned pointers unset, which the destructor would free.
+        Disconnect();
+        return;
+    }
 
-        FPacketBase* Packet = nullptr;
-        unsigned int DecodedSize = 0;
-        Client.Serializer->Allocate(Channel, Opcode, &Packet);
-        if (Packet == nullptr || Packet->Decode(Cursor, Remaining, &DecodedSize) != 0)
-        {
-            Disconnect();
-            return;
-        }
-
-        HandleClientPacket(ClientId, Packet->AsRaw());
-        Remaining -= static_cast<int>(DecodedSize);
-        // 06b3932d subtracts DecodedSize from ESI only. Unlike remoteserver's
-        // decoder loop, retail does not advance EDI past the decoded body.
-    } while (Remaining > 0);
+    HandleClientPacket(ClientId, Packet->AsRaw());
 }
 
 int GetClientStats(FClientStats* Stats, int* Count)

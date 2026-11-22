@@ -46,9 +46,12 @@ void FPacketSerializer::DumpStats(const char* Name) const {
     std::fclose(File);
 }
 
-FRpcSaveGamePacket::FRpcSaveGamePacket() : FPacketBase(0x3001eu) {
+FRpcSaveGamePacket::FRpcSaveGamePacket()
+    : FPacketBase(0x3001eu), Description(nullptr), DescriptionCount(0) {
     // Native writes only CharacterId.Buffer[0]; canonical CHARACTER_ID also
-    // initializes its unused tail. Description and Count stay uninitialized.
+    // initializes its unused tail. Retail leaves Description and Count
+    // uninitialized, so a decoded count of 0 made the destructor free a stale
+    // heap pointer. PORT(deviation) REMOTE-PACKET-HARDENING: both start empty.
 }
 
 FRpcSaveGamePacket::~FRpcSaveGamePacket() {
@@ -88,7 +91,7 @@ unsigned int FRpcSaveGamePacket::Decode(const unsigned char* Buffer,
         const unsigned int ByteCount = DescriptionCount * 2u;
 #if defined(REMOTECLIENT_EXPORTS)
         // RC preflights without committing cursor; RS allocates before bounds.
-        if (MarshalCursor + ByteCount > MarshalLimit) {
+        if (RpcRunExceedsLimit(MarshalCursor, ByteCount, MarshalLimit)) {
             MarshalError = 0x17u;
             return MarshalError;
         }
@@ -135,7 +138,7 @@ unsigned int FRpcTradeResponsePacket::Decode(const unsigned char* Buffer,
     unsigned int Count;
     if (!Stream.Get(&Count, 4u)) return MarshalError;
     DataSize = Count;
-    if (MarshalCursor + DataSize > MarshalLimit) {
+    if (RpcRunExceedsLimit(MarshalCursor, DataSize, MarshalLimit)) {
         MarshalError = 0x17u;
         return MarshalError;
     }
@@ -368,7 +371,7 @@ unsigned int FRpcDebugCreateShipPacket::Decode(const unsigned char* Buffer,
         const unsigned int Width = WideCount * 2u;
 #if defined(REMOTECLIENT_EXPORTS)
         // RC has a noncommitting preflight before allocation; RS allocates first.
-        if (MarshalCursor + Width > MarshalLimit) {
+        if (RpcRunExceedsLimit(MarshalCursor, Width, MarshalLimit)) {
             MarshalError = 0x17u;
             return MarshalError;
         }
@@ -381,7 +384,7 @@ unsigned int FRpcDebugCreateShipPacket::Decode(const unsigned char* Buffer,
     if (!RpcWireGetThenStore(Stream, DataSizeA)) return MarshalError;
     if (DataSizeA != 0) {
 #if defined(REMOTECLIENT_EXPORTS)
-        if (MarshalCursor + DataSizeA > MarshalLimit) {
+        if (RpcRunExceedsLimit(MarshalCursor, DataSizeA, MarshalLimit)) {
             MarshalError = 0x17u;
             return MarshalError;
         }
@@ -394,7 +397,7 @@ unsigned int FRpcDebugCreateShipPacket::Decode(const unsigned char* Buffer,
     if (!RpcWireGetThenStore(Stream, DataSizeB)) return MarshalError;
     if (DataSizeB != 0) {
 #if defined(REMOTECLIENT_EXPORTS)
-        if (MarshalCursor + DataSizeB > MarshalLimit) {
+        if (RpcRunExceedsLimit(MarshalCursor, DataSizeB, MarshalLimit)) {
             MarshalError = 0x17u;
             return MarshalError;
         }
@@ -413,7 +416,7 @@ unsigned int FRpcDebugCreateShipPacket::Decode(const unsigned char* Buffer,
     if (ArrayCount != 0) {
         const unsigned int Width = ArrayCount * 4u;
 #if defined(REMOTECLIENT_EXPORTS)
-        if (MarshalCursor + Width > MarshalLimit) {
+        if (RpcRunExceedsLimit(MarshalCursor, Width, MarshalLimit)) {
             MarshalError = 0x17u;
             return MarshalError;
         }
@@ -455,7 +458,7 @@ unsigned int FRpcDebugLoadSystemPacket::Decode(const unsigned char* Buffer,
 #if defined(REMOTECLIENT_EXPORTS)
         // RC06b59036..5904b checks the body without committing its cursor.
         // RS06c069b6 allocates first. Neither decoder has an OOM-return guard.
-        if (MarshalCursor + DataSize > MarshalLimit) {
+        if (RpcRunExceedsLimit(MarshalCursor, DataSize, MarshalLimit)) {
             MarshalError = 0x17u;
             return MarshalError;
         }
@@ -864,7 +867,7 @@ unsigned int FRpcItemChangePacketBase::DecodeFields(unsigned int& Selector,
 #if defined(REMOTECLIENT_EXPORTS)
         // RC's preflight does not commit the body cursor. RS allocates before
         // that bounds check, and has no separate allocation-failure return.
-        if (MarshalCursor + HardpointSize > MarshalLimit) {
+        if (RpcRunExceedsLimit(MarshalCursor, HardpointSize, MarshalLimit)) {
             MarshalError = 0x17u;
             return MarshalError;
         }
@@ -874,6 +877,15 @@ unsigned int FRpcItemChangePacketBase::DecodeFields(unsigned int& Selector,
         if (Hardpoint == nullptr) return 5u;
 #endif
         if (!Stream.Get(Hardpoint, HardpointSize)) return MarshalError;
+#if defined(REMOTECLIENT_EXPORTS)
+        // PORT(deviation) REMOTE-PACKET-HARDENING: the client sends strlen + 1 bytes
+        // (RemoteServer IServerImpl::ReqAddItem / ReqModifyItem), and the server hands the
+        // name to StringAlloc, which reads to a terminator. Refuse a name without one.
+        if (Hardpoint[HardpointSize - 1] != '\0') {
+            MarshalError = 0x17u;
+            return MarshalError;
+        }
+#endif
     }
     return Stream.Finish(OutLength, false);
 }
@@ -903,8 +915,11 @@ void FRpcRequestLaunchPacket::Dump(std::ostream& Out) const {
     Out << "   Object ID: " << Value << "\n";
 }
 
-FRpcCreateNewCharacterPacket::FRpcCreateNewCharacterPacket()
-    : FPacketBase(0x30039u) {}
+FRpcCreateNewCharacterPacket::FRpcCreateNewCharacterPacket() : FPacketBase(0x30039u) {
+    // PORT(deviation) REMOTE-PACKET-HARDENING: retail leaves Name unset, and an empty name on
+    // the wire leaves it untouched, so RemoteClient's dispatch wcscpy'd heap garbage.
+    Name[0] = L'\0';
+}
 
 FRpcCharacterIdPacketBase::FRpcCharacterIdPacketBase(unsigned int Id)
     : FPacketBase(Id) {
@@ -998,6 +1013,12 @@ unsigned int FRpcCreateNewCharacterPacket::Decode(const unsigned char* Buffer,
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     wchar_t* Temporary;
     if (RpcDecodeWideString(*this, &Temporary) != 0) return 0x17u;
+#if defined(REMOTECLIENT_EXPORTS)
+    // PORT(deviation) REMOTE-PACKET-HARDENING: the client's create page refuses an empty name
+    // (PageCharacterCreate::Confirm, 0x005615c6), so only a forged packet carries one.
+    if (Temporary == nullptr)
+        return 0x17u;
+#endif
     if (Temporary != nullptr) {
 #if defined(REMOTECLIENT_EXPORTS)
         std::wcsncpy(Name, Temporary, 24u);
@@ -1141,7 +1162,10 @@ unsigned int FRpcPlayerTradePacket::Decode(const unsigned char* Buffer,
         // Native decoder bug: writes existing packet TargetPlayer INTO INPUT,
         // rather than reading it (RS06c004ab..4b1 / RC06b691bb..1c1).
         // The packet target remains unchanged; the input pointer still advances.
-        Stream.PutUncounted(&TargetPlayer, 4u);
+        // PORT(deviation) REMOTE-PACKET-HARDENING: only when the DWORD was counted. On a
+        // multiplayer server it is not, and retail wrote four bytes past the received message.
+        if (bCountDirectedTarget)
+            Stream.PutUncounted(&TargetPlayer, 4u);
         bNeedTarget = false;
         break;
     }
@@ -1151,7 +1175,11 @@ unsigned int FRpcPlayerTradePacket::Decode(const unsigned char* Buffer,
     }
     if (bNeedTarget) {
         if (bCountTarget && !Stream.Reserve(4u, 0x17u)) return MarshalError;
-        Stream.GetUncounted(&TargetPlayer, 4u);
+        // PORT(deviation) REMOTE-PACKET-HARDENING: retail read the target even when it was not
+        // counted (actions 04/08/10 on a multiplayer server), four bytes past the message.
+        // Clients leave it out there and the dispatch never uses it, so it stays as it is.
+        if (bCountTarget)
+            Stream.GetUncounted(&TargetPlayer, 4u);
     }
     return Stream.Finish(OutLength, false);
 }
@@ -1181,7 +1209,7 @@ unsigned int FRpcChatMsgPacket::Decode(const unsigned char* Buffer,
     FRpcWireStream Stream(*this, const_cast<unsigned char*>(Buffer), Size);
     if (!Stream.Get(&DataSize, 4u)) return MarshalError;
 #if defined(REMOTECLIENT_EXPORTS)
-    if (MarshalCursor + DataSize > MarshalLimit) {
+    if (RpcRunExceedsLimit(MarshalCursor, DataSize, MarshalLimit)) {
         MarshalError = 0x17u;
         return MarshalError;
     }
@@ -1280,7 +1308,7 @@ unsigned int FRpcCommonBufferPacketBase::Decode(const unsigned char* Buffer,
     // RC 06b66006..601a preflights without committing the cursor. The RS
     // counterpart 06bfd480..4bd instead allocates before its only body check.
     // This is native module behavior; the shared packet class layout is identical.
-    if (MarshalCursor + DataSize > MarshalLimit) {
+    if (RpcRunExceedsLimit(MarshalCursor, DataSize, MarshalLimit)) {
         MarshalError = 0x17u;
         return MarshalError;
     }
@@ -1306,7 +1334,7 @@ unsigned int RpcWireDecodeOwnedBlock(FPacketBase& Packet, FRpcWireStream& Stream
     unsigned int& BlockSize, unsigned char*& Data) {
     if (!Stream.Get(&BlockSize, 4u)) return Packet.MarshalError;
 #if defined(REMOTECLIENT_EXPORTS)
-    if (Packet.MarshalCursor + BlockSize > Packet.MarshalLimit) {
+    if (RpcRunExceedsLimit(Packet.MarshalCursor, BlockSize, Packet.MarshalLimit)) {
         Packet.MarshalError = 0x17u;
         return Packet.MarshalError;
     }
