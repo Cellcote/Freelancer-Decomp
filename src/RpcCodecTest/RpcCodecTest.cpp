@@ -713,6 +713,25 @@ namespace
     }
 }
 
+namespace
+{
+// A packet's body must start at Payload(), which every codec addresses. On the Itanium
+// C++ ABI a derived member could sit in FPacketBase's tail padding instead (rpc_packet.h).
+struct FPayloadProbePacket : FPacketBase
+{
+    FPayloadProbePacket() : FPacketBase(0u) {}
+    unsigned char Body[4];
+};
+
+bool PayloadStartsAfterBase()
+{
+    FPayloadProbePacket* const Probe = new FPayloadProbePacket;
+    const bool bAligned = Probe->Body == Probe->Payload();
+    Probe->Release();
+    return bAligned;
+}
+}
+
 int main(int Argc, char** Argv)
 {
     const char* OutPath = "rpc_codecs.txt";
@@ -737,6 +756,11 @@ int main(int Argc, char** Argv)
     InstallGuardSignals();
     std::thread(WatchdogThread, nullptr).detach();
 #endif
+    if (!PayloadStartsAfterBase())
+    {
+        fprintf(stderr, "RpcCodecTest: a packet's body does not start at FPacketBase::Payload()\n");
+        return 1;
+    }
     FDUMP = CountEngineMessage;
     // The server thread's FPU setup (FLServer SetupServerFpu): 53-bit precision, all masked.
     _control87(0x9001f, 0xfffff);

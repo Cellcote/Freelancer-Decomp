@@ -125,6 +125,14 @@ public:
     unsigned int MarshalLimit;    // +0x14  capacity of the caller's buffer
     std::uintptr_t MarshalPtr;    // +0x18  moving read/write pointer into that buffer (a dword on Win32)
     unsigned int MarshalError;    // +0x1c  0 = ok, 0x16 = encode overflow, 0x17 = decode overrun
+#if defined(FL_PTR64) && !defined(_MSC_VER)
+    // PORT(x64): the Itanium C++ ABI (macOS, Linux) places a derived class's first member in a
+    // base's tail padding, which this class has on 64-bit builds (its data ends 4 bytes short
+    // of its pointer-aligned size). Payload() is sizeof(FPacketBase) past the object, so the
+    // padding is a member here: every packet's body then starts exactly at Payload(). MSVC
+    // never reuses tail padding.
+    unsigned int TailPad = 0;
+#endif
 };
 
 // The compiler must place the vptr first and pack the seven dwords behind it, so the
