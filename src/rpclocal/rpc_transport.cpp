@@ -12,6 +12,7 @@
 #include "rpc_transport.h"
 #include "rpc_payloads.h"
 #include "rpc_containers.h"
+#include "rpc_wire_wide.h"
 #include "common_server_types.h"
 #include "platform.h"
 
@@ -237,7 +238,7 @@ bool FRpcMarshalStream::PutWideString(const wchar_t* Text) {
         return false;
     }
     if (Bytes != 0 && Text != nullptr) {
-        memcpy(Local, Text, Bytes);                                    // 06da1557
+        RpcWideToWire(Local, Text, Count); // 06da1557
     }
     Packet.MarshalPtr = reinterpret_cast<std::uintptr_t>(Local + Bytes); // 06da1565/06da1569
     return true;
@@ -264,8 +265,8 @@ bool FRpcMarshalStream::GetWideString(wchar_t*& OutText) {
         return true;
     }
     wchar_t* Block = static_cast<wchar_t*>(
-        ::operator new(Bytes + 2u, std::nothrow));                     // 06da15dd/06da15e2, bare
-    memcpy(Block, After, Bytes);                                       // 06da15f8
+        ::operator new(RpcWideBytes(Count + 1u), std::nothrow)); // 06da15dd/06da15e2, bare
+    RpcWireToWide(Block, After, Count); // 06da15f8
     Block[Count] = 0;                                                  // 06da1607
     OutText = Block;
     Packet.MarshalPtr = reinterpret_cast<std::uintptr_t>(After + Bytes); // 06da1610/06da1612

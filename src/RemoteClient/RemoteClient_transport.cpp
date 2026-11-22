@@ -13,6 +13,7 @@
 #include "rpc_packet_codec.h"
 #include "rpc_server_channel_codec.h"
 #include "msvcrt_compat.h"
+#include "rpc_wire_wide.h"
 
 #include <cstdarg>
 #include <cstdio>
@@ -206,8 +207,10 @@ void SetRemoteClientResponseData(bool bAllowPvp, bool bAllowNewPlayers,
     sprintf(Buffer, "%d:%d:%d:%d:%s:", static_cast<unsigned int>(bAllowPvp),
         static_cast<unsigned int>(bAllowNewPlayers), ServerVersion, ServerId, ServerSignature);
     unsigned int PrefixLength = static_cast<unsigned int>(strlen(Buffer));
-    wcscpy(reinterpret_cast<wchar_t*>(Buffer + PrefixLength), Description);
+    // Retail wcscpy's the description, terminator included, into the byte buffer: the
+    // client reads it as UTF-16, so convert (a plain copy when wchar_t is 2 bytes).
     unsigned int DescriptionLength = static_cast<unsigned int>(wcslen(Description));
+    RpcWideToWire(Buffer + PrefixLength, Description, DescriptionLength + 1u);
     Client.Host->SetEnumResponse(Buffer, PrefixLength + DescriptionLength * 2 + 2);
 }
 

@@ -49,6 +49,7 @@
 
 #include "rpc_payloads.h"
 #include "rpc_containers.h"
+#include "rpc_wire_wide.h"
 #include "server_pub.h"
 // EquipDesc and its setters, imported by retail rpclocal at .rdata:06db3004 and
 // 06db3070..06db308c and used verbatim by the two PLAYER_TRADE equipment sub-types.
@@ -61,6 +62,7 @@
 // common_cobject.h already coexist in src/Server/server_pub.cpp.
 #include "common_cobject.h"
 
+#include <cstddef>
 #include <cstring>
 #include <cwchar>
 #include <iterator>
@@ -163,7 +165,8 @@ static bool MarshalLogin(FPacketBase* Packet, const RpcArg* Args, unsigned int A
     Wire.CreateFlag = Info[kLoginFlagOffset];
     // 06d8ccca MOV ECX,0x100 / 06d8ccd3 MOVSD.REP / 06d8ccd5 MOVSW: exactly 0x402 bytes
     // reach the payload; +0x402/+0x403 are left as the packet's constructor left them.
-    memcpy(Packet->Payload(), &Wire, 0x402u);
+    // Spelled with sizeof so a 4-byte wchar_t copies both buffers whole.
+    memcpy(Packet->Payload(), &Wire, sizeof(Wire.AccountName) + sizeof(Wire.Password) + 2u);
     return true;
 }
 
@@ -176,8 +179,9 @@ static bool DeliverLogin(const FPacketBase* Packet, IServer* Server, unsigned in
     wcsncpy(reinterpret_cast<wchar_t*>(GStaticLoginInfo + kLoginAccountOffset),
             reinterpret_cast<const wchar_t*>(Payload + 0x000), 0x28);
     wcsncpy(reinterpret_cast<wchar_t*>(GStaticLoginInfo + kLoginPasswordOffset),
-            reinterpret_cast<const wchar_t*>(Payload + 0x200), 0x10);
-    GStaticLoginInfo[kLoginFlagOffset] = Payload[0x400];
+            reinterpret_cast<const wchar_t*>(Payload + offsetof(FPayloadClientLogin, Password)),
+            0x10);
+    GStaticLoginInfo[kLoginFlagOffset] = Payload[offsetof(FPayloadClientLogin, CreateFlag)];
     // Retail's two explicit terminator stores, +0x4e and +0xbe.
     GStaticLoginInfo[0x4e] = 0;
     GStaticLoginInfo[0x4f] = 0;
@@ -588,7 +592,9 @@ static bool MarshalSaveGame(FPacketBase* Packet, const RpcArg* Args, unsigned in
     wchar_t* Block = nullptr;
     unsigned int StoredCount = 0u;
     if (Count != 0 && Description != nullptr) {
-        Block = static_cast<wchar_t*>(RpcCopyIntoPacketBlock(Description, Count * 2u));
+        // Count * 2 bytes on Windows: an in-memory wchar_t copy, converted on the wire.
+        Block = static_cast<wchar_t*>(
+            RpcCopyIntoPacketBlock(Description, static_cast<unsigned int>(RpcWideBytes(Count))));
         StoredCount = Count;
     }
     RpcPayloadWrite(Packet, 0x200, Block);

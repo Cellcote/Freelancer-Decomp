@@ -29,6 +29,7 @@
 
 #include "rpc_payloads.h"
 #include "rpc_containers.h"
+#include "rpc_wire_wide.h"
 #include "rpc_iclient.h"
 // ch2 0x4d LOADHINT serializes a CostumeHint through its own virtuals, exactly as retail
 // does through COMMON.DLL::CostumeHint::{Serialize,UnSerialize,CleanUp}.
@@ -2701,7 +2702,7 @@ static bool MarshalCreateShip(FPacketBase* Packet, const RpcArg* Args, unsigned 
     } else {
         // FUN_06d97ce0: pkt+0xd8 = wcslen, pkt+0xdc = operator new((len*2)+2) + wcscpy.
         wchar_t* Copy = static_cast<wchar_t*>(
-            ::operator new((DisplayLength * 2u) + 2u, std::nothrow));   // 06d97cfe, bare
+            ::operator new(RpcWideBytes(DisplayLength + 1u), std::nothrow)); // 06d97cfe, bare
         for (unsigned int i = 0; i <= DisplayLength; ++i) {
             Copy[i] = DisplayName[i];
         }

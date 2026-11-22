@@ -3188,7 +3188,8 @@ public:
     void Dump(std::ostream& Out) const override {   // 06daf760
         RpcDumpClientCreateNewChar(*this, Out);
     }
-    unsigned char Body[0x90];   // +0x20
+    // 0x90 on Windows; sized from the payload so a 4-byte wchar_t still fits.
+    unsigned char Body[sizeof(FPayloadClientCreateNewChar)]; // +0x20
 };
 FL_LAYOUT_ASSERT(sizeof(FPacket_FLPACKET_CLIENT_CREATENEWCHAR) == 0xb0u, "FLPACKET_CLIENT_CREATENEWCHAR is operator new(0xb0)");
 
@@ -3233,7 +3234,8 @@ public:
     void Dump(std::ostream& Out) const override {   // 06daff50
         RpcDumpClientLogin(*this, Out);
     }
-    unsigned char Body[0x404];   // +0x20
+    // 0x404 on Windows; sized from the payload so a 4-byte wchar_t still fits.
+    unsigned char Body[sizeof(FPayloadClientLogin)]; // +0x20
 };
 FL_LAYOUT_ASSERT(sizeof(FPacket_FLPACKET_CLIENT_LOGIN) == 0x424u, "FLPACKET_CLIENT_LOGIN is operator new(0x424)");
 

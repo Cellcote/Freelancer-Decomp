@@ -24,6 +24,14 @@
 #include <string>
 #include <vector>
 
+#if !defined(_WIN32)
+#include <csetjmp>
+#include <csignal>
+#include <thread>
+
+#include <unistd.h>
+#endif
+
 #include "rpc_packet.h"
 #include "rpc_packet_codec.h"
 #include "rpc_server_channel_codec.h"
@@ -125,7 +133,11 @@ namespace
                 fprintf(stderr, "RpcCodecTest: no progress for %lu s in type %05x, case %s\n",
                     StallSeconds, GCurrentType, (const char*)GCurrentCase);
                 fflush(stderr);
+#if defined(_WIN32)
                 TerminateProcess(GetCurrentProcess(), 3);
+#else
+                _exit(3);
+#endif
             }
         }
     }
@@ -213,6 +225,7 @@ namespace
     // left by a failed Decode, say); the fault code is recorded and the test carries on. These
     // functions hold no objects with destructors, as __try requires.
     // ---------------------------------------------------------------------------------------------
+#if defined(_WIN32)
     int RecordException(unsigned int Code, unsigned int* Out)
     {
         *Out = Code;
@@ -257,6 +270,78 @@ namespace
             return ResultException;
         }
     }
+
+#else
+    // PORT(macOS): no structured exceptions here. A fault raises a signal; its handler jumps
+    // back into the guard, which records the Windows exception code the fault would have raised
+    // (so the output matches the Win32 build's).
+    sigjmp_buf GGuardJump;
+    volatile sig_atomic_t GGuardActive = 0;
+    volatile unsigned int GGuardCode = 0;
+
+    void GuardSignal(int Signal, siginfo_t* Info, void*)
+    {
+        if (GGuardActive == 0)
+        {
+            ::signal(Signal, SIG_DFL);
+            ::raise(Signal);
+            return;
+        }
+        unsigned int Code = 0xC0000005u; // EXCEPTION_ACCESS_VIOLATION (SIGSEGV, SIGBUS)
+        if (Signal == SIGFPE)
+            Code = Info != nullptr && Info->si_code == FPE_INTDIV ? 0xC0000094u : 0xC0000090u;
+        else if (Signal == SIGILL)
+            Code = 0xC000001Du; // EXCEPTION_ILLEGAL_INSTRUCTION
+        GGuardCode = Code;
+        siglongjmp(GGuardJump, 1);
+    }
+
+    void InstallGuardSignals()
+    {
+        struct sigaction Action = {};
+        Action.sa_sigaction = GuardSignal;
+        Action.sa_flags = SA_SIGINFO | SA_NODEFER;
+        sigemptyset(&Action.sa_mask);
+        for (int Signal : {SIGSEGV, SIGBUS, SIGFPE, SIGILL})
+            sigaction(Signal, &Action, nullptr);
+    }
+
+    // Runs Body under the guard: its result, or ResultException with the code in *Exception.
+    template <class F>
+    unsigned int Guarded(F Body, unsigned int* Exception)
+    {
+        if (sigsetjmp(GGuardJump, 1) != 0)
+        {
+            GGuardActive = 0;
+            *Exception = GGuardCode;
+            return ResultException;
+        }
+        GGuardActive = 1;
+        const unsigned int Result = Body();
+        GGuardActive = 0;
+        return Result;
+    }
+
+    unsigned int GuardedAllocate(FPacketFactoryFn Factory, FPacketBase** Out,
+                                 unsigned int* Exception)
+    {
+        *Out = nullptr;
+        return Guarded([&]() { return (unsigned int)Factory(Out); }, Exception);
+    }
+
+    unsigned int GuardedDecode(FPacketBase* Packet, const unsigned char* Buffer, unsigned int Size,
+                               unsigned int* Length, unsigned int* Exception)
+    {
+        return Guarded([&]() { return Packet->Decode(Buffer, Size, Length); }, Exception);
+    }
+
+    unsigned int GuardedEncode(FPacketBase* Packet, unsigned char** Buffer, unsigned int Capacity,
+                               unsigned int* Length, unsigned int* Exception)
+    {
+        return Guarded([&]() { return Packet->Encode(Buffer, Capacity, Length); }, Exception);
+    }
+
+#endif
 
     // ---------------------------------------------------------------------------------------------
     // Inputs
@@ -578,6 +663,7 @@ namespace
         fprintf(Out, "  %-10s %s\n", "prefixes", Line.c_str());
     }
 
+#if defined(_WIN32)
     LONG WINAPI ReportUnhandledException(EXCEPTION_POINTERS* Info)
     {
         fprintf(stderr, "RpcCodecTest: unhandled exception %08lx in type %05x, case %s\n",
@@ -585,6 +671,7 @@ namespace
         fflush(stderr);
         return EXCEPTION_EXECUTE_HANDLER;
     }
+#endif
 
     // RemoteClient_transport.cpp's registration, in its order.
     int RegisterTypes(FPacketSerializer& Serializer)
@@ -642,9 +729,14 @@ int main(int Argc, char** Argv)
         }
     }
 
+#if defined(_WIN32)
     SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
     SetUnhandledExceptionFilter(ReportUnhandledException);
     CloseHandle(CreateThread(nullptr, 0, WatchdogThread, nullptr, 0, nullptr));
+#else
+    InstallGuardSignals();
+    std::thread(WatchdogThread, nullptr).detach();
+#endif
     FDUMP = CountEngineMessage;
     // The server thread's FPU setup (FLServer SetupServerFpu): 53-bit precision, all masked.
     _control87(0x9001f, 0xfffff);

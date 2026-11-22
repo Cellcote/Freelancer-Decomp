@@ -8,9 +8,13 @@
 
 #include "posix/xmmintrin.h"
 
+// _ReturnAddress: the caller's return address (a macro, so it is the caller's own frame).
+#define _ReturnAddress() __builtin_return_address(0)
+
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 
 #if defined(__x86_64__) || defined(__i386__)
 #include <cpuid.h>
@@ -66,12 +70,17 @@ inline unsigned long long __rdtsc()
 #endif
 
 // __movsd / __movsb: REP MOVSD / MOVSB, a forward copy (overlap behaves as the instruction).
+// Neither address need be aligned, as for the instruction: each dword goes through memcpy.
 template <class TDword>
 inline void __movsd(TDword* Destination, const TDword* Source, std::size_t Count)
 {
     static_assert(sizeof(TDword) == 4, "__movsd copies dwords");
     for (std::size_t Index = 0; Index < Count; ++Index)
-        Destination[Index] = Source[Index];
+    {
+        TDword Value;
+        std::memcpy(&Value, Source + Index, sizeof(Value));
+        std::memcpy(Destination + Index, &Value, sizeof(Value));
+    }
 }
 inline void __movsb(unsigned char* Destination, const unsigned char* Source, std::size_t Count)
 {

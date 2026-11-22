@@ -277,6 +277,15 @@ inline char* _strlwr(char* Text)
         *Cursor = static_cast<char>(std::tolower(static_cast<unsigned char>(*Cursor)));
     return Text;
 }
+// _wcslwr: A-Z lowered, as MSVC's in the "C" locale (no retail module sets LC_CTYPE).
+inline wchar_t* _wcslwr(wchar_t* Text)
+{
+    for (wchar_t* Cursor = Text; *Cursor != 0; ++Cursor)
+        if (*Cursor >= L'A' && *Cursor <= L'Z')
+            *Cursor = static_cast<wchar_t>(*Cursor + (L'a' - L'A'));
+    return Text;
+}
+
 inline char* _strupr(char* Text)
 {
     for (char* Cursor = Text; *Cursor != 0; ++Cursor)

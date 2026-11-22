@@ -8,6 +8,7 @@
 #include "common_misc.h" // SinglePlayer selects retail's two FIREWEAPON formats.
 #include "common_net.h" // PLAYER_TRADE counts its trailer by IsMPServer direction.
 #include "common_text.h" // Canonical FmtStr::Val size calculation.
+#include "rpc_wire_wide.h" // Wide text is UTF-16 on the wire, native wchar_t in memory.
 
 #include <cfloat>
 #include <cwchar>
@@ -60,7 +61,8 @@ FRpcSaveGamePacket::~FRpcSaveGamePacket() {
 
 void FRpcSaveGamePacket::CopyDescription(const wchar_t* Source, unsigned int Count) {
     if (Count == 0 || Source == nullptr) return;
-    const unsigned int ByteCount = Count * 2u;
+    // Count * 2u on Windows: Count wchar_t in memory.
+    const std::size_t ByteCount = RpcWideBytes(Count);
     Description = static_cast<wchar_t*>(::operator new(ByteCount, std::nothrow));
     if (ByteCount != 0) std::memcpy(Description, Source, ByteCount);
     DescriptionCount = Count;
@@ -76,7 +78,7 @@ unsigned int FRpcSaveGamePacket::Encode(unsigned char** BufferHolder,
         const unsigned int ByteCount = DescriptionCount * 2u;
         if (!Stream.Reserve(ByteCount, 0x16u)) return 0x16u;
         // RC06b55748..06b55772: cached destination, REP copy, Ptr=cached+bytes.
-        Stream.PutReserved(Description, ByteCount);
+        RpcPutReservedWide(Stream, Description, DescriptionCount);
     }
     return Stream.FinishEncodeSuccess(OutLength);
 }
@@ -96,11 +98,13 @@ unsigned int FRpcSaveGamePacket::Decode(const unsigned char* Buffer,
             return MarshalError;
         }
 #endif
-        Description = static_cast<wchar_t*>(::operator new(ByteCount, std::nothrow));
+        Description =
+            static_cast<wchar_t*>(::operator new(RpcWideBytes(DescriptionCount), std::nothrow));
 #if defined(REMOTECLIENT_EXPORTS)
         if (Description == nullptr) return 5u;
 #endif
-        if (!Stream.Get(Description, ByteCount)) return MarshalError;
+        if (!RpcGetWide(Stream, Description, DescriptionCount))
+            return MarshalError;
     }
     return Stream.Finish(OutLength, false);
 }
@@ -323,7 +327,7 @@ unsigned int FRpcDebugCreateShipPacket::Encode(unsigned char** BufferHolder,
         if (!Stream.Reserve(Width, 0x16u)) return 0x16u;
         // RC06b5853b..06b58560. Native unsigned multiplication may wrap to zero;
         // REP then does no access and the pointer commit adds zero.
-        Stream.PutReserved(WideData, Width);
+        RpcPutReservedWide(Stream, WideData, WideCount);
     }
     if (!Stream.Put(&DataSizeA, 4u)) return 0x16u;
     if (DataSizeA != 0) {
@@ -376,9 +380,11 @@ unsigned int FRpcDebugCreateShipPacket::Decode(const unsigned char* Buffer,
             return MarshalError;
         }
 #endif
-        WideData = static_cast<wchar_t*>(::operator new(Width, std::nothrow));
+        // Width on Windows: WideCount wchar_t in memory, Width bytes on the wire.
+        WideData = static_cast<wchar_t*>(::operator new(RpcWideBytes(WideCount), std::nothrow));
         if (!Stream.Reserve(Width, 0x17u)) return MarshalError;
-        if (Width != 0) std::memcpy(WideData, reinterpret_cast<const void*>(MarshalPtr), Width);
+        if (Width != 0)
+            RpcWireToWide(WideData, reinterpret_cast<const void*>(MarshalPtr), Width >> 1);
         Stream.CommitReadPointer(Width);
     }
     if (!RpcWireGetThenStore(Stream, DataSizeA)) return MarshalError;
@@ -968,7 +974,7 @@ static unsigned int RpcEncodeWideString(FPacketBase& Packet, const wchar_t* Valu
     Packet.MarshalCursor += ByteCount;
     Destination += 2u;
     if (Packet.MarshalCursor >= Packet.MarshalLimit) return 0x16u;
-    std::memcpy(Destination, Value, ByteCount);
+    RpcWideToWire(Destination, Value, Length);
     Packet.MarshalPtr = reinterpret_cast<std::uintptr_t>(Destination + ByteCount);
     return 0;
 }
@@ -985,10 +991,11 @@ static unsigned int RpcDecodeWideString(FPacketBase& Packet, wchar_t** Value) {
     if (Packet.MarshalCursor >= Packet.MarshalLimit) return 0x17u;
     *Value = nullptr;
     if (Length != 0) {
-        *Value = static_cast<wchar_t*>(::operator new(ByteCount + 2u, std::nothrow));
+        // ByteCount + 2u on Windows: Length wchar_t and the terminator in memory.
+        *Value = static_cast<wchar_t*>(::operator new(RpcWideBytes(Length + 1u), std::nothrow));
         // Native has no OOM branch. A zero-length value instead leaves both
         // the packet name and the moving input pointer completely untouched.
-        std::memcpy(*Value, Source, ByteCount);
+        RpcWireToWide(*Value, Source, Length);
         (*Value)[Length] = L'\0';
         Packet.MarshalPtr = reinterpret_cast<std::uintptr_t>(Source + ByteCount);
     }
@@ -1661,10 +1668,12 @@ unsigned int FRpcClientLoginPacket::Encode(unsigned char** BufferHolder,
     if (AccountLength != 0) {
         // This mutation precedes the account-buffer capacity check in retail.
         _wcslwr(AccountName);
-        if (!Stream.PutBlock(AccountName, static_cast<unsigned int>(AccountLength) * 2u)) return 0x16u;
+        if (!RpcPutBlockWide(Stream, AccountName, AccountLength))
+            return 0x16u;
     }
     if (SecondLength != 0) {
-        if (!Stream.PutBlock(Field_0x220, static_cast<unsigned int>(SecondLength) * 2u)) return 0x16u;
+        if (!RpcPutBlockWide(Stream, Field_0x220, SecondLength))
+            return 0x16u;
     }
     return Stream.FinishEncodeSuccess(OutLength);
 }
@@ -1683,11 +1692,13 @@ unsigned int FRpcClientLoginPacket::Decode(const unsigned char* Buffer,
     if (!Stream.Get(&AccountLength, 1u)) return MarshalError;
     if (!Stream.Get(&SecondLength, 1u)) return MarshalError;
     if (AccountLength != 0) {
-        if (!Stream.Get(AccountName, static_cast<unsigned int>(AccountLength) * 2u)) return MarshalError;
+        if (!RpcGetWide(Stream, AccountName, AccountLength))
+            return MarshalError;
         AccountName[AccountLength] = L'\0';
     }
     if (SecondLength != 0) {
-        if (!Stream.Get(Field_0x220, static_cast<unsigned int>(SecondLength) * 2u)) return MarshalError;
+        if (!RpcGetWide(Stream, Field_0x220, SecondLength))
+            return MarshalError;
         Field_0x220[SecondLength] = L'\0';
     }
     return Stream.Finish(OutLength, false);
