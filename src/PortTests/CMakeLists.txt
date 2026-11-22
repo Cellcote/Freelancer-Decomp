@@ -37,6 +37,6 @@ target_include_directories(module_tests PRIVATE ${CMAKE_SOURCE_DIR}/src/include/
 target_compile_options(module_tests PRIVATE -include ${CMAKE_SOURCE_DIR}/src/include/fl_layout.h
                        "-D__declspec(x)=" -D__cdecl= -D__stdcall= -Wall -Wextra -Wno-unknown-pragmas)
 # Loaded at run time, by name, as the game loads them: built first, not linked.
-add_dependencies(module_tests dacom system x86math ReadFile zlib luaprofile Thorn arena_probe_a
-                 arena_probe_b)
+add_dependencies(module_tests dacom system x86math ReadFile zlib luaprofile Thorn EngBase
+                 arena_probe_a arena_probe_b)
 add_test(NAME module_tests COMMAND module_tests $<TARGET_FILE_DIR:dacom>)

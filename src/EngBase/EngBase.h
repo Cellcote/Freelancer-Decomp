@@ -13,6 +13,7 @@
 #include "luaprofile.h"
 #include "engine/engbase.h"
 #include "x86math.h"
+#include "x64_low_arena.h"
 
 #include <cstddef>
 #include <list>
@@ -471,6 +472,14 @@ struct FTypedChannel
     virtual FlULong UpdateDeltaRate(float Dt); // formerly Slot13
     virtual FlULong Step(float* Out, float Dt);
 
+#if defined(FL_PTR64)
+    // PORT(x64): a typed channel is an IChannel key, which retail keeps in 32 bits, so the
+    // channels are LowArena blocks (Encode / Decode). They are freed through this base, which
+    // has no virtual destructor, so every type gets one block size: the largest's.
+    static void* operator new(std::size_t Size);
+    static void operator delete(void* Block);
+#endif
+
     IChannelOwner* Owner;                            // +0x04
     FlULong Kind;                              // +0x08
     FlULong Field0C;                           // +0x0C
@@ -904,7 +913,7 @@ FlULong TypedTick(FTypedChannel* This, float Dt);            // FUN_0661b420
 // The mixer-map key of a typed channel: typed+0x18 read as a signed int (FUN_06614f70).
 inline FlLong TypedMixerKey(FTypedChannel* This)
 {
-    return (FlLong)(ptrdiff_t)(This->Bind);
+    return LowArena::Encode(This->Bind); // Bind is the playback's root instance (LowArena)
 }
 
 // Mixer list primitives (EngBaseMixer.cpp).

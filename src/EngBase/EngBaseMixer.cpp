@@ -814,7 +814,8 @@ void MixerBlendAttach(FAnimationObject* Animation, FTypedChannel* Typed, float D
     float Predicted[3];
     Leaf->SampleDisplacement(Predicted, Duration);
     Blend->Flags |= 2;                                           // 06616334..3d
-    const float* Start = G_AnimEngine->GetInstancePosition((void*)(Typed->Field14));
+    const float* Start =
+        G_AnimEngine->GetInstancePosition(LowArena::Decode<void>((FlLong)Typed->Field14));
     Blend->PoseStart[0] = Start[0];                              // 06616352..67
     Blend->PoseStart[1] = Start[1];
     Blend->PoseStart[2] = Start[2];

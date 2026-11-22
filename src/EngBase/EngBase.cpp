@@ -6,10 +6,12 @@
 
 #include "x86math.h"
 #include "facet_offset.h"
+#include "handle_value.h"
 #include "EngBase.h"
 #include "readfile.h"
 #include "x64_low_arena.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdarg>
 #include <cstddef>
@@ -709,7 +711,7 @@ static FTypedChannel* FindTypedChannel(FAnimationObject* Animation, FlULong Key)
 {
     if (Key == 0xFFFFFFFF)
         return nullptr;
-    FTypedChannel* Wanted = (FTypedChannel*)((size_t)Key);
+    FTypedChannel* Wanted = LowArena::Decode<FTypedChannel>((FlLong)Key);
     FTypedChannelSet::iterator It = Animation->Channels->find(Wanted);
     if (It == Animation->Channels->end())
         return nullptr;
@@ -1080,7 +1082,8 @@ static FlULong DACOM_API AnimationGetFirstInstanceField(FAnimationObject* This,
     {
         if (&Cursor->second == It->second.Name)
         {
-            *Out = (FlULong)((size_t)(Cursor->second.Name));
+            // An opaque cookie to the caller (Deformable2 hands it to its sink): a HandleValue id.
+            *Out = HandleValue::Of(Cursor->second.Name);
             return 1;
         }
         ++Cursor;
@@ -1124,7 +1127,7 @@ static FlULong DACOM_API AnimationFindObject(FAnimationObject* This, FlULong Pla
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
         return 0xFFFFFFFF;
-    return (FlULong)(
+    return (FlULong)LowArena::Encode(
         PlaybackFindTypedByHeader(Playback, (const FAnimBindOut*)Query));
 }
 
@@ -1310,8 +1313,9 @@ static FlULong DACOM_API TypedBindType6(FPosQuatTypedChannel* This, FlULong* Hea
         return 0;
     }
     const float* HeaderF = (const float*)Header;
-    const float* Block = (const float*)((size_t)(Header[6]));
-    FEngineInstance* Instance = (FEngineInstance*)((size_t)(This->Field14));
+    // Header[6]: the frame TypedTick's loop pass builds on its stack, as a HandleValue id.
+    const float* Block = HandleValue::To<const float>(Header[6]);
+    FEngineInstance* Instance = LowArena::Decode<FEngineInstance>((FlLong)This->Field14);
     if (HeaderF[0] == 0.0f || (Header[1] & 0x40) != 0)
     {
         if (Block != nullptr)
@@ -1421,8 +1425,8 @@ static FlULong DACOM_API TypedBindMap(FTypedChannel* This, FlULong* Map, void* B
     const FlULong Bytes = ChannelPayloadBytesFromFlags(Flags);
     if (This->Kind == 0 && G_AnimEngine != nullptr)
     {
-        FlULong* Relative = G_AnimEngine->GetInstanceRelative(
-            (void*)(This->Field14));
+        FlULong* Relative =
+            G_AnimEngine->GetInstanceRelative(LowArena::Decode<void>((FlLong)This->Field14));
         FlULong MixKind = 0;
         if (Relative != nullptr)
         {
@@ -1452,8 +1456,8 @@ static FlULong DACOM_API TypedBindMapType1(FScalarTypedChannel* This, FlULong* M
     const FlULong bBound = TypedBindMap(This, Map, Bind);
     if (bBound != 0)
     {
-        FlULong* Relative = (FlULong*)(
-            G_AnimEngine->GetInstanceRelative((void*)(Map[3])));
+        FlULong* Relative =
+            (FlULong*)(G_AnimEngine->GetInstanceRelative(LowArena::Decode<void>((FlLong)Map[3])));
         if (Relative != nullptr)
             This->JointType = Relative[0];
     }
@@ -1834,9 +1838,8 @@ FlULong TypedTick(FTypedChannel* This, float Dt)
     {
         float* Sampled = This->GetSampled();
         IChannelOwner* Owner = This->Owner;
-        return (FlULong)(Owner->Apply(
-            Sampled, (FlULong)((size_t)This),
-            TypedBindDesc(This), NewTime));                       // 0661b466..7e
+        return (FlULong)(Owner->Apply(Sampled, (FlULong)LowArena::Encode(This), TypedBindDesc(This),
+                                      NewTime)); // 0661b466..7e
     }
 
     FlULong Flags = 0;
@@ -1848,7 +1851,7 @@ FlULong TypedTick(FTypedChannel* This, float Dt)
         Result = TypedCollect(This, OldTime, This->Time, 3, &Keys[0][0], 0x40, &KeyCount);
         if (KeyCount == 0)                                       // 0661b4d6..d8
             return Result;
-        void* Sink = (void*)((size_t)(This->Field0C));
+        void* Sink = LowArena::Decode<void>((FlLong)This->Field0C);
         if (Sink == nullptr)                                     // 0661b4de..e3
             return Result;
         FChannelKeyBatch Batch;                                  // frame +0xA0
@@ -1856,9 +1859,9 @@ FlULong TypedTick(FTypedChannel* This, float Dt)
         // REP MOVSD of (count & 0x1FFFFFFF) * 2 dwords (0661b4f4..0661b50a).
         std::memcpy(Batch.Keys, Keys, (KeyCount & 0x1FFFFFFFu) * 2 * sizeof(float));
         IChannelSink* KeySink = (IChannelSink*)Sink;
-        KeySink->OnKeys((FlULong)((size_t)This),
-                        (void*)((size_t)(This->Field10)),
-                        &Batch);                                  // 0661b50c..1c
+        KeySink->OnKeys((FlULong)LowArena::Encode(This),
+                        LowArena::Decode<void>((FlLong)This->Field10),
+                        &Batch); // 0661b50c..1c
         return Result;
     }
 
@@ -1908,13 +1911,12 @@ FlULong TypedTick(FTypedChannel* This, float Dt)
                 Math->QuaternionToMatrix(*(FMatrix*)(&Frame[12]),
                                          *(const FQuaternion*)(Pose->AppliedQuat));
                 std::memcpy(Frame, &Frame[12], 9 * sizeof(float)); // 0661b648..5d
-                void* Sink = (void*)((size_t)(This->Field0C));
+                void* Sink = LowArena::Decode<void>((FlLong)This->Field0C);
                 if (Sink != nullptr)                             // 0661b65b..6e
                 {
                     IChannelSink* LoopSink = (IChannelSink*)Sink;
-                    LoopSink->OnLoop((FlULong)((size_t)This),
-                                     Frame,
-                                     (void*)((size_t)(This->Field10)));
+                    LoopSink->OnLoop((FlULong)LowArena::Encode(This), Frame,
+                                     LowArena::Decode<void>((FlLong)This->Field10));
                 }
             }
             // 0661b673..0661b6d6: rebind at the start the channel wraps back to.
@@ -1927,10 +1929,9 @@ FlULong TypedTick(FTypedChannel* This, float Dt)
             Header[3] = 0;
             std::memcpy(&Header[4], &This->Scale, sizeof(float));
             std::memcpy(&Header[5], &This->Field_0x30, sizeof(float));
-            Header[6] = This->Kind == 1
-                            ? (FlULong)((size_t)(&Frame[0]))
-                            : 0;
+            Header[6] = This->Kind == 1 ? HandleValue::Of(&Frame[0]) : 0;
             This->BindHeader(Header);
+            HandleValue::Forget(&Frame[0]); // a stack address: no id outlives the call
             // FLD Duration (frame +0x10); FCOMP 0.0f; TEST AH,0x44; JNP -- skipped only when the
             // clip has zero length. Then Weight >= 0 (or unordered) -> Frac, else Duration - Frac.
             if (Duration != 0.0f)                                // 0661b6d9..0661b715
@@ -2426,7 +2427,7 @@ static FlULong DACOM_API SetChannelOverlayOrientation(FPosQuatTypedChannel* This
     Quat[1] = Pose[4];
     Quat[2] = Pose[5];
     Quat[3] = Pose[6];
-    FEngineInstance* Instance = (FEngineInstance*)((size_t)(This->Field14));
+    FEngineInstance* Instance = LowArena::Decode<FEngineInstance>((FlLong)This->Field14);
     const float* InstanceOrient = G_AnimEngine->GetInstanceOrientation(Instance);
     float Transposed[9];                                         // FUN_0661caa0
     Transposed[0] = InstanceOrient[0];
@@ -2576,6 +2577,35 @@ FQuatTypedChannel::FQuatTypedChannel(FChannelArchetypeObject* NewArchetype) : FT
 FPosQuatTypedChannel::FPosQuatTypedChannel(IChannelOwner* NewOwner) : FTypedChannel(NewOwner) {}
 FPosQuatTypedChannel::FPosQuatTypedChannel(FChannelArchetypeObject* NewArchetype) : FTypedChannel(NewArchetype) {}
 
+#if defined(FL_PTR64)
+static constexpr std::size_t kTypedChannelBlock =
+    std::max({sizeof(FTypedChannel), sizeof(FScalarTypedChannel), sizeof(FVectorTypedChannel),
+              sizeof(FQuatTypedChannel), sizeof(FPosQuatTypedChannel)});
+
+void* FTypedChannel::operator new(std::size_t Size)
+{
+    if (Size > kTypedChannelBlock)
+        std::abort(); // a new channel type larger than the block
+    return LowArena::Allocate(kTypedChannelBlock);
+}
+
+void FTypedChannel::operator delete(void* Block)
+{
+    LowArena::Free(Block, kTypedChannelBlock);
+}
+#endif
+
+// FUN_066281d0, operator delete, on a typed channel: retail frees one through its nonvirtual
+// base after releasing the archetype (the class tails are trivial).
+static void FreeTypedChannel(FTypedChannel* Typed)
+{
+#if defined(FL_PTR64)
+    FTypedChannel::operator delete(Typed);
+#else
+    ::operator delete(Typed);
+#endif
+}
+
 // The switch every creation site runs on the type (1 / 2 / 4 / 6 / 8): operator new at the
 static FTypedChannel* NewTypedChannelWithOwner(FlULong Type, IChannelOwner* Owner)
 {
@@ -2621,7 +2651,7 @@ static void FreePlaybackTyped(FAnimPlayback* Playback)
                 Typed->Archetype->Release();
                 Typed->Archetype = nullptr;
             }
-            ::operator delete(Typed); // Nonvirtual base: archetype released above, trivial tails.
+            FreeTypedChannel(Typed); // archetype released above
         }
         ++Cursor;
     }
@@ -2658,7 +2688,7 @@ static FlULong PlaybackFilterTyped(FAnimPlayback* Playback, IChannel* Filter)
         const FlULong Type = Typed->GetType();
         if (Type != 8)
         {
-            if (Filter->InMixer((FlULong)((size_t)Typed)) != 0)
+            if (Filter->InMixer((FlULong)LowArena::Encode(Typed)) != 0)
                 return 0;
         }
         ++Cursor;
@@ -2713,12 +2743,12 @@ static FlULong ChannelBindAndInsert(FAnimationObject* Animation, FTypedChannel* 
                 Typed->Archetype->Release();
                 Typed->Archetype = nullptr;
             }
-            ::operator delete(Typed); // Nonvirtual base: archetype released above, trivial tails.        // FUN_066281d0
+            FreeTypedChannel(Typed); // FUN_066281d0 (archetype released above)
         }
         return 0xFFFFFFFF;
     }
     Animation->Channels->insert(Typed);
-    return (FlULong)((size_t)Typed);
+    return (FlULong)LowArena::Encode(Typed);
 }
 
 // LAB_06615950 / IChannel+0x0C RET 0x14 (Owner, Type, BindA, BindB). Owner null -> -1
@@ -2746,7 +2776,7 @@ static FlULong DACOM_API ChannelCreateTyped(void* ChannelThis, void* Owner, FlUL
             return 0xFFFFFFFF;
         }
         AnimationFromNested(ChannelThis, 8)->Channels->insert((FTypedChannel*)Owner);
-        return (FlULong)((size_t)Owner);
+        return (FlULong)LowArena::Encode(Owner);
     }
     // 0661597a..06615a40: operator new at the type's size, FUN_0661ad50 with the owner, the
     // class tail (type 1: +0x40 = EBX = -1, OR EBX,-1 at 0661595a).
@@ -2790,7 +2820,7 @@ static FlULong DACOM_API ChannelDestroy(void* ChannelThis, FlULong Key)
         Typed->Archetype->Release();
         Typed->Archetype = nullptr;
     }
-    ::operator delete(Typed); // Nonvirtual base: archetype released above, trivial tails.                // 06615e93..94 FUN_066281d0
+    FreeTypedChannel(Typed); // 06615e93..94 (archetype released above) FUN_066281d0
     Animation->Channels->erase(Typed);                           // 06615e9c..a4
     return 0;
 }
@@ -4230,8 +4260,9 @@ static FlULong ChannelRelocatedKey(const FChannelArchetypeObject* Channel, FlULo
     const unsigned char* Payload = ChannelFramePayload(Channel, Index);
     FlULong Reloc = 0;
     std::memcpy(&Reloc, Payload, sizeof(Reloc));
-    return Channel->Stride * Channel->FrameCount + (FlULong)(Channel->Frames) +
-           Reloc;
+    // An event key: the address of the key's payload in the frame data. On 64-bit builds it is
+    // a HandleValue id of that address (EngBase's table), as the sinks get it in a 32-bit slot.
+    return HandleValue::Of(Channel->Frames + Channel->Stride * Channel->FrameCount + Reloc);
 }
 
 // LAB_0661e400, IChannelArchetype slot 9, RET 0x18 (Time0, Time1, OutKeys, Capacity, Count),
@@ -4377,7 +4408,7 @@ static unsigned char BindTrackTarget(FAnimBindOut* Out, FEngineInstance* Root, F
         FEngineInstance* Inst = AnimEngineFindInstanceByName(Root, ChildName);
         if (Inst == Invalid)
             return 0;
-        const bool bMapped = FindAnimHandle((FlULong)((size_t)Inst));
+        const bool bMapped = FindAnimHandle((FlULong)LowArena::Encode(Inst));
         *Already = bMapped ? 1 : 0;
         if (bMapped)
             return 0;
@@ -4398,7 +4429,7 @@ static unsigned char BindTrackTarget(FAnimBindOut* Out, FEngineInstance* Root, F
         FEngineInstance* Inst = AnimEngineFindInstanceByName(Root, ParentName);
         if (Inst == Invalid)
             Inst = Root;
-        const bool bMapped = FindAnimHandle((FlULong)((size_t)Inst));
+        const bool bMapped = FindAnimHandle((FlULong)LowArena::Encode(Inst));
         *Already = bMapped ? 1 : 0;
         if (bMapped)
             return 0;
@@ -4486,7 +4517,7 @@ static void BindPlaybackTracks(FAnimPlayback* Playback, FEngineInstance* Root, v
                     Typed->Archetype->Release();
                     Typed->Archetype = nullptr;
                 }
-                ::operator delete(Typed); // Nonvirtual base: archetype released above, trivial tails.
+                FreeTypedChannel(Typed); // archetype released above
             }
             Cursor = Playback->Typed.erase(Cursor);
         }
@@ -4876,8 +4907,7 @@ static FlULong DACOM_API AnimationSetOverlayPos(FAnimationObject* This, FlULong 
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
         return 0;
-    FMixerDescMap* Inner =
-        MixerFindKey(This, (FlLong)((ptrdiff_t)(Playback->Root)));
+    FMixerDescMap* Inner = MixerFindKey(This, LowArena::Encode(Playback->Root));
     if (Inner != nullptr)
         PlaybackWriteOverlayPos(Playback, Pos, Inner);
     return 0;
@@ -4890,8 +4920,7 @@ static FlULong DACOM_API AnimationSetOverlayExtra(FAnimationObject* This, FlULon
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
         return 0;
-    FMixerDescMap* Inner =
-        MixerFindKey(This, (FlLong)((ptrdiff_t)(Playback->Root)));
+    FMixerDescMap* Inner = MixerFindKey(This, LowArena::Encode(Playback->Root));
     if (Inner != nullptr)
         PlaybackWriteOverlayOrient(Playback, Extra, Inner);
     return 0;
@@ -4916,8 +4945,7 @@ static FlULong DACOM_API AnimationAddOverlayPos(FAnimationObject* This, FlULong 
     FAnimPlayback* Playback = nullptr;
     if (FindPlaybackRecord(This, PlaybackId, &Playback) == 0)
         return 0;
-    FMixerDescMap* Inner =
-        MixerFindKey(This, (FlLong)((ptrdiff_t)(Playback->Root)));
+    FMixerDescMap* Inner = MixerFindKey(This, LowArena::Encode(Playback->Root));
     if (Inner != nullptr)
         PlaybackAddOverlayPos(Playback, Delta, Inner);
     return 0;
@@ -5571,7 +5599,7 @@ static FEngineInstance* AllocEngineInstance(FArchetypeHandle* Handle)
 // The instance-root map key: the instance pointer as a signed int (FUN_06612e70, JGE).
 static FlLong EngineInstanceKey(FEngineInstance* Instance)
 {
-    return (FlLong)((intptr_t)Instance);
+    return LowArena::Encode(Instance);
 }
 
 // FUN_06623ac0 with the pair {Instance, Instance} and the cache update every caller does
@@ -6561,7 +6589,8 @@ static GENRESULT DACOM_API EngineSetTransformUser(FEngineObject* This, FEngineIn
     (void)This;
     if (!IsValidInstance(Instance))
         return GR_OK;
-    return Instance->Transform->SetUser(Instance, (FlULong)User);
+    return Instance->Transform->SetUser(Instance,
+                                        (FlULong)(std::uintptr_t)User); // a value, not an address
 }
 
 // LAB_06621c70 / IEngine +0xB8 (RET 8) -> transform +0x30; fallback 0.
@@ -6776,8 +6805,7 @@ static FEngineInstance* DACOM_API EngineFindMappedInstance(FEngineObject* This,
     {
         if (This->Instances.empty())
             return G_InvalidInstance;
-        return (FEngineInstance*)(
-            (intptr_t)(This->Instances.begin()->first));
+        return LowArena::Decode<FEngineInstance>(This->Instances.begin()->first);
     }
     const FlLong Key = EngineInstanceKey(Instance);
     This->InstanceLookupCount += 1;
@@ -6801,7 +6829,7 @@ static FEngineInstance* DACOM_API EngineFindMappedInstance(FEngineObject* This,
     ++It;
     if (It == This->Instances.end())
         return G_InvalidInstance;
-    return (FEngineInstance*)((intptr_t)(It->first));
+    return LowArena::Decode<FEngineInstance>(It->first);
 }
 
 static I3DMathEngine* G_MathEngine = nullptr;
@@ -6870,8 +6898,9 @@ static GENRESULT DACOM_API EngineQueryEngineComponent(FEngineObject* This, int I
     FEngineChildNode* Sentinel = This->EngineComponentList;
     for (FEngineChildNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
     {
-        const GENRESULT Result = AsEngineComponent(Node->Object)->QueryArchetype(
-            (void*)((ptrdiff_t)Id), (const char*)Name, Out);
+        const GENRESULT Result =
+            AsEngineComponent(Node->Object)
+                ->QueryArchetype(LowArena::Decode<void>(Id), (const char*)Name, Out);
         if (Result >= 0)
             return GR_OK;
     }
@@ -6881,7 +6910,7 @@ static GENRESULT DACOM_API EngineQueryEngineComponent(FEngineObject* This, int I
 // The map key: retail stores the archetype handle as a signed int (FUN_06612e70, JGE).
 static FlLong HardpointKeyOf(FArchetypeHandle* Handle)
 {
-    return (FlLong)((intptr_t)Handle);
+    return LowArena::Encode(Handle);
 }
 
 // The lookup every IHardpoint / IEngineComponent method of this object opens with (inline in
@@ -7763,7 +7792,7 @@ float* DACOM_API FEngineObject::GetIdentityMatrix2(void* Unused)
 GENRESULT DACOM_API FEngineObject::SetTransformUser(void* Instance, FlULong User)
 {
     return EngineSetTransformUser(this, (FEngineInstance*)Instance,
-                                   (void*)User);
+                                  (void*)(std::uintptr_t)User); // a value, not an address
 }
 FlULong DACOM_API FEngineObject::GetTransformUser(void* Instance)
 {
@@ -8166,8 +8195,7 @@ static void RegisterFactory(FDacomFactory* Factory, const char* Name, FlULong Pr
     ICOManager* Dacom = DACOM_Acquire();
     if (Dacom != nullptr)
     {
-        Dacom->RegisterComponent((IDAComponent*)Factory, Name,
-                                 (void*)Priority);
+        Dacom->RegisterComponent((IDAComponent*)Factory, Name, (void*)(std::uintptr_t)Priority);
         Factory->Release();
     }
     else
@@ -8217,3 +8245,7 @@ BOOL APIENTRY DllMain(HMODULE Module, DWORD Reason, LPVOID Reserved)
     }
     return TRUE;
 }
+
+#if !defined(_WIN32)
+FL_POSIX_DLLMAIN(DllMain) // PORT(macOS): run as the module loads (posix/windows.h)
+#endif
