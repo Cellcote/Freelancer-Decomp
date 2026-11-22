@@ -1818,9 +1818,11 @@ void StarSystem::munition_collision(SSPMunitionCollisionInfo const& Info)
     Impact.SubObjId = SUBOBJ_ID_NONE;
     Archetype::Equipment* const MunitionArch = Archetype::GetEquipment(Info.Field_0x00);
     // PORT(deviation) SERVER-INPUT-GUARDS: retail reads MunitionArch->ObjectType below with no
-    // null test. The client sends its projectile's own archetype (client_gameobj.cpp), which
-    // always resolves; an unknown id crashed the server.
-    if (MunitionArch == nullptr)
+    // null test and then uses it as a Munition. The client's only senders are its beam (gun
+    // shot) and guided (missile) objects, which send their own Munition archetype
+    // (client_gameobj.cpp, 0x0053f790 and 0x0053ee00); an unknown id crashed the server and
+    // another equipment class was read as a Munition.
+    if (MunitionArch == nullptr || MunitionArch->get_class_type() != Archetype::AClassMunition)
         return;
     Impact.Munition = static_cast<Archetype::Munition const*>(MunitionArch);
     Impact.ShooterId = Info.Field_0x04;

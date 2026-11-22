@@ -339,15 +339,16 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 
 **Retail → port:**
 - **Login gate (RemoteClient).** Retail dispatched every packet to Server.dll before login, so handlers that assume a logged-in slot ran for anonymous peers. The port dispatches only LOGIN until the server has answered it with status 3. The retail client waits for that answer, sends nothing else first, and disconnects on any other result (`login_mgr.cpp`, `connect_flow.cpp`).
-- **Weapon groups (`SetWeaponGroup`, save writer).** Retail stored any client string and wrote it into the save's `[Player]` block as the `fprintf` format. So a player could add keys (money, ship, rank) to their own save, and a `%` crashed the save. The port keeps a string only if it matches what `FWeaponGroups::SendToServer` builds: `wg = <int>, <name>` lines plus a final empty line, with no NUL. Otherwise the old value is kept. The block is written with `fputs`, so text without a `%` gives the same bytes as before.
+- **Weapon groups (`SetWeaponGroup`, save writer).** Retail stored any client string and wrote it into the save's `[Player]` block as the `fprintf` format. So a player could add keys (money, ship, rank) to their own save, and a `%` crashed the save. The port keeps a string only if it matches what `FWeaponGroups::SendToServer` builds: `wg = <int>, <name>` lines plus a final empty line, with no NUL or `\r` (the save loader ends a line at either). Otherwise the old value is kept. The block is written with `fputs`, so text without a `%` gives the same bytes as before.
 - **Buffer handlers.** SetVisitedState, RequestBestPath and SetInterfaceState now check the size the client sends with the buffer (header plus `count` 5-byte records, 0x34 bytes, and 4 bytes) instead of reading past it.
 - **`CreateNewCharacter`.** It needs a logged-in slot, and `PlayerDB::create_new_character` refuses a slot with no account. Retail dereferenced the missing account.
 - **`MineAsteroid`.** An unknown system id is ignored. Retail dereferenced the null system.
-- **`SPMunitionCollision` (`StarSystem::munition_collision`).** An archetype id that does not resolve is ignored. The client sends its projectile's own archetype.
+- **`SPMunitionCollision` (`StarSystem::munition_collision`).** An archetype id that does not resolve to a Munition is ignored. The client's only senders, its beam and guided objects (0x0053f790, 0x0053ee00), send their own Munition archetype.
 - **`ReqShipArch(0)`** is ignored. The dealer only sends a package's hull, and arch 0 crashed launch and trade.
 - **`ReqHullStatus`.** The value is clamped to [0, 1], and NaN becomes 0. The client sends 1.0 or 0.0.
 - **Trades.**
   - `AddTradeEquip` and `DelTradeEquip` ignore a count of 0 or less. The trade window only offers positive counts.
+  - `AddTradeEquip` also refuses an offer whose total for an archetype would exceed what the player holds of it. The window never offers more than the stack, and repeated additions could otherwise wrap the offer's `int` count negative.
   - `AcceptTrade` returns when the partner has no offer.
   - `AcceptTrade` fails the trade (reason 3) before anything moves when either ship is missing or has no archetype. Retail moved money and cargo, then crashed. A legitimate client reaches this case when a trade is accepted just as a player lands.
 - **Ships without an engine.** `Ship::set_strafe_dir`, cruise (`slot_50`) and thrusters (`slot_54`) return instead of dereferencing a missing engine.

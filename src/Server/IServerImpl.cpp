@@ -52,8 +52,9 @@
 
 // PORT(deviation) SERVER-INPUT-GUARDS: whether Data[0..Size) is weapon-group text as the
 // client builds it (FWeaponGroups::SendToServer, hud_weapon_groups.cpp): lines of the form
-// "wg = <int>, <name>" ended by '\n', with a final empty line. No NUL anywhere, and a name runs
-// to the end of its line, so no line can start a key or section of its own in the save.
+// "wg = <int>, <name>" ended by '\n', with a final empty line. No NUL or '\r' anywhere (the save
+// loader ends a line at either), and a name runs to the end of its line, so no line can start a
+// key or section of its own in the save.
 static bool Server_IsClientWeaponGroupText(const unsigned char* Data, int Size)
 {
     if (Size <= 0 || Data[Size - 1] != '\n')
@@ -64,7 +65,7 @@ static bool Server_IsClientWeaponGroupText(const unsigned char* Data, int Size)
         int End = Pos;
         while (Data[End] != '\n')
         {
-            if (Data[End] == '\0')
+            if (Data[End] == '\0' || Data[End] == '\r')
                 return false;
             ++End;
         }
@@ -2623,10 +2624,29 @@ void IServerImpl::AddTradeEquip(unsigned int session_id, const EquipDesc& equip)
             TerminateTrade(session_id, 2);                                        // .text:06cf21b4
             return;
         }
-        // PORT(deviation) SERVER-INPUT-GUARDS: the trade window only offers a positive count
-        // (nn_trade.cpp); a negative one took items from the partner at accept time.
+        // PORT(deviation) SERVER-INPUT-GUARDS: the trade window only offers a positive count, and
+        // never more in total than the stack it shows (nn_trade.cpp). A negative count took
+        // items from the partner at accept time, and repeated additions could wrap the offer's
+        // int count negative. Refuse an offer whose total for this archetype exceeds what the
+        // player holds of it.
         if (equip.get_count() <= 0)
             return;
+        {
+            long long Offered = equip.get_count();
+            std::list<EquipDesc> const& OfferItems = Offer->GetList().Items;
+            for (std::list<EquipDesc>::const_iterator It = OfferItems.begin();
+                 It != OfferItems.end(); ++It)
+                if (It->ArchId == equip.ArchId)
+                    Offered += It->Count;
+            long long Held = 0;
+            std::list<EquipDesc> const& HeldItems = Players[session_id].equipment.Items;
+            for (std::list<EquipDesc>::const_iterator It = HeldItems.begin(); It != HeldItems.end();
+                 ++It)
+                if (It->ArchId == equip.ArchId)
+                    Held += It->Count;
+            if (Offered > Held)
+                return;
+        }
         CPlayerTradeOffer* const PartnerOffer = Offer->GetTargetOffer();
         if (PartnerOffer != nullptr)
             PartnerOffer->SetAccepted(false);                                     // .text:06cf2134
