@@ -109,7 +109,7 @@ void TestReadFile(ICOManager* Manager)
 
     // EngBase's engine: a compound archetype and an instance of it, which are LowArena blocks
     // whose encoded values key the engine's maps (the root-instance map walked here).
-    void TestEngine(ICOManager* Manager)
+    void TestEngine(ICOManager * Manager)
     {
         AGGDESC Desc = {8, "Engine"};
         IEngine* Engine = nullptr;
@@ -148,7 +148,7 @@ void TestReadFile(ICOManager* Manager)
         Engine->Release();
     }
 
-    int __cdecl CountComponent(IDAComponent* Factory, const char* Name, void*, void* Context)
+    int __cdecl CountComponent(IDAComponent * Factory, const char* Name, void*, void* Context)
     {
         Check(Engine->GetInstanceArchetype(Parent) == Archetype, "the instance's archetype");
         // A joint makes Parent a root: the root map holds it under its encoded key.

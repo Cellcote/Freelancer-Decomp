@@ -28,7 +28,10 @@ extern "C" int FL_PROBE(Read)(FlLong Encoded)
 }
 
 // Frees an encoded block.
-extern "C" void FL_PROBE(Free)(FlLong Encoded) { LowArena::Free(LowArena::Decode<int>(Encoded), 48); }
+extern "C" void FL_PROBE(Free)(FlLong Encoded)
+{
+    LowArena::Free(LowArena::Decode<int>(Encoded), 48);
+}
 
 // The HandleValue id of Object, and the object an id names.
 extern "C" FlULong FL_PROBE(Id)(const void* Object)
