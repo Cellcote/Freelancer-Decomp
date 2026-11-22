@@ -8,9 +8,9 @@
 
 #include "cargo_bar_control.h"
 
-#include "../ids_strings.h"      // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../nn/nn_ui_pulse.h"      // G_HudChromeColorRgba (DAT_00679bb4)
-#include "../space/star_sphere.h"      // Win3DBindModelview (FUN_00422690)
+#include "../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../nn/nn_ui_pulse.h" // G_HudChromeColorRgba (DAT_00679bb4)
+#include "../space/star_sphere.h" // Win3DBindModelview (FUN_00422690)
 #include "tooltip_hover.h"    // FToolTipHoverInfo, NnToolTipFeedHover (FUN_004be370)
 #include "win3d_engine_submit.h" // Win3DRayHitsAabbHalfExtents (FUN_005a1130)
 #include "../cmn/win3d_immediate.h"

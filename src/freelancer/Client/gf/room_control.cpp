@@ -13,23 +13,23 @@
 #include "alchemy.h"
 #include "anim_script_set.h"
 #include "../interface/character_select_equip.h" // GetPlayerShipArchetypeIdRetail / GetPlayerEquipDescListRetail
-#include "base_market.h"     // FClientMarket, GetClientLocationBaseMarket (FUN_0043a510)
-#include "../cmn/fade_to_black.h"          // SetFadeImmediate (FUN_00412070), SetFadeTarget (FUN_00412050)
+#include "base_market.h" // FClientMarket, GetClientLocationBaseMarket (FUN_0043a510)
+#include "../cmn/fade_to_black.h" // SetFadeImmediate (FUN_00412070), SetFadeTarget (FUN_00412050)
 #include "../space/flash_light.h"
 #include "gameflow.h"               // HoldGameflowTime / ClearHoveredHotspot / UnlockHotspotInput
-#include "../cmn/input_manager.h"          // MouseSetCursor (FUN_0041dde0), SetClientMouseCursorDrawFlag
-#include "../space/space_letterbox.h"        // SetLetterboxTarget (FUN_0041a0f0)
+#include "../cmn/input_manager.h" // MouseSetCursor (FUN_0041dde0), SetClientMouseCursorDrawFlag
+#include "../space/space_letterbox.h" // SetLetterboxTarget (FUN_0041a0f0)
 #include "object_prop.h"
 #include "../game_options.h"
-#include "../space/player_spawn.h"       // GetPlayerConnectionId (DAT_00673344)
-#include "../server_connect.h"     // GetLocalServerInterface (DAT_0067ecd0)
+#include "../space/player_spawn.h" // GetPlayerConnectionId (DAT_00673344)
+#include "../server_connect.h" // GetLocalServerInterface (DAT_0067ecd0)
 #include "gf_script.h"
 #include "gf_character_object.h"
 #include "gf_object_ship.h"
 #include "gf_script_object.h"
 #include "menu_universe_base.h"
 #include "mirror_property_bucket.h"
-#include "../nn/nn_main_button.h"     // G_bNnKeepPanelOpen (DAT_0066d359)
+#include "../nn/nn_main_button.h" // G_bNnKeepPanelOpen (DAT_0066d359)
 #include "room_camera.h"
 #include "room_control_hotspot.h" // RoomButton family (Client\Gf\RoomControlHotspot.cpp)
 #include "../cmn/cliobj.h"

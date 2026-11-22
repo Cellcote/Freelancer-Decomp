@@ -19,7 +19,7 @@
 #ifdef FREELANCER_RP9
 #include "nebula_volume.h" // PORT(rp9): Direct3D 9 volumetric nebula gates
 #endif
-#include "../cmn/pixel_format.h"   // PixelFormatFromD3D / PixelFormatGetDesc (FUN_005b7010 / 005b7030)
+#include "../cmn/pixel_format.h" // PixelFormatFromD3D / PixelFormatGetDesc (FUN_005b7010 / 005b7030)
 #include "camera/space_camera.h"
 #include "star_sys.h"
 #include "texture_panels.h"

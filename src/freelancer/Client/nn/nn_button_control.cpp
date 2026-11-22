@@ -12,16 +12,16 @@
 #include "../space/hud/hud_command_dispatch.h" // HudPostCommand (FUN_005763b0)
 #include "../cmn/input_manager.h"        // GetClientSoftwareCursor (DAT_00616840 / DAT_00616844)
 #include "../cmn/menu_sound_arch.h"      // LookupClientSoundArch / PlayClientSoundArchIfIdle
-#include "../interface/menu_ui_init.h"         // FindUiSoundSlot / PlayOrRewindUiSoundSlot / PlayUiRolloverSound
+#include "../interface/menu_ui_init.h" // FindUiSoundSlot / PlayOrRewindUiSoundSlot / PlayUiRolloverSound
 #include "nn_montage_draw.h"      // ButtonMontage tiles, NnMontageDrawTileAt (FUN_00559900)
 #include "nn_tooltip.h"           // NnToolTipHideGlobal (FUN_004be390)
 #include "nn_ui_pulse.h"          // NnUiPulseReset / NnUiPulseBlendArgb / palette
-#include "../space/camera/space_camera.h"         // FSpaceCamera (DAT_0067dbf8)
-#include "../space/camera/space_camera_third.h"   // CockpitMulMatrix (FUN_0051a140)
-#include "../interface/tooltip_hover.h"        // FToolTipHoverInfo / NnToolTipFeedHover (FUN_004be370)
+#include "../space/camera/space_camera.h" // FSpaceCamera (DAT_0067dbf8)
+#include "../space/camera/space_camera_third.h" // CockpitMulMatrix (FUN_0051a140)
+#include "../interface/tooltip_hover.h" // FToolTipHoverInfo / NnToolTipFeedHover (FUN_004be370)
 #include "../interface/win3d.h"
-#include "../interface/win3d_engine_submit.h"  // SubmitWin3DEngineInstance / ..TintedEngineInstanceWrapped
-#include "../cmn/win3d_immediate.h"      // Win3DDisable (FUN_00421ed0)
+#include "../interface/win3d_engine_submit.h" // SubmitWin3DEngineInstance / ..TintedEngineInstanceWrapped
+#include "../cmn/win3d_immediate.h" // Win3DDisable (FUN_00421ed0)
 #include "../interface/win_factory.h"
 
 #include "common_csys.h"          // RotateMatrix, Acquire3DMathEngine (FUN_005b73e0)

@@ -25,7 +25,7 @@ struct EquipDescVector; // common_goods.h
 
 namespace Archetype
 {
-    // MaterialLib path-cache entry (Client\cmn\MaterialLib.cpp); layout in cmn/cliobj.cpp.
+    // MaterialLib path-cache entry (Client\cmn\MaterialLib.cpp); layout in client_cliobj.cpp.
     struct FCliMaterialEntry;
 
     // VC6 std::vector empty-allocator shape: 1-byte cookie + 3 pad + begin/end/cap. The

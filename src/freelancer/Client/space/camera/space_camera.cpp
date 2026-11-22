@@ -243,7 +243,7 @@ namespace
     // Retail carries all of it on the in-flight controller SpaceApp (DAT_00678b98, the `this`
     // of FUN_00549e70 / FUN_00549bc0): the eight cameras at +0x00c .. +0xa9c, the active camera
     // at +0xba0, the preference at +0xba4, the bytes at +0x08 / +0x0b / +0xba8. The port's
-    // object is G_SpaceApp (space/space_app.h), built at static init as retail's is.
+    // object is G_SpaceApp (space_app.h), built at static init as retail's is.
     bool         G_LastModeWasScript = false;  // FUN_00549e70's local_28
 
     // The camera for one of FUN_00549e70's names.

@@ -20,11 +20,11 @@
 #include "common_iface.h"         // IObjRW
 #include "common_ini.h"
 #include "dacom.h"
-#include "../../globals.h"              // GetClientFrameTimeCapped (FUN_0042d680), G_RenderSurface*
+#include "../../globals.h"        // GetClientFrameTimeCapped (FUN_0042d680), G_RenderSurface*
 #include "../hud/hud_command_dispatch.h" // HudCommandRecord (FUN_00576240)
-#include "../hud/hud_target.h"           // HudIsMousePickBlocked (FUN_0045a740)
-#include "../../cmn/input_manager.h"        // GetClientMouseButtons, GetClientSoftwareCursor
-#include "../player_behavior.h"      // IsMouseFlightLocked (FUN_004c7c80)
+#include "../hud/hud_target.h"    // HudIsMousePickBlocked (FUN_0045a740)
+#include "../../cmn/input_manager.h" // GetClientMouseButtons, GetClientSoftwareCursor
+#include "../player_behavior.h"   // IsMouseFlightLocked (FUN_004c7c80)
 #include "x86math.h"
 
 #include <cstddef>

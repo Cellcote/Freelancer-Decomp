@@ -11,9 +11,9 @@
 
 #include "../interface/cargo_bar_control.h"
 #include "../interface/character_select_equip.h" // GetPlayerEquipDescListRetail (FUN_004c4060), credits (FUN_004c4ce0)
-#include "../cmn/cliobj.h"          // Archetype::CliObjMaterialPaths (companion +0x20)
+#include "../cmn/cliobj.h" // Archetype::CliObjMaterialPaths (companion +0x20)
 #include "nn_button_control.h"
-#include "../space/star_sphere.h"            // Win3DIdentityRotation3x3 (FUN_004215b0)
+#include "../space/star_sphere.h" // Win3DIdentityRotation3x3 (FUN_004215b0)
 #include "../interface/win_factory.h"
 
 #include <stdint.h>

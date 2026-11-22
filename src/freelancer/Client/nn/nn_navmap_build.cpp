@@ -9,7 +9,7 @@
 
 #include "nn_navmap.h"
 #include "../interface/character_select_equip.h" // GetPlayerStarSystemIdRetail, GetPlayerVisitFlagsRetail
-#include "../cmn/cliobj.h"          // Archetype::CliSolarShapeName (companion +0x60)
+#include "../cmn/cliobj.h" // Archetype::CliSolarShapeName (companion +0x60)
 #include "nn_ui_pulse.h"            // G_NnPaletteArgb_679ba4
 #include "common_archetype.h"       // Archetype::GetSolar, Solar
 #include "common_id.h"              // CreateID

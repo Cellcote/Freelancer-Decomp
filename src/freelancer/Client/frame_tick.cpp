@@ -23,8 +23,8 @@
 #include "space/hud/hud_element_list.h"
 #include "login_mgr.h"             // G_Server (DAT_0067ecd0), DAT_0067ecbe / DAT_0067ecbf
 #include "main_command_handler.h"  // DAT_0067ecbd (FUN_005b2c50 / FUN_005b2c60)
-#include "interface/menu_enter_state.h"      // FUN_00564b10 / FUN_00564b20
-#include "nn/nn_error.h"              // FUN_00473cb0
+#include "interface/menu_enter_state.h" // FUN_00564b10 / FUN_00564b20
+#include "nn/nn_error.h" // FUN_00473cb0
 #include "space/player_behavior.h"
 #include "server_connect.h"
 #include "space/camera/space_camera.h"
@@ -59,7 +59,7 @@ namespace
 {
     // DAT_0061085c / DAT_00610860 are RenderMgr.cpp globals: G_bRenderDither (the DitherControl
     // apply LAB_00424630) and G_RenderMipFilter (the MipFilterControlCallback apply
-    // LAB_004246d0), defined in cmn/engine_init.cpp.
+    // LAB_004246d0), defined in engine_init.cpp.
 
     // DAT_0067ecb0 -- the IServer* the frame saw last (.bss 0). Only FUN_005b2890 touches it
     // (0x005b28bb read, 0x005b28ca store).

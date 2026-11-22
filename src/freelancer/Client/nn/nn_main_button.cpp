@@ -9,15 +9,15 @@
 #include "../gf/base_walk.h"
 #endif
 
-#include "../space/mesh_load.h"    // ClientUiMeshHolderRelease (FUN_0059eee0), ClientMeshLoadFromPath (FUN_0059ec80)
-#include "../globals.h"             // IsClientServerTickPaused (FUN_0042d730), GetClientFrameTimeCapped (FUN_0042d680)
+#include "../space/mesh_load.h" // ClientUiMeshHolderRelease (FUN_0059eee0), ClientMeshLoadFromPath (FUN_0059ec80)
+#include "../globals.h" // IsClientServerTickPaused (FUN_0042d730), GetClientFrameTimeCapped (FUN_0042d680)
 #include "../space/hud/hud_command_dispatch.h" // HudPostCommand (FUN_005763b0), Hud{Push,Remove}CancelHandler
-#include "../space/hud/hud_target.h"          // HudIsMousePickBlocked (FUN_0045a740)
-#include "../gf/menu_universe_base.h"  // IsClientLocationInTransition (DAT_00668761)
-#include "../cmn/input_manager.h"       // Get/SetClientMouseCursorDrawFlag (FUN_0041dd90 / FUN_0041dda0), MouseSetCursor
-#include "../login_mgr.h"           // G_Server (DAT_0067ecd0)
-#include "../interface/menu_ui_init.h"        // PlayOrRewindUiSoundSlot (FUN_005645c0)
-#include "../gf/nav_bar.h"             // NavBarCloseService (FUN_004424f0)
+#include "../space/hud/hud_target.h" // HudIsMousePickBlocked (FUN_0045a740)
+#include "../gf/menu_universe_base.h" // IsClientLocationInTransition (DAT_00668761)
+#include "../cmn/input_manager.h" // Get/SetClientMouseCursorDrawFlag (FUN_0041dd90 / FUN_0041dda0), MouseSetCursor
+#include "../login_mgr.h" // G_Server (DAT_0067ecd0)
+#include "../interface/menu_ui_init.h" // PlayOrRewindUiSoundSlot (FUN_005645c0)
+#include "../gf/nav_bar.h" // NavBarCloseService (FUN_004424f0)
 #include "nn_messaging.h"        // NnVoiceTick (FUN_00489e00)
 #include "float_bits.h"
 #include "nn_modal.h"            // G_NnMainButton, G_bNnScreenUp
@@ -25,10 +25,10 @@
 #include "nn_story_star.h"       // StoryStarTick (FUN_004bc990), StoryStarRequeueLastObjective
 #include "nn_trade.h"            // G_NnTrade (DAT_006724b4)
 #include "nn_ui_pulse.h"         // G_NnPaletteArgb_679ba8 (DAT_00679ba8)
-#include "../space/player_spawn.h"        // GetPlayerConnectionId (DAT_00673344)
-#include "../space/space_letterbox.h"     // SetLetterboxTarget (FUN_0041a0f0), IsLetterboxVisible (FUN_0041a3e0)
-#include "../interface/win3d.h"               // Win3DFindByName, Win3DReparent, Win3DDeleteTree, Win3DDrawChildrenOf
-#include "../interface/win_factory.h"         // WINFACTORY, WinFactoryCreate (FUN_0059db20)
+#include "../space/player_spawn.h" // GetPlayerConnectionId (DAT_00673344)
+#include "../space/space_letterbox.h" // SetLetterboxTarget (FUN_0041a0f0), IsLetterboxVisible (FUN_0041a3e0)
+#include "../interface/win3d.h" // Win3DFindByName, Win3DReparent, Win3DDeleteTree, Win3DDrawChildrenOf
+#include "../interface/win_factory.h" // WINFACTORY, WinFactoryCreate (FUN_0059db20)
 
 #include "DALib.h"
 #include "common_csys.h"         // Acquire3DMathEngine (FUN_005b73e0)

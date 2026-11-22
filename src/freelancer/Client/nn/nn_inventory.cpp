@@ -8,26 +8,26 @@
 
 #include "nn_inventory.h"
 
-#include "../interface/cargo_bar_control.h"      // ToolTipHoverInit / SetCaption
-#include "../gf/base_market.h"     // GetClientLocationBaseMarket (FUN_0043a510), ClientMarketGetPrice
+#include "../interface/cargo_bar_control.h" // ToolTipHoverInit / SetCaption
+#include "../gf/base_market.h" // GetClientLocationBaseMarket (FUN_0043a510), ClientMarketGetPrice
 #include "commodity_by_base.h"      // AppendCommodityTradeReport (FUN_004704d0)
 #include "../interface/character_select_equip.h" // GetPlayerShipArchetypeIdRetail (FUN_004c3e10),
-                                    // GetPlayerEquipDescListRetail (FUN_004c4060),
-                                    // GetPlayerBaseIdRetail (DAT_00673358)
+// GetPlayerEquipDescListRetail (FUN_004c4060),
+// GetPlayerBaseIdRetail (DAT_00673358)
 #include "dealer_equip_stats.h"     // BuildDealerEquipmentStatText (FUN_00484090)
-#include "../game_options.h"           // GetGameOption (FUN_005792b0)
-#include "../gf/gf_object_ship.h"         // GfObjectShip (FUN_00446be0), SetEquipment / RebuildModel
-#include "../globals.h"                // GetClientFrameTimeCapped (FUN_0042d680)
-#include "../space/hud/hud_command_dispatch.h"   // HudPostCommand (FUN_005763b0)
-#include "../space/hud/hud_weapon_groups.h"      // G_WeaponGroups (DAT_00674c0c)
-#include "../ids_rdl.h"                // LoadIdsIntoRdl (FUN_0057da40), AppendTextMaybeXmlRdl
-                                    // (FUN_0057e2c0), RdlAppendNode
-#include "../ids_strings.h"            // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../login_mgr.h"              // G_Server (DAT_0067ecd0)
-#include "../interface/menu_ui_init.h"           // PlayOrRewindUiSoundSlot (FUN_005645c0)
-#include "../gf/menu_universe_base.h"     // GetClientLocationCurrentBase (DAT_0066873c)
-#include "../cmn/misc_util.h"              // FormatGroupedNumber (FUN_004779a0)
-#include "../gf/nav_bar.h"                // NavBarRefreshRepairTab (FUN_004427e0), NavBarShowDealerTab (FUN_00442850)
+#include "../game_options.h" // GetGameOption (FUN_005792b0)
+#include "../gf/gf_object_ship.h" // GfObjectShip (FUN_00446be0), SetEquipment / RebuildModel
+#include "../globals.h" // GetClientFrameTimeCapped (FUN_0042d680)
+#include "../space/hud/hud_command_dispatch.h" // HudPostCommand (FUN_005763b0)
+#include "../space/hud/hud_weapon_groups.h" // G_WeaponGroups (DAT_00674c0c)
+#include "../ids_rdl.h" // LoadIdsIntoRdl (FUN_0057da40), AppendTextMaybeXmlRdl
+    // (FUN_0057e2c0), RdlAppendNode
+#include "../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../login_mgr.h" // G_Server (DAT_0067ecd0)
+#include "../interface/menu_ui_init.h" // PlayOrRewindUiSoundSlot (FUN_005645c0)
+#include "../gf/menu_universe_base.h" // GetClientLocationCurrentBase (DAT_0066873c)
+#include "../cmn/misc_util.h" // FormatGroupedNumber (FUN_004779a0)
+#include "../gf/nav_bar.h" // NavBarRefreshRepairTab (FUN_004427e0), NavBarShowDealerTab (FUN_00442850)
 #include "nn_dealer.h"
 #include "nn_main_button.h"         // NN_MainButton::FreeScaledBackground (FUN_0045dc60)
 #include "nn_messaging.h"           // NnVoiceEnqueue (FUN_00489e80)
@@ -36,17 +36,17 @@
                                     // NnMainButtonOnModalOpen (FUN_0045a460)
 #include "nn_text_scratch.h"        // DAT_0066dc60 / DAT_0066fc60 / DAT_006119f8
 #include "nn_ui_pulse.h"            // G_HudChromeColorRgba (DAT_00679bb4), DAT_00679bac
-#include "../space/player_behavior.h"        // GetPlayerObjRW (FUN_0054baf0)
-#include "../space/player_spawn.h"           // GetPlayerConnectionId (DAT_00673344)
-#include "../interface/tooltip_hover.h"          // FToolTipHoverInfo, NnToolTipFeedHover (FUN_004be370)
+#include "../space/player_behavior.h" // GetPlayerObjRW (FUN_0054baf0)
+#include "../space/player_spawn.h" // GetPlayerConnectionId (DAT_00673344)
+#include "../interface/tooltip_hover.h" // FToolTipHoverInfo, NnToolTipFeedHover (FUN_004be370)
 #include "../interface/rich_text_win.h"
 #include "../interface/ship_view_control.h"
-#include "../space/star_sphere.h"            // Win3DBindModelview (FUN_00422690)
+#include "../space/star_sphere.h" // Win3DBindModelview (FUN_00422690)
 #include "../interface/ui_scroll.h"
 #include "../interface/win3d.h"
-#include "../cmn/win3d_immediate.h"        // Win3DBegin / Win3DVertex3f / Win3DEnd / ... (OpenGL.cpp)
+#include "../cmn/win3d_immediate.h" // Win3DBegin / Win3DVertex3f / Win3DEnd / ... (OpenGL.cpp)
 #include "../interface/win_factory.h"
-#include "../interface/wire_controls.h"          // WireControlsJoinColumn (FUN_005a4b50)
+#include "../interface/wire_controls.h" // WireControlsJoinColumn (FUN_005a4b50)
 
 #include "DALib.h"
 #include "render/IRenderPipeline.h"

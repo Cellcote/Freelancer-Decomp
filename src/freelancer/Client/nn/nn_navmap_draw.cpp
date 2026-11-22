@@ -16,32 +16,32 @@
 #include "nn_navmap.h"
 #include "best_path.h"              // BestPathGetWaypointCount (FUN_004c4fb0), FUN_004c5040 / 5490
 #include "../interface/character_select_equip.h" // GetPlayerStarSystemIdRetail (FUN_004c4830), visit flags
-#include "../space/mesh_load.h"       // ClientMeshLoadFromPath, ClientMeshHolderRender / Position
-#include "../cmn/font_atlas.h"             // FontAtlasSetDrawColor (FUN_00417780)
-#include "../cmn/font_imp.h"               // FindMenuFontImp (FUN_004177b0)
-#include "../cmn/font_string.h"            // Font::String (FUN_004144b0 ...)
-#include "../game_options.h"           // GetGameOption (FUN_005792b0)
-#include "../globals.h"                // G_RenderSurfaceWidth / Height, GetClientFrameTimeCapped
-#include "../widescreen.h"   // PORT(widescreen)
-#include "../space/hud/hud_target.h"             // HudShipOfObjRw (FUN_00543320)
-#include "../ids_strings.h"            // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../cmn/input_manager.h"          // GetClientSoftwareCursor (DAT_00616840 / 44)
+#include "../space/mesh_load.h" // ClientMeshLoadFromPath, ClientMeshHolderRender / Position
+#include "../cmn/font_atlas.h" // FontAtlasSetDrawColor (FUN_00417780)
+#include "../cmn/font_imp.h" // FindMenuFontImp (FUN_004177b0)
+#include "../cmn/font_string.h" // Font::String (FUN_004144b0 ...)
+#include "../game_options.h" // GetGameOption (FUN_005792b0)
+#include "../globals.h" // G_RenderSurfaceWidth / Height, GetClientFrameTimeCapped
+#include "../widescreen.h" // PORT(widescreen)
+#include "../space/hud/hud_target.h" // HudShipOfObjRw (FUN_00543320)
+#include "../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../cmn/input_manager.h" // GetClientSoftwareCursor (DAT_00616840 / 44)
 #include "nn_inventory.h"           // IsPlayerDockedRetail (FUN_004c4810)
 #include "nn_text_scratch.h"        // G_NnTextScratchB (DAT_0066fc60)
 #include "nn_ui_pulse.h"            // NnUiPulseBlendArgb, NnReputationColorArgb, the palette
-#include "../space/player_behavior.h"        // GetPlayerObjRW (FUN_0054baf0)
-#include "../space/player_spawn.h"           // GetPlayerWaypointCountRetail (FUN_004c4690)
-#include "../interface/rich_text_win.h"          // RichTextWin : WinControl
-#include "../space/camera/space_camera.h"           // FSpaceCamera, AsCamera
-#include "../space/star_sphere.h"            // Win3DBindModelview (FUN_00422690)
-#include "../interface/text_win.h"               // TextWinProjectExtent / TextWinProjectPoint
-#include "../cmn/texture_shapes.h"         // TexShapeGetGpuHandle (FUN_00425640)
-#include "../interface/ui_scroll.h"              // UiScroll : WinControl
-#include "../interface/win3d.h"                  // kWin3DVisible, Win3DGetCamera
-#include "../cmn/win3d_immediate.h"        // Win3DBegin / Vertex / Color / Viewport ...
-#include "../interface/win3d_render.h"           // Win3DApplyCamera (FUN_00422950)
-#include "../interface/win3d_renderables.h"      // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
-#include "../interface/wire_controls.h"          // WireControlsJoinColumn (FUN_005a4b50)
+#include "../space/player_behavior.h" // GetPlayerObjRW (FUN_0054baf0)
+#include "../space/player_spawn.h" // GetPlayerWaypointCountRetail (FUN_004c4690)
+#include "../interface/rich_text_win.h" // RichTextWin : WinControl
+#include "../space/camera/space_camera.h" // FSpaceCamera, AsCamera
+#include "../space/star_sphere.h" // Win3DBindModelview (FUN_00422690)
+#include "../interface/text_win.h" // TextWinProjectExtent / TextWinProjectPoint
+#include "../cmn/texture_shapes.h" // TexShapeGetGpuHandle (FUN_00425640)
+#include "../interface/ui_scroll.h" // UiScroll : WinControl
+#include "../interface/win3d.h" // kWin3DVisible, Win3DGetCamera
+#include "../cmn/win3d_immediate.h" // Win3DBegin / Vertex / Color / Viewport ...
+#include "../interface/win3d_render.h" // Win3DApplyCamera (FUN_00422950)
+#include "../interface/win3d_renderables.h" // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
+#include "../interface/wire_controls.h" // WireControlsJoinColumn (FUN_005a4b50)
 #include "x86math.h"                // FTransform, FMatrix, FVector, I3DMathEngine
 #include "common_cobject.h"         // CShip::get_target
 #include "common_csys.h"            // Acquire3DMathEngine (FUN_005b73e0), Transform
@@ -52,7 +52,7 @@
 #include "DALib.h"                  // DALib::Engine / Pipeline
 #include "dacom.h"                  // FDUMP
 #include "engine/engbase.h"         // IEngine
-#include "../cmn/font.h"                   // IFont
+#include "../cmn/font.h" // IFont
 #include "render/IRenderPipeline.h"
 
 #include <math.h>

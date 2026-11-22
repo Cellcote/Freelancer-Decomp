@@ -10,32 +10,32 @@
 #endif
 
 #include "../interface/character_select_equip.h" // GetPlayerShipArchetypeIdRetail (FUN_004c3e10), visit flags
-#include "base_market.h"     // GetClientCurrentLocationBaseData (FUN_0043b630)
-#include "../cmn/fade_to_black.h"          // SetFadeTarget (FUN_00412050), GetFadeDuration (DAT_0061650c)
+#include "base_market.h" // GetClientCurrentLocationBaseData (FUN_0043b630)
+#include "../cmn/fade_to_black.h" // SetFadeTarget (FUN_00412050), GetFadeDuration (DAT_0061650c)
 #include "gameflow.h"               // RequestGameflowMissionBriefing (FUN_00558a30)
 #include "gf_character_object.h"    // FCharacterObject, PlacePlayerAtSetpoint (FUN_00435cf0)
 #include "gf_object_ship.h"         // GfObjectShip (FUN_00446be0), PlayLaunchScript (FUN_00447cd0)
 #include "gf_script_object.h"       // G_GfScriptManager (DAT_0066d2d0), FGfScriptSequence
-#include "../globals.h"                // GetClientFrameTimeCapped (FUN_0042d680)
-#include "../space/hud/hud_command_dispatch.h"   // HudPostCommand (FUN_005763b0)
-#include "../space/hud/hud_maneuvers.h"          // FHudNamedValue, HudLookupNamedValue (FUN_004d9ca0)
-#include "../space/hud/hud_target.h"             // HudIsMousePickBlocked (FUN_0045a740)
-#include "../cmn/input_manager.h"          // Get/SetClientMouseCursorDrawFlag (FUN_0041dd90 / FUN_0041dda0)
-#include "../interface/menu_ui_init.h"           // PlayOrRewindUiSoundSlot (FUN_005645c0)
+#include "../globals.h" // GetClientFrameTimeCapped (FUN_0042d680)
+#include "../space/hud/hud_command_dispatch.h" // HudPostCommand (FUN_005763b0)
+#include "../space/hud/hud_maneuvers.h" // FHudNamedValue, HudLookupNamedValue (FUN_004d9ca0)
+#include "../space/hud/hud_target.h" // HudIsMousePickBlocked (FUN_0045a740)
+#include "../cmn/input_manager.h" // Get/SetClientMouseCursorDrawFlag (FUN_0041dd90 / FUN_0041dda0)
+#include "../interface/menu_ui_init.h" // PlayOrRewindUiSoundSlot (FUN_005645c0)
 #include "../interface/menu_ui_widgets.h"
-#include "../nn/nn_rollover.h"            // NnRolloverShowIdsGlobal (FUN_004b62f0)
+#include "../nn/nn_rollover.h" // NnRolloverShowIdsGlobal (FUN_004b62f0)
 #include "menu_universe_base.h"     // GetClientCurrentLocationRuntime (FUN_0043a460 / FUN_00438c00)
 #include "mirror_property_bucket.h"
-#include "../nn/nn_button_control.h"      // NnButtonControl (+0x330 bits)
-#include "../nn/nn_inventory.h"           // NnInventoryOpenDealer (FUN_00477ab0) / OpenShipDealer (FUN_00477bf0)
-#include "../nn/nn_messaging.h"           // NnVoiceEnqueue (FUN_00489e80)
+#include "../nn/nn_button_control.h" // NnButtonControl (+0x330 bits)
+#include "../nn/nn_inventory.h" // NnInventoryOpenDealer (FUN_00477ab0) / OpenShipDealer (FUN_00477bf0)
+#include "../nn/nn_messaging.h" // NnVoiceEnqueue (FUN_00489e80)
 #include "float_bits.h"
-#include "../nn/nn_modal.h"               // NnMainButtonOnModalOpen (FUN_0045a460), G_bNnScreenUp
-#include "../nn/nn_repair.h"              // NnRepair::PlayerNeedsRepair (FUN_004b4510)
-#include "../nn/nn_tooltip.h"             // NnToolTipHideGlobal (FUN_004be390)
+#include "../nn/nn_modal.h" // NnMainButtonOnModalOpen (FUN_0045a460), G_bNnScreenUp
+#include "../nn/nn_repair.h" // NnRepair::PlayerNeedsRepair (FUN_004b4510)
+#include "../nn/nn_tooltip.h" // NnToolTipHideGlobal (FUN_004be390)
 #include "room_control.h"
-#include "../interface/win3d.h"                  // Win3DFindByName (FUN_0059da10), Win3DDeleteTree (FUN_0043d2a0)
-#include "../interface/win_factory.h"            // WINFACTORY, WinFactoryCreate (FUN_0059db20)
+#include "../interface/win3d.h" // Win3DFindByName (FUN_0059da10), Win3DDeleteTree (FUN_0043d2a0)
+#include "../interface/win_factory.h" // WINFACTORY, WinFactoryCreate (FUN_0059db20)
 
 #include "DALib.h"
 #include "common_archetype.h"       // Archetype::GetEquipment

@@ -17,9 +17,9 @@
 #include "common_universe.h"
 #include "../cmn/effect_vertex_batch.h" // EffectVertexBatchDestroy (FUN_0046e9c0), the atexit LAB_0050a020
 #include "../cmn/engine_light.h"
-#include "../cmn/part_cache.h"    // FvfTexcoordBlockBytes (FUN_004061a0)
+#include "../cmn/part_cache.h" // FvfTexcoordBlockBytes (FUN_004061a0)
 #include "../perf_options.h"
-#include "../cmn/pixel_format.h"  // PixelFormatFromD3D / PixelFormatGetDesc (FUN_005b7010 / 005b7030)
+#include "../cmn/pixel_format.h" // PixelFormatFromD3D / PixelFormatGetDesc (FUN_005b7010 / 005b7030)
 #include "render/RenderPipeline.h"
 #include "render/IRenderPipeline.h"
 #include "render/shading.h"

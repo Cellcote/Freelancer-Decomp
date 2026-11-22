@@ -30,7 +30,7 @@
 #include "../globals.h"
 #include "hud/hud_element_list.h"
 #include "jump_effect.h"    // FJumpShipEffect::Tunnel (+0x24)
-#include "hud/hud_waypoint.h"   // HudWaypointGetObjectCount / HudWaypointGetObject (FUN_004c83c0 / 83e0)
+#include "hud/hud_waypoint.h" // HudWaypointGetObjectCount / HudWaypointGetObject (FUN_004c83c0 / 83e0)
 #include "../interface/menu_ui_draw.h"
 #ifdef FREELANCER_RP9
 #include "nebula_volume.h"  // PORT(rp9): NebulaVolume
@@ -41,7 +41,7 @@
 #include "player_behavior.h"
 #include "../perf_options.h"
 #ifdef FREELANCER_RP9
-#include "../cmn/render_ex.h"      // PORT(rp9): RenderEx::AfterSpaceScene
+#include "../cmn/render_ex.h" // PORT(rp9): RenderEx::AfterSpaceScene
 #endif
 #include "../cmn/screen_quad_state.h"
 #include "space_scene_draw.h"
@@ -500,7 +500,7 @@ namespace
 {
 
     // FUN_00532170 (callers 0x00532037, 0x00533847) is RemoveAppearanceInstanceValue in
-    // space/equip_fx.cpp, next to its other caller, the cloak wrapper's notify.
+    // client_equip_fx.cpp, next to its other caller, the cloak wrapper's notify.
 
 
     // FUN_004f70c0 — FLD DAT_006129c8; FSUBR double 1.0 (DAT_005c89b8): the difference is

@@ -23,9 +23,9 @@
 #include "../interface/rich_text_win.h"
 #include "../gf/room_control.h"           // GetRoomRuntimeBaseId (+0x34)
 #include "../interface/ui_scroll.h"
-#include "../interface/win3d.h"                  // Win3DFindByName, Win3DFindByClassName, Win3DDeleteTree
+#include "../interface/win3d.h" // Win3DFindByName, Win3DFindByClassName, Win3DDeleteTree
 #include "../interface/win_factory.h"
-#include "../interface/wire_controls.h"          // WireControlsJoinColumn (FUN_005a4b50)
+#include "../interface/wire_controls.h" // WireControlsJoinColumn (FUN_005a4b50)
 
 #include "DALib.h"
 #include "common_goods.h"           // MissionVendorProperties, MissionVendorAcceptance

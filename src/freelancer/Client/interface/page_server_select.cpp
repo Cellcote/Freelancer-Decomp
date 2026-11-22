@@ -6,29 +6,29 @@
 
 #include "page_server_select.h"
 
-#include "../nn/chat_init.h"         // ChatAppendRdlCopy (the FUN_0046c800 / FUN_005754b0 clone loop)
-#include "../connect_flow.h"      // ConnectToServer (FUN_005a8770)
+#include "../nn/chat_init.h"   // ChatAppendRdlCopy (the FUN_0046c800 / FUN_005754b0 clone loop)
+#include "../connect_flow.h"   // ConnectToServer (FUN_005a8770)
 #include "dacom.h"             // FDUMP
-#include "../cmn/font_imp.h"          // FindMenuFontImp (FUN_004177b0)
-#include "../globals.h"           // g_client (DAT_0067ecb8), g_display, GetClientFrameTimeCapped
-#include "../ids_rdl.h"           // LoadIdsIntoRdl, RdlAppendNode, RdlClear, RdlRemoveLastParagraph
-#include "../ids_strings.h"       // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../cmn/input_manager.h"     // MouseSetCursor (FUN_0041dde0)
+#include "../cmn/font_imp.h"   // FindMenuFontImp (FUN_004177b0)
+#include "../globals.h"        // g_client (DAT_0067ecb8), g_display, GetClientFrameTimeCapped
+#include "../ids_rdl.h"        // LoadIdsIntoRdl, RdlAppendNode, RdlClear, RdlRemoveLastParagraph
+#include "../ids_strings.h"    // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../cmn/input_manager.h" // MouseSetCursor (FUN_0041dde0)
 #include "intro_page_util.h"   // the inline RDL / Win3D idioms shared with PageCharacterSelect
 #include "loading_screen.h"    // LoadingScreenStart (FUN_00579290)
-#include "../login_mgr.h"         // G_LoginMgr (DAT_0067e7b8), G_bInternetServerList
+#include "../login_mgr.h"      // G_LoginMgr (DAT_0067e7b8), G_bInternetServerList
 #include "menu_ui_init.h"      // PlayUiSoundSlot (FUN_00564570), PlayOrRewindUiSoundSlot
-#include "../nn/nn_prompt.h"         // NnPromptRunTextEntry (FUN_00473f70)
-#include "../nn/nn_text_control.h"   // NnTextControl (TextControl, FUN_0058a110)
-#include "../nn/nn_ui_pulse.h"       // G_HudChromeColorRgba (DAT_00679bb4)
-#include "../reg_key_stack.h"     // FRegKeyStack
+#include "../nn/nn_prompt.h"   // NnPromptRunTextEntry (FUN_00473f70)
+#include "../nn/nn_text_control.h" // NnTextControl (TextControl, FUN_0058a110)
+#include "../nn/nn_ui_pulse.h" // G_HudChromeColorRgba (DAT_00679bb4)
+#include "../reg_key_stack.h"  // FRegKeyStack
 #include "../server_filter_dialog.h" // ServerFilterDialogRun (FUN_005637b0)
 #include "tooltip_hover.h"     // FToolTipHoverInfo
 #include "ui_fast_table.h"
 #include "ui_rich_text_win.h"
 #include "ui_scroll.h"
 #include "ui_text_msg_button.h"
-#include "../cmn/win3d_immediate.h"   // Win3DVec3Add (FUN_00423b30)
+#include "../cmn/win3d_immediate.h" // Win3DVec3Add (FUN_00423b30)
 #include "win_factory.h"       // WinFactoryCreate (FUN_0059db20)
 
 #include "common_text.h"

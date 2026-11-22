@@ -9,12 +9,12 @@
 #include "server_filter_dialog.h"
 #include "msvcrt_compat.h" // MsvcrtWtoi: retail MSVCRT.DLL wraps mod 2^32, the UCRT saturates
 
-#include "state.h"     // CallClientStateUpdateSlot (DAT_0067ecac vftable[14])
+#include "state.h"            // CallClientStateUpdateSlot (DAT_0067ecac vftable[14])
 #include "globals.h"          // PumpMessages (FUN_005b0b60), GetClientFrameTimeCapped (FUN_0042d680)
 #include "ids_rdl.h"          // LoadIdsIntoRdl (FUN_0057da40), RdlAppendNode
-#include "nn/nn_ui_pulse.h"      // G_HudChromeColorRgba (DAT_00679bb4)
+#include "nn/nn_ui_pulse.h" // G_HudChromeColorRgba (DAT_00679bb4)
 #include "interface/rich_text_win.h"
-#include "interface/tooltip_hover.h"    // FToolTipHoverInfo
+#include "interface/tooltip_hover.h" // FToolTipHoverInfo
 #include "interface/win3d.h"
 #include "interface/win_factory.h"
 

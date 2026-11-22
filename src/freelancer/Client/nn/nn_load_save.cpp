@@ -9,11 +9,11 @@
 #include "nn_load_save.h"
 
 #include "../state.h"          // QueueLoadGameCharacter (FUN_005b2c70)
-#include "../cmn/fade_to_black.h"         // FadeIn (FUN_004120d0)
-#include "../space/hud/hud_command_dispatch.h"  // HudPostCommand (FUN_005763b0)
-#include "../ids_strings.h"           // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../cmn/input_manager.h"         // Get/SetClientMouseCursorDrawFlag (FUN_0041dd90 / FUN_0041dda0)
-#include "../login_mgr.h"             // G_LoginMgr (DAT_0067e7b8), G_Server (DAT_0067ecd0)
+#include "../cmn/fade_to_black.h"  // FadeIn (FUN_004120d0)
+#include "../space/hud/hud_command_dispatch.h" // HudPostCommand (FUN_005763b0)
+#include "../ids_strings.h"        // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../cmn/input_manager.h" // Get/SetClientMouseCursorDrawFlag (FUN_0041dd90 / FUN_0041dda0)
+#include "../login_mgr.h" // G_LoginMgr (DAT_0067e7b8), G_Server (DAT_0067ecd0)
 #include "nn_button_control.h"     // NnButtonControl::SetMontageMode (FUN_0055bfc0)
 #include "nn_confirm.h"            // NnConfirmOpen (FUN_004889e0)
 #include "nn_error.h"              // NnErrorOpen (FUN_00473c00)
@@ -21,11 +21,11 @@
 #include "nn_modal.h"              // NnModalPauseGame / NnModalResumeGame
 #include "nn_text_control.h"       // NnTextControl (+0x381 / +0x385)
 #include "nn_ui_pulse.h"           // G_HudChromeColorRgba (DAT_00679bb4), G_NnPaletteArgb_679ba4
-#include "../space/player_spawn.h"          // GetPlayerConnectionId (DAT_00673344)
-#include "../interface/rich_text_win.h"         // RichTextEditWin
-#include "../interface/ui_scroll.h"             // UiScroll::SetRange (FUN_00595d60)
+#include "../space/player_spawn.h" // GetPlayerConnectionId (DAT_00673344)
+#include "../interface/rich_text_win.h" // RichTextEditWin
+#include "../interface/ui_scroll.h" // UiScroll::SetRange (FUN_00595d60)
 #include "../interface/win3d.h"
-#include "../interface/win3d_renderables.h"     // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
+#include "../interface/win3d_renderables.h" // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
 #include "../interface/win_factory.h"
 
 #include "common_archetype.h"      // Archetype::GetShip

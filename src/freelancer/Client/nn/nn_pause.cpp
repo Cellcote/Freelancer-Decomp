@@ -8,24 +8,24 @@
 
 #include "nn_pause.h"
 
-#include "../globals.h"               // IsClientServerTickPaused (FUN_0042d730), SetClientServerTickPause
-#include "../gf/gf_script_object.h"      // G_GfScriptManager (DAT_0066d2d0), CanSkipAll (FUN_004568a0)
-#include "../space/hud/hud_command_dispatch.h"  // HudPushInputFocus / HudPopInputFocus / HudPostCommand
+#include "../globals.h" // IsClientServerTickPaused (FUN_0042d730), SetClientServerTickPause
+#include "../gf/gf_script_object.h" // G_GfScriptManager (DAT_0066d2d0), CanSkipAll (FUN_004568a0)
+#include "../space/hud/hud_command_dispatch.h" // HudPushInputFocus / HudPopInputFocus / HudPostCommand
 #include "../space/hud/hud_target.h"
-#include "../ids_strings.h"           // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../cmn/input_manager.h"         // MouseSetCursor, Get/SetClientMouseCursorDrawFlag
-#include "../interface/menu_enter_state.h"      // MenuNavSetIntroModeRequest (FUN_00564b10, DAT_0067c200)
+#include "../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../cmn/input_manager.h" // MouseSetCursor, Get/SetClientMouseCursorDrawFlag
+#include "../interface/menu_enter_state.h" // MenuNavSetIntroModeRequest (FUN_00564b10, DAT_0067c200)
 #include "nn_load_save.h"           // OpenNnLoadSave (FUN_00488970)
-#include "../gf/menu_universe_base.h"    // GetClientLocationCurrentBase (DAT_0066873c)
-#include "../gf/nav_bar.h"               // NavBarCloseService (FUN_004424f0)
+#include "../gf/menu_universe_base.h" // GetClientLocationCurrentBase (DAT_0066873c)
+#include "../gf/nav_bar.h" // NavBarCloseService (FUN_004424f0)
 #include "nn_confirm.h"            // NnConfirmOpen (FUN_004889e0)
 #include "nn_inventory.h"          // IsPlayerDockedRetail (FUN_004c4810)
 #include "float_bits.h"
 #include "nn_modal.h"              // G_bNnScreenUp, NnMainButtonOnModalOpen
 #include "nn_rollover.h"           // NnRolloverHideGlobal (FUN_004b65a0)
-#include "../space/player_behavior.h"       // GetPlayerObjRW (FUN_0054baf0)
+#include "../space/player_behavior.h" // GetPlayerObjRW (FUN_0054baf0)
 #include "../interface/win3d.h"
-#include "../interface/win3d_renderables.h"     // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
+#include "../interface/win3d_renderables.h" // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
 #include "../interface/win_factory.h"
 
 #include "common_misc.h"           // SinglePlayer

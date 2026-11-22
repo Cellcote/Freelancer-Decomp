@@ -34,34 +34,34 @@
 #ifdef FREELANCER_RP9
 #include "nebula_volume.h"       // NebulaVolume::NoteOpaqueSphere PORT(rp9)
 #endif
-#include "../nn/nn_messaging.h"        // NnVoiceEnqueue (FUN_00489e80)
-#include "../nn/nn_modal.h"            // G_bNnScreenUp (DAT_0067dcc8), NnArrivalTextShow (FUN_0045b310)
+#include "../nn/nn_messaging.h"  // NnVoiceEnqueue (FUN_00489e80)
+#include "../nn/nn_modal.h"      // G_bNnScreenUp (DAT_0067dcc8), NnArrivalTextShow (FUN_0045b310)
 #include "hud/hud_command_dispatch.h" // HudPostCommand (FUN_005763b0)
 #include "hud/hud_damage_indicator.h" // GetHudDamageIndicator (DAT_00674a10), FUN_004d6d40 / 004d6cd0
-#include "hud/hud_status_core.h"     // GetHudStatus (DAT_00674aa0)
+#include "hud/hud_status_core.h" // GetHudStatus (DAT_00674aa0)
 #include "jump_effect.h"         // FJumpShipEffect (Ship +0x188, dtor FUN_00503a80)
 #include "gate_tunnel.h"         // FGateTunnel::Light (+0x2a8, Ship slot 97 LAB_00546480)
-#include "../cmn/part_cache.h"          // CopyTransform12 (FUN_00406880)
+#include "../cmn/part_cache.h" // CopyTransform12 (FUN_00406880)
 #include "render/IFLAppearance.h" // FUN_005462d0 / 00546380 / 00546400
-#include "hud/hud_waypoint.h"        // GetHudWaypoint (DAT_00674bc8), FUN_004f4d20 / 004f4ca0
-#include "../cmn/input_manager.h"       // GetClientMouseCursorDrawFlag (FUN_0041dd90)
-#include "../nn/nn_ui_pulse.h"         // G_NnPaletteArgb_679b80 (DAT_00679b80)
+#include "hud/hud_waypoint.h" // GetHudWaypoint (DAT_00674bc8), FUN_004f4d20 / 004f4ca0
+#include "../cmn/input_manager.h" // GetClientMouseCursorDrawFlag (FUN_0041dd90)
+#include "../nn/nn_ui_pulse.h" // G_NnPaletteArgb_679b80 (DAT_00679b80)
 #include "../interface/win3d_engine_submit.h" // FUN_00433f40 / FUN_00434630 (Solar waypoint marker)
-#include "land_action.h"  // Action_Land (FUN_00542b70)
+#include "land_action.h" // Action_Land (FUN_00542b70)
 #include "particle_effect.h"     // FParticleEffect, ParticleEffectArmDeath / Release
 #include "player_behavior.h"     // GetPlayerObjRW (FUN_0054baf0)
 #include "player_spawn.h"        // GetPlayerCharacterId (DAT_00673378), GetPlayerConnectionId
 #include "render/rendcomp.h"     // IRenderer2 (Guided slot 112's extents / centre)
-#include "../server_connect.h"      // GetLocalServerInterface (DAT_0067ecd0)
+#include "../server_connect.h" // GetLocalServerInterface (DAT_0067ecd0)
 #include "soundmanager.h"        // ISoundSource
-#include "camera/space_camera.h"        // SetDockingCameraTransform / RequestSpaceCameraMode
+#include "camera/space_camera.h" // SetDockingCameraTransform / RequestSpaceCameraMode
 #include "space_scene_obj_draw.h" // GameobjPickLodRetail (FUN_00539820)
 #include "space_state.h"         // SetPendingLandBase (FUN_00548ef0)
 #include "star_sphere.h"         // FStarSphere (Solar +0xe4)
 #include "star_sys.h"            // StarSysSuppressPlayerCollisions, GetAttitudeClass
 #include "texture_panels.h"      // TexturePanelsCreate / Load (Solar "ring", FUN_005485c0)
 #include "tradelane_fx.h"        // TradeLaneShipGoHandler (the LAB_00546e90 tail)
-#include "../cmn/vis_effect_arch.h"     // FindEffectArch / EffectArchAddRef / EffectArchRelease
+#include "../cmn/vis_effect_arch.h" // FindEffectArch / EffectArchAddRef / EffectArchRelease
 
 #include <cmath>
 #include <cstdio>

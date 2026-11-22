@@ -12,7 +12,7 @@
 #include "common_csys.h"
 #include "DALib.h"
 #include "dacom.h"            // DACOM_CRC::GetCRC32
-#include "../globals.h"          // G_RenderSurfaceWidth / G_RenderSurfaceHeight (DAT_00610850 / 854)
+#include "../globals.h"       // G_RenderSurfaceWidth / G_RenderSurfaceHeight (DAT_00610850 / 854)
 #include "render/IRenderPipeline.h"
 #include "../space/camera/space_camera.h"
 #include "win3d_immediate.h"  // Win3DPushProjection / Win3DSetOrtho2D / Win3DPopProjection

@@ -15,8 +15,8 @@
 #include "common_cobject.h"  // CObject / CSimple::OwnerPlayer
 #include "common_csys.h"
 #include "common_goods.h"    // ThrusterEquipConsts
-#include "../space/player_spawn.h"    // GetPlayerConnectionId (DAT_00673344), GetPlayerCharacterId
-#include "../space/camera/space_camera.h"    // IsFirstPersonCameraCurrent (FUN_0054bc80)
+#include "../space/player_spawn.h" // GetPlayerConnectionId (DAT_00673344), GetPlayerCharacterId
+#include "../space/camera/space_camera.h" // IsFirstPersonCameraCurrent (FUN_0054bc80)
 #include "common_id.h"
 #include "common_ini.h"
 #include "dacom.h"
@@ -28,7 +28,7 @@
 #include "x86math.h"
 #include "x87_portable.h" // the x64 forms of the mixer arithmetic below
 #include "common_misc.h"
-#include "../game_options.h"   // GetGameOption (FUN_005792b0)
+#include "../game_options.h" // GetGameOption (FUN_005792b0)
 #include "sound_archetype.h"
 #include "vc6_sort.h"        // Vc6Sort::Sort (MixerSortRanked)
 

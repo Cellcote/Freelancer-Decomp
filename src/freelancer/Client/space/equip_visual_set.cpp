@@ -8,7 +8,7 @@
 
 #include "equip_visual_set.h"
 
-#include "../cmn/misc_util.h"        // MiscUtilLoadEngineInstance (FUN_0041c540)
+#include "../cmn/misc_util.h" // MiscUtilLoadEngineInstance (FUN_0041c540)
 
 #include "DALib.h"
 #include "dacom.h"

@@ -14,7 +14,7 @@
 #include "dacom.h"         // FDUMP
 #include "globals.h"       // g_client.packed_version (DAT_0067ecb8)
 #include "perf_options.h"  // GetPerfOptionSlot (FUN_005b3510)
-#include "space/player_spawn.h"  // DAT_00673344
+#include "space/player_spawn.h" // DAT_00673344
 #include "platform.h"
 #include "server_filter.h" // ServerFilter::Match (GetFilteredServers)
 #include "reg_key_stack.h" // FRegKeyStack (login history)

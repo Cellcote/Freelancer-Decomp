@@ -9,17 +9,17 @@
 #include "best_path.h"
 
 #include "../interface/character_select_equip.h" // GetPlayerStarSystemIdRetail (FUN_004c4830 -> DAT_00673354)
-#include "../space/gameobj.h"         // FClientGameobj
-#include "../space/objdb.h"           // ClientObjDb_GetKindHead / ClientObjDb_FindEqObjByVibeId
+#include "../space/gameobj.h" // FClientGameobj
+#include "../space/objdb.h" // ClientObjDb_GetKindHead / ClientObjDb_FindEqObjByVibeId
 #include "common_cobject.h"         // CObject, CEqObj::DockingBaseId
 #include "common_goods.h"           // BaseWatcher
 #include "common_iface.h"           // IObjRW, ObjRwFromWatchable
 #include "common_universe.h"        // Universe::get_base
 #include "dacom.h"                  // FDUMP
-#include "../space/hud/hud_contact_list.h"       // G_bHudContactListRefreshRequested (DAT_0067494c)
+#include "../space/hud/hud_contact_list.h" // G_bHudContactListRefreshRequested (DAT_0067494c)
 #include "nn_navmap.h"              // G_bNavMapRouteChanged (DAT_006720c9)
 #include "nn_story_star.h"          // StoryStarReset / StoryStarAddHistory / StoryStarPushPending
-#include "../space/player_spawn.h"           // GetPlayerWaypointCountRetail / ResetPlayerWaypointsRetail
+#include "../space/player_spawn.h" // GetPlayerWaypointCountRetail / ResetPlayerWaypointsRetail
 #include "rpc_iclient_args.h"       // the slot 71 / 72 / 73 argument records
 
 #include <cstring>

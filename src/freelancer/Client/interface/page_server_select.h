@@ -23,10 +23,10 @@
 // ServerRowData copy of its server as the UIFastTable payload.
 //
 // Retail layout past MasterWin (+0x00..+0x8b) is listed member by member below. The port's
-// MasterWin has no retail byte layout (see interface/page_options.h), so the members keep only the order.
+// MasterWin has no retail byte layout (see page_options.h), so the members keep only the order.
 
 #include "common_text.h"   // RenderDisplayList, TextRenderContext::Image
-#include "../login_mgr.h"     // FServerInfo
+#include "../login_mgr.h" // FServerInfo
 #include "../server_filter.h"
 #include "ui_fast_table.h" // UiFastTableRefCounter, FUiFastTableEdges
 #include "ui_page.h"

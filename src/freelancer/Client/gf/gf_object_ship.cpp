@@ -7,14 +7,14 @@
 #include "gf_object_ship.h"
 
 #include "../interface/character_select_equip.h" // GetPlayerEquipDescListRetail (FUN_004c4060) & co.
-#include "../cmn/cliobj.h"          // CliObjMaterialPaths, CliEngine*, CliObjRecomputeLodPickExplicit
-#include "../cmn/fade_to_black.h"          // SetFadeImmediate (FUN_00412070), SetFadeTarget (FUN_00412050)
-#include "../game_options.h"           // GetGameOption (FUN_005792b0)
+#include "../cmn/cliobj.h" // CliObjMaterialPaths, CliEngine*, CliObjRecomputeLodPickExplicit
+#include "../cmn/fade_to_black.h" // SetFadeImmediate (FUN_00412070), SetFadeTarget (FUN_00412050)
+#include "../game_options.h" // GetGameOption (FUN_005792b0)
 #include "gameflow.h"               // FUN_00558a30 / FUN_00558c00
 #include "gf_script_object.h"       // G_GfScriptManager (DAT_0066d2d0)
-#include "../cmn/menu_sound_arch.h"        // LookupClientSoundArch (FUN_0042ae40), PlayClientSoundArch
-#include "../cmn/misc_util.h"              // MiscUtilLoadEngineInstance (FUN_0041c540)
-#include "../cmn/vis_effect_arch.h"        // FindEffectArch (FUN_0040f080)
+#include "../cmn/menu_sound_arch.h" // LookupClientSoundArch (FUN_0042ae40), PlayClientSoundArch
+#include "../cmn/misc_util.h" // MiscUtilLoadEngineInstance (FUN_0041c540)
+#include "../cmn/vis_effect_arch.h" // FindEffectArch (FUN_0040f080)
 
 #include "DALib.h"
 #include "alchemy.h"

@@ -8,14 +8,14 @@
 
 #include "room_control_hotspot.h"
 
-#include "../cmn/fade_to_black.h"      // SetFadeTarget / SetFadeImmediate / GetFadeDuration
+#include "../cmn/fade_to_black.h" // SetFadeTarget / SetFadeImmediate / GetFadeDuration
 #include "gf_object_ship.h"     // GfObjectShip (FUN_00446be0), PlayLaunchScript (FUN_00447cd0)
-#include "../cmn/input_manager.h"      // SetClientMouseCursorDrawFlag (FUN_0041dda0)
+#include "../cmn/input_manager.h" // SetClientMouseCursorDrawFlag (FUN_0041dda0)
 #include "menu_universe_base.h" // ApplyClientLocationAudio / QueueClientLocationChange
 #include "nav_bar.h"            // NavBarCloseService (FUN_004424f0)
-#include "../nn/nn_mission_vendor.h"  // NnMissionVendor::CloseWindow (FUN_0048c720)
-#include "../interface/win3d.h"              // Win3DFindByName (FUN_0059da10), Win3DDeleteTree (FUN_0043d2a0)
-#include "../interface/win_factory.h"        // WinFactoryCreate (FUN_0059db20)
+#include "../nn/nn_mission_vendor.h" // NnMissionVendor::CloseWindow (FUN_0048c720)
+#include "../interface/win3d.h" // Win3DFindByName (FUN_0059da10), Win3DDeleteTree (FUN_0043d2a0)
+#include "../interface/win_factory.h" // WinFactoryCreate (FUN_0059db20)
 
 RoomButton::RoomButton()
     : Location(0)

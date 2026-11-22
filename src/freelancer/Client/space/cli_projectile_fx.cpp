@@ -19,7 +19,7 @@
 #include "../globals.h"
 #include "hud/hud_command_dispatch.h"
 #include "../cmn/menu_sound_arch.h"
-#include "../nn/nn_messaging.h"         // NnVoiceEnqueue (FUN_00489e80) -- launcher-family notifies
+#include "../nn/nn_messaging.h" // NnVoiceEnqueue (FUN_00489e80) -- launcher-family notifies
 #include "particle_effect.h"
 #include "player_behavior.h"
 #include "player_spawn.h"
@@ -971,7 +971,7 @@ namespace
 } // namespace
 
     // LAB_005468e0 — CShip Host+4 vt+0x48 (target, sub, player). RET 0xc. Public: the Ship
-    // gameobj's IObjAffect set_target (space/gameobj.cpp) forwards here.
+    // gameobj's IObjAffect set_target (client_gameobj.cpp) forwards here.
     int CliShipSetTarget(void* AdjustorThis, IObjRW* Target, unsigned short SubId, int PlayerId)
     {
         // 005468e0..00546a04. Nothing is null-tested except the CShip narrowing's own chain,

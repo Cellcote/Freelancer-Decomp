@@ -7,7 +7,7 @@
 #include "knowledge_map.h"
 
 #include "../interface/character_select_equip.h" // GetPlayerVisitFlagsRetail / SetPlayerVisitFlagsRetail (FUN_004c4da0 / FUN_004c4e00)
-#include "../globals.h"                // CopyBoundedString (FUN_00417c50)
+#include "../globals.h" // CopyBoundedString (FUN_00417c50)
 
 #include "common_id.h"         // CreateID
 #include "common_ini.h"        // INI_Reader

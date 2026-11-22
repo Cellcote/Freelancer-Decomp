@@ -13,10 +13,10 @@
 #include "common_ini.h"        // INI_Reader, StringAlloc
 #include "common_misc.h"       // GetFileSysPath
 #include "gate_tunnel.h"
-#include "../globals.h"           // g_display (DAT_00679bc0), [Data] jump_effect at +0x770
+#include "../globals.h"        // g_display (DAT_00679bc0), [Data] jump_effect at +0x770
 #include "particle_effect.h"   // the effect factories, FUN_00503f40 / FUN_00503070 / FUN_004f7d20
 #include "player_behavior.h"   // GetPlayerObjRW (FUN_0054baf0)
-#include "../cmn/vis_effect_arch.h"   // FindEffectArch (FUN_0040f080)
+#include "../cmn/vis_effect_arch.h" // FindEffectArch (FUN_0040f080)
 
 #include "dacom.h" // FDUMP
 #include "soundmanager.h"      // ISoundSource::SetPose

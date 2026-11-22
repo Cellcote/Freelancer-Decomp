@@ -23,7 +23,7 @@
 namespace
 {
     // The line and unit-suffix scratch are retail's shared DAT_0066fc60 / DAT_0066dc60
-    // (nn/nn_text_scratch.h). FUN_00484090 itself only ever writes 0xff chars into them.
+    // (nn_text_scratch.h). FUN_00484090 itself only ever writes 0xff chars into them.
     wchar_t* const G_DealerStatLine = G_NnTextScratchB; // DAT_0066fc60
     wchar_t* const G_DealerStatUnit = G_NnTextScratchA; // DAT_0066dc60
 
