@@ -30,8 +30,10 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #pragma comment(lib, "ws2_32.lib")
@@ -121,8 +123,52 @@ namespace
         return Out;
     }
 
+    // A UDP socket, closed when it goes.
+    class FUdpSocket
+    {
+    public:
+        FUdpSocket() = default;
+        explicit FUdpSocket(SOCKET InHandle) : Handle(InHandle) {}
+        FUdpSocket(FUdpSocket&& Other) noexcept : Handle(Other.Handle) { Other.Handle = INVALID_SOCKET; }
+        FUdpSocket& operator=(FUdpSocket&& Other) noexcept
+        {
+            std::swap(Handle, Other.Handle);
+            return *this;
+        }
+        ~FUdpSocket()
+        {
+            if (Handle != INVALID_SOCKET)
+                closesocket(Handle);
+        }
+
+        SOCKET Get() const { return Handle; }
+        explicit operator bool() const { return Handle != INVALID_SOCKET; }
+
+    private:
+        SOCKET Handle = INVALID_SOCKET;
+    };
+
+    // WSAStartup, undone by WSACleanup when it goes.
+    struct FWinsockSession
+    {
+        FWinsockSession()
+        {
+            WSADATA WsaData;
+            bStarted = WSAStartup(MAKEWORD(2, 2), &WsaData) == 0;
+        }
+        ~FWinsockSession()
+        {
+            if (bStarted)
+                WSACleanup();
+        }
+        FWinsockSession(const FWinsockSession&) = delete;
+        FWinsockSession& operator=(const FWinsockSession&) = delete;
+
+        bool bStarted = false;
+    };
+
     // ---------------------------------------------------------------------------------------
-    // IDirectPlay8Address: a service provider, a device and named components, as
+    // IDirectPlay8Address:a service provider, a device and named components, as
     // dpnet.dll keeps them. Enough for DALib: SetSP, AddComponent, GetComponentByName, GetURLA.
 
     class FAddressObject final : public IDirectPlay8Address
@@ -436,6 +482,13 @@ namespace
         std::vector<BYTE> UserData;
     };
 
+    // Releases the reference it holds.
+    struct FAddressRelease
+    {
+        void operator()(FAddressObject* Address) const { Address->Release(); }
+    };
+    using FAddressRef = std::unique_ptr<FAddressObject, FAddressRelease>;
+
     // ---------------------------------------------------------------------------------------
     // IDirectPlay8Server on DPNet::FServer.
 
@@ -476,10 +529,12 @@ namespace
             std::lock_guard<std::recursive_mutex> Guard(Lock);
             if (MessageHandler != nullptr)
                 return DPNERR_ALREADYINITIALIZED;
-            WSADATA WsaData;
-            if (WSAStartup(MAKEWORD(2, 2), &WsaData) != 0)
+            Winsock.emplace();
+            if (!Winsock->bStarted)
+            {
+                Winsock.reset();
                 return DPNERR_GENERIC;
-            bWinsock = true;
+            }
             MessageHandler = Handler;
             HandlerContext = UserContext;
             return S_OK;
@@ -562,8 +617,12 @@ namespace
             DWORD Port = 0;
             if (NumDevices != 0 && Devices != nullptr && Devices[0] != nullptr)
                 static_cast<FAddressObject*>(Devices[0])->GetDword(DPNA_KEY_PORT, Port);
-            if (!OpenSocket((unsigned short)Port))
+            unsigned short Bound = 0;
+            FUdpSocket Opened = OpenSocket((unsigned short)Port, Bound);
+            if (!Opened)
                 return DPNERR_INVALIDDEVICEADDRESS;
+            Socket = std::move(Opened);
+            BoundPort = Bound;
             // Once per session: a host-name lookup can block, and every enumeration query and
             // connect names the device address. A failed lookup is retried (LocalEndpoint).
             LocalTriedAt = NowMs();
@@ -641,11 +700,7 @@ namespace
             // As in dpnet.dll, a closed object must be initialized again before it is used.
             MessageHandler = nullptr;
             HandlerContext = nullptr;
-            if (bWinsock)
-            {
-                WSACleanup();
-                bWinsock = false;
-            }
+            Winsock.reset();
             return S_OK;
         }
         STDMETHOD(DestroyClient)(DPNID Player, const void* Data, DWORD Size, DWORD) override
@@ -708,10 +763,10 @@ namespace
         // ITransport
         void SendTo(const DPNet::FAddress& To, const uint8_t* Data, size_t Size) override
         {
-            if (Socket == INVALID_SOCKET || To.Family != 4)
+            if (!Socket || To.Family != 4)
                 return;
             const sockaddr_in Target = ToSockaddr(To);
-            sendto(Socket, reinterpret_cast<const char*>(Data), (int)Size, 0,
+            sendto(Socket.Get(),reinterpret_cast<const char*>(Data), (int)Size, 0,
                    reinterpret_cast<const sockaddr*>(&Target), sizeof(Target));
         }
 
@@ -735,18 +790,16 @@ namespace
 
         bool ServerEnumQuery(const DPNet::FAddress& From, const DPNet::FBytes& QueryData, DPNet::FBytes& Response) override
         {
-            FAddressObject* Sender = FAddressObject::ForEndpoint(From);
-            FAddressObject* Device = FAddressObject::ForEndpoint(LocalEndpoint());
+            const FAddressRef Sender(FAddressObject::ForEndpoint(From));
+            const FAddressRef Device(FAddressObject::ForEndpoint(LocalEndpoint()));
             DPNMSG_ENUM_HOSTS_QUERY Message{};
             Message.dwSize = sizeof(Message);
-            Message.pAddressSender = Sender;
-            Message.pAddressDevice = Device;
+            Message.pAddressSender = Sender.get();
+            Message.pAddressDevice = Device.get();
             Message.pvReceivedData = QueryData.empty() ? nullptr : const_cast<uint8_t*>(QueryData.data());
             Message.dwReceivedDataSize = (DWORD)QueryData.size();
             Message.dwMaxResponseDataSize = kMaxEnumResponse;
             const HRESULT Result = Notify(DPN_MSGID_ENUM_HOSTS_QUERY, &Message);
-            Sender->Release();
-            Device->Release();
             if (FAILED(Result))
                 return false;
             const BYTE* Reply = static_cast<const BYTE*>(Message.pvResponseData);
@@ -759,17 +812,15 @@ namespace
         bool ServerIndicateConnect(const DPNet::FAddress& From, const DPNet::FPlayerConnectInfo& Info, void*& PlayerContext,
                                    DPNet::FBytes& Reply) override
         {
-            FAddressObject* Player = FAddressObject::ForEndpoint(From);
-            FAddressObject* Device = FAddressObject::ForEndpoint(LocalEndpoint());
+            const FAddressRef Player(FAddressObject::ForEndpoint(From));
+            const FAddressRef Device(FAddressObject::ForEndpoint(LocalEndpoint()));
             DPNMSG_INDICATE_CONNECT Message{};
             Message.dwSize = sizeof(Message);
             Message.pvUserConnectData = Info.ConnectData.empty() ? nullptr : const_cast<uint8_t*>(Info.ConnectData.data());
             Message.dwUserConnectDataSize = (DWORD)Info.ConnectData.size();
-            Message.pAddressPlayer = Player;
-            Message.pAddressDevice = Device;
+            Message.pAddressPlayer = Player.get();
+            Message.pAddressDevice = Device.get();
             const HRESULT Result = Notify(DPN_MSGID_INDICATE_CONNECT, &Message);
-            Player->Release();
-            Device->Release();
             PlayerContext = Message.pvPlayerContext;
             const BYTE* Data = static_cast<const BYTE*>(Message.pvReplyData);
             if (Data != nullptr && Message.dwReplyDataSize != 0)
@@ -839,60 +890,51 @@ namespace
         // --- socket and thread ---
 
         // Bound like DirectPlay's TCP/IP SP: all interfaces, the given port, else the first free
-        // one of 2302..2400.
-        bool OpenSocket(unsigned short Port)
+        // one of 2302..2400. Bound: the port it took.
+        static FUdpSocket OpenSocket(unsigned short Port, unsigned short& Bound)
         {
             const unsigned short First = Port != 0 ? Port : kFirstDefaultPort;
             const unsigned short Last = Port != 0 ? Port : kLastDefaultPort;
             for (unsigned int Candidate = First; Candidate <= Last; ++Candidate)
             {
-                SOCKET Created = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-                if (Created == INVALID_SOCKET)
-                    return false;
+                FUdpSocket Created(socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
+                if (!Created)
+                    return FUdpSocket();
 #if !defined(_WIN32)
                 // PORT(macOS): NetLoop waits with select, whose fd_set holds only descriptors below
                 // FD_SETSIZE on POSIX (a Windows fd_set is a list of handles, with no such limit).
-                if (Created >= FD_SETSIZE)
-                {
-                    closesocket(Created);
-                    return false;
-                }
+                if (Created.Get() >= FD_SETSIZE)
+                    return FUdpSocket();
 #endif
 #if defined(_WIN32)
                 BOOL Exclusive = TRUE;
-                setsockopt(Created, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char*>(&Exclusive),
+                setsockopt(Created.Get(), SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char*>(&Exclusive),
                            sizeof(Exclusive));
 #endif // (macOS and Linux bind exclusively unless SO_REUSEADDR / SO_REUSEPORT is set)
                 sockaddr_in Local{};
                 Local.sin_family = AF_INET;
                 Local.sin_addr.s_addr = htonl(INADDR_ANY);
                 Local.sin_port = htons((unsigned short)Candidate);
-                if (bind(Created, reinterpret_cast<const sockaddr*>(&Local), sizeof(Local)) == 0)
+                if (bind(Created.Get(), reinterpret_cast<const sockaddr*>(&Local), sizeof(Local)) == 0)
                 {
                     // An ICMP port-unreachable from a vanished client must not fail the next
                     // recvfrom (Windows reports it as WSAECONNRESET on a UDP socket).
                     BOOL Report = FALSE;
                     DWORD Returned = 0;
-                    WSAIoctl(Created, SIO_UDP_CONNRESET, &Report, sizeof(Report), nullptr, 0, &Returned, nullptr,
+                    WSAIoctl(Created.Get(), SIO_UDP_CONNRESET, &Report, sizeof(Report), nullptr, 0, &Returned, nullptr,
                              nullptr);
                     u_long NonBlocking = 1;
-                    ioctlsocket(Created, FIONBIO, &NonBlocking);
-                    Socket = Created;
-                    BoundPort = (unsigned short)Candidate;
-                    return true;
+                    ioctlsocket(Created.Get(), FIONBIO, &NonBlocking);
+                    Bound = (unsigned short)Candidate;
+                    return Created;
                 }
-                closesocket(Created);
             }
-            return false;
+            return FUdpSocket();
         }
 
         void CloseSocket()
         {
-            if (Socket != INVALID_SOCKET)
-            {
-                closesocket(Socket);
-                Socket = INVALID_SOCKET;
-            }
+            Socket = FUdpSocket();
             BoundPort = 0;
         }
 
@@ -934,10 +976,10 @@ namespace
             {
                 fd_set Readable;
                 FD_ZERO(&Readable);
-                FD_SET(Socket, &Readable);
+                FD_SET(Socket.Get(), &Readable);
                 timeval Timeout{0, (FlLong)(kTickMs * 1000)};
                 // The first argument is the highest descriptor + 1 (Windows ignores it).
-                select((int)Socket + 1, &Readable, nullptr, nullptr, &Timeout);
+                select((int)Socket.Get() + 1, &Readable, nullptr, nullptr, &Timeout);
 
                 std::lock_guard<std::recursive_mutex> Guard(Lock);
                 if (Server == nullptr)
@@ -946,7 +988,7 @@ namespace
                 {
                     sockaddr_in From{};
                     socklen_t FromSize = sizeof(From);
-                    const int Got = recvfrom(Socket, Buffer.data(), (int)Buffer.size(), 0,
+                    const int Got = recvfrom(Socket.Get(), Buffer.data(), (int)Buffer.size(), 0,
                                              reinterpret_cast<sockaddr*>(&From), &FromSize);
                     if (Got < 0)
                         break;   // WSAEWOULDBLOCK: nothing more queued
@@ -979,9 +1021,9 @@ namespace
         std::recursive_mutex Lock;
         PFNDPNMESSAGEHANDLER MessageHandler = nullptr;
         void* HandlerContext = nullptr;
-        bool bWinsock = false;
+        std::optional<FWinsockSession> Winsock;
         std::unique_ptr<DPNet::FServer> Server;
-        SOCKET Socket = INVALID_SOCKET;
+        FUdpSocket Socket;
         unsigned short BoundPort = 0;
         static constexpr uint32_t kLocalRetryMs = 10000;
         DPNet::FAddress Local;
