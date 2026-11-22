@@ -128,10 +128,29 @@ long long MinUnit(BaseData const* Base, unsigned int GoodId)
     double Price = MarketPrice(Base, GoodId) * static_cast<double>(Low);
     if (Price > kMaxClientPrice)
         Price = kMaxClientPrice;
-    // A variance above 1 makes the scale range cross 0: prices near it truncate to 0 (and
-    // negative ones become 1.0 in ClientMarketGetPrice), so the least price is 0.
+    // A variance above 1 makes the scale range cross 0, where the price is not monotonic in
+    // the scale (negative prices become 1.0, ones near 0 truncate to 0): the least of the
+    // client's 32768 possible rolls, computed as it computes them.
     if (Low < 0.0f)
-        return 0;
+    {
+        float const Range = static_cast<float>((Variance + 1.0) - static_cast<double>(Low));
+        double const Base0 = MarketPrice(Base, GoodId);
+        long long Least = 9999999;
+        for (int Roll = 0; Roll < 32768 && Least > 0; ++Roll)
+        {
+            float const Scale = static_cast<float>(static_cast<double>(Roll) * (1.0 / 32768.0) *
+                                                       static_cast<double>(Range) +
+                                                   static_cast<double>(Low));
+            double const Raw = Base0 * static_cast<double>(Scale);
+            // ftol: a value in (-1, 1) truncates to 0, one at or below -1 is negative (1.0).
+            long long const Unit = Raw > kMaxClientPrice ? 9999999
+                                   : Raw <= -1.0         ? 1
+                                                         : static_cast<long long>(Raw);
+            if (Unit < Least)
+                Least = Unit;
+        }
+        return Least;
+    }
     long long const Unit = static_cast<long long>(Price);
     return Unit > 0 ? Unit : 0;
 }
