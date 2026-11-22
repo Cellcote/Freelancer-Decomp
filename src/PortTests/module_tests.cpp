@@ -230,6 +230,16 @@ int main(int argc, char** argv)
         FreeB(Made);
         Check(MakeA(7) == Made, "a block freed in one module is reused by another");
     }
+    auto const IdA =
+        reinterpret_cast<FlULong (*)(const void*)>(Platform::ModuleSymbol(ProbeA, "Probe_a_Id"));
+    auto const ObjectB = reinterpret_cast<const void* (*)(FlULong)>(
+        Platform::ModuleSymbol(ProbeB, "Probe_b_Object"));
+    if (IdA != nullptr && ObjectB != nullptr)
+    {
+        static int const Named = 0;
+        Check(ObjectB(IdA(&Named)) == &Named,
+              "a HandleValue id made in one module names the object in another");
+    }
 
     // SearchPathA finds a module by its Windows name (DACOM's AddLibrary looks it up so).
     char Found[1024] = {};

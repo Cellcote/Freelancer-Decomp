@@ -9,6 +9,7 @@
 #include "msvcrt_compat.h"
 #include "platform.h"
 #if !defined(_WIN32)
+#include "handle_value.h"   // FL_HANDLE_VALUE_DEFINE_SHARED
 #include "x64_low_arena.h" // FL_LOW_ARENA_DEFINE_SHARED
 #endif
 
@@ -2763,9 +2764,10 @@ extern "C" int __cdecl DacomStricmp(const char* A, const char* B)
 // rename it, so the name is a function of its own here.
 extern "C" int stricmp(const char* A, const char* B) { return DacomStricmp(A, B); }
 
-// PORT(macOS): the process's LowArena (x64_low_arena.h). Every game module links dacom, so the
-// offsets one module encodes decode the same in another.
+// PORT(macOS): the process's LowArena (x64_low_arena.h) and HandleValue table (handle_value.h).
+// Every game module links dacom, so a value one module encodes decodes the same in another.
 FL_LOW_ARENA_DEFINE_SHARED()
+FL_HANDLE_VALUE_DEFINE_SHARED()
 #endif
 
 namespace LogStream
