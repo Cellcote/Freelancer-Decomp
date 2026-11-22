@@ -182,7 +182,9 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
                 Server->AcceptTrade(ClientId, Wire->bAccepted != 0);
                 break;
             case 0x80:
-                Server->StopTradeRequest(Wire->TargetPlayer);
+                // PORT(deviation) SERVER-OWNERSHIP: the sender's own request, or one sent to it.
+                if (Server_MayStopTradeRequest(ClientId, Wire->TargetPlayer))
+                    Server->StopTradeRequest(Wire->TargetPlayer);
                 break;
             default:
                 break;
@@ -693,13 +695,17 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         case 0x3E: // FLPACKET_CLIENT_LAUNCHCOMPLETE
         {
             const FRpcLaunchCompletePacket* Wire = static_cast<const FRpcLaunchCompletePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
-            Server->LaunchComplete(Wire->Field_0x00, Wire->Field_0x04);
+            // PORT(deviation) SERVER-OWNERSHIP: the client reports its own ship only.
+            if (Server_IsClientShip(ClientId, Wire->Field_0x04))
+                Server->LaunchComplete(Wire->Field_0x00, Wire->Field_0x04);
             break;
         }
         case 0x3F: // FLPACKET_CLIENT_HAIL
         {
             const FRpcHailPacket* Wire = static_cast<const FRpcHailPacket*>(reinterpret_cast<const FPacketBase*>(Packet));
-            Server->Hail(Wire->Field_0x00, Wire->Field_0x04, Wire->Field_0x08);
+            // PORT(deviation) SERVER-OWNERSHIP: the hailing ship is the client's own.
+            if (Server_IsClientShip(ClientId, Wire->Field_0x00))
+                Server->Hail(Wire->Field_0x00, Wire->Field_0x04, Wire->Field_0x08);
             break;
         }
         
@@ -725,7 +731,9 @@ static void DispatchClientPacket(unsigned int ClientId, CDAPacket* Packet)
         case 0x43: // FLPACKET_CLIENT_JUMPINCOMPLETE
         {
             const FRpcJumpInCompletePacket* Wire = static_cast<const FRpcJumpInCompletePacket*>(reinterpret_cast<const FPacketBase*>(Packet));
-            Server->JumpInComplete(Wire->Field_0x00, Wire->Field_0x04);
+            // PORT(deviation) SERVER-OWNERSHIP: the client reports its own ship only.
+            if (Server_IsClientShip(ClientId, Wire->Field_0x04))
+                Server->JumpInComplete(Wire->Field_0x00, Wire->Field_0x04);
             break;
         }
         case 0x44: // FLPACKET_CLIENT_REQINVINCIBILITY

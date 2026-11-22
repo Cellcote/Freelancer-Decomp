@@ -357,7 +357,7 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 ## Server: multiplayer commands only act on the sender's own objects (SERVER-OWNERSHIP, 2026-11-22)
 
 > **Status:** OPEN (retail defect fixed; owner's decision 2026-11-22, including the duplicate-report change below)
-> **Owner:** Server (`src/Server/IServerImpl.cpp`: `Server_IsSessionShip`, `Server_SessionOwnsObject` and the handlers that call them); code tagged `PORT(deviation) SERVER-OWNERSHIP`
+> **Owner:** Server (`src/Server/IServerImpl.cpp`: `Server_IsSessionShip`, `Server_SessionOwnsObject` and the handlers that call them; the exports `Server_IsClientShip` and `Server_MayStopTradeRequest`, called from `src/RemoteClient/RemoteClient_main.cpp`); code tagged `PORT(deviation) SERVER-OWNERSHIP`
 > **Removal condition:** none planned; retail lets any player steer, fire, jettison, teleport or destroy any object.
 
 **Retail.** The object-command handlers look up the object id the client names and act on it, whoever owns it. GoTradelane and StopTradelane are the exception: they compare it with the sender's ship. The collision reports apply the damage, or the badlands destruction, to the object they name.
@@ -366,6 +366,8 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 - **The sender's ship** (`Players[session].ship_object_id`):
   - FireWeapon, ActivateEquip, ActivateCruise, ActivateThrusters, TractorObjects, JettisonCargo, SPRequestUseItem and SPObjUpdate: the client sends these for its own ship (`cli_projectile_fx.cpp`, `client_gameobj.cpp`, `hud_status_core.cpp`, `player_spawn.cpp`).
   - RequestEvent and RequestCancel: the requesting ship `p1`. The dock or formation target is not checked.
+  - LaunchComplete and JumpInComplete (the object id), and Hail (the hailing ship). The client sends the first two from `FClientShipGameobj::slot_70` / `slot_74`, reached only for the player's own ship (`LaunchFromDock` and the jump-in branch both test `get_id() == GetPlayerCharacterId()`), and Hail with the player's ship (`hud_target_panel.cpp`). These reach `IServer` without the sender's id, so remoteclient.dll checks them before dispatching, through `Server_IsClientShip`.
+- **StopTradeRequest:** the id in the payload is the sender's own (withdrawing its request, `hud_target_panel.cpp`) or that of a player whose request to the sender is pending (declining it, `nn_group_control.cpp`). Any other id is dropped (`Server_MayStopTradeRequest`).
 - **An object the sender owns.** Either `CSimple::OwnerPlayer` is the session, or the object is a projectile whose launcher (`CProjectile::OwnerId`) is the sender's ship. The server creates missiles, mines and countermeasures with `OwnerPlayer` 0.
   - SetTarget: the client's ship, or its own missile.
   - SPObjCollision: the damaged side. That is the client's own side; it reports only when it owns that side.
@@ -379,5 +381,4 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 
 **Not covered.**
 - SetManeuver: a legitimate client names the target object and the server acts on it, so an owner check would not limit anything.
-- LaunchComplete, JumpInComplete and Hail: they reach Server.dll without a session id, so they need the id passed through first.
-- StopTradeRequest: its session id comes from the payload; a legitimate client sends either its own id or the requester's.
+- CommComplete: dropped by remoteclient.dll in multiplayer since REMOTE-PACKET-HARDENING (the client never sends it).

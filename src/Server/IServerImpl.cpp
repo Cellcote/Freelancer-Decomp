@@ -4639,3 +4639,18 @@ static bool Server_SessionOwnsObject(unsigned int SessionId, GameObject const* O
     }
     return false;
 }
+
+SERVER_API bool __cdecl Server_IsClientShip(unsigned int ClientId, unsigned int ObjectId)
+{
+    return Server_IsSessionShip(ClientId, ObjectId);
+}
+
+SERVER_API bool __cdecl Server_MayStopTradeRequest(unsigned int ClientId, unsigned int TargetId)
+{
+    if (SinglePlayer() || TargetId == ClientId)
+        return true;
+    unsigned int const Max = PlayerDB_GetMaxPlayers();
+    if (ClientId == 0 || ClientId - 1 >= Max || TargetId == 0 || TargetId - 1 >= Max)
+        return false;
+    return Players[TargetId].trade_request_partner == ClientId;
+}
