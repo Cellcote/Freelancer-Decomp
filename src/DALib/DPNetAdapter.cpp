@@ -709,6 +709,7 @@ namespace
                 {
                     MessageHandler = nullptr;
                     HandlerContext = nullptr;
+                    bTeardownOnExit = true;
                     bStop = true;
                     return S_OK;
                 }
@@ -1030,11 +1031,16 @@ namespace
             }
 
             // Close stopped the loop. If it ran inside a handler on this thread, it left the rest
-            // to us; after a Close from another thread this changes nothing.
+            // to us. A Close from another thread tears down itself once it has joined us: doing it
+            // here would let an Initialize in between succeed, only for that Close to clear it.
             bool bDelete = false;
             {
                 std::lock_guard<std::recursive_mutex> Guard(Lock);
-                Teardown();
+                if (bTeardownOnExit)
+                {
+                    Teardown();
+                    bTeardownOnExit = false;
+                }
                 bDelete = bDeleteOnExit;
             }
             if (bDelete)
@@ -1089,6 +1095,7 @@ namespace
         uint32_t LocalTriedAt = 0;
         std::thread NetThread;
         std::atomic<bool> bStop{false};
+        bool bTeardownOnExit = false; // a Close on the network thread left the teardown to NetLoop
         bool bDeleteOnExit = false;
         std::map<DPNHANDLE, DPNet::FBytes> ReceiveBuffers;
         DPNHANDLE NextBufferHandle = 1;
