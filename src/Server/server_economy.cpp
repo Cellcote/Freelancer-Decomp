@@ -128,9 +128,12 @@ long long MinUnit(BaseData const* Base, unsigned int GoodId)
     double Price = MarketPrice(Base, GoodId) * static_cast<double>(Low);
     if (Price > kMaxClientPrice)
         Price = kMaxClientPrice;
+    // A variance above 1 makes the scale range cross 0: prices near it truncate to 0 (and
+    // negative ones become 1.0 in ClientMarketGetPrice), so the least price is 0.
+    if (Low < 0.0f)
+        return 0;
     long long const Unit = static_cast<long long>(Price);
-    // A negative price (a variance above 1) becomes 1.0 (ClientMarketGetPrice).
-    return Unit < 0 ? 1 : Unit;
+    return Unit > 0 ? Unit : 0;
 }
 
     // What the client's dealer offers: a market entry with stock (ClientMarket build,
