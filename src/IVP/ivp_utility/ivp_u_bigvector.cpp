@@ -27,7 +27,8 @@ FL_LAYOUT_ASSERT(sizeof(IVP_SurfaceManager_OutList) == 0xc, "the inline buffer s
 // then installs the new buffer.
 void __fastcall IVP_U_BigVector_Grow(IVP_SurfaceManager_OutList* Vector) // formerly extern "C" FUN_0635d3e0
 {
-    void* newBuffer = malloc(static_cast<size_t>(Vector->Capacity) * 8 + 8); // FUN_06343f70
+    void* newBuffer = malloc((static_cast<size_t>(Vector->Capacity) * 2 + 2) *
+                             sizeof(void*)); // FUN_06343f70: Capacity * 8 + 8 on Win32
     Vector->Capacity = Vector->Capacity * 2 + 1;
     int count = Vector->Count;
     void** newElems = (void**)newBuffer;

@@ -99,7 +99,8 @@ void FAnimScriptRef::Release()
     if (Index != -1)                                               // .text:0629abd5
     {
         DALib::Anim->StopPlayback(Index);                          // .text:0629abe5 slot 0x38
-        DALib::Anim->DestroyScript((void*)Index); // .text:0629abf5 slot 0x28
+        DALib::Anim->DestroyScript(
+            (void*)(std::uintptr_t)(FlULong)(Index)); // .text:0629abf5 slot 0x28
         Index = -1;                                                // .text:0629abf8
     }
 }
@@ -254,10 +255,9 @@ void CShip::init(CreateParms const& Parms)
     Archetype::Ship const* const ShipArch = shiparch();
     if (ShipArch->BayDoorAnim.Value[0] != '\0')
     {
-        FlULong const PlayId = DALib::Anim->PlayScript(AsOpaqueDword(Archetype->AnimIndex),
-                                                             AsOpaqueDword(EngineInstanceId),
-                                                             ShipArch->BayDoorAnim.Value,
-                                                             nullptr, nullptr);
+        FlULong const PlayId = DALib::Anim->PlayScript(
+            AnimScriptFromId(Archetype->AnimIndex), EngineHandleFromId(EngineInstanceId),
+            ShipArch->BayDoorAnim.Value, nullptr, nullptr);
         BayAnim.Index = (int)PlayId;
     }
 
@@ -1818,7 +1818,8 @@ void CShip::flush_animations()
     if (BayAnim.Index != -1)
     {
         DALib::Anim->StopPlayback(BayAnim.Index);                         // 062b0df9 slot 0x38
-        DALib::Anim->DestroyScript((void*)BayAnim.Index); // 062b0e0d slot 0x28
+        DALib::Anim->DestroyScript(
+            (void*)(std::uintptr_t)(FlULong)(BayAnim.Index)); // 062b0e0d slot 0x28
         BayAnim.Index = -1;                                               // 062b0e10
     }
 
@@ -1913,7 +1914,7 @@ int CShip::update(float Dt, unsigned Flags)
     if (BayState == 3)
     {
         float const ScriptDuration =
-            DALib::Anim->GetScriptDuration((void*)BayAnim.Index);
+            DALib::Anim->GetScriptDuration((void*)(std::uintptr_t)(FlULong)(BayAnim.Index));
         float const StoredDuration = DALib::Anim->GetStoredDuration(BayAnim.Index);
         if (StoredDuration >= ScriptDuration)
             BayState = 2;
@@ -2002,7 +2003,8 @@ double CShip::open_bay()
         // stored duration (slot 0x40, called first and rounded by FSTP dword); the
         // difference is returned off the FPU unrounded. No Anim / handle test.
         float const Stored = DALib::Anim->GetStoredDuration(BayAnim.Index);
-        float const Script = DALib::Anim->GetScriptDuration((void*)BayAnim.Index);
+        float const Script =
+            DALib::Anim->GetScriptDuration((void*)(std::uintptr_t)(FlULong)(BayAnim.Index));
         return (double)Script - Stored;
     }
 
@@ -2022,7 +2024,8 @@ double CShip::open_bay()
     AnimDB::Add(BayAnim.Index);                                       // 062b2b21
     // 062b2b26..062b2b63: Script - Stored (Stored rounded first), FSTP dword.
     float const Stored = DALib::Anim->GetStoredDuration(BayAnim.Index);
-    float const Script = DALib::Anim->GetScriptDuration((void*)BayAnim.Index);
+    float const Script =
+        DALib::Anim->GetScriptDuration((void*)(std::uintptr_t)(FlULong)(BayAnim.Index));
     float const Result = (float)((double)(Script) - Stored);
 
     // 062b2b5b..062b2b79: with an INotify (+0x168), notify(2, &bOpen) (vtable +0xc8,

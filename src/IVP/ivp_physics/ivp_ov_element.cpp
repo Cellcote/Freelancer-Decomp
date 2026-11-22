@@ -222,9 +222,9 @@ uint32_t IVP_HashCollisionPartner(IVP_Collision* Collision, IVP_Real_Object* Obj
     // :0634f151-:0634f15f. One of the two IS `Object`, so the XOR cancels it
     // and what is left is the PARTNER object's pointer -- which is exactly the
     // key the lookup side of RecheckOvElement hashes directly.
-    const uint32_t Key = reinterpret_cast<uint32_t>(Pair[1])
-                       ^ reinterpret_cast<uint32_t>(Pair[0])
-                       ^ reinterpret_cast<uint32_t>(Object);
+    const uint32_t Key = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(Pair[1])) ^
+                         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(Pair[0])) ^
+                         static_cast<uint32_t>(reinterpret_cast<uintptr_t>(Object));
     return SpreadHash(Key); // :0634f161-:0634f16d
 }
 
@@ -244,7 +244,8 @@ IVP_OV_Element::IVP_OV_Element(IVP_Real_Object* Owner)
     // takes the free path in practice.
     collision_fvector.memsize = 0x10;
     collision_fvector.n_elems = 0;
-    collision_fvector.elems = static_cast<IVP_Collision**>(std::malloc(0x40));
+    collision_fvector.elems =
+        static_cast<IVP_Collision**>(std::malloc(0x10 * sizeof(IVP_Collision*))); // 0x40 on Win32
 
     node = nullptr;         // :0635c044
     CenterX = 0.0f;         // :0635c04d
@@ -1390,9 +1391,10 @@ void IVP_Mindist_Manager::RecheckOvElement(IVP_Real_Object* Object)
         IVP_Real_Object* Pair[2];
         Coll->get_objects(Pair); // :0634edd1-:0634edd8
 
-        const uint32_t Key = reinterpret_cast<uint32_t>(Pair[1])
-                           ^ reinterpret_cast<uint32_t>(Pair[0])
-                           ^ reinterpret_cast<uint32_t>(Object); // :0634eddb-:0634edec
+        const uint32_t Key =
+            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(Pair[1])) ^
+            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(Pair[0])) ^
+            static_cast<uint32_t>(reinterpret_cast<uintptr_t>(Object)); // :0634eddb-:0634edec
         uint32_t Slot = SpreadHash(Key) & static_cast<uint32_t>(Mask); // :0634edee-:0634ee00
 
         while (Table[Slot] != 0xffff) // :0634ee02-:0634ee11 (linear probing)
@@ -1449,7 +1451,8 @@ void IVP_Mindist_Manager::RecheckOvElement(IVP_Real_Object* Object)
         // :0634eee3-:0634ef39 -- look the partner up in the table. The lookup
         // key is the partner pointer itself, because the build-side XOR above
         // cancelled `Object` out of every entry.
-        uint32_t Slot = SpreadHash(reinterpret_cast<uint32_t>(OtherObj)) & static_cast<uint32_t>(Mask);
+        uint32_t Slot = SpreadHash(static_cast<uint32_t>(reinterpret_cast<uintptr_t>(OtherObj))) &
+                        static_cast<uint32_t>(Mask);
         int32_t Found = static_cast<int16_t>(Table[Slot]); // :0634eef7 (MOVSX -- 0xffff means empty)
 
         while (Found != -1)

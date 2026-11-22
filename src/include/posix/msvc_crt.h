@@ -14,6 +14,9 @@
 #include "platform.h"
 
 #include <cctype>
+#include <cstdlib>
+#include <cerrno>
+#include <cmath>
 #include <cstdarg>
 #include <cstddef>
 #include <cstdio>
@@ -26,6 +29,8 @@
 #include <unistd.h>
 
 #define _MAX_PATH 260
+
+#define _copysign(x, y) std::copysign((double)(x), (double)(y))
 #define _MAX_DRIVE 3
 #define _MAX_DIR 256
 #define _MAX_FNAME 256
@@ -56,6 +61,22 @@ inline int _wcsicmp(wchar_t const* Left, wchar_t const* Right)
         if (Difference != 0 || *Left == 0)
             return static_cast<int>(Difference);
     }
+}
+// _wcsnicmp: _wcsicmp over at most Count characters.
+inline int _wcsnicmp(wchar_t const* Left, wchar_t const* Right, std::size_t Count)
+{
+    auto Lower = [](wchar_t Char) -> long
+    {
+        return (Char >= L'A' && Char <= L'Z') ? static_cast<long>(Char - L'A' + L'a')
+                                              : static_cast<long>(Char);
+    };
+    for (; Count != 0; --Count, ++Left, ++Right)
+    {
+        long const Difference = Lower(*Left) - Lower(*Right);
+        if (Difference != 0 || *Left == 0)
+            return static_cast<int>(Difference);
+    }
+    return 0;
 }
 inline int _memicmp(void const* Left, void const* Right, std::size_t Count)
 {
@@ -296,4 +317,164 @@ inline char* _itoa(int Value, char* Buffer, int Radix)
 inline char* _ltoa(FlLong Value, char* Buffer, int Radix)
 {
     return _itoa((int)Value, Buffer, Radix);
+}
+
+// The "secure" CRT functions the code uses, with MSVC's results for what the callers pass. A
+// destination too small: strcpy_s / strncpy_s fail (an empty destination, ERANGE / EINVAL;
+// MSVC also calls its invalid-parameter handler); with _TRUNCATE the copy is cut and STRUNCATE
+// returned. sprintf_s fails (an empty destination, -1); _snprintf_s with _TRUNCATE cuts and
+// returns -1.
+#define _TRUNCATE ((std::size_t)-1)
+#ifndef STRUNCATE
+#define STRUNCATE 80
+#endif
+typedef int errno_t;
+inline errno_t strncpy_s(char* Dest, std::size_t DestSize, char const* Source, std::size_t Count)
+{
+    if (Dest == nullptr || DestSize == 0)
+        return EINVAL;
+    if (Source == nullptr)
+    {
+        Dest[0] = 0;
+        return EINVAL;
+    }
+    std::size_t Length = 0;
+    while (Length < Count && Source[Length] != 0 && (Count != _TRUNCATE || Length < DestSize))
+        ++Length;
+    if (Length >= DestSize)
+    {
+        if (Count == _TRUNCATE)
+        {
+            std::memcpy(Dest, Source, DestSize - 1);
+            Dest[DestSize - 1] = 0;
+            return STRUNCATE;
+        }
+        Dest[0] = 0;
+        return ERANGE;
+    }
+    std::memcpy(Dest, Source, Length);
+    Dest[Length] = 0;
+    return 0;
+}
+inline errno_t strcpy_s(char* Dest, std::size_t DestSize, char const* Source)
+{
+    if (Dest == nullptr || DestSize == 0)
+        return EINVAL;
+    if (Source == nullptr)
+    {
+        Dest[0] = 0;
+        return EINVAL;
+    }
+    const std::size_t Length = std::strlen(Source);
+    if (Length >= DestSize)
+    {
+        Dest[0] = 0;
+        return ERANGE;
+    }
+    std::memcpy(Dest, Source, Length + 1);
+    return 0;
+}
+template <std::size_t Size>
+errno_t strcpy_s(char (&Dest)[Size], char const* Source)
+{
+    return strcpy_s(Dest, Size, Source);
+}
+template <std::size_t Size>
+errno_t strncpy_s(char (&Dest)[Size], char const* Source, std::size_t Count)
+{
+    return strncpy_s(Dest, Size, Source, Count);
+}
+inline int vsprintf_s(char* Buffer, std::size_t Size, char const* Format, va_list Args)
+{
+    if (Buffer == nullptr || Size == 0)
+        return -1;
+    const int Length = std::vsnprintf(Buffer, Size, Format, Args);
+    if (Length < 0 || (std::size_t)Length >= Size)
+    {
+        Buffer[0] = 0;
+        return -1;
+    }
+    return Length;
+}
+inline int sprintf_s(char* Buffer, std::size_t Size, char const* Format, ...)
+{
+    va_list Args;
+    va_start(Args, Format);
+    const int Result = vsprintf_s(Buffer, Size, Format, Args);
+    va_end(Args);
+    return Result;
+}
+template <std::size_t Size>
+int sprintf_s(char (&Buffer)[Size], char const* Format, ...)
+{
+    va_list Args;
+    va_start(Args, Format);
+    const int Result = vsprintf_s(Buffer, Size, Format, Args);
+    va_end(Args);
+    return Result;
+}
+inline int _vsnprintf_s(char* Buffer, std::size_t Size, std::size_t Count, char const* Format,
+                        va_list Args)
+{
+    if (Buffer == nullptr || Size == 0)
+        return -1;
+    const std::size_t Limit = Count == _TRUNCATE ? Size - 1 : (Count < Size - 1 ? Count : Size - 1);
+    va_list Copy;
+    va_copy(Copy, Args);
+    const int Length = std::vsnprintf(nullptr, 0, Format, Copy);
+    va_end(Copy);
+    if (Length < 0)
+    {
+        Buffer[0] = 0;
+        return -1;
+    }
+    std::vector<char> Text((std::size_t)Length + 1);
+    std::vsnprintf(Text.data(), Text.size(), Format, Args);
+    if ((std::size_t)Length <= Limit)
+    {
+        std::memcpy(Buffer, Text.data(), (std::size_t)Length + 1);
+        return Length;
+    }
+    if (Count != _TRUNCATE && Count >= Size)
+    {
+        Buffer[0] = 0; // the buffer is too small for Count: MSVC's invalid-parameter case
+        return -1;
+    }
+    std::memcpy(Buffer, Text.data(), Limit);
+    Buffer[Limit] = 0;
+    return -1;
+}
+inline int _snprintf_s(char* Buffer, std::size_t Size, std::size_t Count, char const* Format, ...)
+{
+    va_list Args;
+    va_start(Args, Format);
+    const int Result = _vsnprintf_s(Buffer, Size, Count, Format, Args);
+    va_end(Args);
+    return Result;
+}
+inline wchar_t* _wcsdup(wchar_t const* Text)
+{
+    const std::size_t Length = std::wcslen(Text) + 1;
+    wchar_t* const Copy = static_cast<wchar_t*>(std::malloc(Length * sizeof(wchar_t)));
+    if (Copy != nullptr)
+        std::memcpy(Copy, Text, Length * sizeof(wchar_t));
+    return Copy;
+}
+
+// _control87: the x87 control word. There is no x87 here (nor on x64 Windows, where MSVC ignores
+// the precision bits), so nothing is set; the result is the default control word.
+#define _MCW_PC 0x00030000
+#define _PC_64 0x00000000
+#define _PC_53 0x00010000
+#define _PC_24 0x00020000
+#define _MCW_RC 0x00000300
+#define _RC_NEAR 0x00000000
+#define _MCW_EM 0x0008001F
+inline unsigned int _control87(unsigned int, unsigned int)
+{
+    return 0x0009001F;
+}
+inline unsigned int _controlfp(unsigned int New, unsigned int Mask)
+{
+    return _control87(New, Mask);
 }

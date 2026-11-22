@@ -111,7 +111,8 @@ void FlashLightSetInfo::fixup(FlLong Instance, HardpointSummary const* HpSum, Ro
                 // .text:06273e4f: DALib::Engine slot 40 (+0xa0), the instance's world
                 // transform.
                 Transform const* const InstanceXform =
-                    (Transform const*)DALib::Engine->GetInstanceTransform((void*)HpInstance);
+                    (Transform const*)DALib::Engine->GetInstanceTransform(
+                        EngineHandleFromId(HpInstance));
                 // .text:06273e57..06273e7b: the 3DMathEngine singleton's MulTransform
                 // (+0x1c), World = InstanceXform * Local.
                 I3DMathEngine* const Math = Acquire3DMathEngine();

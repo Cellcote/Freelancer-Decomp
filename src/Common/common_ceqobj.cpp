@@ -1066,7 +1066,7 @@ void CEqObj::compute_explosion_dmg_bounding_sphere(float& OutRadius, Vector& Out
 
     I3DMathEngine* const Math = Acquire3DMathEngine();     // DAT_063fc2e4 cache
     FTransform const& Xform = (FTransform const&)Orientation;   // this+0x08
-    void* const Instance = (void*)EngineInstanceId;
+    void* const Instance = EngineHandleFromId(EngineInstanceId);
 
     // 062abe03..062abebe: root extent (IEngine +0x88, flags 1) -> radius R0 and local centre;
     // TransformXform (+0x28) by this+0x08 -> world centre W0; the AABB starts as W0 +- R0
@@ -1091,18 +1091,20 @@ void CEqObj::compute_explosion_dmg_bounding_sphere(float& OutRadius, Vector& Out
     // min only when min < value, TEST AH,0x41 / JZ keeps a max only when max > value, NaN
     // replaces.
     std::vector<FChildSphere> Children;
-    for (FlLong Child = (FlLong)DALib::Engine->GetRelatedInstance(Instance, 0, G_InvalidEngineHandle);
-         Child != -1;
-         Child = (FlLong)DALib::Engine->GetRelatedInstance(Instance, 0, (void*)Child))
+    for (FlLong Child = EngineIdFromHandle(
+             DALib::Engine->GetRelatedInstance(Instance, 0, G_InvalidEngineHandle));
+         Child != -1; Child = EngineIdFromHandle(DALib::Engine->GetRelatedInstance(
+                          Instance, 0, EngineHandleFromId(Child))))
     {
         if (inst_to_subobj_id(Child) != SUBOBJ_ID_ROOT)
             continue;
 
         float ChildRadius;
         Vector ChildLocal;
-        DALib::Engine->GetInstanceExtent((void*)Child, 1, &ChildRadius, (float*)&ChildLocal);
+        DALib::Engine->GetInstanceExtent(EngineHandleFromId(Child), 1, &ChildRadius,
+                                         (float*)&ChildLocal);
         FTransform const& ChildXform =
-            *(FTransform const*)DALib::Engine->GetInstanceTransform((void*)Child);
+            *(FTransform const*)DALib::Engine->GetInstanceTransform(EngineHandleFromId(Child));
         FChildSphere Sphere;
         Math->TransformXform((FVector&)Sphere.Center, ChildXform, (FVector const&)ChildLocal);
         Sphere.Radius = ChildRadius;
@@ -1421,7 +1423,7 @@ void CEqObj::flush_animations()
         if (It->AnimChannel != -1)
         {
             AnimDB::Rem(It->AnimChannel);
-            DALib::Anim->DestroyScript((void*)It->AnimChannel);
+            DALib::Anim->DestroyScript((void*)(std::uintptr_t)(FlULong)(It->AnimChannel));
         }
     }
     DockingPoints.clear();
@@ -1443,7 +1445,8 @@ void CEqObj::update_docking_animations(float Dt)
             continue;
 
         float const Duration = DALib::Anim->GetStoredDuration(Entry.AnimChannel);
-        float const Position = DALib::Anim->GetScriptDuration((void*)Entry.AnimChannel);
+        float const Position =
+            DALib::Anim->GetScriptDuration((void*)(std::uintptr_t)(FlULong)(Entry.AnimChannel));
 
         if (Entry.bActive)
         {
@@ -1516,7 +1519,8 @@ void CEqObj::destroy_equipment(DamageList const& Damage, bool bParam2)
             // 0xc8 = 0639bf24) with event 4 for a cargo equip (Type +0x14 == 0x10000), else 3,
             // and the zero-extended SubObjId as the context.
             if ((int)Damage.Cause == 0x14)
-                notify((INotify::Event)(Equip->Type == 0x10000 ? 4 : 3), (void*)(unsigned)Entry.SubObjId);
+                notify((INotify::Event)(Equip->Type == 0x10000 ? 4 : 3),
+                       (void*)(std::uintptr_t)(FlULong)(unsigned)Entry.SubObjId);
 
             CAttachedEquip* Attached = CAttachedEquip::cast(Equip);
             if (Attached != nullptr)

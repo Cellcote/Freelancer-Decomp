@@ -95,10 +95,14 @@ void IVP_Synapse_OO::hull_manager_is_going_to_be_deleted_event(IVP_Hull_Manager*
 // only), the vector (memsize 8, n_elems 0, elems = FUN_06343f70(0x20) =
 // malloc), the derived vptrs, init_synapse_oo on both synapses, and finally
 // hull_limit_exceeded_event.
-IVP_OO_Watcher::IVP_OO_Watcher(IVP_Collision_Delegator* Delegator, IVP_Real_Object* Object0, IVP_Real_Object* Object1)
-    : IVP_Collision(Delegator)                                                     // :06369bf9-:06369c0f
-    , IVP_Collision_Delegator()                                                    // :06369c1b
-    , mindists(static_cast<IVP_Collision**>(std::malloc(0x20)), 8)                 // :06369c3f-:06369c58
+IVP_OO_Watcher::IVP_OO_Watcher(IVP_Collision_Delegator* Delegator, IVP_Real_Object* Object0,
+                               IVP_Real_Object* Object1)
+    : IVP_Collision(Delegator) // :06369bf9-:06369c0f
+      ,
+      IVP_Collision_Delegator() // :06369c1b
+      ,
+      mindists(static_cast<IVP_Collision**>(std::malloc(8 * sizeof(IVP_Collision*))),
+               8) // 0x20 on Win32                 // :06369c3f-:06369c58
 {
     synapses[0].init_synapse_oo(this, Object0); // :06369c70-:06369c77
     synapses[1].init_synapse_oo(this, Object1); // :06369c7c-:06369c85

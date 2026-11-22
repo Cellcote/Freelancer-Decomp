@@ -61,6 +61,13 @@
 #include <sys/syscall.h> // renameat2
 #endif
 
+// FILETIME's layout and tag (see Platform::FileTime).
+struct _FILETIME
+{
+    FlULong dwLowDateTime;
+    FlULong dwHighDateTime;
+};
+
 namespace Platform
 {
     // ---------------------------------------------------------------------------------------
@@ -88,30 +95,95 @@ namespace Platform
     {
         // Every handle points at one of these. References counts the open handles (and, for a
         // thread, the running thread itself); Name is set for a named event or mutex.
+        // Kind says what an object is (a header's RTTI is not reliably one per process across
+        // modules here, so no dynamic_cast).
+    enum : unsigned char
+    {
+        kKindNone = 0,
+        kKindFile,
+        kKindFind,
+        kKindEvent,
+        kKindMutex,
+        kKindThread,
+        kKindMapping, // posix/kernel32.h
+    };
         struct FObject
         {
             std::atomic<int> References{1};
             std::string Name;
+            unsigned char Kind = kKindNone;
             virtual ~FObject() = default;
         };
 
-        // The one lock and condition variable behind every wait (see the header comment).
+        // The handle table: slot N is handle (N + 1) * 4. Free slots are reused, as Windows
+        // reuses handle values. Lock order: WaitLock, then this one.
+        struct FHandles
+        {
+            std::mutex Lock;
+            std::vector<FObject*> Slots;
+            std::vector<std::size_t> Free;
+        };
+
+        struct FMutex;
+
+        // The layer's process-wide state. A header's statics are per module on macOS and Linux
+        // (each .dylib / .so has its own), and handles, waits, thread ids and the last error
+        // cross modules, so it is one FShared per process: FL_PLATFORM_DEFINE_SHARED in dacom,
+        // which every game module links, found through FlPlatformShared. Per-thread values sit
+        // under pthread keys of it (a thread_local is per module too).
+        struct FShared
+        {
+            std::mutex WaitLock; // the one lock behind every wait
+            std::condition_variable WaitSignal; // and its condition variable
+            std::atomic<FlULong> NextThreadId{1}; // GetCurrentThreadId's values
+            pthread_key_t ThreadIdKey{};
+            pthread_key_t LastErrorKey{}; // posix/kernel32.h's GetLastError
+            FHandles Handles;
+            std::map<std::string, FObject*> Names; // named events and mutexes, under WaitLock
+            std::set<FMutex*> Mutexes; // every mutex, under WaitLock
+            std::mutex RegionsLock; // posix/kernel32.h's views and VirtualAlloc blocks
+            std::map<const void*, std::size_t> Regions;
+            std::chrono::steady_clock::time_point Start =
+                std::chrono::steady_clock::now(); // timeGetTime's zero
+
+            FShared()
+            {
+                pthread_key_create(&ThreadIdKey, nullptr);
+                pthread_key_create(&LastErrorKey, &std::free);
+            }
+        };
+        }
+        }
+
+        // The process's platform state (FL_PLATFORM_DEFINE_SHARED, in dacom).
+        extern "C" Platform::Detail::FShared* FlPlatformShared();
+
+        namespace Platform
+        {
+        namespace Detail
+        {
+        inline FShared& Shared()
+        {
+            return *FlPlatformShared();
+        }
         inline std::mutex& WaitLock()
         {
-            static std::mutex Lock;
-            return Lock;
+            return Shared().WaitLock;
         }
         inline std::condition_variable& WaitSignal()
         {
-            static std::condition_variable Signal;
-            return Signal;
+            return Shared().WaitSignal;
         }
 
-        // A thread's 32-bit id, as GetCurrentThreadId's: handed out once per thread, never 0.
+        // A thread's 32-bit id, as GetCurrentThreadId's: handed out once per thread, never 0,
+        // the same in every module.
         inline FlULong ThisThreadId()
         {
-            static std::atomic<FlULong> Next{1};
-            thread_local FlULong const Id = Next.fetch_add(1);
+            FShared& State = Shared();
+            if (void* const Stored = pthread_getspecific(State.ThreadIdKey))
+                return (FlULong)(std::uintptr_t)Stored;
+            const FlULong Id = State.NextThreadId.fetch_add(1);
+            pthread_setspecific(State.ThreadIdKey, (void*)(std::uintptr_t)Id);
             return Id;
         }
 
@@ -124,18 +196,9 @@ namespace Platform
             virtual bool Acquire() { return false; }
         };
 
-        // The handle table: slot N is handle (N + 1) * 4. Free slots are reused, as Windows
-        // reuses handle values. Lock order: WaitLock, then this one.
-        struct FHandles
-        {
-            std::mutex Lock;
-            std::vector<FObject*> Slots;
-            std::vector<std::size_t> Free;
-        };
         inline FHandles& Handles()
         {
-            static FHandles Table;
-            return Table;
+            return Shared().Handles;
         }
 
         // A new handle for Object (which it now holds a reference of), or nullptr when the table
@@ -198,18 +261,20 @@ namespace Platform
             return Lookup(Value) != nullptr;
         }
 
-        // The object behind a handle as a T, or nullptr when it names nothing or something else.
+        // The object behind a handle as a T (by its Kind), or nullptr when it names nothing or
+        // something else.
         template <class T>
         T* As(Handle Value)
         {
-            return dynamic_cast<T*>(Lookup(Value));
+            FObject* const Object = Lookup(Value);
+            return Object != nullptr && Object->Kind == T::kKind ? static_cast<T*>(Object)
+                                                                 : nullptr;
         }
 
         // The named events and mutexes of this process, under WaitLock.
         inline std::map<std::string, FObject*>& Names()
         {
-            static std::map<std::string, FObject*> Registry;
-            return Registry;
+            return Shared().Names;
         }
 
         // Drops one reference; the last one deletes the object (outside WaitLock).
@@ -225,7 +290,7 @@ namespace Platform
             if (bLast)
                 delete Object;
         }
-    }
+        }
 
     // CloseHandle: frees the handle value and releases its reference.
     inline bool CloseHandle(Handle Value)
@@ -351,6 +416,8 @@ namespace Platform
     {
         struct FFile : FObject
         {
+            static constexpr unsigned char kKind = kKindFile;
+            FFile() { Kind = kKind; }
             int Descriptor = -1;
             ~FFile() override
             {
@@ -540,11 +607,9 @@ namespace Platform
     }
 
     // WIN32_FIND_DATAA with its field names and layout (320 bytes).
-    struct FileTime
-    {
-        FlULong dwLowDateTime;
-        FlULong dwHighDateTime;
-    };
+    // FILETIME: the global _FILETIME, the tag Windows' headers give it (retail headers forward-
+    // declare `struct _FILETIME`).
+    using FileTime = ::_FILETIME;
     struct FindData
     {
         FlULong dwFileAttributes;
@@ -564,6 +629,8 @@ namespace Platform
     {
         struct FFind : FObject
         {
+            static constexpr unsigned char kKind = kKindFind;
+            FFind() { Kind = kKind; }
             DIR* Entries = nullptr;
             std::string Directory;
             std::string Pattern;
@@ -689,6 +756,8 @@ namespace Platform
     {
         struct FEvent : FWaitable
         {
+            static constexpr unsigned char kKind = kKindEvent;
+            FEvent() { Kind = kKind; }
             bool bManualReset = false;
             bool bSet = false;
             bool Signalled() const override { return bSet; }
@@ -706,12 +775,12 @@ namespace Platform
         // ones it still owns.
         inline std::set<FMutex*>& Mutexes()
         {
-            static std::set<FMutex*> Registry;
-            return Registry;
+            return Shared().Mutexes;
         }
 
         struct FMutex : FWaitable
         {
+            static constexpr unsigned char kKind = kKindMutex;
             FlULong Owner = 0;
             FlULong Count = 0;
             bool bAbandoned = false; // its owner ended without releasing it; the next wait says so
@@ -748,7 +817,11 @@ namespace Platform
         };
 
         // Callers hold WaitLock.
-        inline FMutex::FMutex() { Mutexes().insert(this); }
+        inline FMutex::FMutex()
+        {
+            Kind = kKind;
+            Mutexes().insert(this);
+        }
         inline FMutex::~FMutex()
         {
             std::lock_guard<std::mutex> Lock(WaitLock());
@@ -768,7 +841,13 @@ namespace Platform
         // The waitable object behind a handle, or nullptr (a file, a search, a closed value).
         inline FWaitable* Waitable(Handle Object)
         {
-            return As<FWaitable>(Object);
+            FObject* const Found = Lookup(Object);
+            if (Found == nullptr)
+                return nullptr;
+            const unsigned char Kind = Found->Kind;
+            return Kind == kKindEvent || Kind == kKindMutex || Kind == kKindThread
+                       ? static_cast<FWaitable*>(Found)
+                       : nullptr;
         }
 
         // Waits for one object (WaitAll false: any, true: all), as WaitForMultipleObjects. An
@@ -836,9 +915,9 @@ namespace Platform
                     auto const Found = Names().find(Name);
                     if (Found != Names().end())
                     {
-                        Object = dynamic_cast<T*>(Found->second);
-                        if (Object == nullptr)
+                        if (Found->second->Kind != T::kKind)
                             return nullptr;
+                        Object = static_cast<T*>(Found->second);
                         ++Object->References;
                     }
                     else if ((Object = Make()) != nullptr)
@@ -976,6 +1055,8 @@ namespace Platform
     {
         struct FThread : FWaitable
         {
+            static constexpr unsigned char kKind = kKindThread;
+            FThread() { Kind = kKind; }
             ThreadProc Proc = nullptr;
             void* Parameter = nullptr;
             FlULong Suspended = 0;
@@ -1335,4 +1416,15 @@ namespace Platform
             Directory += '/';
         return Detail::CopyOut(Directory, Path, Size);
     }
-} // namespace Platform
+    } // namespace Platform
+
+    // Defines the process's platform state: in dacom, and in a program that uses the layer without
+    // dacom (the tests). Never destroyed: handles retail keeps open until the process ends stay
+    // reachable, and a module's static destructors may still close handles after another's ran.
+#define FL_PLATFORM_DEFINE_SHARED()                                                            \
+        extern "C" __attribute__((visibility("default"))) Platform::Detail::FShared*               \
+        FlPlatformShared()                                                                         \
+        {                                                                                          \
+            static Platform::Detail::FShared* const Instance = new Platform::Detail::FShared();    \
+            return Instance;                                                                       \
+        }

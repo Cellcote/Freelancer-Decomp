@@ -144,8 +144,8 @@ bool CAttachedEquip::Connect(char const* HpName)
         return false;
 
     FlULong const HpCrc = DACOM_CRC::GetCRC32(HpName);                 // 062932b7
-    CObject* const Parent = (CObject*)(
-        DALib::Engine->GetInstanceUserData((void*)(ConnectionIndex)));   // 062932d0
+    CObject* const Parent = (CObject*)(DALib::Engine->GetInstanceUserData(
+        EngineHandleFromId((ConnectionIndex)))); // 062932d0
     // 062932d6..062932f6: a parent part (+0x58) whose hardpoint id list (std::find over the
     // vector at part+0x24/+0x28) holds the CRC makes this a non-physical attachment.
     PhyArch::Part const* const Part = Parent->PhyPart;
@@ -238,8 +238,7 @@ void CAttachedEquip::ComputeBoundingSphere(float& OutRadius, Vector& OutCenter) 
     // The three arguments (0, &OutRadius, &OutCenter) are pushed before the 0-arg
     // GetRootIndex() vcall (+0x84) and stay on the stack for the engine call.
     FlLong Root = GetRootIndex();
-    DALib::Engine->GetInstanceExtent((void*)(Root), 0, &OutRadius,
-                                     &OutCenter.x);
+    DALib::Engine->GetInstanceExtent(EngineHandleFromId((Root)), 0, &OutRadius, &OutCenter.x);
 }
 
 bool CAttachedEquip::GetCenterOfMass(Vector& Out) const
@@ -261,7 +260,7 @@ bool CAttachedEquip::GetCenterOfMass(Vector& Out) const
         ComputeBoundingSphere(BoundRadius, BoundCenter);
     }
     FlLong Root = Attachment->GetRootIndex();
-    float* Xform = DALib::Engine->GetInstanceTransform((void*)(Root));
+    float* Xform = DALib::Engine->GetInstanceTransform(EngineHandleFromId((Root)));
     Acquire3DMathEngine()->TransformXform((FVector&)(World),
                                           *(FTransform const*)Xform,
                                           (FVector const&)(BoundCenter));

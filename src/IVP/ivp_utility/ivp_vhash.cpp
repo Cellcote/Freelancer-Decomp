@@ -101,6 +101,9 @@ namespace
     }
 }
 
+// The constructor (ivp_vhash.h) sizes the table by IVP_VHashElem.
+static_assert(sizeof(FVHashElem) == sizeof(IVP_VHashElem), "IVP_VHash table slot");
+
 // Common.dll.c 0x6352320 / Common.dll.txt:430367-430440 (Common.dll.c
 // 208870-208905). Grows the table to exactly `param_1` buckets and rehashes
 // every occupied old entry back in through AddElem, then frees the old bucket
@@ -116,7 +119,8 @@ void IVP_VHash::Rehash(int param_1) // formerly extern "C" FUN_06352320
     int oldMask = SizeMm;
     FVHashElem* oldBuckets = static_cast<FVHashElem*>(Elems);
     SizeMm = param_1 - 1;
-    Elems = calloc(static_cast<size_t>(param_1), 0x8); // FUN_06343f80
+    Elems =
+        calloc(static_cast<size_t>(param_1), sizeof(FVHashElem)); // FUN_06343f80 (8 bytes on Win32)
     unsigned preRehashCount = NElemsAndFlags;
 
     if (oldMask >= 0)
@@ -382,7 +386,7 @@ IVP_VHash_Store::IVP_VHash_Store(int param_1) // formerly extern "C" FUN_063525f
     // "slot empty" test throughout is `value == 0` (see the header comment
     // above), so an unzeroed bucket array would make find()/grow() read
     // garbage as live entries.
-    ElemsStore = calloc(static_cast<size_t>(param_1), 0xc);
+    ElemsStore = calloc(static_cast<size_t>(param_1), sizeof(FVHashStoreElem)); // 0xc on Win32
 }
 
 // Common.dll.c 0x6352620 (aka thunk_FUN_06352620, same body folded by
@@ -406,7 +410,10 @@ void IVP_VHash_Store::Rehash(int param_1) // formerly extern "C" FUN_06352650
     int oldCapacity = Size;
     Size = param_1;
     SizeMm = param_1 - 1;
-    ElemsStore = calloc(static_cast<size_t>(param_1), 0xc); // FUN_06343f80 is calloc, not malloc -- see note in the ctor
+    ElemsStore = calloc(
+        static_cast<size_t>(param_1),
+        sizeof(
+            FVHashStoreElem)); // 0xc on Win32; FUN_06343f80 is calloc, not malloc -- see note in the ctor
     int savedCount = NElems;
     if (oldCapacity > 0)
     {
@@ -429,7 +436,8 @@ void IVP_VHash_Store::Rehash(int param_1) // formerly extern "C" FUN_06352650
 // insert (key, value), tagging the hash as "generated" (top bit set).
 void IVP_VHash_Store::AddElem(void* param_1, void* param_2) // formerly extern "C" FUN_063526d0
 {
-    unsigned hash = HashKey_063edcdc((unsigned)param_1) | 0x80000000;
+    unsigned hash =
+        HashKey_063edcdc((unsigned)(uintptr_t)param_1) /* a hash of the address */ | 0x80000000;
     AddElem(param_1, param_2, hash);
 }
 
@@ -485,7 +493,8 @@ void IVP_VHash_Store::AddElem(void* param_1, void* param_2, unsigned param_3) //
 // ABI level, so this is typed to return it too rather than discard it.
 void* IVP_VHash_Store::RemoveElem(void* param_1) // formerly extern "C" FUN_063527e0
 {
-    unsigned hash = HashKey_063edcdc((unsigned)param_1) | 0x80000000;
+    unsigned hash =
+        HashKey_063edcdc((unsigned)(uintptr_t)param_1) /* a hash of the address */ | 0x80000000;
     return RemoveElem(param_1, hash);
 }
 
@@ -568,7 +577,8 @@ void* IVP_VHash_Store::RemoveElem(void* param_1, unsigned param_2) // formerly e
 // the retail ABI level -- typed accordingly.
 void* IVP_VHash_Store::FindElem(void* param_1) // formerly extern "C" FUN_06352930
 {
-    unsigned hash = HashKey_063edcdc((unsigned)param_1) | 0x80000000;
+    unsigned hash =
+        HashKey_063edcdc((unsigned)(uintptr_t)param_1) /* a hash of the address */ | 0x80000000;
     return FindElem(param_1, hash);
 }
 
@@ -606,7 +616,7 @@ void* IVP_VHash_Store::FindElem(void* param_1, unsigned param_2) // formerly ext
 // reference count once the pair is already registered.
 void IVP_VHash_Store::ChangeElem(void* param_1, void* param_2) // formerly extern "C" FUN_063529e0
 {
-    unsigned crc = HashKey_063edcdc((unsigned)param_1);
+    unsigned crc = HashKey_063edcdc((unsigned)(uintptr_t)param_1) /* a hash of the address */;
     if (Size > 0)
     {
         unsigned hash = crc | 0x80000000;

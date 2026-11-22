@@ -168,8 +168,9 @@ protected:
     // the n_elems pointers; free the old block unless it is the inline buffer or null.
     void Realloc()
     {
-        unsigned int NewByteCount = ((unsigned int)memsize * 8) + 8; // 063441a9
-        T** NewBuffer = (T**)malloc(NewByteCount);                  // 063441b1 FUN_06343f70
+        // memsize * 8 + 8 on Win32; pointer-sized so the 2 * memsize + 1 slots fit on x64.
+        size_t NewByteCount = ((size_t)memsize * 2 + 2) * sizeof(T*); // 063441a9
+        T** NewBuffer = (T**)malloc(NewByteCount);                    // 063441b1 FUN_06343f70
 
         unsigned short NewMemsize = (unsigned short)((memsize << 1) + 1); // 063441bb-063441ca
         memsize = NewMemsize;

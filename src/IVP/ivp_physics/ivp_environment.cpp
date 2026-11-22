@@ -1080,7 +1080,8 @@ void IVP_U_Vector_Base_Realloc(IVP_U_Vector_Base* v)
 {
     // 063441a9-063441b1: malloc(mem_size * 8 + 8). Note the *8, not *4: the
     // new capacity is itself 2*mem_size+1 pointers, and the +8 covers the +1.
-    void** NewBuffer = static_cast<void**>(malloc(static_cast<size_t>(v->mem_size) * 8 + 8));
+    void** NewBuffer =
+        static_cast<void**>(malloc((static_cast<size_t>(v->mem_size) * 2 + 2) * sizeof(void*)));
 
     // 063441b8-063441ca: capacity doubles, plus one. Retail computes this in
     // 16 bits (SHL DX,1; INC EDX with DX the live half), so it wraps at 0xFFFF

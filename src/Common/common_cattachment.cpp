@@ -92,7 +92,8 @@ namespace
                                              char const* ChildHp)
     {
         FlULong* Result = nullptr;
-        void* ParentHandle = DALib::Engine->GetInstanceArchetype((void*)ParentInst); // +0x64
+        void* ParentHandle =
+            DALib::Engine->GetInstanceArchetype(EngineHandleFromId(ParentInst)); // +0x64
         if (ParentHandle != (void*)-1)
         {
             FHardpointKey ParentKey;
@@ -102,7 +103,8 @@ namespace
             // IHardpoint+0xc; retail tests only AL.
             if ((unsigned char)DALib::Hardpoint->GetHardpoint(ParentHandle, &ParentKey, &ParentData) != 0)
             {
-                void* ChildHandle = DALib::Engine->GetInstanceArchetype((void*)ChildInst);
+                void* ChildHandle =
+                    DALib::Engine->GetInstanceArchetype(EngineHandleFromId(ChildInst));
                 if (ChildHandle != (void*)-1)
                 {
                     FHardpointKey ChildKey;
@@ -164,7 +166,8 @@ namespace
                                 Joint.Min = ChildData.Min;
                                 Joint.Max = ChildData.Max;
                             }
-                            DALib::Engine->CreateJoint((void*)ParentInst, (void*)ChildInst,
+                            DALib::Engine->CreateJoint(EngineHandleFromId(ParentInst),
+                                                       EngineHandleFromId(ChildInst),
                                                        (FlULong const*)&Joint); // +0xbc
                         }
                         else
@@ -175,10 +178,12 @@ namespace
                             FHardpointKey ParentConnectKey;
                             ParentConnectKey.Name = ParentHp;
                             ParentConnectKey.Crc = DACOM_CRC::GetCRC32(ParentHp);
-                            DALib::Hardpoint->ConnectHardpoints((void*)ParentInst, &ParentConnectKey,
-                                                                (void*)ChildInst, &ChildConnectKey); // +0x18
+                            DALib::Hardpoint->ConnectHardpoints(
+                                EngineHandleFromId(ParentInst), &ParentConnectKey,
+                                EngineHandleFromId(ChildInst), &ChildConnectKey); // +0x18
                         }
-                        Result = DALib::Engine->GetInstanceRelative((void*)ChildInst); // +0xc4
+                        Result = DALib::Engine->GetInstanceRelative(
+                            EngineHandleFromId(ChildInst)); // +0xc4
                     }
                 }
                 DALib::Engine->ReleaseHandle(ChildHandle);   // +0x3c
@@ -244,7 +249,7 @@ CObject* CNonPhysAttachment::GetPhysicsOwner() const
     // .text:062937c0..062937dc: only -1 means "no instance"; otherwise IEngine+0x80.
     if (EngineInstanceId == -1)
         return nullptr;
-    return (CObject*)DALib::Engine->GetInstanceUserData((void*)EngineInstanceId);
+    return (CObject*)DALib::Engine->GetInstanceUserData(EngineHandleFromId(EngineInstanceId));
 }
 
 void CNonPhysAttachment::EnableCollisions(bool bEnable)
@@ -278,7 +283,7 @@ bool CNonPhysAttachment::Connect(CAttachedEquip* Equip)
     // Listing 0x062938c0..0x06293a51.
     Archetype::AttachedEquipment* Arch = (Archetype::AttachedEquipment*)Equip->Arch;
     EngineInstanceId = Arch->create_instance(nullptr);
-    DALib::Engine->UpdateInstance((void*)EngineInstanceId, 0, nullptr); // +0x6c
+    DALib::Engine->UpdateInstance(EngineHandleFromId(EngineInstanceId), 0, nullptr); // +0x6c
     if (EngineInstanceId == -1)
         return false;
 
@@ -294,18 +299,20 @@ bool CNonPhysAttachment::Connect(CAttachedEquip* Equip)
     }
 
     HpCrc = DACOM_CRC::GetCRC32(Equip->GetParentHPName().Value);
-    void* ParentUser = DALib::Engine->GetInstanceUserData((void*)Equip->GetParentConnector(false)); // +0x80
-    DALib::Engine->SetInstanceUserData((void*)EngineInstanceId, ParentUser); // +0x7c
+    void* ParentUser = DALib::Engine->GetInstanceUserData(
+        EngineHandleFromId(Equip->GetParentConnector(false))); // +0x80
+    DALib::Engine->SetInstanceUserData(EngineHandleFromId(EngineInstanceId), ParentUser); // +0x7c
 
     // 0x062939a2: FUN_0628f700 = insert one {HpCrc, instance, flag byte 0} at the end of the
     // parent's PartMap vector (+0x64 object, end = +0x6c).
     AppendPartMapEntry((CObject*)ParentUser, HpCrc, EngineInstanceId, false);
 
-    void* Child = DALib::Engine->GetRelatedInstance((void*)EngineInstanceId, 0, (void*)-1);   // +0xd8
+    void* Child = DALib::Engine->GetRelatedInstance(EngineHandleFromId(EngineInstanceId), 0,
+                                                    (void*)-1); // +0xd8
     while (Child != (void*)-1)
     {
         DALib::Engine->SetInstanceUserData(Child, ParentUser);
-        Child = DALib::Engine->GetRelatedInstance((void*)EngineInstanceId, 0, Child);
+        Child = DALib::Engine->GetRelatedInstance(EngineHandleFromId(EngineInstanceId), 0, Child);
     }
     bCollisions = 1;
     return true;
@@ -317,7 +324,7 @@ CObject* CNonPhysAttachment::Disconnect(CAttachedEquip* Equip, bool bMakeDebris)
     CObject* Debris = nullptr;
     if (bMakeDebris)
     {
-        void* Inst = (void*)EngineInstanceId;
+        void* Inst = EngineHandleFromId(EngineInstanceId);
         CObject* ParentObj = (CObject*)DALib::Engine->GetInstanceUserData(Inst); // +0x80
         if (ParentObj != nullptr)
         {
@@ -453,7 +460,8 @@ bool CPhysAttachment::Connect(CAttachedEquip* Equip)
     EquipObject = CObject::Alloc(CObject::ClassEquipmentObj);
     EquipObject->open(Arch);
     Arch->create_instance(EquipObject);
-    DALib::Engine->UpdateInstance((void*)EquipObject->EngineInstanceId, 0, nullptr); // +0x6c
+    DALib::Engine->UpdateInstance(EngineHandleFromId(EquipObject->EngineInstanceId), 0,
+                                  nullptr); // +0x6c
 
     if (EquipObject == nullptr)
     {

@@ -151,7 +151,8 @@ void IVP_Hash::Add(const void* Key, unsigned Value) // formerly extern "C" FUN_0
     const unsigned Hash = HashKeyBytes(KeyBytes, KeyLength);
     const unsigned BucketIndex = Hash % (unsigned)BucketCount;          // 06356b75-06356b7e
 
-    IVP_Hash_Elem* Node = (IVP_Hash_Elem*)malloc((size_t)KeyLength + 0xc); // 06356b80 FUN_06343f70
+    IVP_Hash_Elem* Node = (IVP_Hash_Elem*)malloc((size_t)KeyLength + sizeof(IVP_Hash_Elem) +
+                                                 4); // 06356b80 FUN_06343f70 (+0xc on Win32)
     memcpy(Node->KeyBytes(), KeyBytes, (size_t)KeyLength);                // 06356b85-06356b9a
 
     Node->Next = Buckets[BucketIndex]; // 06356ba5

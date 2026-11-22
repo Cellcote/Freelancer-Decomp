@@ -423,6 +423,43 @@ int main(int argc, char** argv)
               "a HandleValue id made in one module names the object in another");
     }
 
+    // Common loads (with DALib, qhull and the physics it carries) and runs: a sphere inside another
+    // overlaps by its own volume, two spheres apart by nothing.
+    Platform::Module const Common = Platform::ModuleLoad((Folder + "Common.dll").c_str());
+    Check(Common != nullptr, "Common.dll loads");
+    auto const SphereVolume = reinterpret_cast<float (*)(float, float, float)>(
+        Platform::ModuleSymbol(Common, "_Z21GetSphereIntersectVolfff"));
+    Check(SphereVolume != nullptr && SphereVolume(10.0f, 1.0f, 1.0f) == 0.0f &&
+              SphereVolume(0.0f, 1.0f, 5.0f) == 4.1887903f,
+          "Common's GetSphereIntersectVol");
+
+    using FEventCreate = Platform::Handle (*)();
+    using FEventSet = bool (*)(Platform::Handle);
+    using FEventWait = FlULong (*)(Platform::Handle);
+    using FThreadId = FlULong (*)();
+    auto const EventCreateA =
+        reinterpret_cast<FEventCreate>(Platform::ModuleSymbol(ProbeA, "Probe_a_EventCreate"));
+    auto const EventSetB =
+        reinterpret_cast<FEventSet>(Platform::ModuleSymbol(ProbeB, "Probe_b_EventSet"));
+    auto const EventWaitA =
+        reinterpret_cast<FEventWait>(Platform::ModuleSymbol(ProbeA, "Probe_a_EventWait"));
+    auto const ThreadIdA =
+        reinterpret_cast<FThreadId>(Platform::ModuleSymbol(ProbeA, "Probe_a_ThreadId"));
+    auto const ThreadIdB =
+        reinterpret_cast<FThreadId>(Platform::ModuleSymbol(ProbeB, "Probe_b_ThreadId"));
+    if (EventCreateA != nullptr && EventSetB != nullptr && EventWaitA != nullptr)
+    {
+        Platform::Handle const Event = EventCreateA();
+        Check(Event != nullptr && EventWaitA(Event) == Platform::kWaitTimeout && EventSetB(Event) &&
+                  EventWaitA(Event) == Platform::kWaitSignaled &&
+                  Platform::WaitOne(Event, 0) == Platform::kWaitSignaled,
+              "an event made in one module is set in another and seen by all");
+        Platform::CloseHandle(Event);
+    }
+    Check(ThreadIdA != nullptr && ThreadIdB != nullptr && ThreadIdA() == ThreadIdB() &&
+              ThreadIdA() == Platform::CurrentThreadId(),
+          "a thread has one id in every module");
+
     // SearchPathA finds a module by its Windows name (DACOM's AddLibrary looks it up so).
     char Found[1024] = {};
     char* FilePart = nullptr;

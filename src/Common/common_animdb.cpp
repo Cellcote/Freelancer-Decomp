@@ -374,7 +374,8 @@ void __cdecl Add(VChannel* Chan)
     // 0627d5f3..0627d621: Engine+0x80 GetInstanceUserData(Chan->GetId()) (a second GetId
     // call), Root = GetRoot(result). No null test on Engine or on the result: 0627d626 reads
     // the result's +4 unconditionally.
-    CObject* const InstObj = (CObject*)DALib::Engine->GetInstanceUserData((void*)(intptr_t)Chan->GetId());
+    CObject* const InstObj =
+        (CObject*)DALib::Engine->GetInstanceUserData(EngineHandleFromId(Chan->GetId()));
     Entry->Sub.Root = GetRoot(InstObj);
 
     // 0627d624..0627d633: InstObj->EngineInstanceId compared with a third Chan->GetId().
@@ -446,12 +447,14 @@ COMMON_API void __cdecl Add(int PlaybackId)
     {
         // 0627d9c8..0627d9db: IChannel slot 16 (+0x40) GetHeader(&Header, channel).
         FlULong Header[4];
-        DALib::Channel->GetHeader(Header, (FlULong)*ChanIt);
+        DALib::Channel->GetHeader(Header,
+                                  (FlULong)LowArena::Encode(*ChanIt)); // the typed channel's key
         // 0627d9de..0627d9e4: Header[0] != 0 -> next channel.
         if (Header[0] != 0)
             continue;
         // 0627d9e6..0627d9ff: Engine+0x80 GetInstanceUserData(Header[3]).
-        CObject* const Inst = (CObject*)DALib::Engine->GetInstanceUserData((void*)Header[3]);
+        CObject* const Inst =
+            (CObject*)DALib::Engine->GetInstanceUserData(EngineHandleFromId(Header[3]));
         LastInstance = Inst;
         // 0627da03..0627da08: [Inst+4] == Header[3], no null test.
         if (Inst->EngineInstanceId == (int)Header[3])
@@ -542,11 +545,12 @@ static std::pair<typename std::vector<T>::iterator, bool> InsertUnique(std::vect
 static void CollectInstanceChildren(CObject* Obj, FlLong InstanceId, std::vector<CObject*>& Objs)
 {
     // IEngine carries the instance id in a void* (engine/engbase.h).
-    FlLong Child = (FlLong)(intptr_t)DALib::Engine->GetRelatedInstance((void*)(intptr_t)InstanceId, 1,
-                                                                   G_InvalidEngineHandle);
+    FlLong Child = EngineIdFromHandle(DALib::Engine->GetRelatedInstance(
+        EngineHandleFromId(InstanceId), 1, G_InvalidEngineHandle));
     while (Child != -1)
     {
-        CObject* const ChildObj = (CObject*)DALib::Engine->GetInstanceUserData((void*)(intptr_t)Child);
+        CObject* const ChildObj =
+            (CObject*)DALib::Engine->GetInstanceUserData(EngineHandleFromId(Child));
         if (ChildObj != nullptr && ChildObj != Obj)
         {
             InsertUnique(Objs, ChildObj);
@@ -556,8 +560,8 @@ static void CollectInstanceChildren(CObject* Obj, FlLong InstanceId, std::vector
         {
             CollectInstanceChildren(Obj, Child, Objs);
         }
-        Child = (FlLong)(intptr_t)DALib::Engine->GetRelatedInstance((void*)(intptr_t)InstanceId, 1,
-                                                                  (void*)(intptr_t)Child);
+        Child = EngineIdFromHandle(DALib::Engine->GetRelatedInstance(EngineHandleFromId(InstanceId),
+                                                                     1, EngineHandleFromId(Child)));
     }
 }
 
@@ -650,7 +654,7 @@ void __cdecl Update(float Dt)
     // ---- Phase C: Common.dll.txt:58804-58817 ------------------------------
     // Engine vtable +0x6c == IEngine slot 27, UpdateInstance(Instance, 0, 0).
     for (std::vector<int>::const_iterator It = SeenIds.begin(); It != SeenIds.end(); ++It)
-        DALib::Engine->UpdateInstance((void*)(intptr_t)*It, 0, nullptr);
+        DALib::Engine->UpdateInstance(EngineHandleFromId(*It), 0, nullptr);
 
     // ---- Phase D: Common.dll.txt:58829-58938 ------------------------------
     std::vector<CObject*> Objs;  // retail V3

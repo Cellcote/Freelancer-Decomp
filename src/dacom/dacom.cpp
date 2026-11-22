@@ -2767,10 +2767,12 @@ extern "C" int stricmp(const char* A, const char* B)
     return DacomStricmp(A, B);
 }
 
-// PORT(macOS): the process's LowArena (x64_low_arena.h) and HandleValue table (handle_value.h).
+// PORT(macOS): the process's LowArena (x64_low_arena.h), HandleValue table (handle_value.h) and
+// platform state (platform_posix.h).
 // Every game module links dacom, so a value one module encodes decodes the same in another.
 FL_LOW_ARENA_DEFINE_SHARED()
 FL_HANDLE_VALUE_DEFINE_SHARED()
+FL_PLATFORM_DEFINE_SHARED()
 #endif
 
 namespace LogStream

@@ -631,7 +631,7 @@ namespace Archetype
         if (Anim != nullptr && AnimIndex != nullptr && *AnimIndex == -1)
         {
             // .text:062efdab..062efdb2: IAnimation2 slot 3 (+0x0c) OpenScript(Filesys).
-            *AnimIndex = (int)(ptrdiff_t)Anim->OpenScript(Filesys);
+            *AnimIndex = (int)AnimScriptId(Anim->OpenScript(Filesys));
         }
 
         if (EngineIndex != nullptr)
@@ -643,14 +643,15 @@ namespace Archetype
             FEngineArchetypeName Name;
             Name.Text = PathBuf;
             Name.Crc = DACOM_CRC::GetCRC32(PathBuf);
-            *EngineIndex = (FlLong)DALib::Engine->FindArchetype(&Name);
+            *EngineIndex = EngineIdFromHandle(DALib::Engine->FindArchetype(&Name));
             if (*EngineIndex == -1)
             {
                 // .text:062efe07..062efe31: the CRC taken again, slot 12 (+0x30)
                 // CreateArchetypeHandle(&name, Filesys).
                 Name.Text = PathBuf;
                 Name.Crc = DACOM_CRC::GetCRC32(PathBuf);
-                *EngineIndex = (FlLong)DALib::Engine->CreateArchetypeHandle(&Name, Filesys);
+                *EngineIndex =
+                    EngineIdFromHandle(DALib::Engine->CreateArchetypeHandle(&Name, Filesys));
             }
         }
         return true;
@@ -666,7 +667,7 @@ namespace Archetype
             FEngineArchetypeName Name;
             Name.Text = Path;
             Name.Crc = DACOM_CRC::GetCRC32(Path);
-            *EngineIndex = (FlLong)DALib::Engine->FindArchetype(&Name);
+            *EngineIndex = EngineIdFromHandle(DALib::Engine->FindArchetype(&Name));
             if (*EngineIndex != -1)
                 return true;
         }
@@ -802,7 +803,8 @@ namespace Archetype
         // its result returned as is; no engine or handle test.
         if (EngineIndex != -1)
         {
-            return (FlLong)DALib::Engine->CreateInstance((void*)EngineIndex, EngineInstance);
+            return EngineIdFromHandle(
+                DALib::Engine->CreateInstance(EngineHandleFromId(EngineIndex), EngineInstance));
         }
 
         // The CacheString always holds a pointer (clear() hands out the pool's empty string);
@@ -848,14 +850,15 @@ namespace Archetype
         // (+0x10, CloseScript) and the index reset; DALib::Anim itself is not tested.
         if (AnimIndex != -1)
         {
-            DALib::Anim->CloseScript((void*)(ptrdiff_t)AnimIndex);
+            DALib::Anim->CloseScript(AnimScriptFromId(AnimIndex));
+            AnimScriptForget(AnimIndex);
             AnimIndex = -1;
         }
 
         // .text:062f0b13..062f0b27: a loaded mesh is released through DALib::Engine slot 15
         // (+0x3c, ReleaseHandle).
         if (EngineIndex != -1)
-            DALib::Engine->ReleaseHandle((void*)EngineIndex);
+            DALib::Engine->ReleaseHandle(EngineHandleFromId(EngineIndex));
 
         // .text:062f0b2a..062f0bb6: the surfaces map at +0x48 emptied (the inline erase(begin,
         // end) / clear of the VC6 tree).

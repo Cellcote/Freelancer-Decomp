@@ -36,7 +36,9 @@
 #include <csignal>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <string>
 
 #include <dlfcn.h>
@@ -79,9 +81,9 @@ typedef char CHAR;
 typedef short SHORT;
 typedef float FLOAT;
 typedef void VOID;
-typedef long long LONGLONG;
-typedef unsigned long long ULONGLONG;
-typedef unsigned long long DWORD64;
+typedef std::int64_t LONGLONG; // int64_t, as on Windows (long on Linux, long long on macOS)
+typedef std::uint64_t ULONGLONG;
+typedef std::uint64_t DWORD64;
 typedef std::intptr_t INT_PTR;
 typedef std::uintptr_t UINT_PTR;
 typedef std::intptr_t LONG_PTR;
@@ -157,20 +159,27 @@ union ULARGE_INTEGER
     ULONGLONG QuadPart;
 };
 
-struct RECT
+// The SDK's tag names too: retail headers declare `struct tagRECT;` and mangle it.
+typedef struct tagRECT
 {
     LONG left;
     LONG top;
     LONG right;
     LONG bottom;
-};
-struct POINT
+} RECT;
+typedef struct tagPOINT
 {
     LONG x;
     LONG y;
-};
+} POINT;
+typedef struct tagSIZE
+{
+    LONG cx;
+    LONG cy;
+} SIZE;
 typedef RECT* LPRECT;
 typedef POINT* LPPOINT;
+typedef SIZE* LPSIZE;
 
 // ---------------------------------------------------------------------------------------------
 // Constants
@@ -224,6 +233,8 @@ typedef POINT* LPPOINT;
                                                       << 16))
 
 #include "posix/kernel32.h" // the file, mapping and memory calls (uses the types above)
+#include "posix/wingdi.h"  // GDI's text types and calls, which fail here (fonts come with M3)
+#include "posix/winreg.h"  // the registry: every key absent
 #include "posix/unknwn.h"   // COM's basics: GUID, IUnknown, the HRESULTs, CoCreateInstance
 
 // ---------------------------------------------------------------------------------------------
@@ -292,6 +303,63 @@ inline BOOL SetRectEmpty(LPRECT Rect)
 inline BOOL IsRectEmpty(const RECT* Rect)
 {
     return Rect == nullptr || Rect->right <= Rect->left || Rect->bottom <= Rect->top;
+}
+
+// MessageBoxA's type flags and FormatMessageA (the message tables are Windows'; the text here
+// is the C library's strerror for an errno-style code).
+#define MB_OK 0x00000000L
+#define MB_OKCANCEL 0x00000001L
+#define MB_ABORTRETRYIGNORE 0x00000002L
+#define MB_YESNOCANCEL 0x00000003L
+#define MB_YESNO 0x00000004L
+#define MB_RETRYCANCEL 0x00000005L
+#define MB_ICONHAND 0x00000010L
+#define MB_ICONERROR MB_ICONHAND
+#define MB_ICONQUESTION 0x00000020L
+#define MB_ICONEXCLAMATION 0x00000030L
+#define MB_ICONWARNING MB_ICONEXCLAMATION
+#define MB_ICONASTERISK 0x00000040L
+#define MB_ICONINFORMATION MB_ICONASTERISK
+#define MB_TASKMODAL 0x00002000L
+#define MB_TOPMOST 0x00040000L
+#define LANG_NEUTRAL 0x00
+#define LANG_ENGLISH 0x09
+#define SUBLANG_NEUTRAL 0x00
+#define SUBLANG_DEFAULT 0x01
+#define MAKELANGID(p, s) ((((WORD)(s)) << 10) | (WORD)(p))
+#define FORMAT_MESSAGE_ALLOCATE_BUFFER 0x00000100
+#define FORMAT_MESSAGE_IGNORE_INSERTS 0x00000200
+#define FORMAT_MESSAGE_FROM_STRING 0x00000400
+#define FORMAT_MESSAGE_FROM_SYSTEM 0x00001000
+
+typedef HANDLE HLOCAL;
+inline HLOCAL LocalFree(HLOCAL Memory)
+{
+    std::free(Memory);
+    return nullptr;
+}
+// FormatMessageA(FROM_SYSTEM): "Error <code>." (with ALLOCATE_BUFFER, *(char**)Buffer gets a
+// malloc'd copy for LocalFree). The length written, or 0.
+inline DWORD FormatMessageA(DWORD Flags, LPCVOID, DWORD Code, DWORD, LPSTR Buffer, DWORD Size,
+                            void*)
+{
+    char Text[64];
+    const int Length = std::snprintf(Text, sizeof(Text), "Error %u.\r\n", (unsigned)Code);
+    if (Length <= 0 || Buffer == nullptr)
+        return 0;
+    if ((Flags & FORMAT_MESSAGE_ALLOCATE_BUFFER) != 0)
+    {
+        char* const Copy = static_cast<char*>(std::malloc((size_t)Length + 1));
+        if (Copy == nullptr)
+            return 0;
+        std::memcpy(Copy, Text, (size_t)Length + 1);
+        *reinterpret_cast<char**>(Buffer) = Copy;
+        return (DWORD)Length;
+    }
+    if ((DWORD)Length >= Size)
+        return 0;
+    std::memcpy(Buffer, Text, (size_t)Length + 1);
+    return (DWORD)Length;
 }
 
 // No message loop yet (M3): nothing to post to.
@@ -438,3 +506,149 @@ inline HMODULE ModuleOf(void const* Address)
         }                                                                                          \
     } GPosixDllMain;                                                                               \
     }
+
+// GetVersionExA: Windows' version numbers for a current Windows (10.0), so code that asks for
+// "newer than 4" takes the modern path.
+typedef struct _OSVERSIONINFOA
+{
+    DWORD dwOSVersionInfoSize;
+    DWORD dwMajorVersion;
+    DWORD dwMinorVersion;
+    DWORD dwBuildNumber;
+    DWORD dwPlatformId;
+    CHAR szCSDVersion[128];
+} OSVERSIONINFOA;
+#define VER_PLATFORM_WIN32_NT 2
+inline BOOL GetVersionExA(OSVERSIONINFOA* Info)
+{
+    if (Info == nullptr)
+        return FALSE;
+    Info->dwMajorVersion = 10;
+    Info->dwMinorVersion = 0;
+    Info->dwBuildNumber = 19041;
+    Info->dwPlatformId = VER_PLATFORM_WIN32_NT;
+    Info->szCSDVersion[0] = 0;
+    return TRUE;
+}
+
+// The message loop: no window messages here yet (M3), so PeekMessageA finds none, and
+// MsgWaitForMultipleObjects waits on the handles only (as WaitForMultipleObjects).
+typedef struct tagMSG
+{
+    HWND hwnd;
+    UINT message;
+    WPARAM wParam;
+    LPARAM lParam;
+    DWORD time;
+    POINT pt;
+} MSG;
+#define PM_NOREMOVE 0x0000
+#define PM_REMOVE 0x0001
+#define WM_QUIT 0x0012
+#define WAIT_OBJECT_0 0
+#define WAIT_TIMEOUT 0x102
+#define WAIT_FAILED ((DWORD)0xFFFFFFFF)
+#define QS_ALLINPUT 0x04FF
+inline BOOL PeekMessageA(MSG*, HWND, UINT, UINT, UINT)
+{
+    return FALSE;
+}
+inline BOOL TranslateMessage(const MSG*)
+{
+    return FALSE;
+}
+inline LRESULT DispatchMessageA(const MSG*)
+{
+    return 0;
+}
+inline DWORD MsgWaitForMultipleObjects(DWORD Count, const HANDLE* Handles, BOOL WaitAll,
+                                       DWORD Milliseconds, DWORD)
+{
+    if (Count == 0)
+    {
+        Platform::SleepMs(Milliseconds == INFINITE ? 0 : Milliseconds);
+        return WAIT_TIMEOUT;
+    }
+    return Platform::WaitMany(Count, Handles, WaitAll != FALSE, Milliseconds);
+}
+
+// FileTimeToSystemTime (UTC), and GetTimeFormatA / GetDateFormatA for the flags the code passes:
+// TIME_NOSECONDS / TIME_NOTIMEMARKER / TIME_FORCE24HOURFORMAT, DATE_SHORTDATE (M/d/yyyy, the
+// US system locale's) or DATE_LONGDATE. The format string argument is not supported (nullptr).
+#define TIME_NOMINUTESORSECONDS 0x0001
+#define TIME_NOSECONDS 0x0002
+#define TIME_NOTIMEMARKER 0x0004
+#define TIME_FORCE24HOURFORMAT 0x0008
+#define DATE_SHORTDATE 0x0001
+#define DATE_LONGDATE 0x0002
+#define LOCALE_SYSTEM_DEFAULT 0x0800
+#define LOCALE_USER_DEFAULT 0x0400
+inline BOOL FileTimeToSystemTime(const FILETIME* Time, SYSTEMTIME* Out)
+{
+    if (Time == nullptr || Out == nullptr)
+        return FALSE;
+    const unsigned long long Ticks =
+        ((unsigned long long)Time->dwHighDateTime << 32) | Time->dwLowDateTime;
+    const long long Seconds = (long long)(Ticks / 10000000ULL) - 11644473600LL;
+    const time_t Unix = (time_t)Seconds;
+    struct tm Parts;
+    if (gmtime_r(&Unix, &Parts) == nullptr)
+        return FALSE;
+    Out->wYear = (WORD)(Parts.tm_year + 1900);
+    Out->wMonth = (WORD)(Parts.tm_mon + 1);
+    Out->wDayOfWeek = (WORD)Parts.tm_wday;
+    Out->wDay = (WORD)Parts.tm_mday;
+    Out->wHour = (WORD)Parts.tm_hour;
+    Out->wMinute = (WORD)Parts.tm_min;
+    Out->wSecond = (WORD)Parts.tm_sec;
+    Out->wMilliseconds = (WORD)((Ticks / 10000ULL) % 1000ULL);
+    return TRUE;
+}
+inline int PosixFormatResult(LPSTR Out, int Size, const char* Text)
+{
+    const int Needed = (int)std::strlen(Text) + 1;
+    if (Size == 0)
+        return Needed;
+    if (Out == nullptr || Size < Needed)
+        return 0;
+    std::memcpy(Out, Text, (size_t)Needed);
+    return Needed;
+}
+inline int GetTimeFormatA(DWORD, DWORD Flags, const SYSTEMTIME* Time, LPCSTR, LPSTR Out, int Size)
+{
+    if (Time == nullptr)
+        return 0;
+    char Text[32];
+    const bool b24 = (Flags & TIME_FORCE24HOURFORMAT) != 0;
+    const unsigned Hour = b24 ? Time->wHour : (Time->wHour % 12 == 0 ? 12u : Time->wHour % 12u);
+    const char* Marker =
+        (Flags & TIME_NOTIMEMARKER) != 0 || b24 ? "" : (Time->wHour < 12 ? " AM" : " PM");
+    if ((Flags & TIME_NOMINUTESORSECONDS) != 0)
+        std::snprintf(Text, sizeof(Text), "%u%s", Hour, Marker);
+    else if ((Flags & TIME_NOSECONDS) != 0)
+        std::snprintf(Text, sizeof(Text), b24 ? "%02u:%02u%s" : "%u:%02u%s", Hour,
+                      (unsigned)Time->wMinute, Marker);
+    else
+        std::snprintf(Text, sizeof(Text), b24 ? "%02u:%02u:%02u%s" : "%u:%02u:%02u%s", Hour,
+                      (unsigned)Time->wMinute, (unsigned)Time->wSecond, Marker);
+    return PosixFormatResult(Out, Size, Text);
+}
+inline int GetDateFormatA(DWORD, DWORD Flags, const SYSTEMTIME* Date, LPCSTR, LPSTR Out, int Size)
+{
+    if (Date == nullptr)
+        return 0;
+    static const char* const kDays[] = {"Sunday",   "Monday", "Tuesday", "Wednesday",
+                                        "Thursday", "Friday", "Saturday"};
+    static const char* const kMonths[] = {"January",   "February", "March",    "April",
+                                          "May",       "June",     "July",     "August",
+                                          "September", "October",  "November", "December"};
+    char Text[64];
+    if ((Flags & DATE_LONGDATE) != 0 && Date->wMonth >= 1 && Date->wMonth <= 12 &&
+        Date->wDayOfWeek < 7)
+        std::snprintf(Text, sizeof(Text), "%s, %s %u, %u", kDays[Date->wDayOfWeek],
+                      kMonths[Date->wMonth - 1], (unsigned)Date->wDay, (unsigned)Date->wYear);
+    else
+        std::snprintf(Text, sizeof(Text), "%u/%u/%u", (unsigned)Date->wMonth, (unsigned)Date->wDay,
+                      (unsigned)Date->wYear);
+    return PosixFormatResult(Out, Size, Text);
+}

@@ -55,6 +55,7 @@ namespace CmnCequip
     // IEngine+0xc4 for an instance id (retail never tests the result for null where it reads it).
     inline FJointRelative const* InstanceRelative(FlLong Instance)
     {
-        return (FJointRelative const*)DALib::Engine->GetInstanceRelative((void*)Instance);
+        return (FJointRelative const*)DALib::Engine->GetInstanceRelative(
+            EngineHandleFromId(Instance));
     }
 }

@@ -671,7 +671,7 @@ namespace Archetype
         FEngineArchetypeName Name;
         Name.Text = "BEAM_ARCH";
         Name.Crc = DACOM_CRC::GetCRC32("BEAM_ARCH");
-        BEAM_ARCH_INDEX = (FlLong)DALib::Engine->CreateCompoundArchetype(&Name);
+        BEAM_ARCH_INDEX = EngineIdFromHandle(DALib::Engine->CreateCompoundArchetype(&Name));
     }
 
     void Munition::FreeBeamArchIdx()
@@ -679,7 +679,7 @@ namespace Archetype
         // 062fab7f: not -1 -> IEngine slot 15 (+0x3c, ReleaseHandle), then -1. No engine test.
         if (BEAM_ARCH_INDEX == -1)
             return;
-        DALib::Engine->ReleaseHandle((void*)BEAM_ARCH_INDEX);
+        DALib::Engine->ReleaseHandle(EngineHandleFromId(BEAM_ARCH_INDEX));
         BEAM_ARCH_INDEX = -1;
     }
 
@@ -691,7 +691,7 @@ namespace Archetype
         if (DaArchetype.Value[0] == '\0')
         {
             EngineIndex = BEAM_ARCH_INDEX;
-            DALib::Engine->AddRefHandle((void*)EngineIndex);
+            DALib::Engine->AddRefHandle(EngineHandleFromId(EngineIndex));
             LoadCount += 1;
             return true;
         }
@@ -707,7 +707,7 @@ namespace Archetype
         {
             if (EngineIndex != -1)
             {
-                DALib::Engine->ReleaseHandle((void*)EngineIndex);
+                DALib::Engine->ReleaseHandle(EngineHandleFromId(EngineIndex));
                 EngineIndex = -1;
             }
             CliObjFreeResources(Companion);

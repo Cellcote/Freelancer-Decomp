@@ -23,6 +23,8 @@
 // keys a sink receives are HandleValue ids too. A playback id is a counter, not an address.
 
 #include "dacom.h"
+#include "handle_value.h"
+#include "x64_low_arena.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -38,6 +40,47 @@ struct FEngineName
 
 // Both Engine IIDs share one interface; invalid handles use the -1 pointer sentinel.
 static void* const G_InvalidEngineHandle = (void*)((ptrdiff_t)-1);
+
+// An engine handle (instance, archetype, transform) as the 32-bit id retail keeps in a long / int
+// field, and back: LowArena::Encode / Decode (x64_low_arena.h), the plain sign-extending casts on
+// Windows. 0 is null and -1 (G_InvalidEngineHandle) stays -1.
+inline FlLong EngineIdFromHandle(const void* Handle)
+{
+    return LowArena::Encode(Handle);
+}
+inline void* EngineHandleFromId(FlLong Id)
+{
+    return LowArena::Decode<void>(Id);
+}
+
+// An animation script (IAnimation2::OpenScript's result) as the int retail keeps it in, -1 for
+// none, and back. The plain casts on Win32; on 64-bit builds a HandleValue id (EngBase allocates
+// scripts on the heap), dropped by AnimScriptForget when the script is closed.
+inline FlLong AnimScriptId(void* Script)
+{
+#if defined(FL_PTR64)
+    if (Script == G_InvalidEngineHandle)
+        return -1;
+    return (FlLong)HandleValue::Of(Script);
+#else
+    return (FlLong)(intptr_t)Script;
+#endif
+}
+inline void* AnimScriptFromId(FlLong Id)
+{
+#if defined(FL_PTR64)
+    if (Id == -1)
+        return G_InvalidEngineHandle;
+    return const_cast<void*>(HandleValue::ObjectOf((FlULong)Id));
+#else
+    return (void*)(intptr_t)Id;
+#endif
+}
+inline void AnimScriptForget(FlLong Id)
+{
+    if (Id != -1)
+        HandleValue::Forget(AnimScriptFromId(Id));
+}
 
 // Joint payload contains 23 DWORDs; mixed values are copied without numeric conversion.
 static constexpr FlULong G_EngineJointPayloadDwords = 0x17;
