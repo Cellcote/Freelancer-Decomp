@@ -2681,11 +2681,24 @@ void IServerImpl::DelTradeEquip(unsigned int session_id, const EquipDesc& equip)
         // PORT(deviation) SERVER-INPUT-GUARDS: as in AddTradeEquip, only positive counts.
         if (equip.get_count() <= 0)
             return;
+        EquipDescList& List = Offer->GetList();
+        EquipDesc const* const Hit =
+            List.find_matching_cargo(equip.ArchId, equip.Count, equip.Health);
+        // PORT(deviation) SERVER-INPUT-GUARDS: find_matching_cargo ignores the count for items
+        // that do not stack, and remove_equipment_item changes the first entry with Hit's id,
+        // so retail could leave a negative count in the offer. The client only removes what
+        // it offered (nn_trade.cpp); refuse a count the entry being changed does not hold.
+        if (Hit != nullptr)
+        {
+            std::list<EquipDesc>::const_iterator Target = List.Items.begin();
+            while (Target != List.Items.end() && Target->Id != Hit->Id)
+                ++Target;
+            if (Target->Count < equip.Count)
+                return;
+        }
         CPlayerTradeOffer* const PartnerOffer = Offer->GetTargetOffer();
         if (PartnerOffer != nullptr)
-            PartnerOffer->SetAccepted(false);                                     // .text:06cf2218
-        EquipDescList& List = Offer->GetList();
-        EquipDesc const* const Hit = List.find_matching_cargo(equip.ArchId, equip.Count, equip.Health);
+            PartnerOffer->SetAccepted(false); // .text:06cf2218
         if (Hit != nullptr)
             List.remove_equipment_item(Hit->Id, equip.Count);                     // .text:06cf2253
         Offer->SetAccepted(false);                                                // .text:06cf225d

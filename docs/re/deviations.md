@@ -348,7 +348,8 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 - **`ReqHullStatus`.** The value is clamped to [0, 1], and NaN becomes 0. The client sends 1.0 or 0.0.
 - **Trades.**
   - `AddTradeEquip` and `DelTradeEquip` ignore a count of 0 or less. The trade window only offers positive counts.
-  - `AddTradeEquip` also refuses an offer whose total for an archetype would exceed what the player holds of it. The window never offers more than the stack, and repeated additions could otherwise wrap the offer's `int` count negative.
+  - `DelTradeEquip` refuses a count larger than the offer entry it would change holds. Retail ignored the count for items that do not stack and left a negative count in the offer.
+  - `AddTradeEquip` also refuses an offer whose total for an archetype would exceed what the player holds of it. The window never offers more than the stack, and repeated additions could otherwise wrap the offer's `int` count negative. The total must also fit in an `int`, since a slot can hold more than that across several entries.
   - `AcceptTrade` returns when the partner has no offer.
   - `AcceptTrade` fails the trade (reason 3) before anything moves when either ship is missing or has no archetype. Retail moved money and cargo, then crashed. A legitimate client reaches this case when a trade is accepted just as a player lands.
 - **Ships without an engine.** `Ship::set_strafe_dir`, cruise (`slot_50`) and thrusters (`slot_54`) return instead of dereferencing a missing engine.
