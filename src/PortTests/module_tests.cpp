@@ -233,6 +233,12 @@ int main(int argc, char** argv)
             Manager->EnumerateComponents(nullptr, &CountComponent, &After);
             Check(After > Before, "the render module's DllMain registered its components");
         }
+        // Deformable2 registers its one component, "Deformable", as it loads.
+        Check(Platform::ModuleLoad((Folder + "Deformable2.dll").c_str()) != nullptr,
+              "Deformable2.dll loads");
+        Count = 0;
+        Manager->EnumerateComponents("Deformable", &CountComponent, &Count);
+        Check(Count == 1, "Deformable2's DllMain registered Deformable");
         if (EngBase != nullptr)
             TestEngine(Manager);
         if (Files != nullptr)

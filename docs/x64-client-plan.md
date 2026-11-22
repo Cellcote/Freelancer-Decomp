@@ -304,7 +304,7 @@ without the Windows API. Milestones:
   with MSVC's behaviour (`posix/msvc_crt.h`), and small Win32 calls with an obvious meaning here.
   Larger APIs go through `Platform::` at the call site. `FL_POSIX_DLLMAIN` runs a module's
   `DllMain` as it loads. So far: dacom, zlib, x86math, system, ReadFile, luaprofile, Thorn, EngBase, ximage,
-  Shading, RendComp and alchemy,
+  Shading, RendComp, alchemy and Deformable2,
   loaded and checked by `src/PortTests/module_tests.cpp`. The POSIX handles are small numbers in a table, as Windows
   kernel handles are, so a file handle survives retail's 32-bit fields there too
   (`Platform::HandleToValue` / `HandleFromValue`, as HandleToULong / LongToHandle). The kernel32
@@ -316,7 +316,10 @@ without the Windows API. Milestones:
   `engine/engbase.h`). Its stack frame in a bind header, the name cookie and the event keys are
   HandleValue ids, which only EngBase reads back. The modules that call EngBase (Common,
   Deformable2, the client) follow the same contract as they are ported: their casts of
-  instances to 32 bits become `Encode`.
+  instances to 32 bits become `Encode`. Deformable2 does so: its bone archetype handles and IK joint ids
+  (an aim descriptor's parts, a bind header's instance) are `Encode`d instances, the channel
+  keys and playback ids it keeps in pointer fields are values carried there, and an IK node's
+  value in `CopyList` is a HandleValue id on 64-bit builds.
   HandleValue's table is one per process on macOS and Linux too (held by dacom, as the arena),
   for ids that cross modules: a material property's string or component sits in a 32-bit
   payload (`ShadingPayloadOf` / `ShadingPayloadTo`, render/shading.h). The render modules

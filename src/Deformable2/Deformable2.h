@@ -15,6 +15,8 @@
 #include "render/IMaterial.h"
 #include "render/rendcomp.h"
 #include "render/shading.h"
+#include "handle_value.h"
+#include "x64_low_arena.h"
 #include <cstddef>
 
 // Unversioned aliases from EXE/Disasm/deformable2.dll.txt .data -- retail accepts both the
