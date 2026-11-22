@@ -382,3 +382,36 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 **Not covered.**
 - SetManeuver: a legitimate client names the target object and the server acts on it, so an owner check would not limit anything.
 - CommComplete: dropped by remoteclient.dll in multiplayer since REMOTE-PACKET-HARDENING (the client never sends it).
+
+## Server: the docked economy is checked against the server's market (SERVER-ECONOMY, 2026-11-22)
+
+> **Status:** OPEN (retail defect fixed; owner's decision 2026-11-22: checks per request, rollback at undock left for later). **Needs a test with a retail client before merge.**
+> **Owner:** Server (`src/Server/server_economy.{h,cpp}`, the `Ledger_*` calls in `IServerImpl.cpp`, `Ledger_NoteLanded` in `server_playerview.cpp`); code tagged `PORT(deviation) SERVER-ECONOMY`
+> **Removal condition:** none planned.
+
+**Retail.** The server never prices anything. A docked client tells it the outcome of each trade, and the server applies it. `GFGoodBuy` / `GFGoodSell` only notify the controller. `ReqAddItem` adds any item. `ReqSetCash` / `ReqChangeCash` set any cash. `ReqEquipment` and `ReqShipArch` replace the loadout and the ship. `BaseEnter` puts the player in any base, even from space. `MineAsteroid` spawns any loot in any system. Retail's own anti-cheat (`PlayerData_CheckForCheats`) runs only when saving, and only refuses the save.
+
+**What the client sends** (`src/freelancer/Client`):
+- **Buy** (`NnInventory::BuyFromDealer`): `GFGoodBuy(base, good, n)` → `ReqAddItem` → `ReqChangeCash(-package price × n)`. A gun with an ammo package follows with `GFGoodBuy(ammo)` → `ReqAddItem(ammo)`; the ammo is paid for in the gun's price.
+- **Sell** (`SellSelected`): `ReqChangeCash(+credit)` **first**, then `GFGoodSell(base, good, n)` → `ReqRemoveItem`.
+- **Ship** (`NnDealer::BuyShip`): `GFGoodBuy(package, 1)` → `ReqCollisionGroups` → `ReqSetCash(credits - cost)` → `ReqEquipment(new loadout)` → `ReqShipArch(hull)` → `ReqHullStatus(1)`.
+- **Repair** (`nn_repair.cpp`): `ReqChangeCash(-total)` → `ReqHullStatus` / `ReqCollisionGroups` / `ReqEquipment` at full health.
+- **Mount / unmount:** `ReqEquipment` or `ReqModifyItem` with the same items.
+
+**Pricing.** Each client price is `ftol(market price × scale)`, where scale is a random factor in `[1 - price_variance, 1 + price_variance)` (`client_base_market.cpp`). The server checks against bounds built from its own market data (`BaseData::Market`, the nominal price for goods the base doesn't list), the base's `price_variance`, and one credit of rounding per unit.
+
+**Port (multiplayer only).** A ledger is kept per player per dock:
+- **GFGoodBuy:** must name the base the player is docked at, and a good the base stocks. That lets `ReqAddItem` add that many of the item, and records the least the purchase costs. The gun's own ammo package is allowed after it, at no extra cost.
+- **Payments:** negative `ReqChangeCash` always applies and counts toward the purchases. At the next purchase, sale or BaseExit, anything unpaid is charged.
+- **Sales:** a positive `ReqChangeCash` is held. It is paid when `GFGoodSell` has named the good and `ReqRemoveItem` has removed it, capped at count × the highest client price. A credit with no matching sale is never paid.
+- **Ship purchase:** `ReqSetCash` is accepted only while one is open. `ReqEquipment` may hold only the old items and the package's addons. `ReqShipArch` must be the package's hull. When the hull arrives, the cash is capped at: the cash before the purchase, less the least the hull costs, plus the old hull's price and the highest price of every old or package item the new loadout left behind.
+- **Other docked changes:** `ReqEquipment` may only rearrange or repair what the player has. `ReqModifyItem` may not raise an item's count or health. `ReqAddItem` needs an allowance.
+- **BaseEnter:** must name the base the server placed the player in (character load), the base its own ship just landed on, or, with no ship in space, its last base (respawn).
+- **MineAsteroid:** must be in the player's own system, with its ship there.
+- **Refusals:** a refused request changes nothing, and the client is sent its real cash, equipment or ship.
+
+**Known limits.**
+- The ammo that comes with a gun is not charged separately.
+- Repairs are not priced.
+- A mod whose client market differs from the server's prices against the server's data.
+- Rolling back at undock with retail's net-worth check is not done.

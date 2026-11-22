@@ -17,6 +17,7 @@
 #include "common_id.h"
 #include "common_server_playerdb.h"
 #include "server_savegame.h" // PlayerData_CreateNewCharacter (retail FUN_06d4b790)
+#include "server_economy.h" // Ledger_NoteLanded (PORT(deviation) SERVER-ECONOMY)
 #include "server_savefile.h" // Server_AccountDirName / Server_GetAccountsRoot (FUN_06d49f60)
 #include "common_ini.h"
 #include "common_misc.h"
@@ -1500,6 +1501,11 @@ void SystemPlayerView_OnObjectLanded(Observer* View,
     // own ship landing autosaves the slot (FUN_06d4c430, `LEA ECX,[EAX-0x418]`).
     if (!SinglePlayer() && *ObjId == Owner.ship_object_id)
         PlayerData_AutoSave(Owner);
+
+    // PORT(deviation) SERVER-ECONOMY: the base this player's own ship docked at is the one
+    // its BaseEnter may name (server_economy.h).
+    if (*ObjId == Owner.ship_object_id)
+        Ledger_NoteLanded(View->PlayerId, Wire.BaseId);
 
     // .text:06cf7094 .. .text:06cf70a5 -- IClient +0x0ec (SendServerLand)(player id,
     // &payload). No null test on the interface.

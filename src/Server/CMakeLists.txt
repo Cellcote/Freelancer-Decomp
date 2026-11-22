@@ -26,6 +26,7 @@ fl_add_module(Server DLL RETAIL
     server_guided.cpp
     server_countermeasure.cpp
     server_basedb.cpp
+    server_economy.cpp
 )
 
 fl_defines(Server _WINDOWS _USRDLL SERVER_EXPORTS)

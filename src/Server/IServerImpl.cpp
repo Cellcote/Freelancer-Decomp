@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "server_pub.h"
+#include "server_economy.h" // PORT(deviation) SERVER-ECONOMY
 #include "server_iserverimpl.h"   // IServerImpl, Server
 #include "server_cobject.h"
 #include "server_gameobject.h"
@@ -579,6 +580,7 @@ void IServerImpl::DisConnect(unsigned int session_id, EFLConnection type) {
             Server.BaseExit(Players[session_id].current_base, session_id);
         }
         Players.logout(session_id);
+        Ledger_Forget(session_id); // PORT(deviation) SERVER-ECONOMY (BaseExit settled it)
     }
 
     // IServerImpl::OnConnect -- retail .text:06d45090 .. .text:06d450a8, in full:
@@ -593,7 +595,8 @@ void IServerImpl::DisConnect(unsigned int session_id, EFLConnection type) {
     // m_MOTD is protected; GetMOTD() returns a reference to that very member, so
     // its address is retail's &DAT_06d90280.
 void IServerImpl::OnConnect(unsigned int session_id) {
-        g_pClientInterface->SendServerMiscObjUpdateMotd(session_id, Players.GetMOTD());
+    Ledger_Forget(session_id); // PORT(deviation) SERVER-ECONOMY: a new client in this slot
+    g_pClientInterface->SendServerMiscObjUpdateMotd(session_id, Players.GetMOTD());
     }
 
 void IServerImpl::Login(const SLoginInfo& info, unsigned int session_id) {
@@ -666,6 +669,7 @@ void IServerImpl::CharacterSelect(const CHARACTER_ID& char_id, unsigned int sess
         // .text:06d45449 .. .text:06d45468 -- the worker FUN_06d4a5d0 on the slot
         // (server_classes.cpp); a miss or a failed load ends here.
         if (!PlayerData_SelectCharacter(Slot, char_id, session_id)) return;
+        Ledger_Forget(session_id); // PORT(deviation) SERVER-ECONOMY: a new character, a new ledger
 
         // .text:06d4546e .. .text:06d45518 -- the SETREPUTATION argument at S+0x44:
         // FmtStr ctors (FUN_06d55bc0), +0x10 = 0, byte +0x14 = 0, word +0x48 = 0,
@@ -817,7 +821,11 @@ void IServerImpl::ReqShipArch(unsigned int arch_id, unsigned int session_id) {
         // launch and in trade (Archetype::GetShip(0) is null).
         if (arch_id == 0)
             return;
+        // PORT(deviation) SERVER-ECONOMY: only the hull of a ship being bought.
+        if (!Ledger_MaySetShipArch(Players[session_id], session_id, arch_id))
+            return;
         PlayerData_SetShipArch(Players[session_id], arch_id);
+        Ledger_OnShipArchSet(Players[session_id], session_id);
     }
     // ReqHullStatus -- retail .text:06d17340 .. .text:06d173d9 (RET 0x8), the one
     // member of the family that validates the session first:
@@ -860,6 +868,9 @@ void IServerImpl::ReqCollisionGroups(const std::list<CollisionGroupDesc>& groups
     // port used to drop the list and send message 0 with &session_id.
 void IServerImpl::ReqEquipment(const EquipDescList& equipment, unsigned int session_id) {
         if (!SinglePlayer() && Players[session_id].entered_base_id == 0) return;
+        // PORT(deviation) SERVER-ECONOMY: the items the player has (or is buying with a ship).
+        if (!Ledger_MayLoadEquipment(Players[session_id], session_id, equipment))
+            return;
         PlayerData_LoadEquipment(Players[session_id], equipment);
     }
 
@@ -898,6 +909,9 @@ void IServerImpl::ReqCargo(const EquipDescList& cargo, unsigned int session_id) 
 void IServerImpl::ReqAddItem(unsigned int arch_id, const char* hardpoint, int count, float health,
                     unsigned char b_mounted, unsigned int session_id) {
         if (!SinglePlayer() && Players[session_id].entered_base_id == 0) return;
+        // PORT(deviation) SERVER-ECONOMY: only what GFGoodBuy has just bought.
+        if (!Ledger_MayAddItem(Players[session_id], session_id, arch_id, count, health))
+            return;
         CacheString Hp;
         Hp.Value = StringAlloc(hardpoint, false);
         PlayerData_AddEquipment(Players[session_id], arch_id, Hp, count, health, b_mounted,
@@ -912,7 +926,9 @@ void IServerImpl::ReqAddItem(unsigned int arch_id, const char* hardpoint, int co
     // already knows.
 void IServerImpl::ReqRemoveItem(unsigned short equip_id, int count, unsigned int session_id) {
         if (!SinglePlayer() && Players[session_id].entered_base_id == 0) return;
-        PlayerData_RemoveEquipment(Players[session_id], equip_id, count, /*bNotify*/false);
+        // PORT(deviation) SERVER-ECONOMY: the removal, then a pending sale credit is paid when
+        // this removal completes its sale.
+        Ledger_RemoveItem(Players[session_id], session_id, equip_id, count);
     }
     // ReqModifyItem -- retail .text:06d17530 .. .text:06d1759d (RET 0x18).
     //   .text:06d1754d  +0x3F4 gate, as above
@@ -924,6 +940,9 @@ void IServerImpl::ReqRemoveItem(unsigned short equip_id, int count, unsigned int
 void IServerImpl::ReqModifyItem(unsigned short equip_id, const char* hardpoint, int count, float health,
                        unsigned char b_mounted, unsigned int session_id) {
         if (!SinglePlayer() && Players[session_id].entered_base_id == 0) return;
+        // PORT(deviation) SERVER-ECONOMY: no more of the item, and no healthier, than it is.
+        if (!Ledger_MayModifyItem(Players[session_id], session_id, equip_id, count, health))
+            return;
         CacheString Hp;
         Hp.Value = StringAlloc(hardpoint, false);
         PlayerData_ModifyEquipment(Players[session_id], equip_id, Hp, count, health, b_mounted);
@@ -938,6 +957,9 @@ void IServerImpl::ReqSetCash(int cash, unsigned int session_id) {
         // FUN_06d43650(0, &client_id).
         // Cash is an INT in retail, not a float -- the mangled name is ?ReqSetCash@...@@UAEXHI@Z.
         if (!SinglePlayer() && Players[session_id].entered_base_id == 0) return;
+        // PORT(deviation) SERVER-ECONOMY: only during a ship purchase, which caps it.
+        if (!Ledger_MaySetCash(Players[session_id], session_id, cash))
+            return;
         PlayerData_SetCash(Players[session_id], cash);
     }
 
@@ -947,6 +969,9 @@ void IServerImpl::ReqChangeCash(int delta, unsigned int session_id) {
         // FUN_06d4f4e0(delta, false) on the slot -- PlayerData_AdjustCash without
         // the +0x320 total.
         if (!SinglePlayer() && Players[session_id].entered_base_id == 0) return;
+        // PORT(deviation) SERVER-ECONOMY: payments apply; a sale credit waits for its sale.
+        if (!Ledger_OnChangeCash(Players[session_id], session_id, delta))
+            return;
         PlayerData_AdjustCash(Players[session_id], delta, false);
     }
 
@@ -984,6 +1009,10 @@ void IServerImpl::BaseEnter(unsigned int base_id, unsigned int session_id) {
         unsigned int const ExitedBase = Slot.exited_base_id;
         Universe::IBase const* Base = Universe::get_base(base_id);
         if (Base == nullptr) return;
+        // PORT(deviation) SERVER-ECONOMY: a base the player landed on or was placed in.
+        if (!Ledger_MayEnterBase(Slot, session_id, base_id))
+            return;
+        Ledger_OnBaseEnter(session_id);
 
         if (ExitedBase != 0 && base_id != 0 && ExitedBase != base_id) {
             unsigned int const OldSystem = Slot.system_id;
@@ -1052,6 +1081,8 @@ void IServerImpl::BaseExit(unsigned int base_id, unsigned int session_id) {
             LocationExit(Players[session_id].current_location, session_id);
         }
 
+        // PORT(deviation) SERVER-ECONOMY: unpaid purchases are charged before the save.
+        Ledger_Settle(Players[session_id], session_id);
         unsigned int ExitEvent[2] = { base_id, session_id };
         Server_ControllerDispatch(0, pub::Controller::EMessage::BaseExit, ExitEvent);
         GetBaseDB()->unload_base(session_id, base_id);   // FUN_06d142c0
@@ -1237,18 +1268,32 @@ void IServerImpl::TradeResponse(const unsigned char* data, int size, unsigned in
 
     // GFGoodBuy — retail packs struct fields + session_id, sends message 0x1c
 void IServerImpl::GFGoodBuy(const SGFGoodBuyInfo& info, unsigned int session_id) {
-        // .text:06d17bb0..06d17be9 has no branch -- no session test; the port's
-        // `!p || !p->active` early-out is gone (w4-server-guards).
-        // Retail 0x06d17bb0 copies all four dwords onto the stack, then FUN_06d43650(0x1c, &frame).
+    // .text:06d17bb0..06d17be9 has no branch -- no session test; the port's
+    // `!p || !p->active` early-out is gone (w4-server-guards).
+    // Retail 0x06d17bb0 copies all four dwords onto the stack, then FUN_06d43650(0x1c, &frame).
+    // PORT(deviation) SERVER-ECONOMY: a good this base sells, at the base the player is in.
+    if (!SinglePlayer())
+    {
+        if (!Players.is_valid(session_id) ||
+            !Ledger_OnGoodBuy(Players[session_id], session_id, info))
+            return;
+    }
         unsigned int msg_data[5] = { info.Field_0x00, info.Field_0x04, info.Field_0x08,
                                      info.Field_0x0c, session_id };
         Server_ControllerDispatch(0, pub::Controller::EMessage::GFGoodBuy, msg_data);
     }
     // GFGoodSell — retail sends message 0x1d
 void IServerImpl::GFGoodSell(const SGFGoodSellInfo& info, unsigned int session_id) {
-        // .text:06d17bf0..06d17c22 has no branch -- no session test; the port's
-        // `!p || !p->active` early-out is gone (w4-server-guards).
-        // Retail 0x06d17bf0 copies three dwords onto the stack, then FUN_06d43650(0x1d, &frame).
+    // .text:06d17bf0..06d17c22 has no branch -- no session test; the port's
+    // `!p || !p->active` early-out is gone (w4-server-guards).
+    // Retail 0x06d17bf0 copies three dwords onto the stack, then FUN_06d43650(0x1d, &frame).
+    // PORT(deviation) SERVER-ECONOMY: names the good a pending sale credit is for.
+    if (!SinglePlayer())
+    {
+        if (!Players.is_valid(session_id) ||
+            !Ledger_OnGoodSell(Players[session_id], session_id, info))
+            return;
+    }
         unsigned int msg_data[4] = { info.Field_0x00, info.Field_0x04, info.Field_0x08, session_id };
         Server_ControllerDispatch(0, pub::Controller::EMessage::GFGoodSell, msg_data);
     }
@@ -1958,7 +2003,16 @@ void IServerImpl::MissionSaveB(unsigned int session_id, FlULong mission_id) {
     //                         id 0x23 was invented.
 void IServerImpl::MineAsteroid(unsigned int system_id, const Vector& position, unsigned int loot_id,
                       unsigned int secondary_loot, unsigned int quantity, unsigned int session_id) {
-        (void)session_id;
+    // PORT(deviation) SERVER-ECONOMY: a player mines in its own system, with its ship there.
+    // The client reports its own asteroid hits (cli_asteroid_dynamic.cpp).
+    if (!SinglePlayer())
+    {
+        if (!Players.is_valid(session_id))
+            return;
+        PlayerData const& Miner = Players[session_id];
+        if (Miner.ship_object_id == 0 || Miner.system_id != system_id)
+            return;
+    }
         StarSystem* const System = SysDB_LookupSystem(system_id);
         // PORT(deviation) SERVER-INPUT-GUARDS: retail has no null test; an unknown system id
         // crashed the server. The client sends its active system (cli_asteroid_dynamic.cpp).
