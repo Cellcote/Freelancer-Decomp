@@ -690,13 +690,24 @@ jobs:
           cmake --build --preset portable
           ctest --preset portable
 
-      # clang-tidy (.clang-tidy) over the portable modules, once (Linux, Clang). Findings are
-      # reported on the run page, not fatal; a source clang-tidy cannot parse fails the step.
+  # clang-tidy (.clang-tidy) over the portable modules, once (Linux, Clang), in its own job so it
+  # runs beside the builds instead of after them (it grows with every module the non-Windows
+  # build takes in). Findings are reported on the run page, not fatal; a source clang-tidy
+  # cannot parse fails the job.
+  portable-tidy:
+    name: Portable modules (clang-tidy)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ninja
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ninja-build
+
       - name: clang-tidy
-        if: matrix.name == 'Linux Clang'
         env:
-          CC: ${{ matrix.cc }}
-          CXX: ${{ matrix.cxx }}
+          CC: clang
+          CXX: clang++
         run: |
           pipx install clang-tidy==19.1.0
           cmake --preset portable -B build/tidy -DFL_CLANG_TIDY=ON
