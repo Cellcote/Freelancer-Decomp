@@ -15,8 +15,8 @@
 //   WIN32_FIND_DATAA and SYSTEMTIME are Platform::FileTime, FindData and DateTime.
 // - The MSVC CRT names the code uses (_stricmp, _splitpath, _access...), from posix/msvc_crt.h.
 // - Small Win32 calls with an obvious meaning here (OutputDebugStringA writes to stderr,
-//   SearchPathA looks along the path without regard to case). Larger APIs (files, threads,
-//   modules) go through Platform:: (platform.h) at the call site instead.
+//   SearchPathA looks along the path without regard to case), and the kernel32 file, mapping
+//   and memory calls the retail code makes directly (posix/kernel32.h), over the platform layer.
 // - FL_POSIX_DLLMAIN(DllMain): runs a module's DllMain as it loads and unloads (see below).
 
 #pragma once
@@ -203,6 +203,8 @@ typedef POINT* LPPOINT;
 #define LOBYTE(Value) ((BYTE)(((DWORD_PTR)(Value)) & 0xFF))
 #define HIBYTE(Value) ((BYTE)((((DWORD_PTR)(Value)) >> 8) & 0xFF))
 #define MAKELONG(Low, High) ((LONG)(((WORD)((DWORD_PTR)(Low) & 0xFFFF)) | ((DWORD)((WORD)((DWORD_PTR)(High) & 0xFFFF))) << 16))
+
+#include "posix/kernel32.h" // the file, mapping and memory calls (uses the types above)
 
 // ---------------------------------------------------------------------------------------------
 // Small Win32 calls

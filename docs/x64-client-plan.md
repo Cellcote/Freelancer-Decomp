@@ -300,8 +300,13 @@ without the Windows API. Milestones:
   Windows sizes, the platform layer's structures under their Windows names, the MSVC CRT names
   with MSVC's behaviour (`posix/msvc_crt.h`), and small Win32 calls with an obvious meaning here.
   Larger APIs go through `Platform::` at the call site. `FL_POSIX_DLLMAIN` runs a module's
-  `DllMain` as it loads. So far: dacom, x86math and system, loaded and checked by
-  `src/PortTests/module_tests.cpp`. Next: ReadFile, the first one with handle sites.
+  `DllMain` as it loads. So far: dacom, x86math, system and ReadFile, loaded and checked by
+  `src/PortTests/module_tests.cpp`. The POSIX handles are small numbers in a table, as Windows
+  kernel handles are, so a file handle survives retail's 32-bit fields there too
+  (`Platform::HandleToValue` / `HandleFromValue`, as HandleToULong / LongToHandle). The kernel32
+  file, mapping and memory calls the retail code makes directly are in `posix/kernel32.h`. A
+  retail 32-bit parameter that carries a pointer no caller passes (ReadFile's locked callback,
+  its `OVERLAPPED` in `Read`) is refused on 64-bit builds rather than cut.
 - **M3:** an SDL window to the main menu, drawn by RPGPU through Metal, without sound.
 - **M4:** audio, input and gameplay.
 

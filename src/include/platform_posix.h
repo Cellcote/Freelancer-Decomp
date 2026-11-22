@@ -71,6 +71,13 @@ namespace Platform
 
     inline Handle InvalidHandle() { return reinterpret_cast<Handle>(static_cast<std::intptr_t>(-1)); }
 
+    // A handle in a 32-bit field and back, as HandleToULong / LongToHandle: retail keeps file
+    // handles in DWORDs. Handle values fit in 32 bits (Windows keeps kernel handles there on
+    // x64, and so does the POSIX backend); the way back sign-extends, so 0xFFFFFFFF is
+    // InvalidHandle() again.
+    inline FlULong HandleToValue(Handle Object) { return (FlULong)((std::uintptr_t)(Object)); }
+    inline Handle HandleFromValue(FlULong Value) { return (Handle)((std::intptr_t)((FlLong)(Value))); }
+
     namespace Detail
     {
         // Every handle points at one of these. References counts the open handles (and, for a
