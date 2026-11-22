@@ -9059,8 +9059,8 @@ namespace
         va_end(Args);
 #else
         // PORT(macOS): the nine doubles by value (see SaveBufAppendIntegerAsDouble).
-        std::sprintf(Temporary, Format, Arguments[0], Arguments[1], Arguments[2], Arguments[3], Arguments[4],
-                     Arguments[5], Arguments[6], Arguments[7], Arguments[8]);
+        std::sprintf(Temporary, Format, Arguments[0], Arguments[1], Arguments[2], Arguments[3],
+                     Arguments[4], Arguments[5], Arguments[6], Arguments[7], Arguments[8]);
 #endif
         return SaveBufAppendText(Buf, Temporary);
     }

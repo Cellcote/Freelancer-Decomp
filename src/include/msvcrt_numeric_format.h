@@ -25,7 +25,8 @@
 /* Selected VC6 numeric contracts used by Lua and NumberStringChild.
  * Keep options local: changing the module-wide UCRT policy affects other users. */
 #if defined(_MSC_VER)
-MSVCRT_HELPER int MsvcrtLegacyVsnprintf(char* Buffer, size_t Count, char const* Format, va_list Args)
+MSVCRT_HELPER int MsvcrtLegacyVsnprintf(char* Buffer, size_t Count, char const* Format,
+                                        va_list Args)
 {
     return __stdio_common_vsprintf(
         _CRT_INTERNAL_PRINTF_LEGACY_VSPRINTF_NULL_TERMINATION |
@@ -42,7 +43,8 @@ MSVCRT_HELPER int MsvcrtLegacyVsnprintf(char* Buffer, size_t Count, char const* 
  * - Three-digit exponents: %e and %g print e+005, not e+05.
  * Each conversion is formatted on its own: flags, width and precision (also '*'), and the
  * h, l, ll, I64, L length modifiers. */
-MSVCRT_HELPER void MsvcrtAppend(char** Out, char* End, char const* Text, size_t Length, size_t* Total)
+MSVCRT_HELPER void MsvcrtAppend(char** Out, char* End, char const* Text, size_t Length,
+                                size_t* Total)
 {
     size_t Index;
     for (Index = 0; Index < Length; ++Index)
@@ -53,7 +55,8 @@ MSVCRT_HELPER void MsvcrtAppend(char** Out, char* End, char const* Text, size_t 
     *Total += Length;
 }
 
-MSVCRT_HELPER int MsvcrtLegacyVsnprintf(char* Buffer, size_t Count, char const* Format, va_list Args)
+MSVCRT_HELPER int MsvcrtLegacyVsnprintf(char* Buffer, size_t Count, char const* Format,
+                                        va_list Args)
 {
     char* Out = Buffer;
     char* const End = Buffer + Count;
@@ -173,10 +176,14 @@ MSVCRT_HELPER int MsvcrtLegacyVsnprintf(char* Buffer, size_t Count, char const* 
                 Spec[SpecLength + 3] = 0;
                 {
                     long long const Value = va_arg(Rest, long long);
-                    Length = bWidthStar ? (bPrecisionStar ? snprintf(Piece, sizeof(Piece), Spec, Width, Precision, Value)
-                                                          : snprintf(Piece, sizeof(Piece), Spec, Width, Value))
-                                        : (bPrecisionStar ? snprintf(Piece, sizeof(Piece), Spec, Precision, Value)
-                                                          : snprintf(Piece, sizeof(Piece), Spec, Value));
+                    Length =
+                        bWidthStar
+                            ? (bPrecisionStar
+                                   ? snprintf(Piece, sizeof(Piece), Spec, Width, Precision, Value)
+                                   : snprintf(Piece, sizeof(Piece), Spec, Width, Value))
+                            : (bPrecisionStar
+                                   ? snprintf(Piece, sizeof(Piece), Spec, Precision, Value)
+                                   : snprintf(Piece, sizeof(Piece), Spec, Value));
                 }
             }
             else
@@ -184,13 +191,17 @@ MSVCRT_HELPER int MsvcrtLegacyVsnprintf(char* Buffer, size_t Count, char const* 
                 /* int and long are both 32-bit on Windows. */
                 int Value = va_arg(Rest, int);
                 if (Short)
-                    Value = (Conversion == 'd' || Conversion == 'i') ? (int)(short)Value : (int)(unsigned short)Value;
+                    Value = (Conversion == 'd' || Conversion == 'i') ? (int)(short)Value
+                                                                     : (int)(unsigned short)Value;
                 Spec[SpecLength] = Conversion;
                 Spec[SpecLength + 1] = 0;
-                Length = bWidthStar ? (bPrecisionStar ? snprintf(Piece, sizeof(Piece), Spec, Width, Precision, Value)
-                                                      : snprintf(Piece, sizeof(Piece), Spec, Width, Value))
-                                    : (bPrecisionStar ? snprintf(Piece, sizeof(Piece), Spec, Precision, Value)
-                                                      : snprintf(Piece, sizeof(Piece), Spec, Value));
+                Length =
+                    bWidthStar
+                        ? (bPrecisionStar
+                               ? snprintf(Piece, sizeof(Piece), Spec, Width, Precision, Value)
+                               : snprintf(Piece, sizeof(Piece), Spec, Width, Value))
+                        : (bPrecisionStar ? snprintf(Piece, sizeof(Piece), Spec, Precision, Value)
+                                          : snprintf(Piece, sizeof(Piece), Spec, Value));
             }
             break;
         case 'c':
@@ -198,18 +209,21 @@ MSVCRT_HELPER int MsvcrtLegacyVsnprintf(char* Buffer, size_t Count, char const* 
             int const Value = va_arg(Rest, int);
             Spec[SpecLength] = 'c';
             Spec[SpecLength + 1] = 0;
-            Length = bWidthStar ? snprintf(Piece, sizeof(Piece), Spec, Width, Value) : snprintf(Piece, sizeof(Piece), Spec, Value);
+            Length = bWidthStar ? snprintf(Piece, sizeof(Piece), Spec, Width, Value)
+                                : snprintf(Piece, sizeof(Piece), Spec, Value);
             break;
         }
         case 's':
         case 'p':
         {
             void* const Value = va_arg(Rest, void*);
-            char const* const Text = Conversion == 's' ? (Value != NULL ? (char const*)Value : "(null)") : NULL;
+            char const* const Text =
+                Conversion == 's' ? (Value != NULL ? (char const*)Value : "(null)") : NULL;
             Spec[SpecLength] = Conversion;
             Spec[SpecLength + 1] = 0;
             if (Conversion == 'p')
-                Length = snprintf(Piece, sizeof(Piece), "%08llX", (unsigned long long)(uintptr_t)Value);
+                Length =
+                    snprintf(Piece, sizeof(Piece), "%08llX", (unsigned long long)(uintptr_t)Value);
             else
             {
                 /* A string may be longer than Piece: append it directly with its padding. */
@@ -249,7 +263,11 @@ MSVCRT_HELPER int MsvcrtLegacyVsnprintf(char* Buffer, size_t Count, char const* 
                 int const bQuiet = (Bits & UINT64_C(0x0008000000000000)) != 0;
                 char Text[128];
                 size_t TextLength;
-                char const* const Base = !bNaN ? "1.#INF" : (bNegative && bQuiet && (Bits & UINT64_C(0x0007ffffffffffff)) == 0 ? "1.#IND" : (bQuiet ? "1.#QNAN" : "1.#SNAN"));
+                char const* const Base =
+                    !bNaN ? "1.#INF"
+                          : (bNegative && bQuiet && (Bits & UINT64_C(0x0007ffffffffffff)) == 0
+                                 ? "1.#IND"
+                                 : (bQuiet ? "1.#QNAN" : "1.#SNAN"));
                 snprintf(Text, sizeof(Text), "%s%s", bNegative ? "-" : "", Base);
                 TextLength = strlen(Text);
                 if (Conversion != 'g' && Conversion != 'G')
@@ -266,15 +284,18 @@ MSVCRT_HELPER int MsvcrtLegacyVsnprintf(char* Buffer, size_t Count, char const* 
             }
             Spec[SpecLength] = Conversion;
             Spec[SpecLength + 1] = 0;
-            Length = bWidthStar ? (bPrecisionStar ? snprintf(Piece, sizeof(Piece), Spec, Width, Precision, Value)
-                                                  : snprintf(Piece, sizeof(Piece), Spec, Width, Value))
-                                : (bPrecisionStar ? snprintf(Piece, sizeof(Piece), Spec, Precision, Value)
-                                                  : snprintf(Piece, sizeof(Piece), Spec, Value));
+            Length = bWidthStar
+                         ? (bPrecisionStar
+                                ? snprintf(Piece, sizeof(Piece), Spec, Width, Precision, Value)
+                                : snprintf(Piece, sizeof(Piece), Spec, Width, Value))
+                         : (bPrecisionStar ? snprintf(Piece, sizeof(Piece), Spec, Precision, Value)
+                                           : snprintf(Piece, sizeof(Piece), Spec, Value));
             if (Length > 0 && (size_t)Length < sizeof(Piece) - 1 && Conversion != 'f')
             {
                 /* e+05 -> e+005: one more exponent digit, taken from the padding if any. */
                 char* Exponent = strpbrk(Piece, "eE");
-                if (Exponent != NULL && (Exponent[1] == '+' || Exponent[1] == '-') && strlen(Exponent + 2) == 2)
+                if (Exponent != NULL && (Exponent[1] == '+' || Exponent[1] == '-') &&
+                    strlen(Exponent + 2) == 2)
                 {
                     char* const Digits = Exponent + 2;
                     char* Start = Piece;
@@ -325,7 +346,8 @@ MSVCRT_HELPER int MsvcrtLegacyVsnprintf(char* Buffer, size_t Count, char const* 
 
 /* _ecvt_s: Count significant decimal digits of Value, rounded, without a point; Point is
  * where the point goes (0 for zero, as MSVC), Sign whether Value is negative. */
-MSVCRT_HELPER int MsvcrtEcvt(char* Buffer, size_t Size, double Value, int Count, int* Point, int* Sign)
+MSVCRT_HELPER int MsvcrtEcvt(char* Buffer, size_t Size, double Value, int Count, int* Point,
+                             int* Sign)
 {
     char Text[64];
     char* Cursor;
@@ -440,7 +462,8 @@ MSVCRT_HELPER void MsvcrtFormatLuaNumber(char* Buffer, double Value)
 
 /* NumberStringChild passes a widened float and a single %.Nf with a suffix.
  * VC6's fixed output pads zeros after its 17 significant decimal digits. */
-MSVCRT_HELPER int MsvcrtNumericVsnprintf(char* Buffer, size_t Count, char const* Format, va_list Args)
+MSVCRT_HELPER int MsvcrtNumericVsnprintf(char* Buffer, size_t Count, char const* Format,
+                                         va_list Args)
 {
     char const* Cursor = Format;
     int Precision = 0;

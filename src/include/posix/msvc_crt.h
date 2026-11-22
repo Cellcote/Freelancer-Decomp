@@ -32,8 +32,14 @@
 
 // _stricmp / _strnicmp: both sides lowered, as MSVC's in the C locale (so the order of '_'
 // against letters is the same).
-inline int _stricmp(char const* Left, char const* Right) { return strcasecmp(Left, Right); }
-inline int _strnicmp(char const* Left, char const* Right, std::size_t Count) { return strncasecmp(Left, Right, Count); }
+inline int _stricmp(char const* Left, char const* Right)
+{
+    return strcasecmp(Left, Right);
+}
+inline int _strnicmp(char const* Left, char const* Right, std::size_t Count)
+{
+    return strncasecmp(Left, Right, Count);
+}
 inline int _memicmp(void const* Left, void const* Right, std::size_t Count)
 {
     unsigned char const* A = static_cast<unsigned char const*>(Left);
@@ -81,9 +87,11 @@ inline int _snprintf(char* Buffer, std::size_t Count, char const* Format, ...)
 // _splitpath: drive ("C:"), directory (with its trailing separator), file name and extension
 // (with its '.'; the last '.' after the last separator). Any output may be nullptr. '/' and '\'
 // both separate.
-inline void _splitpath(char const* Path, char* Drive, char* Directory, char* FileName, char* Extension)
+inline void _splitpath(char const* Path, char* Drive, char* Directory, char* FileName,
+                       char* Extension)
 {
-    auto Put = [](char* Out, std::size_t Limit, char const* Begin, char const* End) {
+    auto Put = [](char* Out, std::size_t Limit, char const* Begin, char const* End)
+    {
         if (Out == nullptr)
             return;
         std::size_t Length = static_cast<std::size_t>(End - Begin);
@@ -159,7 +167,8 @@ inline void _makepath(char* Path, char const* Drive, char const* Directory, char
 inline int _access(char const* Path, int Mode)
 {
     std::string const Resolved = Platform::Detail::ResolvePath(Path);
-    return access(Resolved.c_str(), Mode == 0 ? F_OK : ((Mode & 2) != 0 ? W_OK : 0) | ((Mode & 4) != 0 ? R_OK : 0));
+    return access(Resolved.c_str(),
+                  Mode == 0 ? F_OK : ((Mode & 2) != 0 ? W_OK : 0) | ((Mode & 4) != 0 ? R_OK : 0));
 }
 
 inline char* _strlwr(char* Text)
@@ -174,4 +183,7 @@ inline char* _strupr(char* Text)
         *Cursor = static_cast<char>(std::toupper(static_cast<unsigned char>(*Cursor)));
     return Text;
 }
-inline char* _strdup(char const* Text) { return strdup(Text); }
+inline char* _strdup(char const* Text)
+{
+    return strdup(Text);
+}
