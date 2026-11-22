@@ -353,3 +353,31 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
   - `AcceptTrade` returns when the partner has no offer.
   - `AcceptTrade` fails the trade (reason 3) before anything moves when either ship is missing or has no archetype. Retail moved money and cargo, then crashed. A legitimate client reaches this case when a trade is accepted just as a player lands.
 - **Ships without an engine.** `Ship::set_strafe_dir`, cruise (`slot_50`) and thrusters (`slot_54`) return instead of dereferencing a missing engine.
+
+## Server: multiplayer commands only act on the sender's own objects (SERVER-OWNERSHIP, 2026-11-22)
+
+> **Status:** OPEN (retail defect fixed; owner's decision 2026-11-22, including the duplicate-report change below)
+> **Owner:** Server (`src/Server/IServerImpl.cpp`: `Server_IsSessionShip`, `Server_SessionOwnsObject` and the handlers that call them); code tagged `PORT(deviation) SERVER-OWNERSHIP`
+> **Removal condition:** none planned; retail lets any player steer, fire, jettison, teleport or destroy any object.
+
+**Retail.** The object-command handlers look up the object id the client names and act on it, whoever owns it. GoTradelane and StopTradelane are the exception: they compare it with the sender's ship. The collision reports apply the damage, or the badlands destruction, to the object they name.
+
+**Port (multiplayer only).** Single player keeps retail's behaviour. Each check matches what the client sends:
+- **The sender's ship** (`Players[session].ship_object_id`):
+  - FireWeapon, ActivateEquip, ActivateCruise, ActivateThrusters, TractorObjects, JettisonCargo, SPRequestUseItem and SPObjUpdate: the client sends these for its own ship (`cli_projectile_fx.cpp`, `client_gameobj.cpp`, `hud_status_core.cpp`, `player_spawn.cpp`).
+  - RequestEvent and RequestCancel: the requesting ship `p1`. The dock or formation target is not checked.
+- **An object the sender owns** (`CSimple::OwnerPlayer`, which missiles, mines and countermeasures copy from their launcher):
+  - SetTarget: the client's ship, or its own missile.
+  - SPObjCollision: the damaged side. That is the client's own side; it reports only when it owns that side.
+  - SPBadLandsObjCollision: the object destroyed.
+- **SPMunitionCollision:** the shooter is the sender's ship (the client's own gun shots), or the sender owns the victim. The victim's client reports missile hits by others.
+
+**Changes for legitimate clients.**
+- The client sets `OwnerPlayer` on its local copy of a ship that is dying, jumping out or landing (`client_iclient_space.cpp`). It then reports collisions, and possibly an automatic countermeasure or thruster command, for a ship it does not own.
+- Retail applies those reports on top of the server's or the real owner's. The port drops them, so that damage is applied once.
+- The owner accepted this on 2026-11-22.
+
+**Not covered.**
+- SetManeuver: a legitimate client names the target object and the server acts on it, so an owner check would not limit anything.
+- LaunchComplete, JumpInComplete and Hail: they reach Server.dll without a session id, so they need the id passed through first.
+- StopTradeRequest: its session id comes from the payload; a legitimate client sends either its own id or the requester's.
