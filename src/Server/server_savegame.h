@@ -32,7 +32,7 @@
 // The implementation is src/Server/server_savegame.cpp; the writer they all
 // end in is PlayerData_SerializeToFile (retail FUN_06d4ccd0, server_pub.cpp).
 
-#include "common_server_playerdb.h"
+#include "server_playerdata.h"
 
 // Retail FUN_06d47120 (thiscall on the PlayerData, `RET 8`). Parses the
 // character file at Path into Record. Returns true when a [Player] section was

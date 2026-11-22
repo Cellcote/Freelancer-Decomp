@@ -484,7 +484,7 @@ SystemTrackedObject* SystemPlayerView_AddTrackedObject(Observer* View, GameObjec
 //   and reads -0x14 off that (.text:06cf72f9/.text:06cf72ff and
 //   .text:06cf731e/.text:06cf7324), and 0x418 - 0x14 = 0x404. It is only ever
 //   tested for zero and compared between two players, which is exactly what
-//   common_server_playerdb.h already names PlayerData::group_ptr, the
+//   server_playerdata.h already names PlayerData::group_ptr, the
 //   CPlayerGroup*.
 bool SystemPlayerView_ShouldBeVisible(Observer* View, GameObject* Obj);
 

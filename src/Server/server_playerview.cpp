@@ -15,7 +15,7 @@
 #include "common_cequip.h" // TractorArm
 #include "common_casteroid.h" // CmnAsteroid::CAsteroidSystem (SrvAsteroidSystem AddRef/Release/get_sys_id)
 #include "common_id.h"
-#include "common_server_playerdb.h"
+#include "server_playerdata.h"
 #include "server_savegame.h" // PlayerData_CreateNewCharacter (retail FUN_06d4b790)
 #include "server_savefile.h" // Server_AccountDirName / Server_GetAccountsRoot (FUN_06d49f60)
 #include "common_ini.h"
@@ -990,7 +990,7 @@ void SystemPlayerView_CreateShipForPlayer(Observer* View, CShipCreateInfo* Info,
     //
     // CORRECTED 2026-09-17 (wave 13). The wave-12 note said "PlayerData+0x318
     // is not a field this port has identified". It is: PlayerData::rep_vibe,
-    // documented at -0x100 in common_server_playerdb.h and written through
+    // documented at -0x100 in server_playerdata.h and written through
     // `ADD ECX,0x318` in this very file (see the Reputation::Vibe::GetName
     // call site). The same dword goes into the CREATESOLAR payload at +0xb0
     // through the identical `id*0x418 - 0x100 + Players` expression

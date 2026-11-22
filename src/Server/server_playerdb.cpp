@@ -15,7 +15,7 @@
 #include "common_cequip.h" // TractorArm
 #include "common_casteroid.h" // CmnAsteroid::CAsteroidSystem (SrvAsteroidSystem AddRef/Release/get_sys_id)
 #include "common_id.h"
-#include "common_server_playerdb.h"
+#include "server_playerdata.h"
 #include "server_savegame.h" // PlayerData_CreateNewCharacter (retail FUN_06d4b790)
 #include "server_savefile.h" // Server_AccountDirName / Server_GetAccountsRoot (FUN_06d49f60)
 #include "common_ini.h"
@@ -1192,7 +1192,7 @@ bool __cdecl PlayerData_CheckForCheats(PlayerData& Slot) {
 // PlayerData's equipment-list family -- retail FUN_06d4ec10 / FUN_06d4eeb0 /
 // FUN_06d4efc0 / FUN_06d4f100 / FUN_06d4f170 / FUN_06d4fc30, all thiscall
 // members of PlayerData whose `this` is the slot base. Declared in
-// common_server_playerdb.h; the port spells them as free functions because
+// server_playerdata.h; the port spells them as free functions because
 // PlayerData is a plain struct here.
 //
 // Four of the six open with the same MP gate, verbatim:
@@ -1205,7 +1205,7 @@ bool __cdecl PlayerData_CheckForCheats(PlayerData& Slot) {
 //     .text:06d4efd8  TEST  AL,AL
 //     .text:06d4efda  JNZ   do_work
 // i.e. `!IsMPServer() || selected_character[0] != 0`, the exact shape
-// common_server_playerdb.h documents for +0x64.
+// server_playerdata.h documents for +0x64.
 // ===========================================================================
 static bool PlayerData_EquipGateOpen(PlayerSlot const& Slot) {
     if (!IsMPServer())
@@ -1713,7 +1713,7 @@ void __cdecl PlayerData_SetShipArch(PlayerSlot& Slot, unsigned int ShipArch) {
     // ALREADY has (common_archetype.h, implemented in common_archetype_ships.cpp).
     // So slot+0x26c is a std::list<CollisionGroupDesc> -- the hull's undamaged
     // collision groups -- and NOT a "per-hardpoint list" as this port's notes
-    // (and common_server_playerdb.h's declaration comment) have been calling it.
+    // (and server_playerdata.h's declaration comment) have been calling it.
     //
     // Retail, when the archetype changes: unlink and operator_delete every node
     // of that list and zero its size (.text:06d4ec40 .. .text:06d4ec75), then,
@@ -1726,7 +1726,7 @@ void __cdecl PlayerData_SetShipArch(PlayerSlot& Slot, unsigned int ShipArch) {
     // PORTED 2026-09-17 (wave 11). PlayerData::collision_groups exists now; the
     // include that used to block it was avoided entirely by moving
     // CollisionGroupDesc from common_cobject.h into common_archetype.h, which
-    // common_server_playerdb.h already reaches through common_goods.h.
+    // server_playerdata.h already reaches through common_goods.h.
     if (Slot.ship_archetype != ShipArch) {
         // .text:06d4ec40 .. .text:06d4ec75 -- the list is emptied first, and it
         // is emptied even when the archetype will not resolve below.
