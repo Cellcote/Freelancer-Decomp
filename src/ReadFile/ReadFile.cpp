@@ -1215,8 +1215,7 @@ namespace
             if (NestedChild != nullptr)
                 Result = NestedChild->GetSize(NestedHandle(Handle), HighOut);
             else
-                Result = GetFileSize(Platform::HandleFromValue(NestedHandle(Handle)),
-                                     HighOut);
+                Result = GetFileSize(Platform::HandleFromValue(NestedHandle(Handle)), HighOut);
             if (Result == 0xFFFFFFFFu)
                 CopyNestedLastError();
             return Result;
@@ -1244,10 +1243,8 @@ namespace
             if (NestedChild != nullptr)
                 Result = NestedChild->GetFileTimes(NestedHandle(Handle), CreationOut, AccessOut, WriteOut);
             else
-                Result = GetFileTime(Platform::HandleFromValue(NestedHandle(Handle)),
-                                     CreationOut,
-                                     AccessOut,
-                                     WriteOut);
+                Result = GetFileTime(Platform::HandleFromValue(NestedHandle(Handle)), CreationOut,
+                                     AccessOut, WriteOut);
             if (Result == 0)
                 CopyNestedLastError();
             return Result;
@@ -1976,8 +1973,8 @@ namespace
         // formerly Slot4C
         int DACOM_API FindNext(FlULong Handle, WIN32_FIND_DATAA* FindData) override
         {
-            const BOOL Result = Platform::FindNext(Platform::HandleFromValue(Handle),
-                                                   FindData) ? TRUE : FALSE;
+            const BOOL Result =
+                Platform::FindNext(Platform::HandleFromValue(Handle), FindData) ? TRUE : FALSE;
             if (Result == 0)
                 CopyNestedLastError();
             return Result;
@@ -1986,7 +1983,8 @@ namespace
         // formerly Slot50
         int DACOM_API FindClose(FlULong Handle) override
         {
-            const BOOL Result = Platform::FindClose(Platform::HandleFromValue(Handle)) ? TRUE : FALSE;
+            const BOOL Result =
+                Platform::FindClose(Platform::HandleFromValue(Handle)) ? TRUE : FALSE;
             if (Result == 0)
                 CopyNestedLastError();
             return Result;

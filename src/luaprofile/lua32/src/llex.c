@@ -120,18 +120,28 @@ static void skipspace (LexState *LS) {
 /* PORT(macOS): MSVC's _isctype in the C locale. Its mask bits: _UPPER 0x1, _LOWER 0x2,
 ** _DIGIT 0x4, _SPACE 0x8, _PUNCT 0x10, _CONTROL 0x20, _BLANK 0x40, _HEX 0x80, _ALPHA 0x100
 ** (a letter has _ALPHA with _UPPER or _LOWER, so 0x103 is "a letter"). */
-static int _isctype (int c, int mask) {
-  int bits = 0;
-  if (c < 0 || c > 0x7F) return 0;
-  if (isupper(c)) bits |= 0x101;
-  if (islower(c)) bits |= 0x102;
-  if (isdigit(c)) bits |= 0x4;
-  if (isspace(c)) bits |= 0x8;
-  if (ispunct(c)) bits |= 0x10;
-  if (iscntrl(c)) bits |= 0x20;
-  if (c == ' ' || c == '\t') bits |= 0x40;
-  if (isxdigit(c)) bits |= 0x80;
-  return bits & mask;
+static int _isctype(int c, int mask)
+{
+    int bits = 0;
+    if (c < 0 || c > 0x7F)
+        return 0;
+    if (isupper(c))
+        bits |= 0x101;
+    if (islower(c))
+        bits |= 0x102;
+    if (isdigit(c))
+        bits |= 0x4;
+    if (isspace(c))
+        bits |= 0x8;
+    if (ispunct(c))
+        bits |= 0x10;
+    if (iscntrl(c))
+        bits |= 0x20;
+    if (c == ' ' || c == '\t')
+        bits |= 0x40;
+    if (isxdigit(c))
+        bits |= 0x80;
+    return bits & mask;
 }
 #endif
 

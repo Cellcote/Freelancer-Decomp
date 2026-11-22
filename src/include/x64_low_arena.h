@@ -137,18 +137,24 @@ namespace LowArena
             Made.End = Made.Base + Limit;
             return Made;
         }
-    }
-}
+        }
+        }
 
-// The process's arena (FL_LOW_ARENA_DEFINE_SHARED, in dacom).
-extern "C" LowArena::Detail::FShared* FlLowArenaShared();
+        // The process's arena (FL_LOW_ARENA_DEFINE_SHARED, in dacom).
+        extern "C" LowArena::Detail::FShared* FlLowArenaShared();
 
-namespace LowArena
-{
-    namespace Detail
-    {
-        inline FState& State() { return FlLowArenaShared()->State; }
-        inline FReservation& Reservation() { return FlLowArenaShared()->Reservation; }
+        namespace LowArena
+        {
+        namespace Detail
+        {
+        inline FState& State()
+        {
+            return FlLowArenaShared()->State;
+        }
+        inline FReservation& Reservation()
+        {
+            return FlLowArenaShared()->Reservation;
+        }
 
         // The next chunk of the reservation, committed. A block larger than a chunk gets a chunk
         // of its own size.
@@ -263,9 +269,10 @@ namespace LowArena
 #if defined(FL_PTR64) && !defined(_WIN32)
 // Defines the process's arena: in dacom, and in a test that uses the arena without dacom.
 #define FL_LOW_ARENA_DEFINE_SHARED()                                                               \
-    extern "C" __attribute__((visibility("default"))) LowArena::Detail::FShared* FlLowArenaShared() \
+    extern "C" __attribute__((visibility("default"))) LowArena::Detail::FShared*                   \
+    FlLowArenaShared()                                                                             \
     {                                                                                              \
-        static LowArena::Detail::FShared Instance{{}, LowArena::Detail::MakeReservation()};         \
+        static LowArena::Detail::FShared Instance{{}, LowArena::Detail::MakeReservation()};        \
         return &Instance;                                                                          \
     }
 #else

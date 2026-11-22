@@ -50,8 +50,14 @@ namespace Platform
     // handles in DWORDs. Handle values fit in 32 bits (Windows keeps kernel handles there on
     // x64, and so does the POSIX backend); the way back sign-extends, so 0xFFFFFFFF is
     // InvalidHandle() again.
-    inline FlULong HandleToValue(Handle Object) { return (FlULong)((std::uintptr_t)(Object)); }
-    inline Handle HandleFromValue(FlULong Value) { return (Handle)((std::intptr_t)((FlLong)(Value))); }
+    inline FlULong HandleToValue(Handle Object)
+    {
+        return (FlULong)((std::uintptr_t)(Object));
+    }
+    inline Handle HandleFromValue(FlULong Value)
+    {
+        return (Handle)((std::intptr_t)((FlLong)(Value)));
+    }
 
     // CloseHandle.
     inline bool CloseHandle(Handle Object) { return ::CloseHandle(Object) != FALSE; }

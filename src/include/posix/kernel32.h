@@ -54,52 +54,72 @@
 
 namespace PosixWin32
 {
-    inline DWORD& LastError()
-    {
-        thread_local DWORD Value = ERROR_SUCCESS;
-        return Value;
-    }
+inline DWORD& LastError()
+{
+    thread_local DWORD Value = ERROR_SUCCESS;
+    return Value;
+}
 
     // The Win32 error for an errno value.
-    inline DWORD ErrorOf(int Errno)
+inline DWORD ErrorOf(int Errno)
+{
+    switch (Errno)
     {
-        switch (Errno)
-        {
-        case 0: return ERROR_SUCCESS;
-        case ENOENT: return ERROR_FILE_NOT_FOUND;
-        case ENOTDIR: return ERROR_PATH_NOT_FOUND;
-        case EACCES:
-        case EPERM:
-        case EISDIR:
-        case EROFS: return ERROR_ACCESS_DENIED;
-        case EBADF: return ERROR_INVALID_HANDLE;
-        case ENOMEM: return ERROR_NOT_ENOUGH_MEMORY;
-        case EMFILE:
-        case ENFILE: return ERROR_TOO_MANY_OPEN_FILES;
-        case EEXIST: return ERROR_FILE_EXISTS;
-        case ENOSPC: return ERROR_DISK_FULL;
-        case EINVAL: return ERROR_INVALID_PARAMETER;
-        default: return ERROR_ACCESS_DENIED;
-        }
-    }
-
-    inline void SetErrorFromErrno() { LastError() = ErrorOf(errno); }
-
-    // The descriptor behind a file handle, or -1 (ERROR_INVALID_HANDLE set).
-    inline int DescriptorOf(HANDLE File)
-    {
-        Platform::Detail::FFile* const Object = Platform::Detail::As<Platform::Detail::FFile>(File);
-        if (Object == nullptr)
-        {
-            LastError() = ERROR_INVALID_HANDLE;
-            return -1;
-        }
-        return Object->Descriptor;
+    case 0:
+        return ERROR_SUCCESS;
+    case ENOENT:
+        return ERROR_FILE_NOT_FOUND;
+    case ENOTDIR:
+        return ERROR_PATH_NOT_FOUND;
+    case EACCES:
+    case EPERM:
+    case EISDIR:
+    case EROFS:
+        return ERROR_ACCESS_DENIED;
+    case EBADF:
+        return ERROR_INVALID_HANDLE;
+    case ENOMEM:
+        return ERROR_NOT_ENOUGH_MEMORY;
+    case EMFILE:
+    case ENFILE:
+        return ERROR_TOO_MANY_OPEN_FILES;
+    case EEXIST:
+        return ERROR_FILE_EXISTS;
+    case ENOSPC:
+        return ERROR_DISK_FULL;
+    case EINVAL:
+        return ERROR_INVALID_PARAMETER;
+    default:
+        return ERROR_ACCESS_DENIED;
     }
 }
 
-inline DWORD GetLastError() { return PosixWin32::LastError(); }
-inline void SetLastError(DWORD Error) { PosixWin32::LastError() = Error; }
+inline void SetErrorFromErrno()
+{
+    LastError() = ErrorOf(errno);
+}
+
+    // The descriptor behind a file handle, or -1 (ERROR_INVALID_HANDLE set).
+inline int DescriptorOf(HANDLE File)
+{
+    Platform::Detail::FFile* const Object = Platform::Detail::As<Platform::Detail::FFile>(File);
+    if (Object == nullptr)
+    {
+        LastError() = ERROR_INVALID_HANDLE;
+        return -1;
+    }
+    return Object->Descriptor;
+}
+}
+
+inline DWORD GetLastError()
+{
+    return PosixWin32::LastError();
+}
+inline void SetLastError(DWORD Error)
+{
+    PosixWin32::LastError() = Error;
+}
 
 // ---------------------------------------------------------------------------------------------
 // Files
@@ -142,8 +162,8 @@ inline BOOL CloseHandle(HANDLE Object)
 }
 
 // CreateFileA. Security, flags and template are not used here (no ACLs, no overlapped I/O).
-inline HANDLE CreateFileA(LPCSTR Path, DWORD Access, DWORD Share, LPSECURITY_ATTRIBUTES, DWORD Creation,
-                          DWORD FlagsAndAttributes, HANDLE)
+inline HANDLE CreateFileA(LPCSTR Path, DWORD Access, DWORD Share, LPSECURITY_ATTRIBUTES,
+                          DWORD Creation, DWORD FlagsAndAttributes, HANDLE)
 {
     errno = 0;
     HANDLE const File = Platform::FileOpen(Path, Access, Share, Creation, FlagsAndAttributes);
@@ -183,10 +203,12 @@ inline DWORD SetFilePointer(HANDLE File, LONG Distance, LONG* High, DWORD Method
     int const Descriptor = PosixWin32::DescriptorOf(File);
     if (Descriptor < 0)
         return INVALID_SET_FILE_POINTER;
-    std::int64_t const Move = High != nullptr
-                                  ? static_cast<std::int64_t>((static_cast<std::uint64_t>(static_cast<std::uint32_t>(*High)) << 32) |
-                                                              static_cast<std::uint32_t>(Distance))
-                                  : static_cast<std::int64_t>(Distance);
+    std::int64_t const Move =
+        High != nullptr
+            ? static_cast<std::int64_t>(
+                  (static_cast<std::uint64_t>(static_cast<std::uint32_t>(*High)) << 32) |
+                  static_cast<std::uint32_t>(Distance))
+            : static_cast<std::int64_t>(Distance);
     std::int64_t Base = 0;
     if (Method == FILE_CURRENT)
         Base = lseek(Descriptor, 0, SEEK_CUR);
@@ -251,9 +273,11 @@ inline BOOL GetFileTime(HANDLE File, LPFILETIME Creation, LPFILETIME Access, LPF
         return FALSE;
     }
     if (Creation != nullptr)
-        Platform::Detail::ToFileTime(Info.st_ctime, &Creation->dwLowDateTime, &Creation->dwHighDateTime);
+        Platform::Detail::ToFileTime(Info.st_ctime, &Creation->dwLowDateTime,
+                                     &Creation->dwHighDateTime);
     if (Access != nullptr)
-        Platform::Detail::ToFileTime(Info.st_atime, &Access->dwLowDateTime, &Access->dwHighDateTime);
+        Platform::Detail::ToFileTime(Info.st_atime, &Access->dwLowDateTime,
+                                     &Access->dwHighDateTime);
     if (Write != nullptr)
         Platform::Detail::ToFileTime(Info.st_mtime, &Write->dwLowDateTime, &Write->dwHighDateTime);
     return TRUE;
@@ -271,8 +295,9 @@ inline BOOL DosDateTimeToFileTime(WORD Date, WORD Time, LPFILETIME Out)
     unsigned const Second = (Time & 0x1Fu) * 2u;
     static constexpr unsigned kDays[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
     bool const bLeap = (Year % 4 == 0 && Year % 100 != 0) || Year % 400 == 0;
-    if (Month < 1 || Month > 12 || Day < 1 || Day > kDays[Month - 1] + (Month == 2 && bLeap ? 1u : 0u) ||
-        Hour > 23 || Minute > 59 || Second > 59)
+    if (Month < 1 || Month > 12 || Day < 1 ||
+        Day > kDays[Month - 1] + (Month == 2 && bLeap ? 1u : 0u) || Hour > 23 || Minute > 59 ||
+        Second > 59)
     {
         PosixWin32::LastError() = ERROR_INVALID_PARAMETER;
         return FALSE;
@@ -283,7 +308,8 @@ inline BOOL DosDateTimeToFileTime(WORD Date, WORD Time, LPFILETIME Out)
     unsigned const YearOfEra = static_cast<unsigned>(Y - Era * 400);
     unsigned const DayOfYear = (153 * (Month + (Month > 2 ? -3 : 9)) + 2) / 5 + Day - 1;
     unsigned const DayOfEra = YearOfEra * 365 + YearOfEra / 4 - YearOfEra / 100 + DayOfYear;
-    std::int64_t const Days = static_cast<std::int64_t>(Era) * 146097 + static_cast<std::int64_t>(DayOfEra) - 719468;
+    std::int64_t const Days =
+        static_cast<std::int64_t>(Era) * 146097 + static_cast<std::int64_t>(DayOfEra) - 719468;
     std::int64_t const Seconds = Days * 86400 + Hour * 3600 + Minute * 60 + Second;
     std::uint64_t const Ticks = static_cast<std::uint64_t>(Seconds + 11644473600LL) * 10000000ULL;
     Out->dwLowDateTime = static_cast<DWORD>(Ticks & 0xFFFFFFFFu);
@@ -322,49 +348,49 @@ namespace PosixWin32
 {
     // A file mapping object: its own descriptor of the file, so it outlives the file handle,
     // as on Windows.
-    struct FMapping : Platform::Detail::FObject
+struct FMapping : Platform::Detail::FObject
+{
+    int Descriptor = -1;
+    std::uint64_t Size = 0;
+    ~FMapping() override
     {
-        int Descriptor = -1;
-        std::uint64_t Size = 0;
-        ~FMapping() override
-        {
-            if (Descriptor >= 0)
-                close(Descriptor);
-        }
-    };
+        if (Descriptor >= 0)
+            close(Descriptor);
+    }
+};
 
     // The length of each view (and VirtualAlloc block), for UnmapViewOfFile / VirtualFree.
-    struct FRegions
-    {
-        std::mutex Lock;
-        std::map<void const*, std::size_t> Lengths;
-    };
-    inline FRegions& Regions()
-    {
-        static FRegions Table;
-        return Table;
-    }
-    inline void Remember(void const* Address, std::size_t Length)
-    {
-        std::lock_guard<std::mutex> Lock(Regions().Lock);
-        Regions().Lengths[Address] = Length;
-    }
+struct FRegions
+{
+    std::mutex Lock;
+    std::map<void const*, std::size_t> Lengths;
+};
+inline FRegions& Regions()
+{
+    static FRegions Table;
+    return Table;
+}
+inline void Remember(void const* Address, std::size_t Length)
+{
+    std::lock_guard<std::mutex> Lock(Regions().Lock);
+    Regions().Lengths[Address] = Length;
+}
     // The length of the region at Address (removed), or 0.
-    inline std::size_t Forget(void const* Address)
-    {
-        std::lock_guard<std::mutex> Lock(Regions().Lock);
-        auto const Found = Regions().Lengths.find(Address);
-        if (Found == Regions().Lengths.end())
-            return 0;
-        std::size_t const Length = Found->second;
-        Regions().Lengths.erase(Found);
-        return Length;
-    }
+inline std::size_t Forget(void const* Address)
+{
+    std::lock_guard<std::mutex> Lock(Regions().Lock);
+    auto const Found = Regions().Lengths.find(Address);
+    if (Found == Regions().Lengths.end())
+        return 0;
+    std::size_t const Length = Found->second;
+    Regions().Lengths.erase(Found);
+    return Length;
+}
 }
 
 // CreateFileMappingA over a file, read-only and unnamed. Size 0 (both halves) is the file's.
-inline HANDLE CreateFileMappingA(HANDLE File, LPSECURITY_ATTRIBUTES, DWORD Protect, DWORD SizeHigh, DWORD SizeLow,
-                                 LPCSTR Name)
+inline HANDLE CreateFileMappingA(HANDLE File, LPSECURITY_ATTRIBUTES, DWORD Protect, DWORD SizeHigh,
+                                 DWORD SizeLow, LPCSTR Name)
 {
     int const Descriptor = PosixWin32::DescriptorOf(File);
     if (Descriptor < 0)
@@ -412,7 +438,8 @@ inline HANDLE CreateFileMappingA(HANDLE File, LPSECURITY_ATTRIBUTES, DWORD Prote
 // MapViewOfFile, FILE_MAP_READ. Size 0 maps from Offset to the end of the mapping. The offset
 // must be a multiple of the allocation granularity, as on Windows (64 KB there; the page size
 // here divides it).
-inline LPVOID MapViewOfFile(HANDLE MappingHandle, DWORD Access, DWORD OffsetHigh, DWORD OffsetLow, SIZE_T Size)
+inline LPVOID MapViewOfFile(HANDLE MappingHandle, DWORD Access, DWORD OffsetHigh, DWORD OffsetLow,
+                            SIZE_T Size)
 {
     PosixWin32::FMapping* const Mapping = Platform::Detail::As<PosixWin32::FMapping>(MappingHandle);
     if (Mapping == nullptr)
@@ -424,7 +451,8 @@ inline LPVOID MapViewOfFile(HANDLE MappingHandle, DWORD Access, DWORD OffsetHigh
     if (Access != FILE_MAP_READ || Offset > Mapping->Size || Offset % 0x10000 != 0 ||
         (Size != 0 && Size > Mapping->Size - Offset))
     {
-        PosixWin32::LastError() = Access != FILE_MAP_READ ? ERROR_ACCESS_DENIED : ERROR_INVALID_PARAMETER;
+        PosixWin32::LastError() =
+            Access != FILE_MAP_READ ? ERROR_ACCESS_DENIED : ERROR_INVALID_PARAMETER;
         return nullptr;
     }
     std::size_t const Length = Size != 0 ? Size : static_cast<std::size_t>(Mapping->Size - Offset);
@@ -433,7 +461,8 @@ inline LPVOID MapViewOfFile(HANDLE MappingHandle, DWORD Access, DWORD OffsetHigh
         PosixWin32::LastError() = ERROR_INVALID_PARAMETER;
         return nullptr;
     }
-    void* const View = mmap(nullptr, Length, PROT_READ, MAP_PRIVATE, Mapping->Descriptor, static_cast<off_t>(Offset));
+    void* const View = mmap(nullptr, Length, PROT_READ, MAP_PRIVATE, Mapping->Descriptor,
+                            static_cast<off_t>(Offset));
     if (View == MAP_FAILED)
     {
         PosixWin32::SetErrorFromErrno();
@@ -530,7 +559,19 @@ inline BOOL HeapFree(HANDLE, DWORD, LPVOID Block)
 
 typedef Platform::CriticalSection CRITICAL_SECTION;
 typedef CRITICAL_SECTION* LPCRITICAL_SECTION;
-inline void InitializeCriticalSection(LPCRITICAL_SECTION Lock) { Platform::LockInit(Lock); }
-inline void EnterCriticalSection(LPCRITICAL_SECTION Lock) { Platform::LockEnter(Lock); }
-inline void LeaveCriticalSection(LPCRITICAL_SECTION Lock) { Platform::LockLeave(Lock); }
-inline void DeleteCriticalSection(LPCRITICAL_SECTION Lock) { Platform::LockDelete(Lock); }
+inline void InitializeCriticalSection(LPCRITICAL_SECTION Lock)
+{
+    Platform::LockInit(Lock);
+}
+inline void EnterCriticalSection(LPCRITICAL_SECTION Lock)
+{
+    Platform::LockEnter(Lock);
+}
+inline void LeaveCriticalSection(LPCRITICAL_SECTION Lock)
+{
+    Platform::LockLeave(Lock);
+}
+inline void DeleteCriticalSection(LPCRITICAL_SECTION Lock)
+{
+    Platform::LockDelete(Lock);
+}

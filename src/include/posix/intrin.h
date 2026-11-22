@@ -15,6 +15,9 @@
 #if defined(__x86_64__) || defined(__i386__)
 #include <cpuid.h>
 #include <x86intrin.h>
+// <cpuid.h> spells __cpuid as a five-argument macro (__get_cpuid has it expanded already);
+// MSVC's is the function below.
+#undef __cpuid
 #endif
 
 // _BitScanForward / _BitScanReverse: the index of the lowest / highest set bit; 0 (and Index

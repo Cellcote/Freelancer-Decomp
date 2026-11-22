@@ -75,8 +75,14 @@ namespace Platform
     // handles in DWORDs. Handle values fit in 32 bits (Windows keeps kernel handles there on
     // x64, and so does the POSIX backend); the way back sign-extends, so 0xFFFFFFFF is
     // InvalidHandle() again.
-    inline FlULong HandleToValue(Handle Object) { return (FlULong)((std::uintptr_t)(Object)); }
-    inline Handle HandleFromValue(FlULong Value) { return (Handle)((std::intptr_t)((FlLong)(Value))); }
+    inline FlULong HandleToValue(Handle Object)
+    {
+        return (FlULong)((std::uintptr_t)(Object));
+    }
+    inline Handle HandleFromValue(FlULong Value)
+    {
+        return (Handle)((std::intptr_t)((FlLong)(Value)));
+    }
 
     namespace Detail
     {
@@ -183,10 +189,14 @@ namespace Platform
                 return nullptr;
             FHandles& Table = Handles();
             std::lock_guard<std::mutex> Lock(Table.Lock);
-            return static_cast<std::size_t>(Slot) < Table.Slots.size() ? Table.Slots[Slot] : nullptr;
+            return static_cast<std::size_t>(Slot) < Table.Slots.size() ? Table.Slots[Slot]
+                                                                       : nullptr;
         }
 
-        inline bool Valid(Handle Value) { return Lookup(Value) != nullptr; }
+        inline bool Valid(Handle Value)
+        {
+            return Lookup(Value) != nullptr;
+        }
 
         // The object behind a handle as a T, or nullptr when it names nothing or something else.
         template <class T>
@@ -227,7 +237,8 @@ namespace Platform
         {
             Detail::FHandles& Table = Detail::Handles();
             std::lock_guard<std::mutex> Lock(Table.Lock);
-            if (static_cast<std::size_t>(Slot) >= Table.Slots.size() || Table.Slots[Slot] == nullptr)
+            if (static_cast<std::size_t>(Slot) >= Table.Slots.size() ||
+                Table.Slots[Slot] == nullptr)
                 return false;
             Object = Table.Slots[Slot];
             Table.Slots[Slot] = nullptr;
@@ -755,7 +766,10 @@ namespace Platform
         }
 
         // The waitable object behind a handle, or nullptr (a file, a search, a closed value).
-        inline FWaitable* Waitable(Handle Object) { return As<FWaitable>(Object); }
+        inline FWaitable* Waitable(Handle Object)
+        {
+            return As<FWaitable>(Object);
+        }
 
         // Waits for one object (WaitAll false: any, true: all), as WaitForMultipleObjects. An
         // abandoned mutex returns kWaitAbandoned (+ its index when WaitAll is false).
