@@ -1073,6 +1073,165 @@ static void TestJoinTimeout()
     CHECK(Server.Indicated == 0 && Server.Server.GetPlayerCount() == 1);
 }
 
+// Enumeration replies are rationed per IP address, and come back as the budget refills.
+static void TestEnumLimit()
+{
+    std::printf("Enumeration limit\n");
+    FWorld World(31);
+    FTestServer Server(World.Net, kServerAddress);
+    World.Servers.push_back(&Server);
+    CHECK(Server.Server.Host(MakeDesc(), World.Net.Now, 31));
+    FTestClient A(World.Net, FAddress::Ipv4(10, 0, 0, 2, 2302));
+    FTestClient B(World.Net, FAddress::Ipv4(10, 0, 0, 3, 2302));
+    World.Clients.push_back(&A);
+    World.Clients.push_back(&B);
+    for (int i = 0; i < 40; ++i)
+        A.Client.EnumHosts(kServerAddress, &kFreelancerApp, FBytes(), World.Net.Now);
+    World.Run(100);
+    CHECK(A.EnumResponses == 16);
+    // Another address has its own budget.
+    B.Client.EnumHosts(kServerAddress, &kFreelancerApp, FBytes(), World.Net.Now);
+    World.Run(100);
+    CHECK(B.EnumResponses == 1);
+    // Four a second come back.
+    World.Run(1000);
+    for (int i = 0; i < 10; ++i)
+        A.Client.EnumHosts(kServerAddress, &kFreelancerApp, FBytes(), World.Net.Now);
+    World.Run(100);
+    CHECK(A.EnumResponses == 16 + 4);
+    // A query every second, as the server list sends them, is always answered.
+    World.Run(10000);
+    const int Before = A.EnumResponses;
+    for (int i = 0; i < 30; ++i)
+    {
+        A.Client.EnumHosts(kServerAddress, &kFreelancerApp, FBytes(), World.Net.Now);
+        World.Run(1000);
+    }
+    CHECK(A.EnumResponses == Before + 30);
+}
+
+// A partner that stops acknowledging is dropped once its queue passes the limits; a single
+// message larger than the byte limit still goes out.
+static void TestSendQueueLimit()
+{
+    std::printf("Send queue limit\n");
+    FWorld World(32);
+    FLinkConfig Config;
+    Config.MaxQueuedMessages = 50;
+    Config.MaxQueuedBytes = 10000;
+    FTestServer Server(World.Net, kServerAddress, Config);
+    World.Servers.push_back(&Server);
+    CHECK(Server.Server.Host(MakeDesc(), World.Net.Now, 32));
+    FTestClient A(World.Net, FAddress::Ipv4(10, 0, 0, 2, 2302));
+    FTestClient B(World.Net, FAddress::Ipv4(10, 0, 0, 3, 2302));
+    World.Clients.push_back(&A);
+    FTestClient C(World.Net, FAddress::Ipv4(10, 0, 0, 4, 2302));
+    World.Clients.push_back(&B);
+    World.Clients.push_back(&C);
+    CHECK(ConnectClient(World, A, Request("A"), 0x3201) && A.Result == Result::Ok);
+    CHECK(ConnectClient(World, B, Request("B"), 0x3202) && B.Result == Result::Ok);
+    CHECK(ConnectClient(World, C, Request("C"), 0x3203) && C.Result == Result::Ok);
+    auto AllAlive = [&](bool bAlive)
+    {
+        if (Server.Players.size() != 3)
+            return false;
+        for (const auto& Player : Server.Players)
+            if (Player->bAlive != bAlive)
+                return false;
+        return true;
+    };
+    CHECK(World.RunUntil([&] { return AllAlive(true); }, 10000));
+    if (Server.Players.size() != 3)
+        return;
+    const uint32_t PA = Server.Players[0]->Dpnid;
+    const uint32_t PB = Server.Players[1]->Dpnid;
+    const uint32_t PC = Server.Players[2]->Dpnid;
+    const FBytes Big = Pattern(1, 20000);
+    CHECK(Server.Server.SendTo(PB, Big.data(), Big.size(), SendFlags::Guaranteed, nullptr, nullptr,
+                               World.Net.Now));
+    CHECK(World.RunUntil([&] { return !B.Received.empty(); }, 10000));
+    CHECK(!B.Received.empty() && B.Received[0] == Big);
+    World.Run(500);
+
+    World.Net.bCut = true;
+    const FBytes Medium = Pattern(2, 6000);
+    CHECK(Server.Server.SendTo(PB, Medium.data(), Medium.size(), SendFlags::Guaranteed, nullptr,
+                               nullptr, World.Net.Now));
+    CHECK(!Server.Server.SendTo(PB, Medium.data(), Medium.size(), SendFlags::Guaranteed, nullptr,
+                                nullptr, World.Net.Now));
+    const uint8_t Ping = 0x5A;
+    int Accepted = 0;
+    for (int i = 0; i < 60; ++i)
+        if (Server.Server.SendTo(PA, &Ping, 1, SendFlags::Guaranteed | SendFlags::Coalesce, nullptr,
+                                 nullptr, World.Net.Now))
+            ++Accepted;
+    CHECK(Accepted == 50);
+    // Unreliable messages count until their frames are acknowledged, not just until sent.
+    Accepted = 0;
+    for (int i = 0; i < 60; ++i)
+        if (Server.Server.SendTo(PC, &Ping, 1, 0, nullptr, nullptr, World.Net.Now))
+            ++Accepted;
+    CHECK(Accepted == 50);
+    CHECK(World.RunUntil([&] { return AllAlive(false); }, 5000));
+    for (const auto& Player : Server.Players)
+        CHECK(Player->DestroyReason == DestroyReason::ConnectionLost);
+    CHECK(Server.Server.GetPlayerCount() == 1);
+}
+
+// CONNECTs that never finish the handshake: at most eight per IP address, dropped after the
+// handshake timeout, and the oldest gives way when every joining slot is taken.
+static void TestHandshakeLimits()
+{
+    std::printf("Handshake limits\n");
+    FWorld World(33);
+    FTestServer Server(World.Net, kServerAddress);
+    World.Servers.push_back(&Server);
+    CHECK(Server.Server.Host(MakeDesc(), World.Net.Now, 33));
+
+    // The server's CONNECTED answers, counted per sending address.
+    std::map<FAddress, int> Answers;
+    auto Spoof = [&](const FAddress& From, uint32_t SessId)
+    {
+        World.Net.Attach(From, [&Answers, From](const FAddress&, const uint8_t*, size_t)
+                         { ++Answers[From]; });
+        FConnectFrame Connect;
+        Connect.Command = Command::CFrame | Command::Poll;
+        Connect.SessId = SessId;
+        FBytes Out;
+        Connect.Write(Out);
+        Server.Server.OnDatagram(From, Out.data(), Out.size(), World.Net.Now);
+    };
+
+    // One address, many ports: eight are taken in.
+    for (uint16_t Port = 2000; Port < 2012; ++Port)
+        Spoof(FAddress::Ipv4(10, 9, 9, 8, Port), 0x3400u + Port);
+    World.Run(100);
+    int Answered = 0;
+    for (const auto& Entry : Answers)
+        Answered += Entry.second > 0 ? 1 : 0;
+    CHECK(Answered == 8);
+
+    // After the handshake timeout they are gone, and the address may try again.
+    World.Run(5500);
+    Answers.clear();
+    Spoof(FAddress::Ipv4(10, 9, 9, 8, 3000), 0x3500);
+    World.Run(100);
+    CHECK(Answers[FAddress::Ipv4(10, 9, 9, 8, 3000)] > 0);
+
+    // A full joining table: a real client still gets in at once, in place of the oldest
+    // half-open connection.
+    World.Run(5500);
+    Server.Server.SetJoinLimits(30000, 4);
+    for (uint8_t i = 0; i < 4; ++i)
+        Spoof(FAddress::Ipv4(10, 9, 8, i, 4000), 0x3600u + i);
+    World.Run(100);
+    FTestClient A(World.Net, FAddress::Ipv4(10, 0, 0, 2, 2302));
+    World.Clients.push_back(&A);
+    A.Client.Connect(kServerAddress, Request("A"), 0x3700, World.Net.Now);
+    CHECK(World.RunUntil([&] { return A.bConnectDone; }, 1000));
+    CHECK(A.Result == Result::Ok);
+}
+
 int main(int argc, char** argv)
 {
     TestSpecReliable();
@@ -1089,6 +1248,9 @@ int main(int argc, char** argv)
     TestFuzz();
     TestEarlyDelivery();
     TestJoinTimeout();
+    TestEnumLimit();
+    TestSendQueueLimit();
+    TestHandshakeLimits();
     // --stress N: N more traffic runs with assorted seeds and loss rates. Up to 15% each way:
     // above that a frame failing eleven times in a row ends the connection now and then, as
     // the specification's ten retries intend.

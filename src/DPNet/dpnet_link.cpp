@@ -13,6 +13,21 @@ namespace DPNet
         Stats.RttMs = RttMs;
     }
 
+    // The messages release their budget into the counters, which must still be alive.
+    FLink::~FLink()
+    {
+        InFlight.clear();
+        Queue.clear();
+    }
+
+    FLink::FOutMessage::~FOutMessage()
+    {
+        if (Owner == nullptr)
+            return;
+        --Owner->OutstandingMessages;
+        Owner->OutstandingBytes -= Data.size();
+    }
+
     // ---------------------------------------------------------------------------------------
     // Handshake (3.1.4.2, 3.1.5.1.1, 3.1.5.1.2)
 
@@ -30,12 +45,16 @@ namespace DPNet
         Flush();
     }
 
+    bool FLink::IsAcceptable(const FConnectFrame& Connect)
+    {
+        return Connect.Op == ExtOp::Connect &&
+               (Connect.Version & kProtocolMajorMask) == kProtocolMajor;
+    }
+
     bool FLink::Accept(const FConnectFrame& Connect, uint32_t Now)
     {
         LastNow = Now;
-        if (State != ELinkState::Idle || Connect.Op != ExtOp::Connect)
-            return false;
-        if ((Connect.Version & kProtocolMajorMask) != kProtocolMajor)
+        if (State != ELinkState::Idle || !IsAcceptable(Connect))
             return false;
         bConnector = false;
         SessId = Connect.SessId;
@@ -619,10 +638,23 @@ namespace DPNet
         if (Message.empty() || bCloseRequested || State == ELinkState::Idle || State == ELinkState::HardClosing ||
             State == ELinkState::Closed)
             return 0;
+        // A partner that never acknowledges, or keeps asking for replies, must not grow the
+        // queue without bound (docs/dpnet.md, Limits). The first message always fits.
+        const size_t RoomBytes =
+            Config.MaxQueuedBytes - std::min(OutstandingBytes, Config.MaxQueuedBytes);
+        if (OutstandingMessages != 0 &&
+            (OutstandingMessages >= Config.MaxQueuedMessages || Message.size() > RoomBytes))
+        {
+            HardClose(Now);
+            return 0;
+        }
         auto Msg = std::make_shared<FOutMessage>();
         Msg->Id = NextMessageId++;
         Msg->Data = std::move(Message);
         Msg->Flags = (uint8_t)(Flags & (MsgFlags::Mask | MsgFlags::Coalesce));
+        Msg->Owner = this;
+        ++OutstandingMessages;
+        OutstandingBytes += Msg->Data.size();
         Queue.push_back(Msg);
         // DPNSEND_COALESCE messages wait for the next Tick to share frames.
         if ((Msg->Flags & MsgFlags::Coalesce) == 0)

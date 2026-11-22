@@ -47,6 +47,12 @@ namespace DPNet
         uint32_t HardDisconnects = 3;
         // After our END_STREAM is acknowledged, how long to wait for the partner's own.
         uint32_t CloseLingerMs = 10000;
+
+        // The most messages, and message bytes, queued or sent but not yet acknowledged. A Send
+        // beyond either drops the link (HardClose): the partner has stopped acknowledging, or
+        // asks for replies faster than it takes them. DirectPlay itself queues without limit.
+        uint32_t MaxQueuedMessages = 8192;
+        size_t MaxQueuedBytes = 16 * 1024 * 1024;
     };
 
     struct FLinkStats
@@ -117,11 +123,14 @@ namespace DPNet
     {
     public:
         FLink(ILinkEvents& InEvents, const FLinkConfig& InConfig);
+        ~FLink();
         FLink(const FLink&) = delete;
         FLink& operator=(const FLink&) = delete;
 
         // Outbound: send CONNECT (SessId must not be zero).
         void Connect(uint32_t InSessId, uint32_t Now);
+        // True when Accept would take this CONNECT (a supported protocol major version).
+        static bool IsAcceptable(const FConnectFrame& Connect);
         // Inbound: answer a CONNECT that arrived from a new address. False (and the link stays
         // Idle) when the frame is not an acceptable CONNECT.
         bool Accept(const FConnectFrame& Connect, uint32_t Now);
@@ -130,7 +139,8 @@ namespace DPNet
         void Tick(uint32_t Now);
 
         // Queues a message. Flags: MsgFlags. Returns its id for LinkSendComplete, or 0 when
-        // the link no longer sends (closing, closed) or the message is empty.
+        // the link no longer sends (closing, closed) or the message is empty. A message past
+        // the queue limits (FLinkConfig::MaxQueued*) hard-closes the link and returns 0.
         uint64_t Send(FBytes Message, uint8_t Flags, uint32_t Now);
         // Graceful: END_STREAM after everything queued has gone out.
         void Close(uint32_t Now);
@@ -152,6 +162,11 @@ namespace DPNet
     private:
         struct FOutMessage
         {
+            // Counted in the owner's queue budget from Send until the last frame holding the
+            // message is dropped: completion alone does not free an unreliable message, whose
+            // frames stay in flight until acknowledged.
+            FLink* Owner = nullptr;
+            ~FOutMessage();
             uint64_t Id = 0;
             FBytes Data;
             uint8_t Flags = 0;
@@ -259,6 +274,8 @@ namespace DPNet
         std::deque<std::shared_ptr<FOutMessage>> Queue;
         std::deque<FOutFrame> InFlight;
         uint64_t NextMessageId = 1;
+        uint32_t OutstandingMessages = 0; // FOutMessages still held (queued or in a frame)
+        size_t OutstandingBytes = 0;
         uint8_t NextSend = 0;
         uint8_t SendBase = 0;   // the partner's last bNRcv: oldest sequence not yet acknowledged
         std::array<bool, 256> Dropped{};
