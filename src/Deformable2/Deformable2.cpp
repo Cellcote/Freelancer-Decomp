@@ -3442,13 +3442,24 @@ static FlULong NodePlaybackId(const FIkListNode* Node)
 
 // The 32-bit value CopyList hands out for a node and DestroyHandle matches: its +4. An IK node's
 // is its event's address on Win32. On 64-bit builds it is the event's HandleValue id (dropped
-// when the event is deleted) tagged with bit 30, so it never equals a playback id (a counter
-// from 0xED; it would take 2^30 playbacks to reach the tag).
+// when the event is deleted) with bit 30 set, and a playback id is itself: both must stay below
+// 2^30, so the two ranges are disjoint. Neither gets there in practice (a billion live ids, a
+// billion playbacks); if one did, the process stops rather than hand out a handle that could
+// name two nodes.
 static int ListNodeHandle(const FIkListNode* Node)
 {
 #if defined(FL_PTR64)
+    constexpr FlULong kIkTag = 0x40000000u;
+    const FlULong Value =
+        Node->Active != 0 ? HandleValue::Of(Node->Event) : (FlULong)(std::uintptr_t)(Node->Event);
+    if (Value >= kIkTag && Value != 0xFFFFFFFFu)
+    {
+        std::fprintf(stderr, "Deformable2: a list handle reached 2^30 (%s)\n",
+                     Node->Active != 0 ? "IK event id" : "playback id");
+        std::abort();
+    }
     if (Node->Active != 0)
-        return (int)(HandleValue::Of(Node->Event) | 0x40000000u);
+        return (int)(Value | kIkTag);
 #endif
     return (int)(std::uintptr_t)(Node->Event);
 }
