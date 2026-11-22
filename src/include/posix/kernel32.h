@@ -794,8 +794,8 @@ inline UINT SetErrorMode(UINT)
     return 0;
 }
 
-// WideCharToMultiByte to UTF-8 for any code page (CP_ACP is UTF-8 on these systems); the
-// default-character arguments are ignored. As Windows: Count -1 includes the terminator, and
+// WideCharToMultiByte to UTF-8 for any code page (CP_ACP is UTF-8 on these systems), a UTF-16
+// surrogate pair as one character; the default-character arguments are ignored. As Windows: Count -1 includes the terminator, and
 // a zero OutSize asks for the size.
 #define CP_ACP 0
 #define CP_UTF8 65001
@@ -808,7 +808,17 @@ inline int WideCharToMultiByte(UINT, DWORD, const wchar_t* Text, int Count, LPST
     std::string Utf8;
     for (std::size_t Index = 0; Index < Length; ++Index)
     {
-        std::uint32_t const C = static_cast<std::uint32_t>(Text[Index]);
+        std::uint32_t C = static_cast<std::uint32_t>(Text[Index]);
+        // A UTF-16 surrogate pair (text that came from the wire or a file) is one character.
+        if (C >= 0xD800 && C <= 0xDBFF && Index + 1 < Length)
+        {
+            std::uint32_t const Low = static_cast<std::uint32_t>(Text[Index + 1]);
+            if (Low >= 0xDC00 && Low <= 0xDFFF)
+            {
+                C = 0x10000 + ((C - 0xD800) << 10) + (Low - 0xDC00);
+                ++Index;
+            }
+        }
         if (C < 0x80)
             Utf8 += static_cast<char>(C);
         else if (C < 0x800)

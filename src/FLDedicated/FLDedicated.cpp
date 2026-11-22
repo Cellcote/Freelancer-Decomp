@@ -330,12 +330,17 @@ namespace
         }
         char Directory[MAX_PATH];
         strcpy(Directory, ModulePath);
+#if defined(_WIN32)
         char* Slash = strrchr(Directory, '\\');
         if (char* const Forward = strrchr(Directory, '/');
             Forward != nullptr && (Slash == nullptr || Forward > Slash))
         {
-            Slash = Forward; // PORT(macOS): a native path
+            Slash = Forward;
         }
+#else
+        // PORT(macOS): a native path: '/' is the only separator ('\\' is a filename character).
+        char* Slash = strrchr(Directory, '/');
+#endif
         if (Slash == nullptr)
         {
             return false;
@@ -882,10 +887,13 @@ int wmain(int Argc, wchar_t** Argv)
 
 #if !defined(_WIN32)
 // PORT(macOS): no wmain outside Windows. The arguments are UTF-8 (macOS always passes them so,
-// and Linux in any UTF-8 locale), widened here as the Windows console hands them to wmain. A
-// byte that is not valid UTF-8 is taken as itself (Latin-1).
+// and Linux in any UTF-8 locale), widened here to the UTF-16 the Windows console hands wmain.
 namespace
 {
+// UTF-8 to the UTF-16 units Windows' wmain gets: a character above U+FFFF becomes a surrogate
+// pair, so the length limits, FLServer.cfg and the wire see what they see on Windows. Overlong
+// forms, surrogate code points and values above U+10FFFF are not valid UTF-8: their first byte
+// is taken as itself (Latin-1) and decoding resumes after it.
 std::wstring WidenUtf8(const char* Text)
 {
     std::wstring Out;
@@ -893,18 +901,27 @@ std::wstring WidenUtf8(const char* Text)
     while (*Cursor != 0)
     {
         const unsigned char Lead = *Cursor;
-        int Extra = Lead >= 0xF0 && Lead < 0xF8   ? 3
-                    : Lead >= 0xE0                ? 2
-                    : Lead >= 0xC2 && Lead < 0xE0 ? 1
-                                                  : 0;
-        if (Lead >= 0xF8)
+        int Extra = 0;
+        unsigned int Code = Lead;
+        unsigned int Minimum = 0;
+        if (Lead >= 0xC0 && Lead < 0xE0)
         {
-            Extra = 0;
+            Extra = 1;
+            Code = Lead & 0x1Fu;
+            Minimum = 0x80;
         }
-        unsigned int Code = Extra == 3   ? Lead & 0x07u
-                            : Extra == 2 ? Lead & 0x0Fu
-                            : Extra == 1 ? Lead & 0x1Fu
-                                         : Lead;
+        else if (Lead >= 0xE0 && Lead < 0xF0)
+        {
+            Extra = 2;
+            Code = Lead & 0x0Fu;
+            Minimum = 0x800;
+        }
+        else if (Lead >= 0xF0 && Lead < 0xF8)
+        {
+            Extra = 3;
+            Code = Lead & 0x07u;
+            Minimum = 0x10000;
+        }
         bool bValid = Lead < 0x80 || Extra != 0;
         for (int Index = 1; bValid && Index <= Extra; ++Index)
         {
@@ -917,16 +934,28 @@ std::wstring WidenUtf8(const char* Text)
                 Code = (Code << 6) | (Cursor[Index] & 0x3Fu);
             }
         }
-        if (bValid)
+        if (bValid && Extra != 0 &&
+            (Code < Minimum || (Code >= 0xD800 && Code <= 0xDFFF) || Code > 0x10FFFF))
         {
-            Out += static_cast<wchar_t>(Code);
-            Cursor += 1 + Extra;
+            bValid = false;
         }
-        else
+        if (!bValid)
         {
             Out += static_cast<wchar_t>(Lead);
             Cursor += 1;
+            continue;
         }
+        if (Code >= 0x10000)
+        {
+            Code -= 0x10000;
+            Out += static_cast<wchar_t>(0xD800 + (Code >> 10));
+            Out += static_cast<wchar_t>(0xDC00 + (Code & 0x3FFu));
+        }
+        else
+        {
+            Out += static_cast<wchar_t>(Code);
+        }
+        Cursor += 1 + Extra;
     }
     return Out;
 }
