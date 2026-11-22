@@ -104,7 +104,7 @@ const TextRenderAttributes& TextRenderContext::get_default_attributes()
 {
     // .text:06327480: size (+0x18) == 0 -> &DefaultAttrs (+0x24); otherwise the FRONT node's
     // value (head->_Next + 8), i.e. the most recently pushed attributes.
-    if (AttrStack.size() == 0)
+    if (AttrStack.empty())
     {
         return DefaultAttrs;
     }
@@ -255,14 +255,14 @@ void TextRenderContext::reset_to_default()
     // list<...>::erase, the list at +0x10 is this object's own), and CurrentAttrs is set from
     // the front of the attribute stack if it is still non-empty -- which it never is after the
     // erase loop -- else from DefaultAttrs (+0x24). PosH / PosV are not touched.
-    if (AttrStack.size() != 0)
+    if (!AttrStack.empty())
     {
         char Buffer[0x2000];
         _snprintf(Buffer, 0x2000, "size %d\n", (int)AttrStack.size());
         OutputDebugStringA(Buffer);
     }
     AttrStack.clear();
-    if (AttrStack.size() == 0)
+    if (AttrStack.empty())
     {
         CurrentAttrs = DefaultAttrs;
     }

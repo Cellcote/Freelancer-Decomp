@@ -362,7 +362,7 @@ namespace
 std::map<unsigned int, unsigned int>* __cdecl Reputation::GetChangedAffiliationClientMap()
 {
     // .text:0631e8d0: MOV EAX,[06401910] (the map's _Size) / NEG / SBB / AND EAX,06401900.
-    if (GChangedAffiliationClientMap.size() != 0)
+    if (!GChangedAffiliationClientMap.empty())
         return &GChangedAffiliationClientMap;
     return nullptr;
 }

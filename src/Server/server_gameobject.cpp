@@ -5081,7 +5081,7 @@ void Ship::tick_jettison(float Dt)
 {
     // .text:06d0155a .. 06d01572  FLD +0xac / FCOMP 0.0f, then the queue size
     // (+0xa8) decides the arm.
-    if (Jettison.Items.size() == 0u)
+    if (Jettison.Items.empty())
     {
         // .text:06d01574 TEST AH,0x44 / JNP -> return when the timer is 0.
         if (JettisonTimer == 0.0f)

@@ -1325,7 +1325,7 @@ namespace Universe
         std::map<unsigned, SYSTEM>::iterator Found = GSystems.find(SystemId);
         if (Found == GSystems.end())
             return nullptr;
-        if (Found->second.Zones.size() == 0)
+        if (Found->second.Zones.empty())
             return nullptr;
         return Found->second.Zones.front().Zone;
     }
