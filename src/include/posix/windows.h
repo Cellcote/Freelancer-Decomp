@@ -81,9 +81,9 @@ typedef char CHAR;
 typedef short SHORT;
 typedef float FLOAT;
 typedef void VOID;
-typedef long long LONGLONG;
-typedef unsigned long long ULONGLONG;
-typedef unsigned long long DWORD64;
+typedef std::int64_t LONGLONG; // int64_t, as on Windows (long on Linux, long long on macOS)
+typedef std::uint64_t ULONGLONG;
+typedef std::uint64_t DWORD64;
 typedef std::intptr_t INT_PTR;
 typedef std::uintptr_t UINT_PTR;
 typedef std::intptr_t LONG_PTR;
