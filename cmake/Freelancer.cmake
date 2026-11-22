@@ -38,9 +38,15 @@ set(FL_VENDORED_MODULES zlib qhull)
 if(FL_CLANG_TIDY)
   find_program(FL_CLANG_TIDY_EXE NAMES clang-tidy REQUIRED)
   message(STATUS "clang-tidy: ${FL_CLANG_TIDY_EXE}")
+  set(_fl_clang_tidy_command "${FL_CLANG_TIDY_EXE}")
+  if(FL_WINDOWS)
+    # clang-tidy sees cl's command line; /Y- drops /Yc, /Yu and /Fp there, since clang cannot
+    # read the precompiled header cl builds. The compile itself keeps its PCH options.
+    list(APPEND _fl_clang_tidy_command "--extra-arg=/Y-")
+  endif()
   # Every target defined after this point, including those not made with fl_add_module.
-  set(CMAKE_C_CLANG_TIDY "${FL_CLANG_TIDY_EXE}")
-  set(CMAKE_CXX_CLANG_TIDY "${FL_CLANG_TIDY_EXE}")
+  set(CMAKE_C_CLANG_TIDY "${_fl_clang_tidy_command}")
+  set(CMAKE_CXX_CLANG_TIDY "${_fl_clang_tidy_command}")
 endif()
 
 # _fl_clang_tidy(<name>): a vendored module is not checked.
@@ -572,6 +578,8 @@ function(fl_add_module name kind)
   else()
     message(FATAL_ERROR "fl_add_module(${name}): unknown kind ${kind}")
   endif()
+  # Before the early returns below (resource DLLs, static libraries such as qhull).
+  _fl_clang_tidy(${name})
   set_property(TARGET ${name} PROPERTY FL_MODULE_KIND ${_module_kind})
   set_property(TARGET ${name} PROPERTY FL_PCH ${A_PCH})
   # CMake would define <name>_EXPORTS in a DLL or an exe with exports; MSBuild defines no such
@@ -722,7 +730,6 @@ function(fl_add_module name kind)
     # An exe with exports gets an import library next to it, as MSBuild.
     set_property(TARGET ${name} PROPERTY ENABLE_EXPORTS ON)
   endif()
-  _fl_clang_tidy(${name})
 endfunction()
 
 # Resource-only DLLs: src\Resources\ResourceDll.props (no code, no CRT, no entry point, no PDB).
