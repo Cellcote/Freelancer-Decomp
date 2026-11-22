@@ -381,11 +381,22 @@ namespace
     // in the directory of Path.
     void MakeIniPaths(const char* Path, char (&IniPath)[0x104], char (&LocalIniPath)[0x104])
     {
+#if defined(_WIN32)
         char Drive[3] = {};
         char Directory[0x100] = {};
         _splitpath(Path, Drive, Directory, nullptr, nullptr);
         _makepath(IniPath, Drive, Directory, "freelancer.ini", nullptr);
         _makepath(LocalIniPath, Drive, Directory, "SrvLocal-freelancer.ini", nullptr);
+#else
+        // PORT(macOS): a native path: the directory runs to the last '/', as EnterModuleDirectory
+        // takes it ('\\' is a filename character here, which _splitpath would split at).
+        const char* const Slash = strrchr(Path, '/');
+        const std::string Directory =
+            Slash != nullptr ? std::string(Path, Slash + 1) : std::string();
+        snprintf(IniPath, sizeof(IniPath), "%sfreelancer.ini", Directory.c_str());
+        snprintf(LocalIniPath, sizeof(LocalIniPath), "%sSrvLocal-freelancer.ini",
+                 Directory.c_str());
+#endif
     }
 
     bool CopyLimited(const std::wstring& Value, wchar_t* Out, size_t Capacity, const char* What, size_t Limit)
