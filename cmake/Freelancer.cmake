@@ -131,7 +131,8 @@ if(NOT FL_WINDOWS)
       # sprintf / vsprintf stay as they are (macOS's SDK marks them deprecated). Both after
       # -Wall, which turns the warnings on.
       # The calling conventions are empty here too, and __int64 is long long, also for a source
-      # that does not include <windows.h> (the Lua 3.2 C files; GCC knows none of these).
+      # that does not include <windows.h> (the Lua 3.2 C files; GCC knows none of these). The D3D 8
+      # names come from the stand-in posix/d3d8.h.
       set(_posix_options "-D__declspec(x)=" -D__cdecl= -D__stdcall= -D__fastcall= -D__thiscall=
           "-D__int64=long long"
           -Wno-unknown-pragmas -Wno-deprecated-declarations)

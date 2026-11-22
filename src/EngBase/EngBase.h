@@ -13,6 +13,8 @@
 #include "luaprofile.h"
 #include "engine/engbase.h"
 #include "x86math.h"
+#include "handle_value.h"
+#include "x64_low_arena.h"
 
 #include <cstddef>
 #include <list>
@@ -440,13 +442,27 @@ protected:
     ~FAnimScript() = default;
 };
 
-// Bind descriptor: kind, sink, context token and target instance.
+// Bind descriptor: kind, sink, context token and target instance. Retail's four dwords on every
+// platform: a typed channel's Kind..Field14 are read as one (TypedBindDesc), and callers pass
+// one to IChannel::CreateTyped and IAnimation2::FindObject. PORT(x64): the sink (an
+// IChannelSink) and its context are HandleValue ids, the instance is LowArena-encoded
+// (engine/engbase.h); the accessors convert, and are the plain casts on Win32.
 struct FAnimBindOut
 {
     FlULong Kind;
-    void* Extra;
-    void* Typed;
-    FEngineInstance* Instance;
+    FlULong ExtraValue; // the sink
+    FlULong TypedValue; // its context
+    FlULong InstanceValue; // the target instance
+
+    void* Extra() const { return const_cast<void*>(HandleValue::ObjectOf(ExtraValue)); }
+    void* Typed() const { return const_cast<void*>(HandleValue::ObjectOf(TypedValue)); }
+    FEngineInstance* Instance() const
+    {
+        return LowArena::Decode<FEngineInstance>((FlLong)InstanceValue);
+    }
+    void SetExtra(void* Sink) { ExtraValue = HandleValue::Of(Sink); }
+    void SetTyped(void* Context) { TypedValue = HandleValue::Of(Context); }
+    void SetInstance(FEngineInstance* Target) { InstanceValue = (FlULong)LowArena::Encode(Target); }
 };
 
 // Constructors leave unspecified members uninitialized; release the archetype before freeing.
@@ -470,6 +486,14 @@ struct FTypedChannel
     virtual FlULong TouchMapped(void* ArgA, void* ArgB);
     virtual FlULong UpdateDeltaRate(float Dt); // formerly Slot13
     virtual FlULong Step(float* Out, float Dt);
+
+#if defined(FL_PTR64)
+    // PORT(x64): a typed channel is an IChannel key, which retail keeps in 32 bits, so the
+    // channels are LowArena blocks (Encode / Decode). They are freed through this base, which
+    // has no virtual destructor, so every type gets one block size: the largest's.
+    static void* operator new(std::size_t Size);
+    static void operator delete(void* Block);
+#endif
 
     IChannelOwner* Owner;                            // +0x04
     FlULong Kind;                              // +0x08
@@ -852,6 +876,10 @@ struct FChannelArchetypeObject : IChannelArchetype
     FlULong Stride;
     float Duration;
     FlULong RefCount;
+#if defined(FL_PTR64)
+    // PORT(x64): the size of Frames when this archetype owns it (event keys point into it).
+    std::size_t FramesBytes = 0;
+#endif
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
     FlULong DACOM_API AddRef() override;
@@ -904,7 +932,7 @@ FlULong TypedTick(FTypedChannel* This, float Dt);            // FUN_0661b420
 // The mixer-map key of a typed channel: typed+0x18 read as a signed int (FUN_06614f70).
 inline FlLong TypedMixerKey(FTypedChannel* This)
 {
-    return (FlLong)(ptrdiff_t)(This->Bind);
+    return LowArena::Encode(This->Bind); // Bind is the playback's root instance (LowArena)
 }
 
 // Mixer list primitives (EngBaseMixer.cpp).

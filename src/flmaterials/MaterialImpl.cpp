@@ -2371,8 +2371,7 @@ GENRESULT DACOM_API FMaterialImpl::ApplyVerify(void* Context, void* Extra)
         } AnimLib;
         if (Pipeline_->QueryInterface(Iids::MatAnimLibrary, (void**)&AnimLib.Object) >= 0)
         {
-            struct FAnimationNameQuery { const char* Name; FlULong Crc; };
-            FAnimationNameQuery Query = {InstanceName_, DACOM_CRC::GetCRC32(InstanceName_)};
+            FMaterialCrcQuery Query = {InstanceName_, DACOM_CRC::GetCRC32(InstanceName_)};
             if (MatAnim_ != nullptr)
             {
                 MatAnim_->Release();
@@ -2474,15 +2473,14 @@ GENRESULT DACOM_API FMaterialImpl::ResolveTextures(float Delta)
                 if (MatAnim_ == nullptr)
                 {
                     const char* Name = InstanceName_;
-                    FlULong CrcStruct[2];
-                    CrcStruct[0] = (FlULong)(Name);
-                    CrcStruct[1] = DACOM_CRC::GetCRC32(Name);
+                    FMaterialCrcQuery CrcStruct = {Name, DACOM_CRC::GetCRC32(Name)};
                     if (MatAnim_ != nullptr)
                     {
                         MatAnim_->Release();
                         MatAnim_ = nullptr;
                     }
-                    ((IMatAnimLibrary*)(AnimLib.Object))->CreateAnimationInstance(-1, CrcStruct, &MatAnim_);
+                    ((IMatAnimLibrary*)(AnimLib.Object))
+                        ->CreateAnimationInstance(-1, &CrcStruct, &MatAnim_);
                 }
             }
             else if (MatAnim_ != nullptr)

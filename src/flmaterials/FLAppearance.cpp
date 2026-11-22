@@ -372,10 +372,8 @@ namespace
             return;
         }
 
-        FlULong CrcStruct[2];
-        CrcStruct[0] = (FlULong)(Name);
-        CrcStruct[1] = DACOM_CRC::GetCRC32(Name);
-        Materials->RemoveMaterial(0, CrcStruct);
+        FMaterialCrcQuery CrcStruct = {Name, DACOM_CRC::GetCRC32(Name)};
+        Materials->RemoveMaterial(0, &CrcStruct);
     }
 
     void CreateOverrides(IDAComponent* Library)

@@ -7,6 +7,20 @@
 #pragma once
 
 // Public DACOM contracts for EngBase and Deformable2.
+//
+// PORT(x64): the 32-bit values in these interfaces that name an engine object. Retail keeps
+// them in DWORDs; on 64-bit builds each is a LowArena block, and a caller turns it into the
+// 32-bit value with LowArena::Encode and back with LowArena::Decode (x64_low_arena.h), never
+// with a cast (Win32 and x64 Windows compile both to the plain casts):
+// - an instance (IEngine::CreateInstance's result) wherever an interface takes it as a
+//   FlULong or int: IAnimation2::MixerWalk and RegisterHandle / HasHandle / HasAnyHandle keys,
+//   FindObject's query [3], and an IChannel bind map's [3];
+// - an IChannel key (CreateTyped / CreateFromObject / FindObject results, and the ChannelKey of
+//   IChannelOwner and IChannelSink calls): a typed channel;
+// - an archetype handle passed as an int (IEngine::QueryEngineComponent's Id).
+// An IChannel bind map's [1] (the IChannelSink) and [2] (its context) are HandleValue ids
+// (handle_value.h): callers pass any object there. GetFirstInstanceField's cookie and the event
+// keys a sink receives are HandleValue ids too. A playback id is a counter, not an address.
 
 #include "dacom.h"
 

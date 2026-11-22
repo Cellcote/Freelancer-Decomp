@@ -7,11 +7,39 @@
 #pragma once
 
 #include "dacom.h"
+#include "handle_value.h"
 #include "render/IBatchedMaterial.h"
 #include "render/IMaterial.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
+
+// PORT(x64): the pointers a property payload keeps in its first dword (an owned string, a
+// component) go through these, as HandleValue ids on 64-bit builds (one table per process on
+// macOS and Linux, so a value one module stores another reads). Plain casts on Win32. An owned
+// string's id is dropped when the string is freed (ShadingPayloadForget); a component's is
+// kept, since other payloads may name the same component.
+inline FlULong ShadingPayloadOf(const void* Pointer)
+{
+    return HandleValue::Of(Pointer);
+}
+template <class T>
+T* ShadingPayloadTo(FlULong Value)
+{
+    return (T*)(HandleValue::ObjectOf(Value));
+}
+inline void ShadingPayloadForget(FlULong Value)
+{
+    HandleValue::Forget(HandleValue::ObjectOf(Value));
+}
+// Frees a payload's owned string (types 5 and 7).
+inline void ShadingPayloadFreeString(FlULong Value)
+{
+    void* const Text = ShadingPayloadTo<void>(Value);
+    ShadingPayloadForget(Value);
+    HeapFree(GetProcessHeap(), 0, Text);
+}
 
 // Tagged DWORD payload with explicit string/component ownership.
 // Scalar payloads retain their bit patterns; lifetime is managed explicitly.
@@ -34,11 +62,11 @@ struct FShadingPropertyValue
         if (Type == 5 || Type == 7)
         {
             if (Payload0 != 0)
-                HeapFree(GetProcessHeap(), 0, (void*)Payload0);
+                ShadingPayloadFreeString(Payload0);
         }
         else if (Type == 6)
         {
-            IDAComponent* Component = (IDAComponent*)Payload0;
+            IDAComponent* Component = ShadingPayloadTo<IDAComponent>(Payload0);
             Payload0 = 0; // Clear before and after the foreign Release callback.
             if (Component != nullptr)
                 Component->Release();
@@ -54,11 +82,11 @@ struct FShadingPropertyValue
         if (Type == 5 || Type == 7)
         {
             if (Payload0 != 0)
-                HeapFree(GetProcessHeap(), 0, (void*)Payload0);
+                ShadingPayloadFreeString(Payload0);
         }
         else if (Type == 6)
         {
-            IDAComponent* Component = (IDAComponent*)Payload0;
+            IDAComponent* Component = ShadingPayloadTo<IDAComponent>(Payload0);
             Payload0 = 0; // Clear before and after the foreign Release callback.
             if (Component != nullptr)
                 Component->Release();
@@ -77,7 +105,7 @@ struct FShadingPropertyValue
         case 8:
         case 9:
         case 10:
-            Payload0 = (FlULong)Source;
+            Payload0 = (FlULong)(std::uintptr_t)Source; // a value carried in the pointer
             break;
         case 2:
             Payload0 = *(const FlULong*)Source;
@@ -98,14 +126,14 @@ struct FShadingPropertyValue
         {
             // Replace an old string even when the type stays the same.
             if (Payload0 != 0)
-                HeapFree(GetProcessHeap(), 0, (void*)Payload0);
+                ShadingPayloadFreeString(Payload0);
             Payload0 = 0;
             const char* Text = (const char*)Source;
             if (Text != nullptr)
             {
                 const size_t Size = std::strlen(Text) + 1;
                 char* Copy = (char*)HeapAlloc(GetProcessHeap(), 0, Size);
-                Payload0 = (FlULong)Copy;
+                Payload0 = ShadingPayloadOf(Copy);
                 // Publish before copying; the copy is mandatory.
                 std::memcpy(Copy, Text, Size);
             }
@@ -113,10 +141,10 @@ struct FShadingPropertyValue
         }
         case 6:
         {
-            IDAComponent* Previous = (IDAComponent*)Payload0;
+            IDAComponent* Previous = ShadingPayloadTo<IDAComponent>(Payload0);
             // Source is a const view; component reference management needs its mutable face.
             IDAComponent* Component = static_cast<IDAComponent*>(const_cast<void*>(Source));
-            Payload0 = (FlULong)Component;
+            Payload0 = ShadingPayloadOf(Component);
             if (Component != nullptr)
                 Component->AddRef();
             if (Previous != nullptr)

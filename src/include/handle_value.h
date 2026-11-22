@@ -14,15 +14,30 @@
 // - x64:   an id, the same for the same address until Forget. Ids start at 1, so 0 and
 //          0xFFFFFFFF (the interfaces' "none" values) never name an object.
 //
-// The table belongs to the module that includes this header (each DLL has its own copy), so a
-// value must be decoded by the module that made it. Kernel handles (HANDLE) need none of this:
-// Windows keeps their values within 32 bits on x64.
+// On x64 Windows the table belongs to the module that includes this header (each DLL has its
+// own copy), so a value must be decoded by the module that made it. On macOS and Linux it is
+// one table per process, held by dacom (FL_HANDLE_VALUE_DEFINE_SHARED, as LowArena's arena):
+// retail passes such values between modules (a material property's string or component, made
+// by one module and read by another). Kernel handles (HANDLE) need none of this: Windows keeps
+// their values within 32 bits on x64, and so does the POSIX platform layer.
 
 #include <cstdint>
 
 #if defined(FL_PTR64)
 #include <mutex>
 #include <unordered_map>
+#endif
+
+#if defined(FL_PTR64) && !defined(_WIN32)
+namespace HandleValue
+{
+namespace Detail
+{
+struct FTable;
+}
+}
+// The process's table (FL_HANDLE_VALUE_DEFINE_SHARED, in dacom).
+extern "C" HandleValue::Detail::FTable* FlHandleValueShared();
 #endif
 
 namespace HandleValue
@@ -38,11 +53,18 @@ namespace HandleValue
             FlULong NextId = 1;
         };
 
+#if defined(_WIN32)
         inline FTable& Table()
         {
             static FTable Instance;
             return Instance;
         }
+#else
+        inline FTable& Table()
+        {
+            return *FlHandleValueShared();
+        }
+#endif
     }
 
     // The value that names Object (null gives 0).
@@ -89,6 +111,26 @@ namespace HandleValue
         Table.Objects.erase(Found->second);
         Table.Ids.erase(Found);
     }
+
+    // Forget for every object in [Begin, End): the ids of addresses inside a buffer that is
+    // being freed.
+    inline void ForgetRange(const void* Begin, const void* End)
+    {
+        if (Begin == nullptr || End <= Begin)
+            return;
+        Detail::FTable& Table = Detail::Table();
+        std::lock_guard<std::mutex> Guard(Table.Lock);
+        for (auto It = Table.Ids.begin(); It != Table.Ids.end();)
+        {
+            if (It->first >= Begin && It->first < End)
+            {
+                Table.Objects.erase(It->second);
+                It = Table.Ids.erase(It);
+            }
+            else
+                ++It;
+        }
+    }
 #else
     inline FlULong Of(const void* Object)
     {
@@ -103,6 +145,8 @@ namespace HandleValue
     inline void Forget(const void*)
     {
     }
+
+    inline void ForgetRange(const void*, const void*) {}
 #endif
 
     // ObjectOf, typed.
@@ -112,3 +156,16 @@ namespace HandleValue
         return (T*)(ObjectOf(Value));
     }
 }
+
+#if defined(FL_PTR64) && !defined(_WIN32)
+// Defines the process's table: in dacom, and in a test that uses HandleValue without dacom.
+#define FL_HANDLE_VALUE_DEFINE_SHARED()                                                            \
+    extern "C" __attribute__((visibility("default"))) HandleValue::Detail::FTable*                 \
+    FlHandleValueShared()                                                                          \
+    {                                                                                              \
+        static HandleValue::Detail::FTable Instance;                                               \
+        return &Instance;                                                                          \
+    }
+#else
+#define FL_HANDLE_VALUE_DEFINE_SHARED()
+#endif
