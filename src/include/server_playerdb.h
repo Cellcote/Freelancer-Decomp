@@ -15,7 +15,7 @@
 #include "server_exports.h"         // SERVER_API
 #include "common_server_types.h"    // SLoginInfo, SCreateCharacterInfo
 #include "common_net.h"             // CPlayerAccount (by value in PlayerDB at +0x10)
-#include "common_server_playerdb.h" // PlayerData (PlayerDB's slot array)
+#include "server_playerdata.h" // PlayerData (PlayerDB's slot array)
 #include <cstring>   // _strnicmp (ci_char_traits)
 #include <cwchar>    // _wcsnicmp (ci_wchar_traits)
 #include <list>
@@ -147,14 +147,14 @@ public:
 // PlayerData & PlayerDB
 // ============================================================================
 // PlayerData used to be declared in server_pub.h a second time, as an opaque
-// `unsigned char data[0x418]` blob, while common_server_playerdb.h carried the
+// `unsigned char data[0x418]` blob, while server_playerdata.h carried the
 // real record under the name PlayerSlot. PlayerDB::m_PlayerArray was calloc'd
 // from the blob version and poked at retail byte offsets, and everything else
 // in the port wrote the other one; the two never met. There is one definition
-// now and it is the one in common_server_playerdb.h.
+// now and it is the one in server_playerdata.h.
 
 class SERVER_API PlayerDB {
-    // The port's own C accessor (common_server_playerdb.h) for the
+    // The port's own C accessor (server_playerdata.h) for the
     // allow-new-players flag at [this+0x0c]; not a retail function, and a friend
     // declaration exports nothing.
     friend bool __cdecl PlayerDB_AllowsNewPlayers();

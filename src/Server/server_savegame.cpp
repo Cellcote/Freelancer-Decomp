@@ -27,7 +27,7 @@
 
 #include "common_pub.h"
 #include "server_pub.h"          // Players (PlayerDB::operator[])
-#include "common_server_playerdb.h"
+#include "server_playerdata.h"
 #include "server_savegame.h"
 #include "server_savefile.h"        // FLS1, account paths, last saved path
 #include "common_net.h"             // IsMPServer

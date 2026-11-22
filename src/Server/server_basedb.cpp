@@ -10,7 +10,7 @@
 
 #include "server_basedb.h"
 #include "server_pub.h"          // Players, PlayerDB
-#include "common_server_playerdb.h" // PlayerData
+#include "server_playerdata.h" // PlayerData
 #include "common_reputation.h"      // Reputation::Vibe::GetName
 #include "common_misc.h"            // malloc_strcpy, malloc_wstrcpy
 #include "common_net.h"             // MarshalBuffer

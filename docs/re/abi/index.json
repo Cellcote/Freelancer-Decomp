@@ -39586,13 +39586,13 @@
    "name": "CargoDesc"
   },
   {
-   "file": "src/include/common_server_playerdb.h",
+   "file": "src/include/server_playerdata.h",
    "line": 14,
    "module": "(public)",
    "name": "CPlayerTradeOffer"
   },
   {
-   "file": "src/include/common_server_playerdb.h",
+   "file": "src/include/server_playerdata.h",
    "line": 773,
    "module": "(public)",
    "name": "Vector"

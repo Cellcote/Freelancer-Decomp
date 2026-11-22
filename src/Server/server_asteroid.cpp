@@ -15,7 +15,7 @@
 #include "common_cequip.h" // TractorArm
 #include "common_casteroid.h" // CmnAsteroid::CAsteroidSystem (SrvAsteroidSystem AddRef/Release/get_sys_id)
 #include "common_id.h"
-#include "common_server_playerdb.h"
+#include "server_playerdata.h"
 #include "server_savegame.h" // PlayerData_CreateNewCharacter (retail FUN_06d4b790)
 #include "server_savefile.h" // Server_AccountDirName / Server_GetAccountsRoot (FUN_06d49f60)
 #include "common_ini.h"

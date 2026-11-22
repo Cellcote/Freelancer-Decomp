@@ -33,7 +33,7 @@ struct IFileSystem;
 // forward declaration, with the definition sitting in the object layer, which meant that
 // anything wanting to HOLD a std::list<CollisionGroupDesc> by value had to include the whole
 // of common_cobject.h. PlayerData needs exactly that (retail slot+0x26c -- see
-// common_server_playerdb.h), and common_server_playerdb.h reaches fourteen translation units.
+// server_playerdata.h), and server_playerdata.h reaches fourteen translation units.
 //
 // Moving the struct costs nothing: every translation unit that includes common_cobject.h
 // gets this header through common_cobject.h's own `#include "common_archetype.h"`, and this

@@ -15,7 +15,7 @@
 #include "common_cobjdb.h"
 #include "common_csys.h"
 #include "common_cobject.h"
-#include "common_server_playerdb.h"
+#include "server_playerdata.h"
 #include "server_exports.h"
 #include "server_basedb.h"
 #include "server_cobject.h"
@@ -4682,7 +4682,7 @@ SERVER_API int __cdecl AdjustCash(const unsigned int& player_id, int amount) {
 
     // 0x06d55424 jumps into the body when IsMPServer() is false; 0x06d55430
     // jumps PAST it when [player+0x64] is zero. +0x64 is the session's SELECTED
-    // CHARACTER_ID (see common_server_playerdb.h -- proved on the raw bytes at
+    // CHARACTER_ID (see server_playerdata.h -- proved on the raw bytes at
     // 0x06d4a7d0), so the body runs on
     // `!IsMPServer() || selected_character[0] != 0`: an MP server only adjusts
     // the cash of a session that has actually picked a character. Still returns
@@ -5364,7 +5364,7 @@ SERVER_API int __cdecl SetMissionObjectives(const unsigned int& player_id, const
 // into a mission-log entry. That was a fabrication twice over -- retail's 0x75c10
 // never touches PlayerData+0x390 at all, and the `timestamp` field it wrote into
 // did not exist in retail either (the list holds FmtStr; see
-// PlayerData::mission_log in common_server_playerdb.h). The bogus write is gone.
+// PlayerData::mission_log in server_playerdata.h). The bogus write is gone.
 //
 // Ported 2026-09-24 (claude-code:w5-server-06d4) off .text:06d55c10..06d55d0f:
 //   guard -> -2 (EAX preset at .text:06d55c35)

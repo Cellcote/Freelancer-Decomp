@@ -15,7 +15,7 @@
 #include "common_ini.h"
 #include "common_goods.h"
 #include "common_universe.h"
-#include "common_server_playerdb.h"
+#include "server_playerdata.h"
 #include "server_savegame.h"
 #include "server_characterset.h" // CCharacterSet (CharacterInfoReq)
 #include "common_misc.h"      // safe_strcpy (CharacterSelect key)
@@ -1676,7 +1676,7 @@ void IServerImpl::Hail(unsigned int object_id, unsigned int arg1, unsigned int a
         if (Players.is_valid(session_id))
         { // .text:06cf0657 .. 06cf067b
             // FUN_06d498f0 reads only its first stack argument; the port's helper takes
-            // just that one (common_server_playerdb.h).
+            // just that one (server_playerdata.h).
             if (!PlayerData_CheckPositionBound(Players[session_id],
                                                &info.Position)) // .text:06cf0698
                 return; // .text:06cf069f
@@ -2147,7 +2147,7 @@ void IServerImpl::SetVisitedState(unsigned int session_id, unsigned char* data, 
         //
         // That is PlayerData::visit_map, NOT the pending queue at +0x3b8 this
         // used to write. The two are different containers (see the field note
-        // in common_server_playerdb.h): +0x3b8 is appended by FUN_06d4b270 and
+        // in server_playerdata.h): +0x3b8 is appended by FUN_06d4b270 and
         // drained into the map by FUN_06d4b450 when the player leaves a system.
         std::map<unsigned int, unsigned char>::iterator Existing = p->visit_map.find(system_id);
         if (Existing != p->visit_map.end())
