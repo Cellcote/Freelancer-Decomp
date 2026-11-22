@@ -30,7 +30,6 @@
 #include <vector>
 
 #if !defined(_WIN32)
-#include <clocale>
 #include <csignal>
 
 #include <pthread.h>
@@ -496,7 +495,13 @@ namespace
     // (src/ServerHost/server_host.cpp).
     bool IsServerRunning()
     {
+#if defined(_WIN32)
         return GServerRunning != 0;
+#else
+        // An atomic load, paired with StopServer's InterlockedExchange (a volatile read has no
+        // ordering with GCC or Clang).
+        return __atomic_load_n(&GServerRunning, __ATOMIC_SEQ_CST) != 0;
+#endif
     }
 
     // ApplyServerNews (.text:00413780).
@@ -846,7 +851,16 @@ int wmain(int Argc, wchar_t** Argv)
 #if defined(_WIN32)
     SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
 #else
-    CloseHandle(CreateThread(nullptr, 0, StopSignalThreadProc, nullptr, 0, nullptr));
+    // The stop signals are blocked in every thread; without this thread nothing takes them.
+    HANDLE const StopSignalThread =
+        CreateThread(nullptr, 0, StopSignalThreadProc, nullptr, 0, nullptr);
+    if (StopSignalThread == nullptr)
+    {
+        fprintf(stderr,
+                "FLDedicated: cannot start the thread that takes SIGINT, SIGTERM and SIGHUP\n");
+        return 1;
+    }
+    CloseHandle(StopSignalThread);
 #endif
 
     // AfxOleInit in InitInstance.
@@ -867,34 +881,64 @@ int wmain(int Argc, wchar_t** Argv)
 }
 
 #if !defined(_WIN32)
-// PORT(macOS): no wmain outside Windows. The arguments are widened from the locale's encoding
-// (UTF-8), as the Windows console hands them to wmain.
+// PORT(macOS): no wmain outside Windows. The arguments are UTF-8 (macOS always passes them so,
+// and Linux in any UTF-8 locale), widened here as the Windows console hands them to wmain. A
+// byte that is not valid UTF-8 is taken as itself (Latin-1).
+namespace
+{
+std::wstring WidenUtf8(const char* Text)
+{
+    std::wstring Out;
+    const unsigned char* Cursor = reinterpret_cast<const unsigned char*>(Text);
+    while (*Cursor != 0)
+    {
+        const unsigned char Lead = *Cursor;
+        int Extra = Lead >= 0xF0 && Lead < 0xF8   ? 3
+                    : Lead >= 0xE0                ? 2
+                    : Lead >= 0xC2 && Lead < 0xE0 ? 1
+                                                  : 0;
+        if (Lead >= 0xF8)
+        {
+            Extra = 0;
+        }
+        unsigned int Code = Extra == 3   ? Lead & 0x07u
+                            : Extra == 2 ? Lead & 0x0Fu
+                            : Extra == 1 ? Lead & 0x1Fu
+                                         : Lead;
+        bool bValid = Lead < 0x80 || Extra != 0;
+        for (int Index = 1; bValid && Index <= Extra; ++Index)
+        {
+            if ((Cursor[Index] & 0xC0u) != 0x80u)
+            {
+                bValid = false;
+            }
+            else
+            {
+                Code = (Code << 6) | (Cursor[Index] & 0x3Fu);
+            }
+        }
+        if (bValid)
+        {
+            Out += static_cast<wchar_t>(Code);
+            Cursor += 1 + Extra;
+        }
+        else
+        {
+            Out += static_cast<wchar_t>(Lead);
+            Cursor += 1;
+        }
+    }
+    return Out;
+}
+}
+
 int main(int Argc, char** Argv)
 {
-    std::setlocale(LC_CTYPE, "");
     std::vector<std::wstring> Wide;
     Wide.reserve(static_cast<size_t>(Argc));
     for (int Index = 0; Index < Argc; ++Index)
     {
-        std::wstring Text;
-        std::mbstate_t State{};
-        const char* Source = Argv[Index];
-        const size_t Length = std::mbsrtowcs(nullptr, &Source, 0, &State);
-        if (Length != static_cast<size_t>(-1))
-        {
-            Text.resize(Length);
-            Source = Argv[Index];
-            State = std::mbstate_t{};
-            std::mbsrtowcs(&Text[0], &Source, Length, &State);
-        }
-        else
-        {
-            for (const char* Cursor = Argv[Index]; *Cursor != 0; ++Cursor)
-            {
-                Text += static_cast<wchar_t>(static_cast<unsigned char>(*Cursor));
-            }
-        }
-        Wide.push_back(Text);
+        Wide.push_back(WidenUtf8(Argv[Index]));
     }
     std::vector<wchar_t*> Pointers;
     for (std::wstring& Text : Wide)

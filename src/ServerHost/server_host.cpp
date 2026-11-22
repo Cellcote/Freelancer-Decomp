@@ -20,6 +20,7 @@
 
 #include "common_ini.h"           // ILoadingScreen
 #include "common_misc.h"          // WaitForServerRunPermission, GiveClientRunPermission
+#include "rpc_wire_wide.h"        // FLServer.cfg's UTF-16 strings
 #include "common_timing.h"        // Timing
 #include "dacom.h"                // DACOM_GetDllVersion
 #include "remoteclient.h"         // SetRemoteClient*
@@ -174,6 +175,43 @@ void PublishServerSession(const wchar_t* Name, const wchar_t* Password, bool bAl
         Server.GetServerID(), Server.GetServerSig());
 }
 
+namespace
+{
+// FLServer.cfg keeps its three strings as UTF-16, 2 bytes a character (0x42, 0x102 and
+// 0x22 bytes, server_host.h), as Windows writes them. On Windows that is the wchar_t array
+// itself; with a 4-byte wchar_t (macOS, Linux) each unit is converted (rpc_wire_wide.h).
+// A short read converts only the units it read, as Windows' fread fills only those.
+template <size_t Count>
+void ReadWideField(FILE* File, wchar_t (&Field)[Count])
+{
+    if constexpr (sizeof(wchar_t) == 2)
+    {
+        fread(Field, sizeof(Field), 1, File);
+    }
+    else
+    {
+        unsigned char Units[Count * 2];
+        const size_t Read = fread(Units, 2, Count, File);
+        RpcWireToWide(Field, Units, static_cast<unsigned int>(Read));
+    }
+}
+
+template <size_t Count>
+void WriteWideField(FILE* File, const wchar_t (&Field)[Count])
+{
+    if constexpr (sizeof(wchar_t) == 2)
+    {
+        fwrite(Field, sizeof(Field), 1, File);
+    }
+    else
+    {
+        unsigned char Units[Count * 2];
+        RpcWideToWire(Units, Field, static_cast<unsigned int>(Count));
+        fwrite(Units, sizeof(Units), 1, File);
+    }
+}
+}
+
 bool ReadServerConfigFile(FServerConfigFile& Config, char (&Path)[0x400])
 {
     Players.MakeLocalUserPath(Path, ServerConfigFileName);
@@ -185,9 +223,9 @@ bool ReadServerConfigFile(FServerConfigFile& Config, char (&Path)[0x400])
     fread(&Config.Version, 4, 1, File);
     if (Config.Version == 2 || Config.Version == 3)
     {
-        fread(Config.ServerName, sizeof(Config.ServerName), 1, File);
-        fread(Config.Description, sizeof(Config.Description), 1, File);
-        fread(Config.Password, sizeof(Config.Password), 1, File);
+        ReadWideField(File, Config.ServerName);
+        ReadWideField(File, Config.Description);
+        ReadWideField(File, Config.Password);
         fread(&Config.bAllowNewPlayers, 1, 1, File);
         fread(&Config.bInternetAccessible, 1, 1, File);
         fread(&Config.MaxPlayers, 4, 1, File);
@@ -209,9 +247,9 @@ bool WriteServerConfigFile(const FServerConfigFile& Config, char (&Path)[0x400])
         return false;
     }
     fwrite(&Config.Version, 4, 1, File);
-    fwrite(Config.ServerName, sizeof(Config.ServerName), 1, File);
-    fwrite(Config.Description, sizeof(Config.Description), 1, File);
-    fwrite(Config.Password, sizeof(Config.Password), 1, File);
+    WriteWideField(File, Config.ServerName);
+    WriteWideField(File, Config.Description);
+    WriteWideField(File, Config.Password);
     fwrite(&Config.bAllowNewPlayers, 1, 1, File);
     fwrite(&Config.bInternetAccessible, 1, 1, File);
     fwrite(&Config.MaxPlayers, 4, 1, File);
