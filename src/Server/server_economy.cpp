@@ -37,6 +37,12 @@ struct FLedger
     // A refused GFGoodBuy: the client sends its payment anyway (BuyFromDealer does not wait),
     // and that payment, the next cash change, is refused too.
     bool bRefusedBuy = false;
+    // The ammo package of a refused gun purchase: the client still asks for it (with no
+    // payment after it), and it is refused quietly.
+    unsigned int RefusedAmmoGood = 0;
+    // Goods sold this dock, by good: the client's market takes them back into stock
+    // (SellSelected), so it offers them for sale again even when the base does not.
+    std::map<unsigned int, long long> SoldBack;
     // The price the client paid per unit this dock, by good. A dock's prices are fixed
     // (LoadLocationBase fills the market once per dock), and the client buys and sells a good
     // at the same price, so a sale this dock pays no more than that.
@@ -214,46 +220,46 @@ long long ShipCeiling(PlayerSlot const& Slot, FLedger const& Ledger)
             Ceiling += Sold * MaxUnit(Base, Arch2Good(It->first));
     }
     return Ceiling;
-    }
+}
 
     // A ship purchase that did not complete, or that the player could not pay for: the
     // loadout and cash it changed go back to what they were.
-    void RollBackShip(PlayerSlot& Slot, FLedger& Ledger)
-    {
-        Ledger.bShip = false;
-        if (Ledger.bEquipmentSet)
-            PlayerData_LoadEquipment(Slot, Ledger.OldEquipment);
-        if (Slot.cash != Ledger.StartCash)
-            PlayerData_SetCash(Slot, Ledger.StartCash);
-    }
+void RollBackShip(PlayerSlot& Slot, FLedger& Ledger)
+{
+    Ledger.bShip = false;
+    if (Ledger.bEquipmentSet)
+        PlayerData_LoadEquipment(Slot, Ledger.OldEquipment);
+    if (Slot.cash != Ledger.StartCash)
+        PlayerData_SetCash(Slot, Ledger.StartCash);
+}
 
     // An open ship purchase is closed: complete when the hull arrived (cash held to the
     // ceiling), otherwise undone.
-    void FinishShip(PlayerSlot& Slot, FLedger& Ledger)
+void FinishShip(PlayerSlot& Slot, FLedger& Ledger)
+{
+    if (!Ledger.bShip)
+        return;
+    if (!Ledger.bHullSet)
     {
-        if (!Ledger.bShip)
-            return;
-        if (!Ledger.bHullSet)
-        {
-            RollBackShip(Slot, Ledger);
-            return;
-        }
-        Ledger.bShip = false;
-        long long const Ceiling = ShipCeiling(Slot, Ledger);
-        if (Slot.cash > Ceiling)
-            PlayerData_SetCash(Slot, ClampCash(Ceiling));
+        RollBackShip(Slot, Ledger);
+        return;
     }
+    Ledger.bShip = false;
+    long long const Ceiling = ShipCeiling(Slot, Ledger);
+    if (Slot.cash > Ceiling)
+        PlayerData_SetCash(Slot, ClampCash(Ceiling));
+}
 
     // The lowest price paid for a good this dock: an honest client pays one price per good per
     // dock, so a higher one can only raise the resale cap of the units bought earlier.
-    void NotePricePaid(FLedger& Ledger, unsigned int GoodId, long long Unit)
-    {
-        std::map<unsigned int, long long>::iterator It = Ledger.UnitPaid.find(GoodId);
-        if (It == Ledger.UnitPaid.end())
-            Ledger.UnitPaid[GoodId] = Unit;
-        else if (Unit < It->second)
-            It->second = Unit;
-    }
+void NotePricePaid(FLedger& Ledger, unsigned int GoodId, long long Unit)
+{
+    std::map<unsigned int, long long>::iterator It = Ledger.UnitPaid.find(GoodId);
+    if (It == Ledger.UnitPaid.end())
+        Ledger.UnitPaid[GoodId] = Unit;
+    else if (Unit < It->second)
+        It->second = Unit;
+}
 
 void SettleAll(PlayerSlot& Slot, FLedger& Ledger)
 {
@@ -328,8 +334,16 @@ bool Ledger_OnGoodBuy(PlayerSlot& Slot, unsigned int SessionId, SGFGoodBuyInfo c
 
     BaseData const* const Base = FindBaseData(BaseId);
     GoodInfo const* const Good = GoodList::find_by_id(GoodId);
+    if (!bAmmo && Ledger.RefusedAmmoGood != 0 && GoodId == Ledger.RefusedAmmoGood)
+    {
+        Ledger.RefusedAmmoGood = 0;
+        return false;
+    }
+    Ledger.RefusedAmmoGood = 0;
+    std::map<unsigned int, long long>::iterator Sold = Ledger.SoldBack.find(GoodId);
+    bool const bSoldBack = Sold != Ledger.SoldBack.end() && Sold->second >= Count;
     bool bOk = Docked(Slot) && BaseId == Slot.current_base && Count >= 1 && Good != nullptr &&
-               Sells(Base, GoodId);
+               (Sells(Base, GoodId) || bSoldBack);
     if (bOk && bAmmo)
     {
         if (Count > Ledger.FreeAmmoLeft)
@@ -349,10 +363,19 @@ bool Ledger_OnGoodBuy(PlayerSlot& Slot, unsigned int SessionId, SGFGoodBuyInfo c
         bOk = false;
     if (!bOk)
     {
-        if (!bAmmo)
+        // The dealer's payment follows a refused purchase of goods or equipment. A ship
+        // purchase pays with ReqSetCash instead (refused outside an open purchase), and an
+        // ammo package has no payment.
+        if (!bAmmo && Good != nullptr && Good->Category != GoodCategoryShip)
+        {
             Ledger.bRefusedBuy = true;
+            if (Good->FreeAmmoArchId != 0 && Good->FreeAmmoCount > 0)
+                Ledger.RefusedAmmoGood = Arch2Good(Good->FreeAmmoArchId);
+        }
         return false;
     }
+    if (bSoldBack && !Sells(Base, GoodId))
+        Sold->second -= Count;
 
     if (Good->Category == GoodCategoryShip)
     {
@@ -551,7 +574,7 @@ bool Ledger_OnChangeCash(PlayerSlot& Slot, unsigned int SessionId, int Delta)
             ResyncCash(Slot);
             return false;
         }
-        Ledger.Balance -= Delta;   // a payment
+        Ledger.Balance -= Delta; // a payment
         if (Ledger.PricedCount > 0)
         {
             // The client paid package price x count (BuyFromDealer), and sells this dock at that
@@ -615,5 +638,6 @@ void Ledger_RemoveItem(PlayerSlot& Slot, unsigned int SessionId, unsigned short 
     Ledger.bCredit = false;
     Ledger.Credit = 0;
     Ledger.bSaleNamed = false;
+    Ledger.SoldBack[Ledger.SaleGood] += Sold;
     PlayerData_SetCash(Slot, ClampCash(static_cast<long long>(Slot.cash) + Pay));
 }
