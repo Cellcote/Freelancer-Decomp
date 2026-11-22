@@ -325,7 +325,7 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 - **PLAYER_TRADE on a multiplayer server.** Retail read the uncounted target DWORD (actions 04/08/10) and wrote one (action 40) past the received message. The port touches it only when it is counted. Clients leave it out there, and the dispatch does not use it.
 - **Hardpoint names.** In REQEQUIPMENT, REQCARGO, REQADDITEM and REQMODIFYITEM, RemoteClient refuses a non-empty hardpoint whose last byte is not 0. The client always sends `strlen + 1` bytes, and `StringAlloc` reads to the terminator.
 
-**Not changed.** A packet that fails to decode is still not released, as in retail, because a failed `Decode` can leave owned pointers unset.
+**Failed decodes.** Retail never releases a packet that failed to decode, so each rejected message leaked it. The port releases it. Every client-to-server packet that owns memory starts with its pointers null, and a decoder stores only its own allocations in them, so the destructor is safe after a failed decode.
 
 **Tests.** RpcCodecTest used to skip the overflowing inputs. It now records them as failed decodes (`0x17`), so its output differs from the base: the PR carries `codecs: expected change`.
 
@@ -421,3 +421,23 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 - Selling in a later dock pays up to the highest variance price, because the client draws new prices on every dock. So the price spread is open to whoever docks again, as it is in retail.
 - A mod whose client market differs from the server's prices against the server's data.
 - Rolling back at undock with retail's net-worth check is not done.
+
+## Server: account names kept out of the logs (SERVER-LOG-ACCOUNT-ID, 2026-11-22)
+
+> **Status:** OPEN (retail defect fixed)
+> **Owner:** Server (`src/Server/server_playerdb.cpp`, `AccountLogLabel`); code tagged `PORT(deviation) SERVER-LOG-ACCOUNT-ID`
+> **Removal condition:** none planned.
+
+**Retail.** The multiplayer log lines for login, logout, character deletion, and account creation and deletion print the account name (`%S`). So do the cheat report and `cheaters.log`. A multiplayer account name is the account's only credential: the client sends it from its registry as its login. Anyone who can read the server log can therefore log in as any player in it.
+
+**Port.** These lines print the account's directory name instead (`Server_AccountDirName`, `%02x-%08x` of a CRC of the lowercased name). That is the folder under `Accts\MultiPlayer`, so an operator can still tell which account it was. Single player logs nothing here, as before.
+
+## RemoteClient: no joins before the server's password is set (SERVER-STARTUP-PASSWORD, 2026-11-22)
+
+> **Status:** OPEN (retail defect fixed)
+> **Owner:** RemoteClient (`src/RemoteClient/RemoteClient_transport.cpp`, `CClientImpl::Startup`); code tagged `PORT(deviation) SERVER-STARTUP-PASSWORD`
+> **Removal condition:** none planned.
+
+**Retail.** `CClientImpl::Startup` starts hosting with an empty password. FLServer and FLDedicated set the configured password (`PublishServerSession`, `SetRemoteClientPassword`) only after `IServerImpl::Startup` has returned. A client that joins in between keeps its connection on a password-protected server.
+
+**Port.** Startup hosts with a random 32-character password from `std::random_device` until `PublishServerSession` sets the real one, which may be empty. A client that tries during startup gets "wrong password", and can retry a moment later. Both hosts call `PublishServerSession`, FLServer even when startup failed.

@@ -569,6 +569,18 @@ void Server_RdlAppend(RenderDisplayList& Rdl, const RDLNode& Node) {
     Rdl.Count++;
 }
 
+// PORT(deviation) SERVER-LOG-ACCOUNT-ID: a multiplayer account name is the account's only
+// credential (the client sends it from the registry as its login), so the logs name the
+// account by its directory name (Server_AccountDirName, a CRC of the lowercased name) instead.
+static std::string AccountLogLabel(const wchar_t* AccountName)
+{
+    if (AccountName == nullptr)
+        return std::string();
+    char Label[32];
+    Server_AccountDirName(Label, AccountName);
+    return Label;
+}
+
 void PlayerData_ReportCheat(PlayerData& Slot, int Reason) {
     // (1) resolve the character name off the reputation vibe.
     const wchar_t* CharacterNameWide = GCheatBadName;
@@ -583,7 +595,7 @@ void PlayerData_ReportCheat(PlayerData& Slot, int Reason) {
     }
 
     const std::string CharacterName = NarrowCopy(CharacterNameWide);
-    const std::string AccountName = NarrowCopy(Slot.AccountName);
+    const std::string AccountName = AccountLogLabel(Slot.AccountName);
 
     // (w4-server-guards) retail 06d4f6b3 `MOV EDX,[ECX*4 + .data:06d8d430]` indexes the
     // reason table directly -- no range clamp -- and 06d4f6c6/06d4f6cb load the
@@ -2561,8 +2573,8 @@ void PlayerDB::logout(unsigned int SessionId) {
         // account DIRECTORY PATH at login. It is a real member now
         // (CAccount::m_DirectoryPath). Retail's own null guard is the MSVCP60
         // `_Nullstr` fallback at 0x06d545bc, which is the empty string.
-        FDUMP(0x100003, "LOG: Logout on account %S (\"%s\")\n",
-              Slot.AccountName, Account->m_DirectoryPath.c_str());
+        FDUMP(0x100003, "LOG: Logout on account %s (\"%s\")\n",
+              AccountLogLabel(Slot.AccountName).c_str(), Account->m_DirectoryPath.c_str());
     }
 
     // (10) the slot teardown, retail FUN_06d49230(slot) = PlayerData_Teardown
@@ -3005,8 +3017,8 @@ bool __cdecl PlayerData_DestroyCharacter(PlayerData& Slot, CHARACTER_ID const& I
 
     // .text:06d4a192 .. .text:06d4a1b3 -- outside single player, log it.
     if (!SinglePlayer()) {
-        FDUMP(0x100003, "LOG: Delete character on account %S (\"%s\")\n",
-              Slot.AccountName, Path);
+        FDUMP(0x100003, "LOG: Delete character on account %s (\"%s\")\n",
+              AccountLogLabel(Slot.AccountName).c_str(), Path);
     }
     return true;                                                        // .text:06d4a1b8
 }
@@ -3820,8 +3832,8 @@ static unsigned char PlayerData_LoginAccount(PlayerData& Slot, const char* Accou
         } else {
             Result = 3;                                                     // .text:06d490a8
             if (!SinglePlayer()) {                                          // .text:06d490ad
-                FDUMP(0x100003, "LOG: Login on account %S (\"%s\")\n",
-                      Info.AccountName, AccountDir);                        // .text:06d490d1
+                FDUMP(0x100003, "LOG: Login on account %s (\"%s\")\n",
+                      AccountLogLabel(Info.AccountName).c_str(), AccountDir); // .text:06d490d1
             }
             static_cast<CAccount*>(Slot.account_ptr)->m_DirectoryPath = AccountDir; // .text:06d490d6..06d4911b
         }
@@ -4270,7 +4282,8 @@ void PlayerDB::DeleteAccount(CiWString& AccountName) {
     // .text:06d521e7 .. 06d52218: !SinglePlayer() logs through the FDUMP hook
     // (0x100003, .rdata:06d6b8b8), not OutputDebugString.
     if (!SinglePlayer()) {
-        FDUMP(0x100003, "LOG: Delete account %S \"%s\"\n", NamePtr, AccountDir);
+        FDUMP(0x100003, "LOG: Delete account %s \"%s\"\n", AccountLogLabel(NamePtr).c_str(),
+              AccountDir);
     }
 
     // Force logout and delete account object
@@ -4350,7 +4363,8 @@ bool PlayerDB::CreateAccount(CiWString& AccountName) {
     // .text:06d525c6 .. 06d525f9: !SinglePlayer() logs through the FDUMP hook
     // (0x100003), not OutputDebugString (fixed 2026-09-24, claude-code:w5-server-06d4).
     if (!SinglePlayer()) {
-        FDUMP(0x100003, "LOG: Create account %S \"%s\"\n", NamePtr, AccountDir);
+        FDUMP(0x100003, "LOG: Create account %s \"%s\"\n", AccountLogLabel(NamePtr).c_str(),
+              AccountDir);
     }
 
     // .text:06d525fe .. 06d52682: operator new(0x38) and the default ctor inlined
