@@ -11,6 +11,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+#include <cstddef>
 #include <cstring>
 #include <vector>
 #include "x87_portable.h"
@@ -1738,8 +1739,12 @@ GENRESULT DACOM_API FTextureLibrary::FindTextureByCrc(void* Query, void** OutTex
 {
     // LAB_06ec2810 RET 0xC: CRC at Query+4 → map this+0x54 (FUN_06ecaa00).
     // Hit: FUN_06ebe560(tex) then *OutTex = node+0x10. Miss: EAX=-1.
-    // Every caller passes an FMaterialCrcQuery or a struct of its layout ({name, CRC}).
-    const FlULong Crc = static_cast<const FMaterialCrcQuery*>(Query)->Crc;
+    // Callers pass their own {name, CRC} structs, all with FMaterialCrcQuery's layout; the CRC is
+    // copied from the caller's bytes at that offset (+4 on Win32, +8 on 64-bit builds) rather
+    // than read through an FMaterialCrcQuery the object is not.
+    FlULong Crc;
+    std::memcpy(&Crc, static_cast<const unsigned char*>(Query) + offsetof(FMaterialCrcQuery, Crc),
+                sizeof(Crc));
     FTextureEntry* Entry = FindEntryByCrc(Crc);
     if (Entry == nullptr)
         return GR_GENERIC;
