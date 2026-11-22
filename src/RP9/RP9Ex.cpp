@@ -192,8 +192,8 @@ namespace
         {
             const char* Text = (const char*)(Errors->GetBufferPointer());
             if (Text != nullptr)
-                ExLog(bOk ? kExFdumpWarning : kExFdumpError, bOk ? "WARNING" : "ERROR",
-                      __LINE__, Text);
+                ExLog(bOk ? kExFdumpWarning : kExFdumpError, bOk ? "WARNING" : "ERROR", __LINE__,
+                      Text);
         }
         if (!bOk)
             return false;
@@ -315,9 +315,9 @@ namespace
         unsigned long Bytes = 0;
         const D3DFORMAT Format = ExFormatToD3d(Target->Format, &Bytes);
         ComPtr<IDirect3DTexture9> Texture;
-        HRESULT Hr = Device->CreateTexture((UINT)(Width), (UINT)(Height), 1, D3DUSAGE_RENDERTARGET,
-                                           Format, D3DPOOL_DEFAULT, Texture.GetAddressOf(),
-                                           nullptr);
+        HRESULT Hr =
+            Device->CreateTexture((UINT)(Width), (UINT)(Height), 1, D3DUSAGE_RENDERTARGET, Format,
+                                  D3DPOOL_DEFAULT, Texture.GetAddressOf(), nullptr);
         ComPtr<IDirect3DSurface9> Surface;
         if (SUCCEEDED(Hr))
             Hr = Texture->GetSurfaceLevel(0, Surface.GetAddressOf());
@@ -624,8 +624,8 @@ HRESULT FDirectX9::ExCreateDeviceResources(bool bIntzDepth, D3DFORMAT DepthForma
     {
         ComPtr<IDirect3DSurface9> BackBuffer;
         D3DSURFACE_DESC Desc;
-        if (SUCCEEDED(Device_->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO,
-                                             BackBuffer.GetAddressOf())) &&
+        if (SUCCEEDED(
+                Device_->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, BackBuffer.GetAddressOf())) &&
             SUCCEEDED(BackBuffer->GetDesc(&Desc)))
         {
             Ex->BackBufferWidth = Desc.Width;
@@ -639,10 +639,9 @@ HRESULT FDirectX9::ExCreateDeviceResources(bool bIntzDepth, D3DFORMAT DepthForma
         // is the depth surface from now on (same size as the back buffer, no multisampling).
         ComPtr<IDirect3DTexture9> Texture;
         ComPtr<IDirect3DSurface9> Surface;
-        HRESULT Hr = Device_->CreateTexture((UINT)(Ex->BackBufferWidth),
-                                            (UINT)(Ex->BackBufferHeight), 1, D3DUSAGE_DEPTHSTENCIL,
-                                            kIntzFormat, D3DPOOL_DEFAULT, Texture.GetAddressOf(),
-                                            nullptr);
+        HRESULT Hr = Device_->CreateTexture(
+            (UINT)(Ex->BackBufferWidth), (UINT)(Ex->BackBufferHeight), 1, D3DUSAGE_DEPTHSTENCIL,
+            kIntzFormat, D3DPOOL_DEFAULT, Texture.GetAddressOf(), nullptr);
         if (SUCCEEDED(Hr))
             Hr = Texture->GetSurfaceLevel(0, Surface.GetAddressOf());
         if (SUCCEEDED(Hr))
@@ -661,11 +660,9 @@ HRESULT FDirectX9::ExCreateDeviceResources(bool bIntzDepth, D3DFORMAT DepthForma
             ExLogf(kExFdumpWarning, "WARNING", __LINE__,
                    "INTZ depth texture failed (hr 0x%08x); plain depth surface instead, no scene "
                    "depth", (unsigned int)(Hr));
-            Hr = Device_->CreateDepthStencilSurface((UINT)(Ex->BackBufferWidth),
-                                                    (UINT)(Ex->BackBufferHeight), DepthFormat,
-                                                    D3DMULTISAMPLE_NONE, 0, FALSE,
-                                                    Ex->FallbackDepth.ReleaseAndGetAddressOf(),
-                                                    nullptr);
+            Hr = Device_->CreateDepthStencilSurface(
+                (UINT)(Ex->BackBufferWidth), (UINT)(Ex->BackBufferHeight), DepthFormat,
+                D3DMULTISAMPLE_NONE, 0, FALSE, Ex->FallbackDepth.ReleaseAndGetAddressOf(), nullptr);
             if (SUCCEEDED(Hr))
                 Hr = Device_->SetDepthStencilSurface(Ex->FallbackDepth.Get());
         }
@@ -869,9 +866,8 @@ GENRESULT DACOM_API FDirectX9::CreateExRenderTarget(const FRPExRenderTargetDesc*
     Target->TargetDesc = *Desc;
     if (Device_ != nullptr && (DeviceReady_ & 1) != 0)
     {
-        const HRESULT Hr =
-            CreateRenderTargetGpu(Device_, Target.get(), Ex_->BackBufferWidth,
-                                  Ex_->BackBufferHeight);
+        const HRESULT Hr = CreateRenderTargetGpu(Device_, Target.get(), Ex_->BackBufferWidth,
+                                                 Ex_->BackBufferHeight);
         if (FAILED(Hr))
             return (GENRESULT)(Hr);
     }
