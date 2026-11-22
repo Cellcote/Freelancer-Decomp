@@ -32,7 +32,7 @@
 #include "DALib.h"         // DALib::Engine (Ship::create / Solar::create, IEngine +0x6c)
 #include "common_ini.h"              // StringAlloc (EqObj::*_by_name / dump_cargo)
 #include "server_pub.h"           // Players, Server_BroadcastGroupControl (EqObj::destroy)
-#include "server_playerdata.h"  // PlayerData_ShouldQueueVisit / PlayerData_QueueVisit
+#include "server_playerdata.h" // PlayerData_ShouldQueueVisit / PlayerData_QueueVisit
 #include "common_server_types.h"     // ServerStats (EqObj::destroy)
 #include "rpc_iclient_args.h"        // FServerBurnFuseInfo (EqObj::light_fuse)
 #include <map>                                  // ServerFuseDB::Get (EqObj::light_fuse)
