@@ -187,7 +187,29 @@ jobs:
           for /f "usebackq delims=" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set "VSDIR=%%i"
           call "%VSDIR%\VC\Auxiliary\Build\vcvarsall.bat" %ARCH% || exit /b 1
           cmake --preset %PRESET% %OPTIONS% || exit /b 1
-          cmake --build --preset %PRESET% || exit /b 1
+          rem The output goes to build.log for the warning summary, and is printed after.
+          cmake --build --preset %PRESET% > build.log 2>&1
+          set BUILD_RESULT=%ERRORLEVEL%
+          type build.log
+          exit /b %BUILD_RESULT%
+
+      # /W4 warnings are reported, not fatal: a table per warning and per module on the run
+      # page, and the full log beside the binaries. The PR side only (the base side's checkout
+      # may predate the script).
+      - name: Summarise warnings
+        if: always() && matrix.side == 'pr' && hashFiles('build.log') != ''
+        shell: pwsh
+        run: |
+          python .github/scripts/warning_summary.py build.log "Compiler warnings (${{ matrix.platform }})" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload build output
+        if: always() && matrix.side == 'pr'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-${{ matrix.platform }}
+          path: build.log
+          if-no-files-found: ignore
+          retention-days: 14
 
       # A base commit from before the CMake build (src\Freelancer.sln) is built with MSBuild.
       - uses: microsoft/setup-msbuild@v2
@@ -668,6 +690,20 @@ jobs:
           cmake --build --preset portable
           ctest --preset portable
 
+      # clang-tidy (.clang-tidy) over the portable modules, once (Linux, Clang). Findings are
+      # reported on the run page, not fatal; a source clang-tidy cannot parse fails the step.
+      - name: clang-tidy
+        if: matrix.name == 'Linux Clang'
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: |
+          pipx install clang-tidy==19.1.0
+          cmake --preset portable -B build/tidy -DFL_CLANG_TIDY=ON
+          set -o pipefail
+          cmake --build build/tidy 2>&1 | tee tidy.log
+          python3 .github/scripts/warning_summary.py tidy.log "clang-tidy (portable modules)" >> "$GITHUB_STEP_SUMMARY"
+
   # DPNet, the port's own DirectPlay 8 protocol implementation (docs/dpnet.md), on its own with
   # its tests on Windows (MSVC, 32 and 64 bit). Linux and macOS build it in the portable job.
   dpnet:
@@ -842,3 +878,30 @@ jobs:
               Select-String -Pattern '^\s*[0-9a-f]{2} |Last event|Access violation|ExceptionAddress|exception|^\w+!|\.(cpp|h)' |
               Select-Object -First 80 | ForEach-Object { Write-Host $_.Line }
           }
+
+  format:
+    name: clang-format (changed lines)
+    # Only the lines a pull request touches are checked; the tree is not bulk-reformatted
+    # (see .clang-format). Fix locally with: git clang-format origin/master
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install clang-format
+        run: pipx install clang-format==19.1.7
+
+      - name: Check formatting of changed lines
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          base=$(git merge-base "origin/$BASE_REF" HEAD)
+          if ! git clang-format --binary "$(command -v clang-format)" --diff "$base" HEAD -- src > format.diff; then
+            cat format.diff
+            echo "::error::Changed lines are not clang-formatted. Run: git clang-format $base"
+            exit 1
+          fi
+          cat format.diff
