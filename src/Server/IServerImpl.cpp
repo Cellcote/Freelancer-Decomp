@@ -50,6 +50,45 @@
 
 #pragma comment(lib, "winmm.lib")
 
+// PORT(deviation) SERVER-INPUT-GUARDS: whether Data[0..Size) is weapon-group text as the
+// client builds it (FWeaponGroups::SendToServer, hud_weapon_groups.cpp): lines of the form
+// "wg = <int>, <name>" ended by '\n', with a final empty line. No NUL anywhere, and a name runs
+// to the end of its line, so no line can start a key or section of its own in the save.
+static bool Server_IsClientWeaponGroupText(const unsigned char* Data, int Size)
+{
+    if (Size <= 0 || Data[Size - 1] != '\n')
+        return false;
+    int Pos = 0;
+    while (Pos < Size)
+    {
+        int End = Pos;
+        while (Data[End] != '\n')
+        {
+            if (Data[End] == '\0')
+                return false;
+            ++End;
+        }
+        if (End > Pos)
+        {
+            static const char Prefix[] = "wg = ";
+            const int PrefixLength = static_cast<int>(sizeof(Prefix) - 1);
+            if (End - Pos < PrefixLength || std::memcmp(Data + Pos, Prefix, PrefixLength) != 0)
+                return false;
+            int Cursor = Pos + PrefixLength;
+            if (Cursor < End && Data[Cursor] == '-')
+                ++Cursor;
+            const int DigitsStart = Cursor;
+            while (Cursor < End && Data[Cursor] >= '0' && Data[Cursor] <= '9')
+                ++Cursor;
+            if (Cursor == DigitsStart || Cursor + 2 > End || Data[Cursor] != ',' ||
+                Data[Cursor + 1] != ' ')
+                return false;
+        }
+        Pos = End + 1;
+    }
+    return true;
+}
+
 // Server_ControllerDispatch (server_controller.h), pub::Controller::_SendMessage's
 // dispatch core, is defined further down this file. Retail's FUN_06d43650 (exported by the
 // port from Common.dll as Server_SendMessage) is only `_SendMessage(0 /* broadcast */,
@@ -665,16 +704,24 @@ void IServerImpl::CharacterSelect(const CHARACTER_ID& char_id, unsigned int sess
 void IServerImpl::NewCharacterInfoReq(unsigned int /*session_id*/) {}
 
 void IServerImpl::CreateNewCharacter(const SCreateCharacterInfo& info, unsigned int session_id) {
-        // Retail .text:06d45670 .. .text:06d456a5 (RET 8), no guards:
-        // PlayerDB::create_new_character(info, sid), then this->vtable +0x4c --
-        // CharacterInfoReq -- (sid, false) on success (.text:06d45693) and
-        // (sid, true) on failure (.text:06d456a0).
-        if (Players.create_new_character(info, session_id)) {
-            CharacterInfoReq(session_id, false);
-        } else {
-            CharacterInfoReq(session_id, true);
-        }
+    // Retail .text:06d45670 .. .text:06d456a5 (RET 8), no guards:
+    // PlayerDB::create_new_character(info, sid), then this->vtable +0x4c --
+    // CharacterInfoReq -- (sid, false) on success (.text:06d45693) and
+    // (sid, true) on failure (.text:06d456a0).
+    // PORT(deviation) SERVER-INPUT-GUARDS: the client creates characters only after a
+    // successful login (login_mgr.cpp); before one the slot has no account, and retail
+    // dereferenced it.
+    if (!Players.is_valid(session_id))
+        return;
+    if (Players.create_new_character(info, session_id))
+    {
+        CharacterInfoReq(session_id, false);
     }
+    else
+    {
+        CharacterInfoReq(session_id, true);
+    }
+}
 
 void IServerImpl::DestroyCharacter(const CHARACTER_ID& char_id, unsigned int session_id) {
         // Retail 0x656b0: validate, FUN_06d49f60 delete char, vtable[19](session_id, 0)
@@ -727,6 +774,11 @@ void IServerImpl::CharacterSkipAutosave(unsigned int session_id) {
     // archetype itself and send 0x35 with an invented {session, arch} payload.
 void IServerImpl::ReqShipArch(unsigned int arch_id, unsigned int session_id) {
         if (!SinglePlayer() && Players[session_id].entered_base_id == 0) return;
+        // PORT(deviation) SERVER-INPUT-GUARDS: the dealer only sends a package's hull
+        // (nn_dealer.cpp, NnDealer::BuyShip); arch 0 left a ship that crashed the server at
+        // launch and in trade (Archetype::GetShip(0) is null).
+        if (arch_id == 0)
+            return;
         PlayerData_SetShipArch(Players[session_id], arch_id);
     }
     // ReqHullStatus -- retail .text:06d17340 .. .text:06d173d9 (RET 0x8), the one
@@ -749,6 +801,11 @@ void IServerImpl::ReqHullStatus(float hull_status, unsigned int session_id) {
         if (!SinglePlayer() && Players[session_id].entered_base_id == 0) return;
         if ((Players[session_id].current_base & 0x3fffffff) == 0) return;
         if (hull_status < 0.0f) hull_status = 0.0f;
+        // PORT(deviation) SERVER-INPUT-GUARDS: retail clamps only negatives, so a client could
+        // launch with any multiple of its hit points. The client sends 1.0 (purchase, repair)
+        // or 0.0 (destroyed); NaN and values above 1 are clamped too.
+        if (!(hull_status <= 1.0f))
+            hull_status = (hull_status > 1.0f) ? 1.0f : 0.0f;
         PlayerData_SetRelativeHealth(Players[session_id], hull_status, true);
     }
     // ReqCollisionGroups -- retail .text:06d173e0 .. .text:06d1741d (RET 0x8):
@@ -1815,6 +1872,10 @@ void IServerImpl::MineAsteroid(unsigned int system_id, const Vector& position, u
                       unsigned int secondary_loot, unsigned int quantity, unsigned int session_id) {
         (void)session_id;
         StarSystem* const System = SysDB_LookupSystem(system_id);
+        // PORT(deviation) SERVER-INPUT-GUARDS: retail has no null test; an unknown system id
+        // crashed the server. The client sends its active system (cli_asteroid_dynamic.cpp).
+        if (System == nullptr)
+            return;
         System->spawn_mined_loot(position, loot_id, secondary_loot, static_cast<int>(quantity));
     }
     // CommComplete -- retail .text:06cf0850 .. 06cf08d1, RET 0x10. Ported
@@ -1956,8 +2017,15 @@ void IServerImpl::SetWeaponGroup(unsigned int session_id, unsigned char* data, i
         // basic_string::assign(const char*) on player+0x380: strlen of the whole
         // NUL-terminated buffer (06d50505 REPNE SCASB), no bound from `size` and no
         // null check on `data` -- the caller at 06cf0e40 has neither guard either.
-        (void)size;
-        p->weapon_group_name = reinterpret_cast<const char*>(data);
+        // PORT(deviation) SERVER-INPUT-GUARDS: the string is written into the character's save
+        // as raw [Player] lines (Server_WriteCharacterFile) and read back key by key, so a
+        // forged one could add any key (money, ship, rank) or crash the save as a printf
+        // format. Keep it only when it has the shape the client builds
+        // (FWeaponGroups::SendToServer: "wg = %d, %s\n" lines and a final "\n", size =
+        // strlen); otherwise keep the previous value.
+        if (data == nullptr || size < 0 || !Server_IsClientWeaponGroupText(data, size))
+            return;
+        p->weapon_group_name.assign(reinterpret_cast<const char*>(data), static_cast<size_t>(size));
     }
     // SetVisitedState — retail 0x10e90: iterates buffer entries, calls FUN_06d508a0 per entry
     // FUN_06d508a0: finds or inserts {system_id, visit_flags} in player+0x3A0 sorted list,
@@ -1969,33 +2037,41 @@ void IServerImpl::SetWeaponGroup(unsigned int session_id, unsigned char* data, i
     // test (param_3 is never read) and no port `active` test -- all three were
     // port additions and are gone.
 void IServerImpl::SetVisitedState(unsigned int session_id, unsigned char* data, int data_len) {
-        (void)data_len;
-        if (!Players.is_valid(session_id)) return;
-        PlayerSlot* p = &Players[session_id];
+    // PORT(deviation) SERVER-INPUT-GUARDS: retail reads `count` 5-byte records whatever the
+    // buffer holds. The client sends {count, records} with its real size
+    // (character_select_equip.cpp), so a count the buffer cannot hold is refused.
+    if (data == nullptr || data_len < 4 || *(int*)data > (data_len - 4) / 5)
+        return;
+    if (!Players.is_valid(session_id))
+        return;
+    PlayerSlot* p = &Players[session_id];
 
-        int count = *(int*)data;
-        unsigned char* ptr = data + 4;
-        for (int i = 0; i < count; i++) {
-            unsigned int system_id = *(unsigned int*)ptr;
-            unsigned char visit_flags = ptr[4];
-            ptr += 5;
-            // Retail FUN_06d508a0 (0x06d508a0): lower_bound on the player's visited
-            // MAP at +0x3a0, OR the incoming flags into an existing entry, otherwise
-            // insert a fresh {system_id, flags} node at the hint position.
-            //
-            // That is PlayerData::visit_map, NOT the pending queue at +0x3b8 this
-            // used to write. The two are different containers (see the field note
-            // in common_server_playerdb.h): +0x3b8 is appended by FUN_06d4b270 and
-            // drained into the map by FUN_06d4b450 when the player leaves a system.
-            std::map<unsigned int, unsigned char>::iterator Existing =
-                p->visit_map.find(system_id);
-            if (Existing != p->visit_map.end()) {
-                Existing->second = (unsigned char)(Existing->second | visit_flags);
-            } else {
-                p->visit_map[system_id] = visit_flags;
-            }
+    int count = *(int*)data;
+    unsigned char* ptr = data + 4;
+    for (int i = 0; i < count; i++)
+    {
+        unsigned int system_id = *(unsigned int*)ptr;
+        unsigned char visit_flags = ptr[4];
+        ptr += 5;
+        // Retail FUN_06d508a0 (0x06d508a0): lower_bound on the player's visited
+        // MAP at +0x3a0, OR the incoming flags into an existing entry, otherwise
+        // insert a fresh {system_id, flags} node at the hint position.
+        //
+        // That is PlayerData::visit_map, NOT the pending queue at +0x3b8 this
+        // used to write. The two are different containers (see the field note
+        // in common_server_playerdb.h): +0x3b8 is appended by FUN_06d4b270 and
+        // drained into the map by FUN_06d4b450 when the player leaves a system.
+        std::map<unsigned int, unsigned char>::iterator Existing = p->visit_map.find(system_id);
+        if (Existing != p->visit_map.end())
+        {
+            Existing->second = (unsigned char)(Existing->second | visit_flags);
+        }
+        else
+        {
+            p->visit_map[system_id] = visit_flags;
         }
     }
+}
     // RequestBestPath — retail 0x10f00: packs 9 fields from buffer, sends message 0x31
 void IServerImpl::RequestBestPath(unsigned int session_id, unsigned char* data, int data_len) {
         unsigned int max_players = PlayerDB_GetMaxPlayers();
@@ -2003,9 +2079,12 @@ void IServerImpl::RequestBestPath(unsigned int session_id, unsigned char* data, 
         // .text:06cf0f33: client_id (+0x348) != 0 -- PlayerDB_GetPlayer's null.
         // Retail has no `active` test and no test on `data` / `data_len` (param_3
         // is never read); both were port additions and are gone (w4-server-guards).
-        (void)data_len;
         PlayerSlot* p = GetPlayerBySession(session_id);
         if (!p) return;
+        // PORT(deviation) SERVER-INPUT-GUARDS: the request is 0x34 bytes (player_spawn.cpp);
+        // retail reads that much from any buffer.
+        if (data == nullptr || data_len < 0x34)
+            return;
 
         // Retail stack layout (0x10f00), ascending from the message base:
         // session, +0x00, +0x1c, +0x0c, +0x10, +0x14, +0x20, +0x24, +0x28, +0x30.
@@ -2181,10 +2260,13 @@ void IServerImpl::SetMissionLog(unsigned int session_id, unsigned char* data, in
     // is pushed but never read, and nothing tests `data`. The port's
     // `!data || data_len < 4` and `active` tests were additions and are gone.
 void IServerImpl::SetInterfaceState(unsigned int session_id, unsigned char* data, int data_len) {
-        (void)data_len;
-        if (!Players.is_valid(session_id)) return;
-        Players[session_id].interface_state = *(unsigned int*)data;
-    }
+    // PORT(deviation) SERVER-INPUT-GUARDS: the client sends 4 bytes (game_options.cpp).
+    if (data == nullptr || data_len < 4)
+        return;
+    if (!Players.is_valid(session_id))
+        return;
+    Players[session_id].interface_state = *(unsigned int*)data;
+}
     // RequestRankLevel — retail 0x11260: SP check, reads player+0x284, sends via controller vtable+0x18c
     // FUN_06d4ec00: returns *(uint*)(player + 0x284) — the rank level
 void IServerImpl::RequestRankLevel(unsigned int session_id, unsigned char* data, int data_len) {
@@ -2374,6 +2456,9 @@ void IServerImpl::AcceptTrade(unsigned int session_id, bool b_accepted) {
         g_pClientInterface->SendCommonPlayerTradeAcceptTrade(PartnerId, Own.ship_object_id, b_accepted);  // .text:06cf1aeb
 
         CPlayerTradeOffer* const PartnerOffer = Partner.trade_offer;              // .text:06cf1af1
+        // PORT(deviation) SERVER-INPUT-GUARDS: no null test in retail.
+        if (PartnerOffer == nullptr)
+            return;
         if (!PartnerOffer->GetAccepted()) return;                                 // .text:06cf1b00
         if (!Offer->GetAccepted()) return;                                        // .text:06cf1b0a
 
@@ -2407,6 +2492,17 @@ void IServerImpl::AcceptTrade(unsigned int session_id, bool b_accepted) {
             CObject* const Cobj = PartnerBase->Object;
             if (Cobj != nullptr && (static_cast<unsigned int>(Cobj->ObjectClass) & 0x503u) == 0x503u)
                 PartnerShip = static_cast<CShip*>(Cobj);
+        }
+        // PORT(deviation) SERVER-INPUT-GUARDS: retail moves money and cargo and then calls
+        // sync_cargo on both ships with no null test, so a trade accepted while one player was
+        // docked (a request accepted just as they land) crashed the server, and a hull with no
+        // archetype crashed the hold check below. Such a trade now fails before anything moves.
+        if (OwnShip == nullptr || PartnerShip == nullptr ||
+            Archetype::GetShip(Own.ship_archetype) == nullptr ||
+            Archetype::GetShip(Partner.ship_archetype) == nullptr)
+        {
+            TerminateTrade(session_id, 3);
+            return;
         }
 
         std::list<EquipDesc> const& OwnItems = Offer->GetList().Items;
@@ -2527,6 +2623,10 @@ void IServerImpl::AddTradeEquip(unsigned int session_id, const EquipDesc& equip)
             TerminateTrade(session_id, 2);                                        // .text:06cf21b4
             return;
         }
+        // PORT(deviation) SERVER-INPUT-GUARDS: the trade window only offers a positive count
+        // (nn_trade.cpp); a negative one took items from the partner at accept time.
+        if (equip.get_count() <= 0)
+            return;
         CPlayerTradeOffer* const PartnerOffer = Offer->GetTargetOffer();
         if (PartnerOffer != nullptr)
             PartnerOffer->SetAccepted(false);                                     // .text:06cf2134
@@ -2556,6 +2656,9 @@ void IServerImpl::DelTradeEquip(unsigned int session_id, const EquipDesc& equip)
             TerminateTrade(session_id, 2);                                        // .text:06cf22b8
             return;
         }
+        // PORT(deviation) SERVER-INPUT-GUARDS: as in AddTradeEquip, only positive counts.
+        if (equip.get_count() <= 0)
+            return;
         CPlayerTradeOffer* const PartnerOffer = Offer->GetTargetOffer();
         if (PartnerOffer != nullptr)
             PartnerOffer->SetAccepted(false);                                     // .text:06cf2218

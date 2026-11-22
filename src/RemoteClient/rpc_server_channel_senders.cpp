@@ -19,6 +19,7 @@
 #include <cwchar>
 
 void CClientImpl::SendServerLoginResponse(unsigned int ClientId, const unsigned char& Status) {
+    RemoteClientNoteLoginResponse(ClientId, Status);
     FPacketBase* Packet = nullptr;
     if (Serializer->Allocate(2, 2, &Packet) == 0)
     {

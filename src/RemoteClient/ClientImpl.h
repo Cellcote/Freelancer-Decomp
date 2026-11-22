@@ -171,3 +171,8 @@ public:
 extern "C" __declspec(dllexport) CClientImpl Client;
 
 CDPServer* CreateRemoteClientHost();
+
+// PORT(deviation) SERVER-INPUT-GUARDS: tells the client's proxy the login result the server sent
+// (RemoteClient_transport.cpp), so packets other than LOGIN are only dispatched after a
+// successful login (status 3).
+void RemoteClientNoteLoginResponse(unsigned int ClientId, unsigned char Status);
