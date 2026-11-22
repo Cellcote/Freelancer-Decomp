@@ -107,7 +107,7 @@ void ConstructSystemManagerGunGroupManager(SystemManagerGunGroupManager* Self)
     Self->GunFireBurstIntervalTime = 4.0f;
     Self->AutoTurretBurstIntervalTime = 4.0f;
     Self->MissileLaunchIntervalTime = 3.0f;
-    Self->MissileLaunchConeAngle = 3.14159274f;
+    Self->MissileLaunchConeAngle = std::numbers::pi_v<float>;
     Self->MineLaunchInterval = 5.0f;
     Self->MineLaunchConeAngle = 0.3926991f;
     Self->GunFireAccuracyConeAngle = 0.05f;

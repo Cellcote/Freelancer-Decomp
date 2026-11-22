@@ -22,6 +22,7 @@
 #include "engine/engbase.h"    // IDeformable
 #include "x86math.h"
 
+#include <numbers>
 #include <stdio.h>
 #include <string.h>
 
@@ -291,7 +292,7 @@ void UiWinDeform::PoseBody()
     // spell out inline: the 3x3 identity (FUN_004215b0 / the explicit 1s and 0s), then
     // FUN_004c8b40(pi = 0x40490fdb), FUN_004c8b80(0), FUN_004c8bc0(0).
     float Rotation[9] = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
-    HudMatrixRotationY(Rotation, 3.14159274f);
+    HudMatrixRotationY(Rotation, std::numbers::pi_v<float>);
     HudMatrixRotateRows12(Rotation, 0.0f);
     HudMatrixRotateRows01(Rotation, 0.0f);
 

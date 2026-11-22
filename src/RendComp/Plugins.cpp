@@ -11,6 +11,7 @@
 #include "common_misc.h"     // ICamera (the sphere draw reads the camera)
 #include "render/shading.h" // IMaterialLibrary, FShadingPropertyValue (the sphere archetype)
 
+#include <numbers>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -1280,8 +1281,8 @@ static void SphereFaceRotation(FTransform& Out, int Face, float HalfPi)
         Sin = std::sin((double)HalfPi);
         break;
     case 2:
-        Cos = std::cos(3.141592653589793);
-        Sin = std::sin((double)((float)3.141592653589793));
+        Cos = std::cos(std::numbers::pi);
+        Sin = std::sin((double)((float)std::numbers::pi));
         break;
     case 3:
         Cos = std::cos((double)-HalfPi);
@@ -1865,7 +1866,7 @@ public:
 
     void UpdateLevel(float Distance)
     {
-        const double HalfPi = 3.141592653589793 * 0.5;
+        const double HalfPi = std::numbers::pi * 0.5;
         const double Ratio =
             HalfPi / std::acos(1.0 - (double)Distance / (double)Radius);
         const double Log2 = std::log10(Ratio) / std::log10(2.0);
@@ -1936,7 +1937,7 @@ public:
         FVector Normals[6] = {{0.0f, 0.0f, 1.0f},  {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f},
                               {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}};
         // ESP+0x17C: the cube corners, +-k with k = 0x3f13cd3a.
-        const float K = 0.57735026f;
+        const float K = std::numbers::inv_sqrt3_v<float>;
         FVector Corners[8] = {{K, K, K},   {K, K, -K},   {-K, K, -K},  {-K, K, K},
                               {K, -K, K},  {K, -K, -K},  {-K, -K, -K}, {-K, -K, K}};
         const FMatrix WorldRotation = World->Rotation; // ESP+0x2CC
@@ -1974,7 +1975,7 @@ public:
         }
         const double Limit = (double)InvDistance * ArchRadius;
         float Threshold = (float)Limit; // ESP+0x48
-        if (Limit > 0.57735026918962573)
+        if (Limit > std::numbers::inv_sqrt3)
             Threshold = K;
         const int* BestCorners = FaceCorners[BestFace]; // ESP+0x78
         for (int Index = 0; Index < 4; ++Index)
@@ -2010,7 +2011,7 @@ public:
         else
             Lock.Listing.VertexBuffer = nullptr;
 
-        const float HalfPi = (float)(3.141592653589793 * 0.5); // ESP+0x10
+        const float HalfPi = (float)(std::numbers::pi * 0.5); // ESP+0x10
         // ESP+0x9C. +0x18 is never written by retail (a stack leftover); the port passes 0.
         FMaterialSubmitContext Context;
         Context.Inst = InstId;
@@ -2093,7 +2094,7 @@ public:
         Context.ReplacedMaterial = nullptr;
         const double AtmosphereLimit = (double)InvDistance * ScaledRadius;
         double AtmosphereThreshold = AtmosphereLimit;
-        if (AtmosphereLimit > 0.57735026918962573)
+        if (AtmosphereLimit > std::numbers::inv_sqrt3)
             AtmosphereThreshold = K;
         for (int Index = 0; Index < 4; ++Index)
         {

@@ -16,6 +16,7 @@
 #include "common_systemmanager.h"  // SystemManager -- what NavHelperPtr24 points at
 #include "x86math.h"               // I3DMathEngine::TransformMatrix (+0x2c)
 
+#include <numbers>
 #include <cmath>
 #include <cstring>
 
@@ -146,7 +147,7 @@ bool TrailBehavior::SetContext(void* Owner, void* Manager, void* Sys)
     bHasDirectiveTarget1e0 = 0;                                     // 062ca5ac
     Face.SetContext(OwnerContextPtr14, NavHelperPtr24, Manager);              // 062ca5b3
     MatchThrottle.SetContext(OwnerContextPtr14, NavHelperPtr24, Manager);     // 062ca5c6
-    MatchThrottle.SetMaxBearing(3.14159274f);                       // 062ca5cf .text:063275d0, 0x40490fdb
+    MatchThrottle.SetMaxBearing(std::numbers::pi_v<float>); // 062ca5cf .text:063275d0, 0x40490fdb
     MatchThrottle.SetCatchUpRange(CatchUpRange244);                 // 062ca5dd FUN_062d6740
     if (!ObjInspectOf(OwnerContextPtr14)->is_player())                   // 062ca5e7 [+0xbc] on the owner
         MatchThrottle.SetFlag3b(true);                              // 062ca5f5 FUN_062d6730
@@ -445,7 +446,7 @@ int TrailBehavior::Slot7()
             Move.SetMode(0);                                        // 062cae05 FUN_062d5980
             Move.SetScale40(1.0f);                                  // 062cae11 .text:062a33e0
             Move.SetDirectionFrom(&Sys->SelfTarget.Iface->get_transform());   // 062cae2e FUN_062d58f0
-            Move.SetAngle38(3.14159274f);                           // 062cae3a .text:063275f0
+            Move.SetAngle38(std::numbers::pi_v<float>); // 062cae3a .text:063275f0
             Move.Update(DeltaTime1c);                                 // 062cae47
             UpdateResult10 = 0;
             return 0;
@@ -527,7 +528,7 @@ int TrailBehavior::Slot7()
         Move.SetMode(0);                                            // 062cb03a FUN_062d5980
         Move.SetScale40(1.0f);                                      // 062cb046
         Move.SetWatchObject(Leader);                                // 062cb04e FUN_062d5760
-        Move.SetAngle38(3.14159274f);                               // 062cb05a
+        Move.SetAngle38(std::numbers::pi_v<float>); // 062cb05a
         Move.SetRange3c(TrailDistance1e8);                          // 062cb068 .text:062a66b0
         Driver = &Move;
     }

@@ -57,6 +57,7 @@
 #include "../../interface/win3d_renderables.h" // Win3DImmedDrawLine (FUN_005a2940)
 #include "x86math.h"
 
+#include <numbers>
 #include <cfloat>
 #include <cmath>
 #include <cstdio>
@@ -3450,7 +3451,7 @@ void HudTargetableObjects::DrawOffScreenContact(IObjRW* Object, FHudContactRecor
     if (!bWaypoint)
         Roll = HudVectorAngle(ArrowXform.Rotation.D[0][2], ArrowXform.Rotation.D[1][2]);
     float const Angle = static_cast<float>(static_cast<double>(Roll) +
-                                           static_cast<double>(3.14159265f) -
+                                           static_cast<double>(std::numbers::pi_v<float>) -
                                            static_cast<double>(0.7853982f));
     float const* const Point = &ArrowPos.x;
 

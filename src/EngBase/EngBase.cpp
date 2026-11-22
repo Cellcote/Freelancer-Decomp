@@ -11,6 +11,7 @@
 #include "readfile.h"
 #include "x64_low_arena.h"
 
+#include <numbers>
 #include <algorithm>
 #include <cmath>
 #include <cstdarg>
@@ -1512,8 +1513,8 @@ static FlULong DACOM_API TypedWrapLerpType2(FScalarTypedChannel* This, float* Ou
     if (This->JointType == 2)
     {
         const double Delta = Right - Left;
-        const double NegPi = (double)(-3.14159274f);
-        const double Pi = (double)(3.14159274f);
+        const double NegPi = (double)(-std::numbers::pi_v<float>);
+        const double Pi = (double)(std::numbers::pi_v<float>);
         const double TwoPi = (double)(6.28318548f);
         double Target = Right;
         if (Delta < NegPi)
@@ -4038,7 +4039,7 @@ static void ChannelDecompressFrames(FChannelArchetypeObject* Channel)
             if (Sum > 0.0)
             {
                 const double Length = std::sqrt(Sum);
-                const double Sine = std::sin((double)(3.1415927f) * Length * 0.5);
+                const double Sine = std::sin((double)(std::numbers::pi_v<float>)*Length * 0.5);
                 const float SineStored = (float)Sine;
                 const float Scale = (float)(Sine / Length);
                 const double W = std::sqrt(1.0 - (double)SineStored *

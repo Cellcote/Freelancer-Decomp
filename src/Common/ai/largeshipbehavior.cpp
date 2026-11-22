@@ -12,6 +12,7 @@
 #include "common_ini.h"            // Vec3Assign (FUN_0628b030, item 763)
 #include "aisteer_internal.h" // CmnAiSteer::InlineFastLength
 
+#include <numbers>
 #include <cmath>  // sqrtf, for the two places retail uses a real FSQRT rather than the bit-hack
 
 // LargeShipBehavior -- see ai/largeshipbehavior.h for the full RTTI/layout writeup this
@@ -92,7 +93,7 @@ void LargeShipBehavior::Slot3()
     // unrelated, separately-ported class (ai/idea.h's fold table names it explicitly).
     // Real call as of 2026-09-17; the SetApproachOrientationAngle stub is gone. The literal is
     // the exact bit pattern 0x40490fdb, i.e. this restores MoveIdea's own ctor default of pi.
-    SubObjectA.SetAngle38(3.14159274f);
+    SubObjectA.SetAngle38(std::numbers::pi_v<float>);
 
     // 062cffbe: FUN_062d21d0(0, 3) == Behavior::SetCruiseLock (the manager's PathfindManager).
     SetCruiseLock(0, 3);

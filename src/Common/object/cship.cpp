@@ -912,7 +912,7 @@ bool CShip::generate_follow_offset(IObjInspect const* Inspect, Transform& OutOff
     // 062b4fcd..062b502a: A = Quad * pi(float, DAT_0639d208) * 0.5(double, DAT_0639df88) kept
     // on the FPU; FST dword stores A rounded, FCOS runs on the unrounded A, FSIN on the
     // reloaded rounded one. Rows {cos, -sin, 0}, {sin, cos, 0}, {0, 0, 1}.
-    double const Angle = (double)(Quad) * (double)(3.1415927f) * 0.5;
+    double const Angle = (double)(Quad) * (double)std::numbers::pi_v<float> * 0.5;
     float const AngleRounded = (float)(Angle);
     float const Cos = X87CosF(Angle);
     float const Sin = X87SinF((double)(AngleRounded));

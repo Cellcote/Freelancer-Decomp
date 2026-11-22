@@ -35,6 +35,7 @@
 #include "x86math.h"
 #include "float_bits.h"
 
+#include <numbers>
 #include <algorithm>
 #include <list>
 #include <map>
@@ -2929,7 +2930,7 @@ void NebulaRebuild(FNebulaEffect* Nebula)
             Bits = static_cast<int>(
                 floor((1.0 - W) * EndCount + static_cast<double>(MidCount) * W + 0.5));
             if (T > Mid)
-                Phase = static_cast<float>(3.1415927f / static_cast<double>(Bits));
+                Phase = static_cast<float>(std::numbers::pi_v<float> / static_cast<double>(Bits));
         }
 
         // 0x005069e0..0x00506a06: Lat = acos((((slice + 1.0f) / (slices + 1.0f)) * 2 - 1.0f)

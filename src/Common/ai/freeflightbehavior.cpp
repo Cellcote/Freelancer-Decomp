@@ -7,6 +7,8 @@
 #include "freeflightbehavior.h"
 #include "common_systemmanager.h"  // SystemManager::Thrust (ThrustManager::bAutoAvoidance)
 
+#include <numbers>
+
 // FreeFlightBehavior -- see ai/freeflightbehavior.h for the full
 // RTTI/layout writeup this pass relied on. Ported from
 // EXE/Disasm/Common.dll.txt (raw disassembly is authoritative in this module
@@ -39,7 +41,7 @@ void FreeFlightBehavior::Slot3()
     Flags28 = static_cast<unsigned char>(Flags28 | 0x2);            // 062c6eea
     Flag365 = 1;                                                    // 062c6efa
     Flag3fc = 0;                                                    // 062c6f01
-    SubObjectA.SetAngle38(3.14159274f);                             // 062c6f07, 0x40490fdb
+    SubObjectA.SetAngle38(std::numbers::pi_v<float>); // 062c6f07, 0x40490fdb
     Field358 = 0.0f;                                                // 062c6f0f
     SubObjectA.SetRange3c(0.0f);                                    // 062c6f15 (bind_to_dc fold)
     SubObjectA.SetEnabled(false);                                   // 062c6f1d FUN_062d5a10

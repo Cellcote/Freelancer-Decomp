@@ -34,6 +34,7 @@
 
 #include "x87_trig.h" // retail's inline FSIN / FCOS / FPTAN (CullQuatFromAxisAngle, FrustumCull)
 
+#include <numbers>
 #include <math.h>
 #include <stdlib.h>
 
@@ -723,7 +724,7 @@ namespace
 
     float const kCullHalf = 0.5f;          // .rdata:0639c13c (float)
     float const kCullHalfPi = 1.5707964f;  // .rdata:0639f5d4 (float)
-    float const kCullPi = 3.1415927f;      // .rdata:0639d208 (float)
+    float const kCullPi = std::numbers::pi_v<float>; // .rdata:0639d208 (float)
 
     // .data:DAT_063edc78 (int 5): the number of steps of FrustumCull's far-cap sweep. Retail
     // reads it again on every iteration (MOV EAX / FIDIV).

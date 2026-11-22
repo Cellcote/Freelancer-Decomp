@@ -12,6 +12,7 @@
 #include "dacom.h"         // FDUMP
 #include "x87_trig.h"      // retail's inline FSIN / FCOS / FPTAN / FPATAN (random_*, get_projected_bounding_sphere)
 
+#include <numbers>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -1132,7 +1133,8 @@ float __cdecl GetSphereIntersectVol(float Dist, float RadiusA, float RadiusB)
     const double H2 = D - H1;
     const double Caps = (LargeSq * Large + SmallSq * Small) * 2.0943952f;
     const double Lens = (((H2 * Large * Large + H1 * Small * Small) - H1 * H1 * H1 * 0.33333334f) -
-                         H2 * H2 * H2 * 0.33333334f) * 3.1415927f;
+                         H2 * H2 * H2 * 0.33333334f) *
+                        std::numbers::pi_v<float>;
     return (float)(Caps - Lens);
 }
 

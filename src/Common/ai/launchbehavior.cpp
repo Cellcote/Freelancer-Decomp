@@ -6,6 +6,7 @@
 
 #include "launchbehavior.h"
 
+#include <numbers>
 #include <cmath>
 #include <cstring>
 
@@ -858,8 +859,10 @@ bool LaunchBehavior::StartLaunchSequence()
         RotateBasisRowsXZ(ApproachBasis3, 3.1415927410125732);                  // DAT_0639e2d0
         // .text:062ce2af-062ce2c4: FUN_062ce320(pi) on ESI == &ApproachBasis2 and on
         // EBX == &LaunchBasis (both pointers loaded at 062ce13a / 062ce166).
-        RotateBasisRowsXZ(ApproachBasis2, static_cast<double>(3.14159274f));     // PUSH 0x40490fdb
-        RotateBasisRowsXZ(LaunchBasis, static_cast<double>(3.14159274f));        // PUSH 0x40490fdb
+        RotateBasisRowsXZ(ApproachBasis2,
+                          static_cast<double>(std::numbers::pi_v<float>)); // PUSH 0x40490fdb
+        RotateBasisRowsXZ(LaunchBasis,
+                          static_cast<double>(std::numbers::pi_v<float>)); // PUSH 0x40490fdb
         return true;
     case 2:
     case 3:

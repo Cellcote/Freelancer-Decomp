@@ -28,6 +28,7 @@
 #include "ivp_physics/ivp_real_object.h"
 #include "ivp_physics/ivp_controller.h"  // IVP_Event_Sim (do_simulation_controller)
 
+#include <numbers>
 #include <cstdarg>
 #include <cstdint>
 #include <math.h>
@@ -43,7 +44,7 @@ namespace
 {
     const char kCEGunSource[] = "E:\\FL\\Scratch\\Source\\Common\\CEGun.cpp";
     const float kDegToRad = 0.017453292f;   // .rdata:0639d210 = 0x3c8efa35
-    const float kGunPi = 3.1415927f;
+    const float kGunPi = std::numbers::pi_v<float>;
     const float kGunTwoPi = 6.2831855f;
     const float kSeeTargetAngle = 0.05235988f;
     const float kTargetPointHold = 2.0f;

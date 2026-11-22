@@ -18,6 +18,7 @@
 #include "DALib.h"
 #include "dacom.h"
 
+#include <numbers>
 #include <stdlib.h>
 #include "cequip_internal.h"
 
@@ -137,8 +138,8 @@ namespace
                             double ParentRange = (double)ParentData.Max - ParentData.Min;
                             if (ParentRange >= 6.2831855f)
                             {
-                                ParentData.Min = -3.1415927f;  // 0xc0490fdb
-                                ParentData.Max = 3.1415927f;   // 0x40490fdb
+                                ParentData.Min = -std::numbers::pi_v<float>; // 0xc0490fdb
+                                ParentData.Max = std::numbers::pi_v<float>; // 0x40490fdb
                             }
                             else
                             {
@@ -147,8 +148,8 @@ namespace
                             double ChildRange = (double)ChildData.Max - ChildData.Min;
                             if (ChildRange >= 6.2831855f)
                             {
-                                ChildData.Min = -3.1415927f;
-                                ChildData.Max = 3.1415927f;
+                                ChildData.Min = -std::numbers::pi_v<float>;
+                                ChildData.Max = std::numbers::pi_v<float>;
                             }
                             else
                             {
