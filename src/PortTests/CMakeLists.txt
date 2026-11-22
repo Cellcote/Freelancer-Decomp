@@ -16,7 +16,7 @@ target_compile_features(module_tests PRIVATE cxx_std_20)
 target_include_directories(module_tests PRIVATE ${CMAKE_SOURCE_DIR}/src/include/posix
                            ${CMAKE_SOURCE_DIR}/src/include)
 target_compile_options(module_tests PRIVATE -include ${CMAKE_SOURCE_DIR}/src/include/fl_layout.h
-                       "-D__declspec(x)=" -Wall -Wextra -Wno-unknown-pragmas)
+                       "-D__declspec(x)=" -D__cdecl= -D__stdcall= -Wall -Wextra -Wno-unknown-pragmas)
 # Loaded at run time, by name, as the game loads them: built first, not linked.
 add_dependencies(module_tests dacom system x86math ReadFile)
 add_test(NAME module_tests COMMAND module_tests $<TARGET_FILE_DIR:dacom>)

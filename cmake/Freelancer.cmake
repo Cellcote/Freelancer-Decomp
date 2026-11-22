@@ -92,7 +92,10 @@ if(NOT FL_WINDOWS)
       # comment(lib, ...) and the like are MSVC's, with nothing to do here, and the retail code's
       # sprintf / vsprintf stay as they are (macOS's SDK marks them deprecated). Both after
       # -Wall, which turns the warnings on.
-      set(_posix_options "-D__declspec(x)=" -Wno-unknown-pragmas -Wno-deprecated-declarations)
+      # The calling conventions are empty here too, also for a source that does not include
+      # <windows.h> (GCC knows none of them on x86-64 or arm64).
+      set(_posix_options "-D__declspec(x)=" -D__cdecl= -D__stdcall= -D__fastcall= -D__thiscall=
+          -Wno-unknown-pragmas -Wno-deprecated-declarations)
     endif()
     target_compile_definitions(${name} PRIVATE FREELANCER_ENABLE_TICK_PROFILE=0)
     target_compile_options(${name} PRIVATE
