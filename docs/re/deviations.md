@@ -366,7 +366,7 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 - **The sender's ship** (`Players[session].ship_object_id`):
   - FireWeapon, ActivateEquip, ActivateCruise, ActivateThrusters, TractorObjects, JettisonCargo, SPRequestUseItem and SPObjUpdate: the client sends these for its own ship (`cli_projectile_fx.cpp`, `client_gameobj.cpp`, `hud_status_core.cpp`, `player_spawn.cpp`).
   - RequestEvent and RequestCancel: the requesting ship `p1`. The dock or formation target is not checked.
-- **An object the sender owns** (`CSimple::OwnerPlayer`, which missiles, mines and countermeasures copy from their launcher):
+- **An object the sender owns.** Either `CSimple::OwnerPlayer` is the session, or the object is a projectile whose launcher (`CProjectile::OwnerId`) is the sender's ship. The server creates missiles, mines and countermeasures with `OwnerPlayer` 0.
   - SetTarget: the client's ship, or its own missile.
   - SPObjCollision: the damaged side. That is the client's own side; it reports only when it owns that side.
   - SPBadLandsObjCollision: the object destroyed.

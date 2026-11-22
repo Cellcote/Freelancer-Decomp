@@ -93,9 +93,9 @@ static bool Server_IsClientWeaponGroupText(const unsigned char* Data, int Size)
 // PORT(deviation) SERVER-OWNERSHIP: retail never checks that the object a multiplayer command
 // names belongs to the sender, so a client could fire, steer, jettison or teleport any ship and
 // report collisions that destroy anything. These two tests answer "is this the sender's ship"
-// and "does the sender own this object" (its ship and what it launched: CSimple::OwnerPlayer is
-// the session id, copied to missiles, mines and countermeasures). Both pass in single player,
-// which keeps retail's behaviour there.
+// and "does the sender own this object": its ship (CSimple::OwnerPlayer is the session id) or a
+// projectile its ship launched (CProjectile::OwnerId). Both pass in single player, which keeps
+// retail's behaviour there.
 static bool Server_IsSessionShip(unsigned int SessionId, unsigned int ObjectId);
 static bool Server_SessionOwnsObject(unsigned int SessionId, GameObject const* Obj);
 
@@ -4621,7 +4621,21 @@ static bool Server_SessionOwnsObject(unsigned int SessionId, GameObject const* O
 {
     if (SinglePlayer())
         return true;
-    if (SessionId == 0 || Obj == nullptr || Obj->cobj() == nullptr)
+    if (SessionId == 0 || SessionId - 1 >= PlayerDB_GetMaxPlayers() || Obj == nullptr)
         return false;
-    return Obj->csimple()->OwnerPlayer == SessionId;
+    CObject* const Raw = Obj->cobj();
+    if (Raw == nullptr)
+        return false;
+    if (Obj->csimple()->OwnerPlayer == SessionId)
+        return true;
+    // The server creates missiles, mines and countermeasures with OwnerPlayer 0 and only their
+    // launcher in CProjectile::OwnerId (StarSystem::create_guided / create_mine /
+    // create_counter_measure), so a projectile is the sender's when its launcher is the
+    // sender's ship. Every projectile class (0x0f, 0x17, 0x67, 0xa7) has the 7 bits set.
+    if ((static_cast<unsigned int>(Raw->ObjectClass) & 7u) == 7u)
+    {
+        unsigned int const Ship = Players[SessionId].ship_object_id;
+        return Ship != 0 && static_cast<CProjectile const*>(Raw)->OwnerId == Ship;
+    }
+    return false;
 }
