@@ -578,7 +578,7 @@ namespace
         return Base->cobject();
     }
 
-    // CShip +0x1b4 -- the multiplayer group id (common_basefollowerbehavior.cpp .text:062cb7a2 compares the
+    // CShip +0x1b4 -- the multiplayer group id (Common/ai/basefollowerbehavior.cpp .text:062cb7a2 compares the
     // same field between two player ships) -- CShip::GroupId, read by offset from a CObject.
     unsigned HudShipGroupId(CObject const* Ship)
     {

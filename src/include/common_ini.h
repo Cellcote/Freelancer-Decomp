@@ -164,7 +164,7 @@ inline double Distance3(Vector const* A, Vector const* B)
 
 // OrientedBox: the 15-float box (Center, the three axes as columns of the owning rotation,
 // HalfExtent) RayOrientedBoxIntersect (FUN_062dfd80) takes and FUN_062e04c0 (OBBIntersect,
-// file-local in src/Common/common_airaycast.cpp) tests pairwise.
+// file-local in src/Common/ai/airaycast.cpp) tests pairwise.
 struct OrientedBox
 {
     Vector Center;

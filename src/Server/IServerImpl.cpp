@@ -280,7 +280,7 @@ bool IServerImpl::Startup(const SStartupInfo& info) {
         // Retail 0x06d44c1c-0x06d44c24: MOV EBX,EAX / NEG EBX / SBB BL,BL / INC BL / JZ.
         // That idiom yields 1 only when DataConfig::startup returned ZERO, and the JZ
         // then SKIPS the whole init block. Success is a 0 return, and the same byte is
-        // what Startup gives back. src/Common/common_dataconfig.cpp keeps that convention.
+        // what Startup gives back. src/Common/core/dataconfig.cpp keeps that convention.
         // Retail 0x64bdd / 0x64bf6: both DataConfig::startup and FUN_06d448d0 take
         // param_1 + 0x104 — the INI path, not the module path.
         const bool bConfigOk = (DataConfig::startup(info.IniPath, nullptr, nullptr) == 0);

@@ -15,12 +15,12 @@
 | `AttachedEquipment` | 4 | 17 | `src/include/common_archetype.h:866` | **public** | `public Equipment` |
 | `AttachedFXEquip` | 1 | 14 | `src/include/common_archetype.h:1251` | **public** | `public Equipment` |
 | `AttribStackNode` | 9 | 41 | `src/include/common_text.h:800` | **public** | `public RDLNode` |
-| `BaseFollowerBehavior` | 2 | 29 | `src/Common/common_behavior.h:876` | private (Common) | `public Behavior` |
+| `BaseFollowerBehavior` | 2 | 29 | `src/Common/ai/behavior.h:876` | private (Common) | `public Behavior` |
 | `BaseHint` | 4 | 4 | `src/include/common_goods.h:767` | **public** | — |
-| `BaseIdea` | 6 | 6 | `src/Common/common_idea.h:181` | private (Common) | — |
+| `BaseIdea` | 6 | 6 | `src/Common/ai/idea.h:181` | private (Common) | — |
 | `BaseOp` | 1 | 1 | `src/include/common_pub.h:695` | **public** | — |
 | `BaseRichTextWin` | 2 | 47 | `src/freelancer/Client/rich_text_win.h:83` | private (freelancer) | `public WinControl` |
-| `Behavior` | 27 | 27 | `src/Common/common_behavior.h:538` | private (Common) | — |
+| `Behavior` | 27 | 27 | `src/Common/ai/behavior.h:538` | private (Common) | — |
 | `BinaryRDLReader` | 3 | 3 | `src/include/common_text.h:1170` | **public** | — |
 | `BinaryRDLWriter` | 2 | 2 | `src/include/common_text.h:1190` | **public** | — |
 | `BroadcastRecord` | 3 | 3 | `src/Server/server_basedb.h:123` | private (Server) | — |
@@ -489,7 +489,7 @@
 | `Observer` | 1 | 1 | `src/include/server_sysdb.h:308` | **public** | — |
 | `OwnerList` | 1 | 2 | `src/include/common_metalist.h:295` | **public** | `public MetaList<T>` |
 | `ParagraphNode` | 9 | 41 | `src/include/common_text.h:921` | **public** | `public RDLNode` |
-| `PhysicalSystem` | 7 | 12 | `src/Common/common_physys_internal.h:36` | private (Common) | `public IVP_Listener_Object, public IVP_Listener_Collision, public IVP_Collision_Filter_Coll_Group_Ident` |
+| `PhysicalSystem` | 7 | 12 | `src/Common/physics/physys_internal.h:36` | private (Common) | `public IVP_Listener_Object, public IVP_Listener_Collision, public IVP_Collision_Filter_Coll_Group_Ident` |
 | `PositionNode` | 9 | 41 | `src/include/common_text.h:874` | **public** | `public RDLNode` |
 | `PotionHelper` | 2 | 2 | `src/include/common_systemmanager.h:992` | **public** | — |
 | `Power` | 4 | 17 | `src/include/common_archetype.h:922` | **public** | `public Equipment` |

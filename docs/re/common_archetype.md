@@ -5,7 +5,7 @@ An archetype is a game-data record (ship, solar, equipment, asteroid, explosion)
 `CreateID(nickname)`. This document describes the file formats, the database insertion rules and
 the contract with the client "companions" (`ICliObj`) that crosses the `Common.dll` <->
 `freelancer.exe` boundary. Code:
-`src/include/common_archetype.h`, `src/Common/common_archetype*.cpp`, `common_archetypeloader.cpp`;
+`src/include/common_archetype.h`, `src/Common/common_archetype*.cpp`, `Common/archetype/archetypeloader.cpp`;
 the client side is in [freelancer_cliobj.md](freelancer_cliobj.md).
 
 ## Classes

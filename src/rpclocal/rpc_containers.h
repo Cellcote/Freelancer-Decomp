@@ -1528,7 +1528,7 @@ unsigned int RpcFlattenedFmtStrSize(const FmtStr& Source);
 void* RpcFlattenFmtStr(const FmtStr& Source, unsigned int& OutSize);
 
 // `PUSH size ; PUSH buffer ; CALL FmtStr::unflatten`. A null buffer is fine: unflatten
-// clears the object and returns 0 (src/Common/common_fmtstr.cpp, FmtStr::unflatten).
+// clears the object and returns 0 (src/Common/text/fmtstr.cpp, FmtStr::unflatten).
 __declspec(dllexport) void RpcUnflattenFmtStr(FmtStr& Dest, void* Buffer, unsigned int Size);
 
 // ===========================================================================

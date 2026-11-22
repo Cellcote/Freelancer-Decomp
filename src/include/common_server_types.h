@@ -437,7 +437,7 @@ struct EquipDesc;
 // (`06d4a7d3  CALL dword ptr [->COMMON.DLL::CHARACTER_ID::operator=]`), so the
 // export is a real cross-module contract, not decoration. Every one of the
 // seven therefore carries COMMON_API, and the two bodies that used to be inline
-// are now out of line in src/Common/common_id.cpp: a __declspec(dllimport)
+// are now out of line in src/Common/core/id.cpp: a __declspec(dllimport)
 // declaration must not also carry a definition in the importing TU.
 struct CHARACTER_ID {
     char Buffer[0x200];

@@ -66,7 +66,7 @@ struct IStateGraph;
 //   - The ctor default-constructs an embedded `pub::AI::Personality` at
 //     `this+0x1584` (Common.dll.c:116875), which is the SAME hardcoded
 //     offset `IBehaviorManager::get_personality`/`set_personality`
-//     (common_behaviormanager.cpp) read/write via `Sys+0x1584`.
+//     (Common/ai/behaviormanager.cpp) read/write via `Sys+0x1584`.
 //   - 0x1584 + sizeof(pub::AI::Personality) (0x3D8, common_pub.h) == 0x195C,
 //     exactly the operator_new size above -- Personality is SystemManager's
 //     last member, so sizeof(SystemManager) == 0x195C precisely.
@@ -369,7 +369,7 @@ struct IObjInspect
 // Retail Common.dll exports every member of std::vector<IObjInspect*> (VC6 vector, 47
 // members). Its bodies are /OPT:ICF-folded with every other pointer vector, so the retail
 // user cannot be pinned from the addresses; the export itself is what the port reproduces.
-// The definition is in common_iobjinspectimpl.cpp; other modules import it through this declaration.
+// The definition is in Common/object/iobjinspectimpl.cpp; other modules import it through this declaration.
 #ifndef COMMON_EXPORTS
 extern template class COMMON_API std::vector<IObjInspect*>;
 #endif
@@ -385,7 +385,7 @@ extern template class COMMON_API std::vector<IObjInspect*>;
 // IBehaviorManager[+8] + 0x142c.
 // Ported 2026-09-24: the ctor (FUN_062ed570), both vtable slots, the owner bind
 // FUN_062ed620 and the commit-timer tick FUN_062ed740; SystemManager now embeds the class
-// for real (common_systemmanager.h). Every member is defined in common_targetmanager.cpp
+// for real (common_systemmanager.h). Every member is defined in Common/ai/targetmanager.cpp
 // (CMN-SPLIT 2026-10-14); FUN_062ed670 / FUN_062ee600 / FUN_062ed780 became members there,
 // their bodies still reading `this` as raw bytes at the offsets this layout names.
 // Field names come from those readers (cited per field).
@@ -583,8 +583,8 @@ struct IObjAffect
     // classes implement it as a SECOND, non-virtual base via multiple
     // inheritance at a fixed +0x2c offset (confirmed identical mdisp=0x2c in
     // both classes' RTTIBaseClassDescriptor): DockBehavior (see
-    // common_dockbehavior.h) and InstantTradeLaneBehavior (see
-    // common_itlbehavior.h). The
+    // Common/ai/dockbehavior.h) and InstantTradeLaneBehavior (see
+    // Common/ai/itlbehavior.h). The
     // real secondary vtable has exactly one slot each -- for DockBehavior it is
     // .rdata:0639f498 / Common.dll.c-equivalent LAB_062c53f0, a `this`-adjust-
     // by-(-0x2c)-then-call-EnterState-style dispatcher taking 3 ints and
@@ -791,8 +791,8 @@ struct IObjRW : IObjInspect, IObjAffect, Watchable
 #define FL_OBJRW_WATCHABLE_OFFSET FL_FACET_OFFSET(8, IObjRW, Watchable)
 
 // `Watchable` is IObjRW's third base and sits at +8, so the `- 8` the AI state machines
-// do on a watcher target is a downcast to the whole object. The AI TUs (common_aisteer.cpp,
-// common_behaviormanager.cpp, common_targetmanager.cpp, ...) all spell it out by hand; this names it.
+// do on a watcher target is a downcast to the whole object. The AI TUs (Common/ai/aisteer.cpp,
+// Common/ai/behaviormanager.cpp, Common/ai/targetmanager.cpp, ...) all spell it out by hand; this names it.
 inline IObjRW* ObjRwFromWatchable(void* WatchableSubObject)
 {
     if (WatchableSubObject == nullptr)
@@ -951,7 +951,7 @@ public:
     bool is_dying() const override;
 
     // The port's delegate-cast helpers (CSimple / CShip / CEqObj by ObjectClass mask) are
-    // file-local functions in common_iobjinspectimpl.cpp: retail inlines those tests and exports no
+    // file-local functions in Common/object/iobjinspectimpl.cpp: retail inlines those tests and exports no
     // such members.
 };
 
@@ -1017,7 +1017,7 @@ FL_LAYOUT_ASSERT(sizeof(IObjInspectImpl) == 0x14, "IObjInspectImpl sizeof 0x14")
 // StateGraph after get_state_graph's exported name; that name is retail's, and
 // says nothing about the FUN_062ed780 cluster.
 class IBehaviorManager;
-class Behavior;   // common_behavior.h -- what the dispatch table holds
+class Behavior;   // Common/ai/behavior.h -- what the dispatch table holds
 
 COMMON_API IBehaviorManager* __cdecl GetBehaviorManager(IObjRW* Obj);
 
@@ -1048,7 +1048,7 @@ COMMON_API IBehaviorManager* __cdecl GetBehaviorManager(IObjRW* Obj);
 //   - +0x0C/+0x14 WatcherA/WatcherB: two embedded BaseWatcher (8 bytes each,
 //     matching BaseWatcher's own established sizeof), zeroed then optionally
 //     pointed at a target via the public BaseWatcher::set() API (this file's
-//     common_basewatcher.cpp already documents FUN_062c3040/FUN_062c5c20/
+//     Common/object/basewatcher.cpp already documents FUN_062c3040/FUN_062c5c20/
 //     FUN_062d27b0 making the identical "set(nullptr) instead of needing
 //     friend access to protected set_pointer" substitution for other embedded
 //     BaseWatchers in this module -- same substitution used here).
@@ -1089,7 +1089,7 @@ FL_LAYOUT_ASSERT(sizeof(NotificationNode) == 0x24, "NotificationNode sizeof 0x24
 // pair with `FST [EBP]` / `MOV [EBP+4],EDI` on a cursor stepping by 8, and reads it back with
 // `FLD [EBX+ECX*8]` / `MOV EDX,[EBX+ECX*8+4]` -- a float followed by the int behavior index it
 // came from. Weight is the candidate's transition weight for this tick (see the scoring block in
-// common_behaviormanager.cpp for how it is derived), BehaviorIndex the index into BehaviorDispatchTable
+// Common/ai/behaviormanager.cpp for how it is derived), BehaviorIndex the index into BehaviorDispatchTable
 // that produced it.
 struct BehaviorScore
 {
@@ -1232,12 +1232,12 @@ public:
     // Notification / delayed-callback queue -- not an export; internal machinery
     // that FUN_062d2b10 (IBehaviorManager's own large per-tick method, decomp-
     // tracker item 1553) depends on. See NotificationNode above and
-    // common_behaviormanager.cpp for the full per-function writeup. Ported from FUN_062d4450
+    // Common/ai/behaviormanager.cpp for the full per-function writeup. Ported from FUN_062d4450
     // (tick walk/expiry -> UpdateNotificationQueue), FUN_062d4520/FUN_062d4750
     // (the two delayed-op kinds a node's Mode selects -> QueueNotification/
     // InsertNotification), FUN_062d46f0 (watcher teardown), FUN_062d4bf0/
     // FUN_062d4c90 (full queue teardown -- behaviorally identical to each other,
-    // see common_behaviormanager.cpp), FUN_062d4c50/FUN_062d4d20 (single-node unlink,
+    // see Common/ai/behaviormanager.cpp), FUN_062d4c50/FUN_062d4d20 (single-node unlink,
     // likewise behaviorally identical to each other).
     void UpdateNotificationQueue(float Dt);
     void QueueNotification(IObjRW* Target, unsigned Extra, float Duration);
@@ -1253,7 +1253,7 @@ public:
     // behavior re-evaluation and weighted random pick, and the DirectiveCallbacks[]
     // fan-out. Three side-effect-only calls into still-deferred subsystems remain
     // (211899-211904 and 211929-211990); each is an individually-cited
-    // TODO(FULLPORT-DEFERRED) comment in common_behaviormanager.cpp.
+    // TODO(FULLPORT-DEFERRED) comment in Common/ai/behaviormanager.cpp.
     void UpdateBehaviorTick(float Dt);
 
     // FUN_062d3420 (decomp-tracker item 1555), Common.dll.txt 212626-212771, 128
@@ -1319,7 +1319,7 @@ public:
     // is NOT exported: Server reaches it only through the vptr of an object Common built
     // (GetBehaviorManager / CEqObj::create_behavior_interface).
     // Event->Type selects one of eight cases; Event->Data is a per-case payload block whose
-    // offsets are listed on the definition in common_behaviormanager.cpp. Types above 7, and any event
+    // offsets are listed on the definition in Common/ai/behaviormanager.cpp. Types above 7, and any event
     // while CurrentBehaviorIndex == -1, are ignored.
     virtual void Slot00(FBehaviorManagerEvent const* Event); // vftable 063a037c +0x00
 
@@ -1496,7 +1496,7 @@ public:
     unsigned char Pad151[3];            // +0x151 .. +0x153
     int CameraLevelStatus;              // +0x154
     // Notification queue root (see NotificationNode above this class, and
-    // common_behaviormanager.cpp's UpdateNotificationQueue/QueueNotification/
+    // Common/ai/behaviormanager.cpp's UpdateNotificationQueue/QueueNotification/
     // InsertNotification for the full writeup). +0x158 itself is never read or
     // written by any function in the traced cluster (FUN_062d4450/4520/4750/
     // 46f0/4bf0/4c50/4c90/4cf0/4d20/4d60) -- left as reserved padding rather
@@ -1550,7 +1550,7 @@ public:
 //   Behavior dispatch table at +0x174 is an array indexed by CurrentBehaviorIndex.
 //   Each entry is a pointer to a behavior object with a vtable.
 //   The slot map that used to live here is now the declaration of class Behavior in
-//   common_behavior.h, so the compiler checks it.
+//   Common/ai/behavior.h, so the compiler checks it.
 // static_asserts removed — layout not yet fully verified. The notification-queue
 // fields added in this pass (2026-09-11, d294:common-port) are independently
 // hand-verified against IBehaviorManager+0x8 (Sys) staying put, so asserted here:

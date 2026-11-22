@@ -119,7 +119,7 @@ FL_LAYOUT_ASSERT(sizeof(SubObjectID::ShieldIdMaker) == 2, "ShieldIdMaker sizeof 
 
 // Retail Common.dll exports every member of this STL instantiation (VC6 std::list, 55
 // members, imported by name by FreeLancer.exe, Server.dll and rpclocal.dll). The port
-// exports the modern MSVC instantiation instead: the definition is in common_archetype_ships.cpp; other modules
+// exports the modern MSVC instantiation instead: the definition is in Common/archetype/archetype_ships.cpp; other modules
 // import it through this declaration. It must precede the first use that would implicitly
 // instantiate the class, which is why it sits directly after the element type.
 #ifndef COMMON_EXPORTS
@@ -131,7 +131,7 @@ class INI_Reader;
 // 4-byte holder of a StringAlloc'd (StringCache-interned) string. Not MSVCP60 std::string.
 // Retail exports only clear() (no class-level export: no operator=). clear (06333e30) stores
 // the StringCache pool's shared empty string (DAT_0640a810) -- the pointer StringAlloc(null/"")
-// also returns -- so it is defined next to the pool in common_stringcache.cpp.
+// also returns -- so it is defined next to the pool in Common/core/stringcache.cpp.
 struct CacheString
 {
     char const* Value;
@@ -1708,7 +1708,7 @@ namespace Archetype
     // ArchDB below (already ported, pre-existing this pass) is the project's
     // OWN already-shipped, functionally-equivalent replacement for this exact
     // machinery -- confirmed, not assumed: ArchDB::FImpl stores a REAL
-    // `std::map<unsigned, void*> Records` (common_archetype.cpp ArchDB::FImpl),
+    // `std::map<unsigned, void*> Records` (Common/archetype/archetype.cpp ArchDB::FImpl),
     // ArchDB::Insert's own doc comment cites "FUN_062fbeb0 insert" (the
     // insert entry point that itself calls FUN_062fbad0 lower_bound +
     // FUN_062fd060 rebalance-insert, items 1954/1979 above), and
@@ -1718,7 +1718,7 @@ namespace Archetype
     // sixth). This is the SAME
     // "replace identified raw _Tree machinery with a real std::map once the
     // owning container is known" convention already established elsewhere in
-    // this port (CArchGroupManager::Traverse, common_carchgroup.cpp).
+    // this port (CArchGroupManager::Traverse, Common/equip/carchgroup.cpp).
     //
     // Per this project's "skipped vs ported-name for rewrites" convention, all
     // eleven items above are marked `skipped` with ported_name pointing at
@@ -1729,7 +1729,7 @@ namespace Archetype
     //
     // The per-map teardown (062fabb0 / 062facf0 / 062fae00 and the inline walks in
     // 062fa980) -- release loop, dangling-reference warning, scalar deleting dtor --
-    // lives in Archetype::Free's per-record callbacks (common_archetypeloader.cpp); ArchDB::Clear
+    // lives in Archetype::Free's per-record callbacks (Common/archetype/archetypeloader.cpp); ArchDB::Clear
     // only empties the map.
     //
     // decomp-tracker item 1944 (FUN_062fb1e0, Common.dll.c:134030-134055) is a
@@ -1741,7 +1741,7 @@ namespace Archetype
     // fixed-layout array. Also marked `skipped`, ported_name Loadout::Map.
     // ------------------------------------------------------------------------
 
-    // ArchDB's out-of-line pieces (common_archetype.cpp): the three dumps and the small-id
+    // ArchDB's out-of-line pieces (Common/archetype/archetype.cpp): the three dumps and the small-id
     // registry shared by every map.
     void ArchDBDumpNoNickname(char const* KindName);      // line 0x84
     void ArchDBDumpMiss(unsigned NicknameId);             // line 0x3c
@@ -1918,7 +1918,7 @@ namespace Archetype
     COMMON_API bool __cdecl Load(char const* Path, FlLong* EngineIndex, int* AnimIndex);
     COMMON_API bool __cdecl Load(IFileSystem* Filesys, FlLong* EngineIndex, int* AnimIndex);
 
-    // Table loaders (common_archetypeloader.cpp). int = ArchDB insert delta (0 = open fail /
+    // Table loaders (Common/archetype/archetypeloader.cpp). int = ArchDB insert delta (0 = open fail /
     // nothing added).
     // bool = reload (true → redefine on duplicate nickname). DataConfig passes false.
     COMMON_API int __cdecl LoadEquipment(char const* Path, bool bReload, ICliObjFactory* Factory);

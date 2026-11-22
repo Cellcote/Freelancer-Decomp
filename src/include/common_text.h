@@ -91,7 +91,7 @@ COMMON_API bool operator==(Rect const& A, Rect const& B);
 // "at least one non-empty" check here tests Width>0 && Height>0 (signed JLE/JG),
 // while the sibling operator== just above tests Width!=0 && Height!=0 (JZ/JNZ,
 // i.e. Rect::null()). Kept as its own faithful copy rather than collapsed to
-// !(A==B) -- see common_rect.cpp for the asymmetry this preserves.
+// !(A==B) -- see Common/text/rect.cpp for the asymmetry this preserves.
 COMMON_API bool operator!=(Rect const& A, Rect const& B);
 
 // ============================================================================
@@ -123,14 +123,14 @@ COMMON_API int __cdecl PackMissionLogData(int Type, FmtStr const* Fmt, unsigned 
 class TextRenderContext;
 class RenderDisplayList;
 // 0x06326600, 828 insns, tracker item 72966 -- the RDLX LAYOUT/line-breaking pass (consumes the tree
-// ParseRdlxTag/ParseRdlxEndElement/ParseRdlxCharacters in common_rdlio.cpp build, produces line breaks/positions/
+// ParseRdlxTag/ParseRdlxEndElement/ParseRdlxCharacters in Common/text/rdlio.cpp build, produces line breaks/positions/
 // wrapping/truncation into OutRdl). Ported 2026-09-10 (layoutrichtext-pass11): walks Rdl's node
 // list (a documented flat-walk simplification of retail's single-use recursion deque), measuring/
 // splitting/wrapping/justifying/positioning each line into OutRdl, with a single-line "truncate
 // with an ellipsis" mode gated by Param7. One low-confidence sub-piece (an edge-case list trim when
 // the ellipsis itself doesn't fit) and the exact meaning of the boolean return value are flagged as
 // documented judgment calls rather than confirmed facts -- see the full trail on the definition in
-// common_renderdisplaylist.cpp (dated "layoutrichtext-pass10"/"layoutrichtext-pass11" comment sections).
+// Common/text/renderdisplaylist.cpp (dated "layoutrichtext-pass10"/"layoutrichtext-pass11" comment sections).
 COMMON_API bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl, int Param3, RenderDisplayList& OutRdl, int Param5, int Param6, bool Param7, int* Param8, bool Param9);
 COMMON_API int __cdecl lex_compare(RenderDisplayList const& A, RenderDisplayList const& B, bool Param3);
 
@@ -312,7 +312,7 @@ struct TextRenderAttributes
 };
 
 // LineParser32 and TextFile32 (INI infrastructure) are declared in common_ini.h and
-// ported in common_textfile.cpp.
+// ported in Common/core/textfile.cpp.
 
 // ============================================================================
 // TextRenderContext — base class for text rendering. Has vtable. Size 0x3C.
@@ -542,7 +542,7 @@ private:
     friend COMMON_API void __cdecl ShutdownRichText();
 
     // The concrete image create_image returns (RTTI .?AVBMPImage@DeviceTRC@@, vftable
-    // .rdata:063a4608); nothing of it is exported, so it is defined in common_textrender.cpp.
+    // .rdata:063a4608); nothing of it is exported, so it is defined in Common/text/textrender.cpp.
     class BMPImage;
 
     // Private static data, exported: ?mDropShadowX@DeviceTRC@@0HA (.data:063ed670),
@@ -1228,14 +1228,14 @@ public:
     // (Buffer, Size) in a BSTR and calls ISAXXMLReader::parse(VARIANT) instead of parseURL. Full
     // instruction-by-instruction trace and the one deliberately-simplified edge case (retail's
     // OOM path throws a real C++ exception this port doesn't reproduce; treated as an ordinary
-    // parse failure instead) are documented on the definition in common_rdlio.cpp.
+    // parse failure instead) are documented on the definition in Common/text/rdlio.cpp.
     virtual bool read_buffer(RenderDisplayList& Rdl, const char* Buffer, unsigned int Size);
     // Common.dll.c/.txt 0xcbf80 (Common.dll.txt:364321-364417). Ported 2026-09-09 (D109, item
     // 13991): CoCreateInstance()s Microsoft's real MSXML2 SAXXMLReader COM object
     // (CLSID_SAXXMLReader), registers a genuine ISAXContentHandler-implementing sink (see
-    // RdlxSaxContentHandler in common_rdlio.cpp) via putContentHandler, mbstowcs's Filename, and
+    // RdlxSaxContentHandler in Common/text/rdlio.cpp) via putContentHandler, mbstowcs's Filename, and
     // calls parseURL. NOT a DOM/IPersistStreamInit load as previously assumed -- see the
-    // detailed evidence trail on the definition in common_rdlio.cpp.
+    // detailed evidence trail on the definition in Common/text/rdlio.cpp.
     virtual bool read_file(RenderDisplayList& Rdl, const char* Filename);
     // Common.dll.c/.txt 0xcc0a0: concrete default — XOR AL,AL; RET (always false). Retail's
     // XMLReader is instantiable; this was wrongly pure in the port and blocked IDS→RDL XML.

@@ -8,7 +8,7 @@
 
 #include "common_exports.h"
 
-// AnimDB — Common.dll animation-registration table (common_animdb.cpp).
+// AnimDB — Common.dll animation-registration table (Common/archetype/animdb.cpp).
 // Retail exports two registration families: Add(int)/Rem(int) for freelancer.exe (muzzle
 // joint, bay, gates) and Add(VChannel*)/Rem(VChannel const*) for per-frame joint channels,
 // plus Count/Shutdown/Update.

@@ -22,7 +22,7 @@
 
 // Retail Common.dll exports every member of this STL instantiation (VC6 std::vector, 47
 // members, imported by name by FreeLancer.exe, Server.dll and rpclocal.dll). The port
-// exports the modern MSVC instantiation instead: the definition is in common_fuses.cpp; other modules
+// exports the modern MSVC instantiation instead: the definition is in Common/equip/fuses.cpp; other modules
 // import it through this declaration. It must precede the first use that would implicitly
 // instantiate the class, which is why it sits right after
 // the includes. Retail's user is FuseAction::TriggeredSubObjs (sub-object ids, copied by

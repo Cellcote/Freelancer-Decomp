@@ -122,7 +122,7 @@
 // This IClientS.cpp range transitions directly into the already-triaged CDeadReckonedVector /
 // CRemotePhysicsSimulation cluster at 0x0053f890 (see decomp-tracker notes on those items --
 // those two classes DO have a partial port in src/Common/common_cobject.h/.cpp and
-// src/include/server_pub.h + src/Common/common_physys.cpp; CDeadReckonedVector's layout
+// src/include/server_pub.h + src/Common/physics/physys.cpp; CDeadReckonedVector's layout
 // and quadratic dead-reckoning algorithm were re-derived and fixed, but CRemotePhysicsSimulation's
 // own Doit/RemoteUpdate/CheckForSync are still unported), then into ship.cpp beyond 0x00540000.
 //

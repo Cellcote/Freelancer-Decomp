@@ -46,7 +46,7 @@ What is left, from a fresh survey of `master` (counts are from grep, then spot-c
 | Inline assembly | None left outside `#if defined(_M_IX86)`; every block has a portable version |
 | Layout `static_assert`s not yet `FL_LAYOUT_ASSERT` | None left in the client modules. The plain ones that remain hold on both platforms |
 | Hard-coded retail byte offsets | About 160 in the client modules (freelancer 92, of which `cli_nebula.cpp` 37; movie 48; alchemy 9; flmaterials 5; RemoteServer 2; Deformable2 1), and about 45 more in Common and Server |
-| Raw `this + 0x..` offsets in Common's AI behaviours | About 44 sites in 14 files (`common_behavior.cpp` and the behaviours). They already run in the x64 server and hit the wrong fields there; being fixed first |
+| Raw `this + 0x..` offsets in Common's AI behaviours | About 44 sites in 14 files (`Common/ai/behavior.cpp` and the behaviours). They already run in the x64 server and hit the wrong fields there; being fixed first |
 | Pointers stored in 32-bit integers | movie's big-number code (about 300 casts, left out on x64, step 2.2); the rest was fixed in phase 2 |
 | Renderer | RP8 cannot be built for x64 (D3DX8 has no 64-bit version). The x64 client gets RPGPU (phase 5), which so far draws the 2D draws (menus, HUD) |
 

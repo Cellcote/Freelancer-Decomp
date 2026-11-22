@@ -6,9 +6,9 @@ Archetype files (ships, solars, asteroids, equipment, explosions) are read by Co
 
 ## How the companion is reached
 
-* While a record's section is being read, Common offers every key to the record class first (`Root::read` and the leaf classes, [common_archetype.cpp:468](../../src/Common/common_archetype.cpp#L468)). Only a key that the record class does **not** consume falls through to `Companion->ReadUnknown(reader)` ([common_archetype.cpp:542](../../src/Common/common_archetype.cpp#L542)). A key that Common already handles (for example `ids_info`) therefore never reaches the companion even if the companion code also tests it.
+* While a record's section is being read, Common offers every key to the record class first (`Root::read` and the leaf classes, [Common/archetype/archetype.cpp:468](../../src/Common/archetype/archetype.cpp#L468)). Only a key that the record class does **not** consume falls through to `Companion->ReadUnknown(reader)` ([Common/archetype/archetype.cpp:542](../../src/Common/archetype/archetype.cpp#L542)). A key that Common already handles (for example `ids_info`) therefore never reaches the companion even if the companion code also tests it.
 * Each companion class first calls its base class, so the generic keys of section 2 are accepted by every record kind. A key nobody consumes is ignored without a message by the client (what the loader does with the `false` result is described in [archetypes-and-equipment.md](archetypes-and-equipment.md)).
-* A `[LOD]` section is not read by Common: the loader hands it to the companion of the last record that was inserted successfully ([common_archetypeloader.cpp:443](../../src/Common/common_archetypeloader.cpp#L443)), so it must follow the record it belongs to.
+* A `[LOD]` section is not read by Common: the loader hands it to the companion of the last record that was inserted successfully ([Common/archetype/archetypeloader.cpp:443](../../src/Common/archetype/archetypeloader.cpp#L443)), so it must follow the record it belongs to.
 * Records marked "inherit" copy the donor's companion fields too, so a key given in the donor is inherited ([archetypes-and-equipment.md](archetypes-and-equipment.md)).
 
 The companion class is chosen by the section kind ([FCliObjFactory::Create, client_cliobj.cpp:4328](../../src/freelancer/Client/client_cliobj.cpp#L4328)):

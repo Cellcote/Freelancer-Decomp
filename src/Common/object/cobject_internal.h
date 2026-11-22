@@ -1,0 +1,36 @@
+// Freelancer Decomp: a reimplementation of the Freelancer (2003) game client and engine,
+// faithful to the behaviour of the original game.
+// This file was reconstructed by reverse engineering the binaries of Freelancer 1.1,
+// developed by Digital Anvil.
+// Author: Giperion.
+
+#pragma once
+
+// Common-internal helpers shared by the CObject-family TUs (object/cobject.cpp,
+// object/engineobject.cpp, object/csimple.cpp, object/cprojectile.cpp, object/cship.cpp,
+// object/csolar.cpp, object/cmine.cpp, object/cloot.cpp). Defined in object/cobject.cpp.
+// Not exported.
+
+#include "common_cobject.h"
+
+struct IObjDB;
+
+namespace CmnCobject
+{
+    // World-space vector -> object space through the transposed orientation and the cached
+    // 3DMathEngine's TransformMatrix (slot +0x2c); used by the init_physics of CGuided, CMine,
+    // CCounterMeasure, CLoot and CShip.
+    Vector RotateWorldToObjectSpace(Matrix const& Orient, Vector const& World);
+
+    // IObjDB slot 2 (GetZoneDb) -> Universe::ISystem slot 0: the system id used as the
+    // physics collision group in the init_physics family.
+    unsigned GetObjectDbCollisionGroup(IObjDB* Db);
+
+    // Element-wise copy of the 3x3 rotation.
+    void CopyMatrix9(Matrix& Dst, Matrix const& Src);
+
+    // PORT(perf-index): re-files Object in the class-list index (CObject::Find) under its current
+    // EngineInstanceId and CSimple::Id. Every write to either field made while the object can
+    // be listed calls it right after the write; objects in no class list are ignored.
+    void ClassListKeysChanged(EngineObject const* Object);
+}
