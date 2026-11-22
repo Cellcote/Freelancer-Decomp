@@ -27,6 +27,30 @@ else()
 endif()
 
 # ---------------------------------------------------------------------------------------------
+# clang-tidy (developer tooling, off by default): with -DFL_CLANG_TIDY=ON every first-party
+# source is checked against the repository's .clang-tidy while it compiles. Analysis only: the
+# generated code is the same. The vendored libraries are not checked. CI runs it on the portable
+# modules (Linux, Clang); on Windows it needs clang-tidy on PATH (Visual Studio's "C++ Clang
+# tools for Windows" component).
+# ---------------------------------------------------------------------------------------------
+option(FL_CLANG_TIDY "Run clang-tidy (.clang-tidy) on the first-party sources while building" OFF)
+set(FL_VENDORED_MODULES zlib qhull)
+if(FL_CLANG_TIDY)
+  find_program(FL_CLANG_TIDY_EXE NAMES clang-tidy REQUIRED)
+  message(STATUS "clang-tidy: ${FL_CLANG_TIDY_EXE}")
+  # Every target defined after this point, including those not made with fl_add_module.
+  set(CMAKE_C_CLANG_TIDY "${FL_CLANG_TIDY_EXE}")
+  set(CMAKE_CXX_CLANG_TIDY "${FL_CLANG_TIDY_EXE}")
+endif()
+
+# _fl_clang_tidy(<name>): a vendored module is not checked.
+function(_fl_clang_tidy name)
+  if(FL_CLANG_TIDY AND name IN_LIST FL_VENDORED_MODULES)
+    set_target_properties(${name} PROPERTIES C_CLANG_TIDY "" CXX_CLANG_TIDY "")
+  endif()
+endfunction()
+
+# ---------------------------------------------------------------------------------------------
 # Portable build (GCC / Clang): plain CMake targets for the PORTABLE modules.
 # ---------------------------------------------------------------------------------------------
 if(NOT FL_WINDOWS)
@@ -84,6 +108,7 @@ if(NOT FL_WINDOWS)
     target_compile_options(${name} PRIVATE
       "SHELL:-include \"${FL_SRC_DIR}/include/fl_layout.h\""
       $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra>)
+    _fl_clang_tidy(${name})
   endfunction()
 
   function(fl_includes name)
@@ -501,7 +526,7 @@ endfunction()
 #               [NO_SAFESEH]               <ImageHasSafeExceptionHandlers>false
 #               [NO_INCREMENTAL]           <LinkIncremental>false in every configuration
 #               [EXPORTS]                  an exe that exports names (and so has an import library)
-#               [WARNING_LEVEL <n>]        default 3
+#               [WARNING_LEVEL <n>]        default 4; vendored code (zlib, qhull) sets its own
 #               [DEF <file.def>]           ModuleDefinitionFile
 #               [PCH]                      the precompiled header (src\pch\fl_pch.h, see there)
 #               [ITEM_DEFAULTS <Key> <Value>...]  ClCompile ItemDefinitionGroup (see fl_item)
@@ -530,7 +555,7 @@ function(fl_add_module name kind)
     message(FATAL_ERROR "fl_add_module(${name}): give exactly one of RETAIL, PORT or TOOL")
   endif()
   if(NOT DEFINED A_WARNING_LEVEL)
-    set(A_WARNING_LEVEL 3)
+    set(A_WARNING_LEVEL 4)
   endif()
 
   if(A_PCH)
@@ -625,12 +650,16 @@ function(fl_add_module name kind)
   # implies /permissive-), fl_layout.h forced into every source (FL_LAYOUT_ASSERT, the retail
   # struct size and offset checks; per source, in _fl_finalize), C4251 / C4275 off (exported classes hold STL members and
   # derive from non-exported bases; their consumers do not need the dll-interface).
+  # Warnings: /W4 by default and never errors (/WX-); CI summarises them per warning and per
+  # module (.github/scripts/warning_summary.py). Headers included with <...> (CRT, STL, Windows
+  # SDK, MFC, DirectX) are external and silent: first-party headers are included with "...".
+  # The warning options change no generated code.
   set(_cl
     /W${A_WARNING_LEVEL} /WX- /diagnostics:column /Gm- /EHsc
     "$<${_fl_cfg_asan}:/fsanitize=address>"
     /GS /Zc:wchar_t /Zc:forScope /Zc:inline
     /std:c++20 /permissive
-    /external:W${A_WARNING_LEVEL} /Gd /FC /wd4251 /wd4275)
+    /external:anglebrackets /external:W0 /Gd /FC /wd4251 /wd4275)
   if(FL_WIN32)
     # MSBuild passes these two for Win32 only.
     list(APPEND _cl /Oy- /analyze-)
@@ -693,6 +722,7 @@ function(fl_add_module name kind)
     # An exe with exports gets an import library next to it, as MSBuild.
     set_property(TARGET ${name} PROPERTY ENABLE_EXPORTS ON)
   endif()
+  _fl_clang_tidy(${name})
 endfunction()
 
 # Resource-only DLLs: src\Resources\ResourceDll.props (no code, no CRT, no entry point, no PDB).

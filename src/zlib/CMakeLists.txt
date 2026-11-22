@@ -1,7 +1,8 @@
 # See cmake/Freelancer.cmake. The source list is the link order, and with it the order of
 # static initialisation.
 
-fl_add_module(zlib DLL RETAIL DEF zlib.def
+# Vendored zlib keeps its own warning level, not the first-party /W4.
+fl_add_module(zlib DLL RETAIL DEF zlib.def WARNING_LEVEL 3
   SOURCES
     vendor/adler32.c
     vendor/compress.c

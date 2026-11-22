@@ -108,6 +108,9 @@ Port-only features are build switches, set with `-D<Name>=0|1` at configure time
 | `FreelancerBetaLabel` | 0 | The "Beta" label in the corner of the screen |
 | `FreelancerEnableTickProfile` | 0 | On-screen frame profiler |
 
+Code style, the `/W4` warnings and the opt-in clang-tidy run are described in
+[docs/building.md](docs/building.md#warnings-formatting-and-static-analysis).
+
 ## Documentation
 
 Start at [docs/README.md](docs/README.md). [docs/MISSION.md](docs/MISSION.md) covers the

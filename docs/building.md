@@ -155,3 +155,23 @@ folder in the non-Windows `FL_PROJECTS` of the root `CMakeLists.txt`. On these c
 Windows. Making more modules portable is the non-Windows port (on hold; see
 [x64-client-plan.md](x64-client-plan.md)), which needs a non-Windows backend for
 `src/include/platform.h` ([platform.md](platform.md)) first.
+
+## Warnings, formatting and static analysis
+
+- **Warnings.** On Windows every first-party module builds at `/W4` (`fl_add_module`'s default);
+  the vendored zlib and qhull keep their own levels. Headers included with `<...>` (CRT, STL,
+  Windows SDK, MFC, DirectX) are external and their warnings are off. Warnings never fail the
+  build: CI shows a table per warning and per module on the run page
+  (`.github/scripts/warning_summary.py`) and keeps the full build output as an artifact. The
+  portable build uses `-Wall -Wextra`.
+- **Formatting.** `.clang-format` (clang-format 19) describes the code style. The tree is not
+  reformatted in bulk, which would rewrite about a quarter of all lines and break upstream merges:
+  CI checks only the lines a pull request changes. Format your own changes with
+  `git clang-format origin/master`. Reformat a whole file only in a commit that changes nothing
+  else.
+- **clang-tidy.** `.clang-tidy` lists bug-finding checks; checks that would push changes to
+  retail layout or ownership (`modernize-*` and the like) are left out. Configure with
+  `-DFL_CLANG_TIDY=ON` to run it while building (needs clang-tidy 19 or later on `PATH`; on
+  macOS with a non-Apple clang-tidy also pass `-DCMAKE_OSX_SYSROOT=$(xcrun --show-sdk-path)`).
+  Vendored modules are skipped. CI runs it on the portable modules (Linux, Clang) and reports the
+  findings without failing.
