@@ -745,7 +745,7 @@ public:
         Args[1] = SenderId;
         Args[2] = ReceiverId;
         Args[3] = VoiceId;
-#if defined(_WIN64)
+#if defined(FL_PTR64)
         // Args[4..16]: the Costume's thirteen dwords, one per slot. A slot is wider than a
         // dword on x64, so the struct cannot be copied across the slots as one block.
         unsigned int CostumeDwords[13];

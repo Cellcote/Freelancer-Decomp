@@ -58,6 +58,7 @@
 
 #include "rpc_containers.h"
 #include "rpc_payloads.h"
+#include "rpc_wire_wide.h"
 
 #include <new>
 #include <cstring>
@@ -118,12 +119,12 @@ unsigned int RpcEncodeClientLogin(FPacketBase& Packet, unsigned char** BufferHol
         // MSVCRT `_wcslwr` through IAT .rdata:06db320c, on the packet itself.
         _wcslwr(Wire->AccountName);                                       // 06dafc1d
         // 06dafc2e `SHL EAX,0x1` -- the reservation and the copy are both 2*LenA.
-        if (!Stream.PutBytes(Wire->AccountName, (unsigned int)LenA * 2u)) {  // 06dafc63
+        if (!RpcPutBytesWide(Stream, Wire->AccountName, LenA)) { // 06dafc63
             return Stream.GetError();
         }
     }
     if (LenB != 0) {                                                      // 06dafc7b
-        if (!Stream.PutBytes(Wire->Password, (unsigned int)LenB * 2u)) {     // 06dafcc1
+        if (!RpcPutBytesWide(Stream, Wire->Password, LenB)) { // 06dafcc1
             return Stream.GetError();
         }
     }
@@ -144,8 +145,9 @@ unsigned int RpcDecodeClientLogin(FPacketBase& Packet, const unsigned char* Buff
     }
     // 06dafd87..06dafd93: 0x100 dwords plus one word from packet+0x20, i.e. 0x402 bytes
     // -- both wide buffers and the two bytes after them. The CreateFlag at payload+0x400
-    // is inside that run and is overwritten by the read below.
-    ::memset(Wire->AccountName, 0, 0x402u);
+    // is inside that run and is overwritten by the read below. Spelled with sizeof so a
+    // 4-byte wchar_t still clears both buffers; 0x402 when wchar_t is 2 bytes.
+    ::memset(Wire->AccountName, 0, sizeof(Wire->AccountName) + sizeof(Wire->Password) + 2u);
     if (!Stream.GetByte(Wire->CreateFlag)) {                              // 06dafdba
         return Stream.GetError();
     }
@@ -158,13 +160,13 @@ unsigned int RpcDecodeClientLogin(FPacketBase& Packet, const unsigned char* Buff
         return Stream.GetError();
     }
     if (LenA != 0) {                                                      // 06dafe13
-        if (!Stream.GetBytes(Wire->AccountName, (unsigned int)LenA * 2u)) {  // 06dafe49
+        if (!RpcGetBytesWide(Stream, Wire->AccountName, LenA)) { // 06dafe49
             return Stream.GetError();
         }
         Wire->AccountName[LenA] = L'\0';                                  // 06dafe60
     }
     if (LenB != 0) {                                                      // 06dafe6e
-        if (!Stream.GetBytes(Wire->Password, (unsigned int)LenB * 2u)) {     // 06dafeae
+        if (!RpcGetBytesWide(Stream, Wire->Password, LenB)) { // 06dafeae
             return Stream.GetError();
         }
         Wire->Password[LenB] = L'\0';                                     // 06dafec4
@@ -419,8 +421,8 @@ unsigned int RpcEncodeClientSaveGame(FPacketBase& Packet, unsigned char** Buffer
         return Stream.GetError();
     }
     if (Wire->DescriptionCount != 0) {                                    // 06d9a88a
-        if (!Stream.PutBytes(Wire->Description,
-                             Wire->DescriptionCount * 2u)) {              // 06d9a8d3
+        if (!RpcPutBytesWide(Stream, Wire->Description,
+                             Wire->DescriptionCount)) { // 06d9a8d3
             return Stream.GetError();
         }
     }
@@ -443,9 +445,9 @@ unsigned int RpcDecodeClientSaveGame(FPacketBase& Packet, const unsigned char* B
     }
     if (Wire->DescriptionCount != 0) {                                    // 06d9a9c7
         Wire->Description = static_cast<wchar_t*>(
-            ::operator new(Wire->DescriptionCount * 2u, std::nothrow));   // 06d9a9cd, bare
-        if (!Stream.GetBytes(Wire->Description,
-                             Wire->DescriptionCount * 2u)) {              // 06d9aa1f
+            ::operator new(RpcWideBytes(Wire->DescriptionCount), std::nothrow)); // 06d9a9cd, bare
+        if (!RpcGetBytesWide(Stream, Wire->Description,
+                             Wire->DescriptionCount)) { // 06d9aa1f
             return Stream.GetError();
         }
     }

@@ -49,6 +49,7 @@
 
 #include "rpc_payloads.h"
 #include "rpc_containers.h"
+#include "rpc_wire_wide.h"
 #include "server_pub.h"
 // EquipDesc and its setters, imported by retail rpclocal at .rdata:06db3004 and
 // 06db3070..06db308c and used verbatim by the two PLAYER_TRADE equipment sub-types.
@@ -61,6 +62,7 @@
 // common_cobject.h already coexist in src/Server/server_pub.cpp.
 #include "common_cobject.h"
 
+#include <cstddef>
 #include <cstring>
 #include <cwchar>
 #include <iterator>
@@ -137,17 +139,17 @@ static bool MarshalCh3StructHead(FPacketBase* Packet, const RpcArg* Args, unsign
 // string's offset inside SLoginInfo to +0xa0 and the flag's to +0xc0.
 // ===========================================================================
 
-// Byte-addressed so the field offsets stay the ones the listing proves, without
-// depending on src/include/common_server_types.h's SLoginInfo field break -- which is
-// wrong (it has one wchar_t AccountName[96] spanning +0x00..+0xbf and therefore no room
-// for the string retail keeps at +0xa0). Reported, not patched: cross-module header.
-static constexpr unsigned int kLoginAccountOffset = 0x00;   // cap 0x28 wide chars
-static constexpr unsigned int kLoginPasswordOffset = 0xa0;  // cap 0x10 wide chars
-static constexpr unsigned int kLoginFlagOffset = 0xc0;
-static unsigned char GStaticLoginInfo[sizeof(SLoginInfo)];   // retail .data:0x06dbba38
+// SLoginInfo's members (src/include/common_server_types.h) are at the offsets the listing
+// proves on Win32: the account name at +0x00 (cap 0x28 wide characters), the second
+// string at +0xa0 (cap 0x10) and the flag byte at +0xc0. Through the members, a 4-byte
+// wchar_t (macOS, Linux) moves them as the receiver's own layout does.
+FL_LAYOUT_ASSERT(offsetof(SLoginInfo, AccountName) == 0x00, "SLoginInfo account name at +0x00");
+FL_LAYOUT_ASSERT(offsetof(SLoginInfo, Field_0xA0) == 0xa0, "SLoginInfo second string at +0xa0");
+FL_LAYOUT_ASSERT(offsetof(SLoginInfo, CreateFlag) == 0xc0, "SLoginInfo flag at +0xc0");
+static SLoginInfo GStaticLoginInfo;   // retail .data:0x06dbba38
 
 static bool MarshalLogin(FPacketBase* Packet, const RpcArg* Args, unsigned int ArgCount) {
-    const unsigned char* Info = RpcArgAs<const unsigned char*>(Args[0]);
+    const SLoginInfo* Info = RpcArgAs<const SLoginInfo*>(Args[0]);
     // IServerImpl::Login 0x06d8cc70: two UNBOUNDED wcscpy calls into a 0x404-byte stack
     // window (06d8cca3 from SLoginInfo+0, 06d8ccb4 from SLoginInfo+0xa0 to window+0x200),
     // the flag byte SLoginInfo+0xc0 to window+0x400 (06d8ccb6/06d8ccc0), then 0x402 bytes
@@ -158,12 +160,14 @@ static bool MarshalLogin(FPacketBase* Packet, const RpcArg* Args, unsigned int A
     for (unsigned int i = 0; i < (unsigned int)sizeof(Wire); ++i) {
         reinterpret_cast<unsigned char*>(&Wire)[i] = 0;
     }
-    wcscpy(Wire.AccountName, reinterpret_cast<const wchar_t*>(Info + kLoginAccountOffset));
-    wcscpy(Wire.Password, reinterpret_cast<const wchar_t*>(Info + kLoginPasswordOffset));
-    Wire.CreateFlag = Info[kLoginFlagOffset];
+    wcscpy(Wire.AccountName, Info->AccountName);
+    wcscpy(Wire.Password, Info->Field_0xA0);
+    // The flag's low byte (MOV AL,[ESI+0xc0]).
+    Wire.CreateFlag = *reinterpret_cast<const unsigned char*>(&Info->CreateFlag);
     // 06d8ccca MOV ECX,0x100 / 06d8ccd3 MOVSD.REP / 06d8ccd5 MOVSW: exactly 0x402 bytes
     // reach the payload; +0x402/+0x403 are left as the packet's constructor left them.
-    memcpy(Packet->Payload(), &Wire, 0x402u);
+    // Spelled with sizeof so a 4-byte wchar_t copies both buffers whole.
+    memcpy(Packet->Payload(), &Wire, sizeof(Wire.AccountName) + sizeof(Wire.Password) + 2u);
     return true;
 }
 
@@ -173,17 +177,19 @@ static bool DeliverLogin(const FPacketBase* Packet, IServer* Server, unsigned in
     // wide characters at 06d86ddc, 0x10 at 06d86ded -- which pads with NULs up to the
     // count, then the flag byte (06d86dfc). Retail never clears the static itself: every
     // byte it does not overwrite stays at its zero .data image, and nothing else writes it.
-    wcsncpy(reinterpret_cast<wchar_t*>(GStaticLoginInfo + kLoginAccountOffset),
-            reinterpret_cast<const wchar_t*>(Payload + 0x000), 0x28);
-    wcsncpy(reinterpret_cast<wchar_t*>(GStaticLoginInfo + kLoginPasswordOffset),
-            reinterpret_cast<const wchar_t*>(Payload + 0x200), 0x10);
-    GStaticLoginInfo[kLoginFlagOffset] = Payload[0x400];
-    // Retail's two explicit terminator stores, +0x4e and +0xbe.
-    GStaticLoginInfo[0x4e] = 0;
-    GStaticLoginInfo[0x4f] = 0;
-    GStaticLoginInfo[0xbe] = 0;
-    GStaticLoginInfo[0xbf] = 0;
-    Server->Login(*reinterpret_cast<const SLoginInfo*>(GStaticLoginInfo), SessionId);
+    wcsncpy(GStaticLoginInfo.AccountName,
+            reinterpret_cast<const wchar_t*>(Payload + offsetof(FPayloadClientLogin, AccountName)),
+            0x28);
+    wcsncpy(GStaticLoginInfo.Field_0xA0,
+            reinterpret_cast<const wchar_t*>(Payload + offsetof(FPayloadClientLogin, Password)),
+            0x10);
+    // One byte, the flag's low byte (the other three stay as .data left them).
+    *reinterpret_cast<unsigned char*>(&GStaticLoginInfo.CreateFlag) =
+        Payload[offsetof(FPayloadClientLogin, CreateFlag)];
+    // Retail's two explicit terminator stores, +0x4e and +0xbe: each string's last character.
+    GStaticLoginInfo.AccountName[0x27] = 0;
+    GStaticLoginInfo.Field_0xA0[0x0f] = 0;
+    Server->Login(GStaticLoginInfo, SessionId);
     return true;
 }
 
@@ -588,15 +594,18 @@ static bool MarshalSaveGame(FPacketBase* Packet, const RpcArg* Args, unsigned in
     wchar_t* Block = nullptr;
     unsigned int StoredCount = 0u;
     if (Count != 0 && Description != nullptr) {
-        Block = static_cast<wchar_t*>(RpcCopyIntoPacketBlock(Description, Count * 2u));
+        // Count * 2 bytes on Windows: an in-memory wchar_t copy, converted on the wire.
+        Block = static_cast<wchar_t*>(
+            RpcCopyIntoPacketBlock(Description, static_cast<unsigned int>(RpcWideBytes(Count))));
         StoredCount = Count;
     }
-    RpcPayloadWrite(Packet, 0x200, Block);
-    return RpcPayloadWrite(Packet, 0x204, StoredCount);
+    RpcPayloadWrite(Packet, offsetof(FPayloadClientSaveGame, Description), Block);
+    return RpcPayloadWrite(Packet, offsetof(FPayloadClientSaveGame, DescriptionCount), StoredCount);
 }
 
 static bool DeliverSaveGame(const FPacketBase* Packet, IServer* Server, unsigned int SessionId) {
-    const wchar_t* Description = RpcPayloadRead<wchar_t*>(Packet, 0x200);
+    const wchar_t* Description =
+        RpcPayloadRead<wchar_t*>(Packet, offsetof(FPayloadClientSaveGame, Description));
     Server->SaveGame(*reinterpret_cast<const CHARACTER_ID*>(Packet->Payload()), Description, SessionId);
     return true;
 }

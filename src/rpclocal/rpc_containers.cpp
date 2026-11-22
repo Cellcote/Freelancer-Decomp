@@ -25,6 +25,7 @@
 
 #include "rpc_containers.h"
 #include "rpc_payloads.h"
+#include "rpc_wire_wide.h"
 
 // Retail rpclocal imports COMMON.DLL::EquipDesc::is_internal (.rdata:06db30d8) and
 // ::make_internal (.rdata:06db3070) by name and uses them as the hardpoint gate on both
@@ -593,11 +594,11 @@ void RpcCollisionGroupListAssign(FRpcCollisionGroupList* List,
 
 // retail FUN_06d931b0 -- `LEA EAX,[this + 0x28]; RET`, i.e. payload+0x08.
 FRpcLootWireList* RpcPacketLootList(FPacketBase* Packet) {
-    return reinterpret_cast<FRpcLootWireList*>(Packet->Payload() + 8);
+    return &reinterpret_cast<FPayloadServerCreateLoot*>(Packet->Payload())->Items;
 }
 
 __declspec(dllexport) const FRpcLootWireList* RpcPacketLootList(const FPacketBase* Packet) {
-    return reinterpret_cast<const FRpcLootWireList*>(Packet->Payload() + 8);
+    return &reinterpret_cast<const FPayloadServerCreateLoot*>(Packet->Payload())->Items;
 }
 
 // Stand-in for the CREATELOOT packet constructor's list constructor; bare operator new.
@@ -1688,12 +1689,10 @@ unsigned int RpcEncodeServerCharacterInfo(FPacketBase& Packet, unsigned char** B
             // 06d94b73 / 06d94ba8: the length is in CHARACTERS and the run is 2*that.
             const unsigned short LenA = (unsigned short)(Record->TextA.size() & 0xffffu);
             Stream.PutWord(LenA);
-            Stream.PutBytes(LenA != 0 ? Record->TextA.data() : nullptr,
-                            (unsigned int)LenA * 2u);
+            RpcPutBytesWide(Stream, LenA != 0 ? Record->TextA.data() : nullptr, LenA);
             const unsigned short LenB = (unsigned short)(Record->TextB.size() & 0xffffu);
             Stream.PutWord(LenB);                                   // 06d94c1b
-            Stream.PutBytes(LenB != 0 ? Record->TextB.data() : nullptr,
-                            (unsigned int)LenB * 2u);
+            RpcPutBytesWide(Stream, LenB != 0 ? Record->TextB.data() : nullptr, LenB);
             Stream.PutDword(Record->Field_0x224);                   // 06d94ca7
             Stream.PutDword(Record->Field_0x22c);                   // 06d94cd4
             Stream.PutDword(Record->Field_0x228);                   // 06d94d01
@@ -1810,16 +1809,14 @@ unsigned int RpcDecodeServerCharacterInfo(FPacketBase& Packet, const unsigned ch
             return Stream.GetError();
         }
         Record->TextA.append((size_t)Length, L' ');
-        if (!Stream.GetBytes(Length != 0 ? &Record->TextA[0] : nullptr,
-                             (unsigned int)Length * 2u)) {
+        if (!RpcGetBytesWide(Stream, Length != 0 ? &Record->TextA[0] : nullptr, Length)) {
             return Stream.GetError();
         }
         if (!Stream.GetWord(Length)) {                               // 06d9384a
             return Stream.GetError();
         }
         Record->TextB.append((size_t)Length, L' ');
-        if (!Stream.GetBytes(Length != 0 ? &Record->TextB[0] : nullptr,
-                             (unsigned int)Length * 2u)) {
+        if (!RpcGetBytesWide(Stream, Length != 0 ? &Record->TextB[0] : nullptr, Length)) {
             return Stream.GetError();
         }
         if (!Stream.GetDword(Record->Field_0x224)) { return Stream.GetError(); }  // 06d9393a
@@ -2726,7 +2723,7 @@ unsigned int RpcEncodeServerCreateShip(FPacketBase& Packet, unsigned char** Buff
             if (!Stream.PutByte((unsigned char)(Wire->DisplayNameLength & 0xffu))) {
                 return Stream.GetError();
             }
-            if (!Stream.PutBytes(Wire->DisplayName, Wire->DisplayNameLength * 2u)) {
+            if (!RpcPutBytesWide(Stream, Wire->DisplayName, Wire->DisplayNameLength)) {
                 return Stream.GetError();
             }
         }
@@ -2827,8 +2824,8 @@ unsigned int RpcDecodeServerCreateShip(FPacketBase& Packet, const unsigned char*
             const unsigned int Length = (unsigned int)(int)(signed char)LengthByte;
             Wire->DisplayNameLength = Length;                            // 06d98469
             Wire->DisplayName = static_cast<wchar_t*>(
-                ::operator new((Length * 2u) + 2u, std::nothrow));       // 06d9846f
-            if (!Stream.GetBytes(Wire->DisplayName, Length * 2u)) {      // 06d9847a / 06d984c3
+                ::operator new(RpcWideBytes(Length + 1u), std::nothrow)); // 06d9846f
+            if (!RpcGetBytesWide(Stream, Wire->DisplayName, Length)) { // 06d9847a / 06d984c3
                 return Stream.GetError();
             }
             Wire->DisplayName[Length] = L'\0';                           // 06d984e1
@@ -3350,7 +3347,7 @@ unsigned int RpcEncodeClientDbgCreateShip(FPacketBase& Packet, unsigned char** B
         return FRpcMarshalStream::kEncodeOverflow;
     }
     if (Wire->NameCharCount != 0 &&
-        !Stream.PutBytes(Wire->NameChars, Wire->NameCharCount * 2u)) {
+        !RpcPutBytesWide(Stream, Wire->NameChars, Wire->NameCharCount)) {
         return FRpcMarshalStream::kEncodeOverflow;
     }
 
@@ -3435,10 +3432,10 @@ unsigned int RpcDecodeClientDbgCreateShip(FPacketBase& Packet, const unsigned ch
         return FRpcMarshalStream::kDecodeOverrun;
     }
     if (Wire->NameCharCount != 0) {
-        const unsigned int NameBytes = Wire->NameCharCount * 2u;   // 06db0d3c ADD EAX,EAX
+        // 06db0d3c ADD EAX,EAX: count*2 bytes, i.e. NameCharCount wchar_t in memory.
         Wire->NameChars = static_cast<wchar_t*>(
-            ::operator new(NameBytes, std::nothrow));              // 06db0d3f, untested
-        if (!Stream.GetBytes(Wire->NameChars, NameBytes)) {
+            ::operator new(RpcWideBytes(Wire->NameCharCount), std::nothrow)); // 06db0d3f, untested
+        if (!RpcGetBytesWide(Stream, Wire->NameChars, Wire->NameCharCount)) {
             return FRpcMarshalStream::kDecodeOverrun;
         }
     }

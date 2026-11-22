@@ -29,6 +29,7 @@
 
 #include "rpc_payloads.h"
 #include "rpc_containers.h"
+#include "rpc_wire_wide.h"
 #include "rpc_iclient.h"
 // ch2 0x4d LOADHINT serializes a CostumeHint through its own virtuals, exactly as retail
 // does through COMMON.DLL::CostumeHint::{Serialize,UnSerialize,CleanUp}.
@@ -2012,7 +2013,7 @@ static bool DeliverSetReputation(const FPacketBase* Packet, IClient* Client, ICh
     }
 
     const FRpcRelationList* List =
-        reinterpret_cast<const FRpcRelationList*>(Packet->Payload() + 0x28);
+        &reinterpret_cast<const FPayloadServerSetReputation*>(Packet->Payload())->Relations;
     // 06d81490..06d81497 FUN_06d927e0(packet, &local): the packet's list is copied into a
     // stack list -- its dummy read untested (06d927e1..06d927e5; the packet constructor
     // always builds it, 06d9d30c..06d9d31a), a fresh new(8) per value, and NULL VALUES
@@ -2129,7 +2130,7 @@ static bool DeliverSetGroupFeelings(const FPacketBase* Packet, IClient* Client,
     strncpy(Info.Name, Wire.Name, Wire.NameSize);
 
     const FRpcRelationList* List =
-        reinterpret_cast<const FRpcRelationList*>(Packet->Payload() + 0x08);
+        &reinterpret_cast<const FPayloadServerSetGroupFeelings*>(Packet->Payload())->Relations;
     // 06d815fa..06d81601 FUN_06d91d20(packet, &local): the packet's list is copied into a
     // stack list -- its dummy read untested (06d91d21..06d91d25; the packet constructor
     // always builds it, 06d9c59f), a fresh new(8) per value, NULL VALUES SKIPPED
@@ -2701,7 +2702,7 @@ static bool MarshalCreateShip(FPacketBase* Packet, const RpcArg* Args, unsigned 
     } else {
         // FUN_06d97ce0: pkt+0xd8 = wcslen, pkt+0xdc = operator new((len*2)+2) + wcscpy.
         wchar_t* Copy = static_cast<wchar_t*>(
-            ::operator new((DisplayLength * 2u) + 2u, std::nothrow));   // 06d97cfe, bare
+            ::operator new(RpcWideBytes(DisplayLength + 1u), std::nothrow)); // 06d97cfe, bare
         for (unsigned int i = 0; i <= DisplayLength; ++i) {
             Copy[i] = DisplayName[i];
         }

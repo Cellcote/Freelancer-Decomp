@@ -209,7 +209,7 @@ static bool MarshalServerStopTradelane(FPacketBase* Packet, const RpcArg* Args,
 static bool MarshalServerPopUpDialog(FPacketBase* Packet, const RpcArg* Args,
                                      unsigned int ArgCount) {
     const unsigned int Value = Args[1];
-    return RpcPayloadWrite(Packet, 0x10, Value);
+    return RpcPayloadWrite(Packet, offsetof(FPayloadCommonPopUpDialog, Field_0x10), Value);
 }
 
 // ============================================================================

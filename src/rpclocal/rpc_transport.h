@@ -39,7 +39,11 @@ class IChatClient;
 #include "rpc_packet.h"
 
 // Stores one field of 1, 2 or 4 bytes at a packet-relative Offset, unchecked -- one
-// retail constructor store (e.g. 06d9afcd `MOV dword ptr [EAX + 0x24],EDX`).
+// retail constructor store (e.g. 06d9afcd `MOV dword ptr [EAX + 0x24],EDX`). Offset is the
+// Win32 one (0x20 + the payload offset) and is taken relative to Payload(), so a 64-bit
+// build, whose FPacketBase is larger, still writes the payload and not the base. Only
+// payloads without pointers are stored this way: their layout is the same on every target.
+// A class whose payload holds a pointer keeps it as a typed member instead.
 void RpcPacketStoreField(FPacketBase* Packet, unsigned int Offset, unsigned int Width,
                          unsigned int Value);
 
@@ -57,9 +61,10 @@ void RpcPacketStoreField(FPacketBase* Packet, unsigned int Offset, unsigned int 
 // CREATESHIP and CREATESOLAR reach the same result through COMMON.DLL's
 // std::list<CollisionGroupDesc>::list (06d9cce2) and DamageList::DamageList (06d9ccf3).
 // Nothing is tested. The allocator byte is stored as 0: retail copies it out of an
-// uninitialised stack slot, and nothing reads it.
-void RpcPacketBuildListSentinel(FPacketBase* Packet, unsigned int Offset,
-                                unsigned int NodeSize);
+// uninitialised stack slot, and nothing reads it. ListHeader is the packet's typed list
+// member (allocator byte, Head, Size); NodeSize is retail's operator new argument on Win32
+// and FL_RETAIL_NEW_SIZE of the node type elsewhere, where the links are 8 bytes each.
+void RpcPacketBuildListSentinel(void* ListHeader, unsigned int NodeSize);
 
 // Tears down one list built by RpcPacketBuildListSentinel, as every retail packet
 // destructor does it -- e.g. FLPACKET_SERVER_CREATELOOT's FUN_06d9d1f0:
@@ -68,7 +73,7 @@ void RpcPacketBuildListSentinel(FPacketBase* Packet, unsigned int Offset,
 //                         same thing out of line)
 //     06d9d227..06d9d238  free(Head) ; Head = 0 ; Size = 0
 // The node values are NOT touched; a destructor that owns them frees them first.
-void RpcPacketDestroyEmbeddedList(FPacketBase* Packet, unsigned int Offset);
+void RpcPacketDestroyEmbeddedList(void* ListHeader);
 
 // ===========================================================================
 // FRpcMarshalStream -- the cursor the packet codec slots run on.

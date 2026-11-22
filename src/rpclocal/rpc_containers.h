@@ -1181,6 +1181,10 @@ unsigned int RpcDecodeWireByte(FPacketBase& Packet, const unsigned char* Buffer,
 // 0x06da9110 / 0x06d95d40 -- two dwords.
 unsigned int RpcEncodeWireDwordPair(FPacketBase& Packet, unsigned char** BufferHolder,
                                     unsigned int Capacity, unsigned int* OutLength);
+// RpcEncodeWireDwordPair with the two dwords given instead of read from the payload.
+unsigned int RpcEncodeWireDwordPairValues(FPacketBase& Packet, unsigned char** BufferHolder,
+                                          unsigned int Capacity, unsigned int* OutLength,
+                                          unsigned int First, unsigned int Second);
 unsigned int RpcDecodeWireDwordPair(FPacketBase& Packet, const unsigned char* Buffer,
                                     unsigned int Size, unsigned int* OutLength);
 // 0x06dab0e0 / 0x06daf230 -- a dword then a byte, five bytes on the wire.

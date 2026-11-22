@@ -9,6 +9,7 @@
 
 // ===== shared SERVER helpers =====
 #include "common_text.h"
+#include "rpc_wire_wide.h" // Wide text is UTF-16 on the wire, native wchar_t in memory.
 #include <new>
 
 // RS-P2: the 127-scale attitude quantizer and its inverse (CREATEGUIDED 0x37: RC
@@ -1315,8 +1316,7 @@ unsigned int FRpcServerCreateShipPacket::Encode(unsigned char** BufferHolder,
             const unsigned char Length =
                 static_cast<unsigned char>(static_cast<unsigned int>(DisplayNameLength) & 0xffu);
             if (!Stream.Put(&Length, 1u)) return 0x16u;                     // 06bf102e
-            if (!Stream.PutBlock(DisplayName,
-                    static_cast<unsigned int>(DisplayNameLength) << 1))
+            if (!RpcPutBlockWide(Stream, DisplayName, static_cast<unsigned int>(DisplayNameLength)))
                 return 0x16u;                                               // 06bf1069 -> 06bf11b7
         }
     } else if (!SinglePlayer()) {                                           // 06bf107e
@@ -1369,13 +1369,17 @@ unsigned int FRpcServerCreateShipPacket::Decode(const unsigned char* Buffer,
             if (RpcRunExceedsLimit(MarshalCursor, Bytes, MarshalLimit))
                 MarshalError = 0x17u;
             if (MarshalError != 0) return MarshalError;
-            DisplayName = static_cast<wchar_t*>(::operator new(Bytes + 2u, std::nothrow));
+            // Bytes + 2u on Windows: the name and its terminator as wchar_t in memory.
+            DisplayName = static_cast<wchar_t*>(::operator new(
+                RpcWideBytes(static_cast<unsigned int>(DisplayNameLength) + 1u), std::nothrow));
             if (DisplayName == nullptr) return 5u;
 #else
             // 06bf14ef: allocated and stored before the check, no null test.
-            DisplayName = static_cast<wchar_t*>(::operator new(Bytes + 2u, std::nothrow));
+            DisplayName = static_cast<wchar_t*>(::operator new(
+                RpcWideBytes(static_cast<unsigned int>(DisplayNameLength) + 1u), std::nothrow));
 #endif
-            if (!Stream.Get(DisplayName, Bytes)) return MarshalError;        // 06bf1543
+            if (!RpcGetWide(Stream, DisplayName, static_cast<unsigned int>(DisplayNameLength)))
+                return MarshalError; // 06bf1543
             DisplayName[DisplayNameLength] = L'\0';                          // 06bf1561
         }
     } else if (!SinglePlayer()) {                                            // 06bf1607
@@ -2464,7 +2468,8 @@ void FRpcServerSetReputationPacket::SetDisplayName(const wchar_t* Source, unsign
     if (Source == nullptr || Length == 0) return;
     const unsigned int Count = Length + 1u;
     DisplayName = static_cast<wchar_t*>(::operator new(Count * 4u, std::nothrow));
-    std::memcpy(DisplayName, Source, Count * 2u);
+    // Count * 2u on Windows: Count wchar_t, terminator included (the block is twice that).
+    std::memcpy(DisplayName, Source, RpcWideBytes(Count));
     DisplayNameLength = static_cast<int>(Count);
 }
 
@@ -2519,7 +2524,7 @@ unsigned int FRpcServerSetReputationPacket::Encode(unsigned char** BufferHolder,
     if ((static_cast<unsigned char>(MaskDisplayName) & Flags) != 0) {
         const unsigned char Length = static_cast<unsigned char>(DisplayNameLength);
         if (!Stream.Put(&Length, 1u)) return 0x16u;
-        if (!Stream.PutBlock(DisplayName, static_cast<unsigned int>(DisplayNameLength) << 1)) {
+        if (!RpcPutBlockWide(Stream, DisplayName, static_cast<unsigned int>(DisplayNameLength))) {
             return 0x16u;
         }
     }
@@ -2582,7 +2587,7 @@ unsigned int FRpcServerSetReputationPacket::Decode(const unsigned char* Buffer,
 #endif
             DisplayName = static_cast<wchar_t*>(::operator new(
                 static_cast<unsigned int>(DisplayNameLength) * 4u + 4u, std::nothrow));
-            if (!Stream.Get(DisplayName, static_cast<unsigned int>(DisplayNameLength) << 1)) {
+            if (!RpcGetWide(Stream, DisplayName, static_cast<unsigned int>(DisplayNameLength))) {
                 return MarshalError;
             }
             DisplayName[DisplayNameLength] = 0;
@@ -3298,7 +3303,8 @@ unsigned int FRpcServerPlayerListPacket::Encode(unsigned char** BufferHolder,
     }
     if (!Stream.Put(&Count, 1u)) return 0x16u;
     if (Count != 0) {
-        if (!Stream.PutBlock(Name, static_cast<unsigned int>(Count) * 2u)) return 0x16u;
+        if (!RpcPutBlockWide(Stream, Name, Count))
+            return 0x16u;
     }
     return Stream.FinishEncodeSuccess(OutLength);                      // 06b4689f
 }
@@ -3324,8 +3330,10 @@ unsigned int FRpcServerPlayerListPacket::Decode(const unsigned char* Buffer,
             MarshalError = 0x17u;
         if (MarshalError != 0) return MarshalError;
 #endif
-        Name = static_cast<wchar_t*>(std::malloc(Bytes));
-        if (!Stream.Get(Name, Bytes)) return MarshalError;
+        // Bytes on Windows: Count wchar_t in memory.
+        Name = static_cast<wchar_t*>(std::malloc(RpcWideBytes(Count)));
+        if (!RpcGetWide(Stream, Name, Count))
+            return MarshalError;
     }
     return Stream.Finish(OutLength, false);
 }
@@ -3627,7 +3635,8 @@ unsigned int FRpcServerMiscObjUpdatePacket::Encode(unsigned char** BufferHolder,
     if ((Flags & 0x10u) != 0) {
         const unsigned short Length = static_cast<unsigned short>(Text.size());
         if (!Stream.Put(&Length, 2u)) return 0x16u;
-        if (!Stream.PutBlock(Text.c_str(), static_cast<unsigned int>(Length) * 2u)) return 0x16u;
+        if (!RpcPutBlockWide(Stream, Text.c_str(), Length))
+            return 0x16u;
     }
     if ((Flags & 0x20u) != 0) {
         if (!Stream.Put(&Field_0x54, 4u)) return 0x16u;
@@ -3680,12 +3689,13 @@ unsigned int FRpcServerMiscObjUpdatePacket::Decode(const unsigned char* Buffer,
         if (RpcRunExceedsLimit(MarshalCursor, Length, MarshalLimit))
             MarshalError = 0x17u;
         if (MarshalError != 0) return MarshalError;
-        wchar_t* Chars = static_cast<wchar_t*>(std::malloc(static_cast<unsigned int>(Length) * 2u + 2u));
+        wchar_t* Chars = static_cast<wchar_t*>(std::malloc(RpcWideBytes(Length + 1u)));
         if (Chars == nullptr) return 5u;
 #else
-        wchar_t* Chars = static_cast<wchar_t*>(std::malloc(static_cast<unsigned int>(Length) * 2u + 2u));
+        wchar_t* Chars = static_cast<wchar_t*>(std::malloc(RpcWideBytes(Length + 1u)));
 #endif
-        if (!Stream.Get(Chars, static_cast<unsigned int>(Length) * 2u)) return MarshalError;
+        if (!RpcGetWide(Stream, Chars, Length))
+            return MarshalError;
         Chars[Length] = 0;
         Text.assign(Chars, std::wcslen(Chars));
         std::free(Chars);
@@ -3821,7 +3831,7 @@ static bool RpcServerPutWideText(FRpcWireStream& Stream, const std::wstring& Tex
     if (!Stream.Put(&Length, 2u)) return false;
     const unsigned int Bytes = static_cast<unsigned int>(Length) * 2u;
     Stream.Reserve(Bytes, 0x16u);
-    Stream.PutReserved(Text.c_str(), Bytes);
+    RpcPutReservedWide(Stream, Text.c_str(), Length);
     return true;
 }
 
@@ -3929,6 +3939,8 @@ static bool RpcServerGetWideText(FRpcWireStream& Stream, std::wstring& Text) {
     const unsigned int Bytes = static_cast<unsigned int>(Length) * 2u;
     Stream.Reserve(Bytes, 0x17u);
     Stream.GetUncounted(&Text[0], Bytes);
+    // The 2*length wire bytes land at the front of the string; widen them in place.
+    RpcWireToWide(&Text[0], &Text[0], Length);
     return true;
 }
 

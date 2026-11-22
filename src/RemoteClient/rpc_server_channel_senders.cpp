@@ -14,6 +14,7 @@
 #include "server_sysdb.h"        // FMineExplosion (SendServerExplodeAsteroidMine)
 #include "common_reputation.h"   // RS-P1: Reputation::Vibe (SendServerCreateShip)
 #include "common_text.h"         // RS-P1: FmtStr (SendServerCreateShip)
+#include "rpc_wire_wide.h"       // RpcWideBytes: wchar_t buffer sizes
 #include <cstdint>
 #include <cstring>
 #include <cwchar>
@@ -433,7 +434,7 @@ static void RpcServerCreateShipSetDisplayName(FRpcServerCreateShipPacket* Packet
     if (Name == nullptr) return;
     Packet->DisplayNameLength = static_cast<int>(std::wcslen(Name));
     Packet->DisplayName = static_cast<wchar_t*>(::operator new(
-        static_cast<unsigned int>(Packet->DisplayNameLength) * 2u + 2u, std::nothrow));
+        RpcWideBytes(static_cast<unsigned int>(Packet->DisplayNameLength) + 1u), std::nothrow));
     std::wcscpy(Packet->DisplayName, Name);
 }
 

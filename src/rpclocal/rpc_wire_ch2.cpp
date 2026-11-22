@@ -56,6 +56,7 @@
 
 #include "rpc_containers.h"
 #include "rpc_payloads.h"
+#include "rpc_wire_wide.h"
 
 // COMMON.DLL entry points retail imports by name, IAT slots read off the call bytes:
 //   06d92a0c `ff d3` with EBX loaded at 06d929f7 `8b1d 0831db06` -> [06db3108]
@@ -361,7 +362,7 @@ unsigned int RpcEncodeServerSetReputation(FPacketBase& Packet, unsigned char** B
     }
     if ((Flag4 & Mask) != 0) {                                 // 06d92028
         Stream.PutByte((unsigned char)(Wire->DisplayNameLength & 0xffu));   // 06d92057
-        Stream.PutBytes(Wire->DisplayName, Wire->DisplayNameLength * 2u);   // 06d9209a
+        RpcPutBytesWide(Stream, Wire->DisplayName, Wire->DisplayNameLength); // 06d9209a
     }
     if ((Flag2 & Mask) != 0) {                                 // 06d920b4
         RpcPutSizedBlock(Stream, Wire->NameASize, Wire->NameABuffer);       // 06d920e8
@@ -445,11 +446,12 @@ unsigned int RpcDecodeServerSetReputation(FPacketBase& Packet, const unsigned ch
             // for a buffer only ever used two bytes per character. Bare call (06d92479).
             void* Block = ::operator new(Chars * 4u + 4u, std::nothrow);
             Wire->DisplayName = static_cast<wchar_t*>(Block);  // 06d92481
-            if (!Stream.GetBytes(Block, Chars * 2u)) {         // 06d92488 / 06d924bf
+            if (!RpcGetBytesWide(Stream, Wire->DisplayName, Chars)) { // 06d92488 / 06d924bf
                 return Stream.GetError();
             }
-            // 06d924d7 `MOV word ptr [EAX + EDX*0x2],0x0`.
-            static_cast<unsigned short*>(Block)[Chars] = 0;
+            // 06d924d7 `MOV word ptr [EAX + EDX*0x2],0x0` -- one wchar_t (a word on
+            // Windows) after the text.
+            Wire->DisplayName[Chars] = 0;
         } else {
             Wire->DisplayNameLength = 0;                       // 06d924df
         }
@@ -591,7 +593,7 @@ unsigned int RpcEncodeServerMiscObjUpdate(FPacketBase& Packet, unsigned char** B
         Stream.PutWord(Chars);                                 // 06d98ee3
         // 06d98f12..06d98f17: retail's buffer pointer, or MSVCP60's _Nullstr when the
         // string never allocated -- which is what std::wstring::c_str() is.
-        Stream.PutBytes(Wire->Text.c_str(), (unsigned int)Chars * 2u);   // 06d98f2e
+        RpcPutBytesWide(Stream, Wire->Text.c_str(), Chars); // 06d98f2e
     }
     if ((Flags & kMiscObjUpdateFlagField_0x34) != 0) {         // 06d98f45
         Stream.PutDword(Wire->Field_0x34);                     // 06d98f74
@@ -663,9 +665,9 @@ unsigned int RpcDecodeServerMiscObjUpdate(FPacketBase& Packet, const unsigned ch
         // a scratch buffer of count*2 + 2 bytes. A failed bounds check (06d9929c JNZ
         // LAB_06d9969f) leaves without freeing it: retail leaks the buffer there, and so
         // does the port. Only the success path frees it (06d99320 MSVCRT free).
-        const unsigned int Bytes = (unsigned int)WireChars * 2u;
-        wchar_t* Temp = static_cast<wchar_t*>(malloc(Bytes + 2u));
-        if (!Stream.GetBytes(Temp, Bytes)) {                   // 06d992b3
+        // count + 1 wchar_t in memory; the wire run is still count*2 bytes.
+        wchar_t* Temp = static_cast<wchar_t*>(malloc(RpcWideBytes(WireChars + 1u)));
+        if (!RpcGetBytesWide(Stream, Temp, WireChars)) { // 06d992b3
             return Stream.GetError();
         }
         Temp[WireChars] = 0;                                   // 06d992c9

@@ -304,7 +304,8 @@ without the Windows API. Milestones:
   with MSVC's behaviour (`posix/msvc_crt.h`), and small Win32 calls with an obvious meaning here.
   Larger APIs go through `Platform::` at the call site. `FL_POSIX_DLLMAIN` runs a module's
   `DllMain` as it loads. So far: dacom, zlib, DALib, x86math, system, ReadFile, luaprofile, Thorn,
-  EngBase, ximage, Shading, flmaterials, RendComp, alchemy, Deformable2, Common and Server,
+  EngBase, ximage, Shading, flmaterials, RendComp, alchemy, Deformable2, Common, Server,
+  rpclocal and RemoteClient,
   loaded and checked by `src/PortTests/module_tests.cpp`. The POSIX handles are small numbers in a table, as Windows
   kernel handles are, so a file handle survives retail's 32-bit fields there too
   (`Platform::HandleToValue` / `HandleFromValue`, as HandleToULong / LongToHandle). The kernel32
@@ -352,10 +353,14 @@ without the Windows API. Milestones:
   handle is a 32-bit id on 64-bit builds, as `PhantomEnter` / `PhantomExit` carry it in a
   dword to Content. A loaded module stays
   mapped until the process ends (`RTLD_NODELETE`): handles in the platform's table and what a
-  module registered with dacom outlive `FreeLibrary`. `wchar_t` is 4 bytes here; the wire and
-  file formats carry UTF-16, so the codecs convert at that boundary (RemoteClient, next).
-  Next: RemoteClient (with the UTF-16 boundary), then Content, for a headless FLDedicated on
-  macOS.
+  module registered with dacom outlive `FreeLibrary`. `wchar_t` is 4 bytes here and the wire
+  carries UTF-16, so the packet codecs keep native `wchar_t` in memory and convert at the wire
+  (`rpc_wire_wide.h`: one UTF-16 unit per `wchar_t`, as retail's UCS-2; a plain copy on
+  Windows). RpcCodecTest runs on macOS and Linux too (ctest `rpc_codecs`; faults are caught by
+  signal handlers and recorded with Windows' exception codes), and its output matches the
+  Win32 build's byte for byte. Not yet: `SLoginInfo`'s byte offsets in rpclocal's in-process
+  login path still assume a 2-byte `wchar_t`, and some rpclocal payloads overflow their fixed
+  bodies with 64-bit pointers. Next: Content, then FLDedicated on macOS.
 - **M3:** an SDL window to the main menu, drawn by RPGPU through Metal, without sound.
 - **M4:** audio, input and gameplay.
 

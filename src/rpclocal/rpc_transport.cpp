@@ -12,6 +12,7 @@
 #include "rpc_transport.h"
 #include "rpc_payloads.h"
 #include "rpc_containers.h"
+#include "rpc_wire_wide.h"
 #include "common_server_types.h"
 #include "platform.h"
 
@@ -92,7 +93,7 @@ void FPacketBase::AddRef() {
 // inside the class's own size.
 void RpcPacketStoreField(FPacketBase* Packet, unsigned int Offset, unsigned int Width,
                          unsigned int Value) {
-    unsigned char* Bytes = reinterpret_cast<unsigned char*>(Packet) + Offset;
+    unsigned char* Bytes = Packet->Payload() + (Offset - 0x20u);
     switch (Width) {
         case 1:
             *Bytes = (unsigned char)(Value & 0xffu);
@@ -128,10 +129,8 @@ struct FRpcEmbeddedListNode {
 // ctors are the same sequence with their own offset and node size). Nothing is tested:
 // not the packet, not the operator new result -- 06d9d541 stores through EAX straight
 // after the CALL. The sentinel's value bytes are left as operator new returned them.
-void RpcPacketBuildListSentinel(FPacketBase* Packet, unsigned int Offset,
-                                unsigned int NodeSize) {
-    FRpcEmbeddedListHeader* Header = reinterpret_cast<FRpcEmbeddedListHeader*>(
-        reinterpret_cast<unsigned char*>(Packet) + Offset);
+void RpcPacketBuildListSentinel(void* ListHeader, unsigned int NodeSize) {
+    FRpcEmbeddedListHeader* Header = static_cast<FRpcEmbeddedListHeader*>(ListHeader);
     Header->Allocator = 0;                                  // 06d9d535 MOV [ESI+0x24],AL
     FRpcEmbeddedListNode* Sentinel =
         static_cast<FRpcEmbeddedListNode*>(::operator new(NodeSize));   // 06d9d52f / 06d9d538
@@ -143,9 +142,8 @@ void RpcPacketBuildListSentinel(FPacketBase* Packet, unsigned int Offset,
 
 // FUN_06d9d1f0's list half (06d9d1f5..06d9d238), which is FUN_06d901f0 / COMMON.DLL's
 // list::erase in a loop, then the sentinel.
-void RpcPacketDestroyEmbeddedList(FPacketBase* Packet, unsigned int Offset) {
-    FRpcEmbeddedListHeader* Header = reinterpret_cast<FRpcEmbeddedListHeader*>(
-        reinterpret_cast<unsigned char*>(Packet) + Offset);
+void RpcPacketDestroyEmbeddedList(void* ListHeader) {
+    FRpcEmbeddedListHeader* Header = static_cast<FRpcEmbeddedListHeader*>(ListHeader);
     FRpcEmbeddedListNode* Sentinel = static_cast<FRpcEmbeddedListNode*>(Header->Head);
     FRpcEmbeddedListNode* Node = Sentinel->Next;            // 06d9d1f8 MOV ESI,[EBX]
     while (Node != Sentinel) {                              // 06d9d1fa / 06d9d220 CMP
@@ -237,7 +235,7 @@ bool FRpcMarshalStream::PutWideString(const wchar_t* Text) {
         return false;
     }
     if (Bytes != 0 && Text != nullptr) {
-        memcpy(Local, Text, Bytes);                                    // 06da1557
+        RpcWideToWire(Local, Text, Count); // 06da1557
     }
     Packet.MarshalPtr = reinterpret_cast<std::uintptr_t>(Local + Bytes); // 06da1565/06da1569
     return true;
@@ -264,8 +262,8 @@ bool FRpcMarshalStream::GetWideString(wchar_t*& OutText) {
         return true;
     }
     wchar_t* Block = static_cast<wchar_t*>(
-        ::operator new(Bytes + 2u, std::nothrow));                     // 06da15dd/06da15e2, bare
-    memcpy(Block, After, Bytes);                                       // 06da15f8
+        ::operator new(RpcWideBytes(Count + 1u), std::nothrow)); // 06da15dd/06da15e2, bare
+    RpcWireToWide(Block, After, Count); // 06da15f8
     Block[Count] = 0;                                                  // 06da1607
     OutText = Block;
     Packet.MarshalPtr = reinterpret_cast<std::uintptr_t>(After + Bytes); // 06da1610/06da1612

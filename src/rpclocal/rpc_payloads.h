@@ -55,6 +55,7 @@
 
 class IClient;
 class IChatClient;
+struct FRpcEquipWireHandle;   // rpc_containers.h
 
 // ===========================================================================
 // Argument slots
@@ -68,7 +69,7 @@ class IChatClient;
 // always has. On x64 an address is 8 bytes, which a dword would truncate (docs/x64.md,
 // "Pointers held in integers"), so FRpcArg keeps the whole address. It converts to
 // `unsigned int` implicitly, so a slot that holds a value is still read as one.
-#if defined(_WIN64)
+#if defined(FL_PTR64)
 class FRpcArg {
 public:
     FRpcArg() = default;
@@ -95,7 +96,7 @@ using RpcArg = unsigned int;
 
 // The slot of a reference or pointer argument.
 inline RpcArg RpcArgFromPointer(const void* Pointer) {
-#if defined(_WIN64)
+#if defined(FL_PTR64)
     return FRpcArg::FromAddress(reinterpret_cast<std::uintptr_t>(Pointer));
 #else
     return static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(Pointer));
@@ -106,7 +107,7 @@ inline RpcArg RpcArgFromPointer(const void* Pointer) {
 template<typename TPointer>
 inline TPointer RpcArgAs(RpcArg Slot) {
     static_assert(std::is_pointer<TPointer>::value, "RpcArgAs reads a pointer");
-#if defined(_WIN64)
+#if defined(FL_PTR64)
     return reinterpret_cast<TPointer>(Slot.Address());
 #else
     return reinterpret_cast<TPointer>(Slot);
@@ -392,7 +393,7 @@ FL_LAYOUT_ASSERT(sizeof(FPayloadCommonTractorObjects) == 0x18, "TRACTOROBJECTS p
 // +0x04) and 0x06d8c081 (a dword at +0x08), and read back by caseD_3d at 0x06d82a64
 // and 0x06d82a7d. Registry size 0x2c.
 struct FPayloadServerRemoteObjectCargoUpdate {
-    unsigned int EquipHandle;    // +0x00, owned by the packet
+    FRpcEquipWireHandle* EquipHandle; // +0x00, owned by the packet
     unsigned char Field_0x04;    // +0x04  TODO: semantics unproven (a mode/flag byte)
     unsigned char Pad_0x05[3];   // +0x05
     unsigned int Field_0x08;     // +0x08  TODO: semantics unproven (an object id)

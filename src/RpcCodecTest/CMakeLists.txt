@@ -18,3 +18,12 @@ fl_defines(RpcCodecTest FL_SERVER REMOTECLIENT_EXPORTS _CONSOLE)
 fl_link(RpcCodecTest
   LIBS dacom.lib Common.lib Server.lib rpclocal.lib DALib.lib
   REFERENCES Server dacom Common DALib rpclocal)
+
+# PORT(macOS): on macOS and Linux the test runs with the others (ctest), outside the sanitizer
+# build: some codecs over-read a truncated packet's input on purpose, as retail does (e.g. the
+# CharacterInfo wide text, RpcServerGetWideText), which AddressSanitizer reports. Its output
+# matches the Win32 build's byte for byte; the Windows job compares it with the base commit.
+if(NOT WIN32 AND NOT FL_SANITIZE)
+  add_test(NAME rpc_codecs COMMAND RpcCodecTest --out ${CMAKE_BINARY_DIR}/codecs.txt
+           WORKING_DIRECTORY $<TARGET_FILE_DIR:RpcCodecTest>)
+endif()

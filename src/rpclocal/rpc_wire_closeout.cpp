@@ -46,6 +46,7 @@
 
 #include "rpc_containers.h"
 #include "rpc_payloads.h"
+#include "rpc_wire_wide.h"
 
 #include <new>
 #include <cstring>
@@ -748,7 +749,7 @@ unsigned int RpcEncodeServerPlayerList(FPacketBase& Packet, unsigned char** Buff
     }
     if (Count != 0) {                                                     // 06d99aa6
         // 06d99ab0 `SHL EAX,0x1` -- the reservation and the copy are both 2*Count.
-        if (!Stream.PutBytes(Wire->Name, (unsigned int)Count * 2u)) {      // 06d99add
+        if (!RpcPutBytesWide(Stream, Wire->Name, Count)) { // 06d99add
             return Stream.GetError();
         }
     }
@@ -774,10 +775,10 @@ unsigned int RpcDecodeServerPlayerList(FPacketBase& Packet, const unsigned char*
         return Stream.GetError();
     }
     if (Count != 0) {                                                     // 06d99c40
-        const unsigned int Bytes = (unsigned int)Count * 2u;              // 06d99c45 SHL
+        // 06d99c45 SHL: 2*Count bytes, i.e. Count wchar_t in memory.
         // 06d99c4c malloc, stored at once (06d99c52) and never tested.
-        Wire->Name = static_cast<wchar_t*>(::malloc(Bytes));              // 06d99c4c
-        if (!Stream.GetBytes(Wire->Name, Bytes)) {                        // 06d99c87
+        Wire->Name = static_cast<wchar_t*>(::malloc(RpcWideBytes(Count))); // 06d99c4c
+        if (!RpcGetBytesWide(Stream, Wire->Name, Count)) { // 06d99c87
             return Stream.GetError();
         }
     }
