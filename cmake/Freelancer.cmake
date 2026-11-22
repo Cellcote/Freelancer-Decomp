@@ -97,6 +97,9 @@ if(NOT FL_WINDOWS)
       add_library(${name} SHARED ${_sources})
     elseif(kind STREQUAL "LIB")
       add_library(${name} STATIC ${_sources})
+      # Linked into the shared modules (qhull into Common), so position-independent, as macOS
+      # makes all code anyway.
+      set_property(TARGET ${name} PROPERTY POSITION_INDEPENDENT_CODE ON)
     else()
       message(FATAL_ERROR "fl_add_module(${name}): unknown kind ${kind}")
     endif()
