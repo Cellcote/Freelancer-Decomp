@@ -219,7 +219,8 @@ namespace
         Platform::Handle const NamedB = Platform::EventCreate(false, true, "PortTestEvent");
         Check(NamedA != nullptr && NamedB != nullptr && NamedA != NamedB,
               "a named event opens the existing one, with a handle of its own");
-        Check(Platform::MutexCreate("PortTestEvent") == nullptr, "a name taken by an event is no mutex");
+        Check(Platform::MutexCreate("PortTestEvent") == nullptr,
+              "a name taken by an event is no mutex");
         Platform::EventSet(NamedB);
         Platform::CloseHandle(NamedB);
         Check(Platform::WaitOne(NamedA, 0) == Platform::kWaitSignaled, "a named event lives until its last handle closes");

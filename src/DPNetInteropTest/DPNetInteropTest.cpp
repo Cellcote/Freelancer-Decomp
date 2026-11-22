@@ -126,7 +126,8 @@ int main(int argc, char** argv)
             TimeoutMs = (DWORD)std::strtoul(argv[Index + 1], nullptr, 10);
     }
     std::setvbuf(stdout, nullptr, _IONBF, 0);
-    std::printf("DPNetInteropTest: %s:%lu, Microsoft DirectPlay 8 client\n", Host, (unsigned long)Port);
+    std::printf("DPNetInteropTest: %s:%lu, Microsoft DirectPlay 8 client\n", Host,
+                (unsigned long)Port);
 
     InitializeCriticalSection(&GLock);
     GEnumDone = CreateEventW(nullptr, TRUE, FALSE, nullptr);
