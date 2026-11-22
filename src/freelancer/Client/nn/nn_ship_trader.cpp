@@ -7,27 +7,27 @@
 #include "nn_ship_trader.h"
 
 #include "../interface/character_select_equip.h" // GetPlayerShipArchetypeIdRetail, GetPlayerCreditsRetail,
-                                    // GetPlayerEquipDescListRetail, GetPlayerRankLevelRetail
-#include "../gf/base_market.h"     // GetClientLocationBaseMarket (FUN_0043a510) and the market
-#include "../space/hud/hud_command_dispatch.h"   // HudPushCancelHandler (FUN_00576360)
-#include "../ids_rdl.h"                // LoadIdsIntoRdl (FUN_0057da40), RdlAppendNode
-#include "../ids_strings.h"            // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../cmn/input_manager.h"          // GetClientMouseButtons (DAT_00616850)
-#include "../interface/menu_ui_widgets.h"        // HudMessageQueueRequestRankRefresh (FUN_004c55f0)
-#include "../gf/menu_universe_base.h"     // GetClientLocationCurrentBase (DAT_0066873c),
-                                    // GetClientCurrentBaseStridName (FUN_0043bbe0)
-#include "../cmn/misc_util.h"              // FormatGroupedNumber (FUN_004779a0)
+// GetPlayerEquipDescListRetail, GetPlayerRankLevelRetail
+#include "../gf/base_market.h" // GetClientLocationBaseMarket (FUN_0043a510) and the market
+#include "../space/hud/hud_command_dispatch.h" // HudPushCancelHandler (FUN_00576360)
+#include "../ids_rdl.h" // LoadIdsIntoRdl (FUN_0057da40), RdlAppendNode
+#include "../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../cmn/input_manager.h" // GetClientMouseButtons (DAT_00616850)
+#include "../interface/menu_ui_widgets.h" // HudMessageQueueRequestRankRefresh (FUN_004c55f0)
+#include "../gf/menu_universe_base.h" // GetClientLocationCurrentBase (DAT_0066873c),
+// GetClientCurrentBaseStridName (FUN_0043bbe0)
+#include "../cmn/misc_util.h" // FormatGroupedNumber (FUN_004779a0)
 #include "nn_dealer.h"              // NnDealer::GetBaseFactionFeeling (FUN_00483df0)
-#include "../gf/nav_bar.h"                // NavBarCloseService (FUN_004424f0), NavBarShowDealerTab
-                                    // (FUN_00442850), NavBarOpenDealer (FUN_004421a0)
+#include "../gf/nav_bar.h" // NavBarCloseService (FUN_004424f0), NavBarShowDealerTab
+// (FUN_00442850), NavBarOpenDealer (FUN_004421a0)
 #include "nn_inventory.h"           // resale values
 #include "nn_text_control.h"        // NnTextControl::GetFontString (+0x334)
 #include "nn_text_scratch.h"        // DAT_0066dc60 / DAT_0066fc60 / DAT_006119f8
 #include "../interface/rich_text_win.h"
 #include "../interface/ship_view_control.h"
-#include "../interface/win3d.h"                  // Win3DFindByName, Win3DDeleteTree, Win3DGetMouseRay
+#include "../interface/win3d.h" // Win3DFindByName, Win3DDeleteTree, Win3DGetMouseRay
 #include "../interface/win_factory.h"
-#include "../interface/wire_controls.h"          // WireControlsJoinColumn (FUN_005a4b50)
+#include "../interface/wire_controls.h" // WireControlsJoinColumn (FUN_005a4b50)
 
 #include "common_archetype.h"
 #include "common_goods.h"

@@ -15,27 +15,27 @@
                                     // FindPlayerNonMissionEquipRetail (FUN_004c45d0),
                                     // GetPlayerCharacterNameRetail (DAT_006732f0)
 #include "../space/gameobj.h"         // FClientGameobj -> IObjRW
-#include "../space/mesh_load.h"       // ClientMeshHolderHasInstance (FUN_00420d60)
-#include "../space/objdb.h"           // ClientObjDb_FindObject (FUN_005416c0)
-#include "../globals.h"                // GetClientFrameTimeCapped (FUN_0042d680)
-#include "../space/hud/hud_status_core.h"        // GetHudStatus (DAT_00674aa0), G_HudTargetPanel (DAT_00674b04)
-#include "../space/hud/hud_target.h"             // HudShipOfObjRw (FUN_00543320), HudTargetBase
-#include "../ids_rdl.h"                // LoadIdsIntoRdl (FUN_0057da40), RdlAppendNode
-#include "../login_mgr.h"              // G_Server (DAT_0067ecd0)
+#include "../space/mesh_load.h"     // ClientMeshHolderHasInstance (FUN_00420d60)
+#include "../space/objdb.h"         // ClientObjDb_FindObject (FUN_005416c0)
+#include "../globals.h"             // GetClientFrameTimeCapped (FUN_0042d680)
+#include "../space/hud/hud_status_core.h" // GetHudStatus (DAT_00674aa0), G_HudTargetPanel (DAT_00674b04)
+#include "../space/hud/hud_target.h" // HudShipOfObjRw (FUN_00543320), HudTargetBase
+#include "../ids_rdl.h" // LoadIdsIntoRdl (FUN_0057da40), RdlAppendNode
+#include "../login_mgr.h" // G_Server (DAT_0067ecd0)
 #include "nn_button_control.h"
 #include "nn_inventory.h"           // G_NanobotArchId (DAT_00674a8c), G_ShieldBatteryArchId (DAT_00674a88)
 #include "nn_static_control.h"      // StaticControl +0x348 / +0x410 / +0x414
 #include "nn_text_control.h"
-#include "../space/player_behavior.h"        // GetPlayerObjRW (FUN_0054baf0)
-#include "../space/player_spawn.h"           // GetPlayerConnectionId (DAT_00673344),
-                                    // GetPlayerShipHoldSizeRetail (FUN_004c4610)
+#include "../space/player_behavior.h" // GetPlayerObjRW (FUN_0054baf0)
+#include "../space/player_spawn.h" // GetPlayerConnectionId (DAT_00673344),
+// GetPlayerShipHoldSizeRetail (FUN_004c4610)
 #include "../interface/rich_text_win.h"
 #include "../interface/scroll_control.h"
 #include "../interface/ship_view_control.h"
-#include "../space/star_sphere.h"            // Win3DIdentityRotation3x3, Win3DBindModelview (FUN_00422690)
+#include "../space/star_sphere.h" // Win3DIdentityRotation3x3, Win3DBindModelview (FUN_00422690)
 #include "../interface/win3d.h"
-#include "../cmn/win3d_immediate.h"        // Win3DBegin / Win3DVertex3f / Win3DEnd / ... (OpenGL.cpp)
-#include "../interface/win3d_renderables.h"      // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
+#include "../cmn/win3d_immediate.h" // Win3DBegin / Win3DVertex3f / Win3DEnd / ... (OpenGL.cpp)
+#include "../interface/win3d_renderables.h" // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
 #include "../interface/win_factory.h"
 
 #include "DALib.h"

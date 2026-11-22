@@ -39,12 +39,12 @@
 //     LoadCharacterInfo / PreloadCharacterScripts (FUN_004354e0 / FUN_004355e0).
 // -------------------------------------------------------------------------------------------
 
-#include "../mesh_load.h"   // FClientMeshHolder
+#include "../mesh_load.h" // FClientMeshHolder
 #include "common_reputation.h"  // Costume
 #include "common_server_types.h" // CommResult
 #include "hud_element_list.h"   // HUDItem
-#include "../camera/space_camera_game.h"  // FGameCamera
-#include "../../cmn/texture_shapes.h"     // FTextureRef
+#include "../camera/space_camera_game.h" // FGameCamera
+#include "../../cmn/texture_shapes.h" // FTextureRef
 #include "../../interface/win3d.h"
 #include "x86math.h"            // FMatrix, FVector, FTransform
 

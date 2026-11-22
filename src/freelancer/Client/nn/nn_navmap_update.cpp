@@ -9,24 +9,24 @@
 
 #include "nn_navmap.h"
 #include "best_path.h"              // BestPath* (FUN_004c4fb0 / 4ff0 / 5530 / 52d0 / 58e0)
-#include "../interface/cargo_bar_control.h"      // ToolTipHoverInit / SetCaption
+#include "../interface/cargo_bar_control.h" // ToolTipHoverInit / SetCaption
 #include "../interface/character_select_equip.h" // GetPlayerStarSystemIdRetail / BaseId / LastPosition
-#include "../space/mesh_load.h"       // ClientMeshLoadFromPath (FUN_0059ec80)
-#include "../globals.h"                // GetClientFrameTimeCapped (FUN_0042d680)
-#include "../space/hud/hud_element_list.h"       // HudVectorAngle (FUN_0053eb10)
-#include "../ids_strings.h"            // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../cmn/input_manager.h"          // GetClientSoftwareCursor, GetClientMouseButtons
-#include "../login_mgr.h"              // G_Server (DAT_0067ecd0)
-#include "../interface/menu_ui_init.h"           // PlayOrRewindUiSoundSlot (FUN_005645c0)
+#include "../space/mesh_load.h" // ClientMeshLoadFromPath (FUN_0059ec80)
+#include "../globals.h" // GetClientFrameTimeCapped (FUN_0042d680)
+#include "../space/hud/hud_element_list.h" // HudVectorAngle (FUN_0053eb10)
+#include "../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../cmn/input_manager.h" // GetClientSoftwareCursor, GetClientMouseButtons
+#include "../login_mgr.h" // G_Server (DAT_0067ecd0)
+#include "../interface/menu_ui_init.h" // PlayOrRewindUiSoundSlot (FUN_005645c0)
 #include "../space/mission_created_solars.h" // FindMissionCreatedSolar (FUN_00476fe0)
 #include "nn_inventory.h"           // IsPlayerDockedRetail (FUN_004c4810)
 #include "nn_text_scratch.h"        // G_NnTextScratchB (DAT_0066fc60), capacity DAT_006119f8
 #include "nn_tooltip.h"             // FUN_004be2d0 / FUN_004be2f0 / FUN_004be370
 #include "nn_ui_pulse.h"            // G_NnPaletteArgb_679bb0 / _679b80
-#include "../space/player_spawn.h"           // waypoints (FUN_004c4690 / 46a0), GetPlayerConnectionId
-#include "../space/camera/space_camera.h"           // FSpaceCamera, AsCamera, FUN_0040f8c0 / FUN_0040fb80
+#include "../space/player_spawn.h" // waypoints (FUN_004c4690 / 46a0), GetPlayerConnectionId
+#include "../space/camera/space_camera.h" // FSpaceCamera, AsCamera, FUN_0040f8c0 / FUN_0040fb80
 #include "../interface/tooltip_hover.h"
-#include "../interface/win3d.h"                  // Win3DGetMouseRay / Win3DGetCamera / FUN_00423b90
+#include "../interface/win3d.h" // Win3DGetMouseRay / Win3DGetCamera / FUN_00423b90
 #include "x86math.h"                // FTransform, FVector, FMatrix, I3DMathEngine
 #include "common_csys.h"            // Acquire3DMathEngine (FUN_005b73e0)
 #include "common_misc.h"            // Geometry::Sphere

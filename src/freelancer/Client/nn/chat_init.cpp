@@ -21,16 +21,16 @@
 #include "chat_init.h"
 #include "../event_handler.h"
 
-#include "../interface/character_select_equip.h"   // GetPlayerSpawnSystemIdRetail (FUN_004c4670)
+#include "../interface/character_select_equip.h" // GetPlayerSpawnSystemIdRetail (FUN_004c4670)
 #include "chat_msg_win.h"
 #include "chat_text_input.h"          // ChatTextInputDisplay ("CTID")
-#include "../space/hud/hud_command_dispatch.h"     // HudRegisterCommandHandler / HudDestroyEventHandler
+#include "../space/hud/hud_command_dispatch.h" // HudRegisterCommandHandler / HudDestroyEventHandler
 #include "../ids_rdl.h"
-#include "../ids_strings.h"              // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
 #include "../interface/menu_ui_widgets.h"
 #include "nn_group_control.h"
 #include "nn_ui_pulse.h"              // G_HudChromeColorRgba (DAT_00679bb4), G_NnPaletteArgb_679ba4
-#include "../space/player_spawn.h"             // GetPlayerConnectionId (DAT_00673344)
+#include "../space/player_spawn.h" // GetPlayerConnectionId (DAT_00673344)
 #include "../interface/rich_text_win.h"
 #include "../interface/win_factory.h"
 #include "../interface/win3d.h"

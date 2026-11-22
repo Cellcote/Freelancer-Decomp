@@ -777,7 +777,7 @@ public:
     unsigned Field_0x160;              // +0x160
     void* Field_0x164[4];              // +0x164 companion (arch, sound, particle, light)
     void* Field_0x174[4];              // +0x174 companion
-    unsigned Field_0x184;              // +0x184 (space/tradelane_fx.cpp reads bytes +0x184/+0x185)
+    unsigned Field_0x184;              // +0x184 (tradelane_fx.cpp reads bytes +0x184/+0x185)
     // +0x188 -- a 0xdc-byte object built by FUN_00543530 (FUN_00503440(this, Arg)) or
     // FUN_00543630 (FUN_005038c0(this)), destroyed by FUN_00503a80 + free (FUN_005437d0 case 0,
     // FUN_00543530, FUN_00543630, the dtor). FUN_005437d0's tail clears its +0x70.

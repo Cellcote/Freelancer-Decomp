@@ -7,10 +7,10 @@
 #include "type_select.h"
 
 #include "../globals.h"
-#include "../ids_rdl.h"      // LoadIdsIntoRdl (FUN_0057da40), RdlRemoveLastParagraph (FUN_0057eb40)
+#include "../ids_rdl.h" // LoadIdsIntoRdl (FUN_0057da40), RdlRemoveLastParagraph (FUN_0057eb40)
 #include "../login_mgr.h"
 #include "menu_ui_init.h"
-#include "../nn/nn_prompt.h"    // FUN_004740f0 / FUN_00474260
+#include "../nn/nn_prompt.h" // FUN_004740f0 / FUN_00474260
 #include "platform.h"
 
 #include "common_errorhandler.h" // ErrorHandler::log_last_error, SeverityWarning

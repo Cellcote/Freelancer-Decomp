@@ -12,21 +12,21 @@
 #include "../../cmn/font_string.h"
 #include "../../globals.h"                // IsClientServerTickPaused (FUN_0042d730)
 #include "../../ids_strings.h"            // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../../cmn/input_manager.h"          // GetClientMouseCursorDrawFlag, GetClientSoftwareCursor
-#include "../../gf/menu_universe_base.h"     // IsClientLocationInTransition (DAT_00668761)
-#include "../../cmn/misc_util.h"              // FmtStrSprintf (FUN_0041c970)
-#include "../../nn/nn_modal.h"               // G_bNnScreenUp (DAT_0067dcc8)
-#include "../../nn/nn_text_scratch.h"        // G_NnTextScratchA/B (DAT_0066dc60 / DAT_0066fc60)
-#include "../../nn/nn_ui_pulse.h"            // G_HudChromeColorRgba (DAT_00679bb4)
-#include "../../cmn/engine_light.h"           // ScaleVec3 (FUN_00411d60)
-#include "../player_behavior.h"        // GetPlayerObjRW (FUN_0054baf0)
-#include "../player_spawn.h"           // IsPlayerShipId (FUN_00548eb0)
-#include "../camera/space_camera.h"           // AsCamera
-#include "../star_sphere.h"            // Win3DIdentityRotation3x3 (FUN_004215b0)
-#include "../../cmn/win3d_immediate.h"        // Win3DSetViewport (FUN_00422610), FUN_00422910
-#include "../space_letterbox.h"        // IsLetterboxVisible (FUN_0041a3e0)
-#include "../../interface/tooltip_hover.h"          // FToolTipHoverInfo, NnToolTipFeedHover (FUN_004be370)
-#include "../../interface/win3d.h"                  // Win3DGetCamera (DAT_0067dbf8)
+#include "../../cmn/input_manager.h" // GetClientMouseCursorDrawFlag, GetClientSoftwareCursor
+#include "../../gf/menu_universe_base.h" // IsClientLocationInTransition (DAT_00668761)
+#include "../../cmn/misc_util.h" // FmtStrSprintf (FUN_0041c970)
+#include "../../nn/nn_modal.h" // G_bNnScreenUp (DAT_0067dcc8)
+#include "../../nn/nn_text_scratch.h" // G_NnTextScratchA/B (DAT_0066dc60 / DAT_0066fc60)
+#include "../../nn/nn_ui_pulse.h" // G_HudChromeColorRgba (DAT_00679bb4)
+#include "../../cmn/engine_light.h" // ScaleVec3 (FUN_00411d60)
+#include "../player_behavior.h" // GetPlayerObjRW (FUN_0054baf0)
+#include "../player_spawn.h" // IsPlayerShipId (FUN_00548eb0)
+#include "../camera/space_camera.h" // AsCamera
+#include "../star_sphere.h" // Win3DIdentityRotation3x3 (FUN_004215b0)
+#include "../../cmn/win3d_immediate.h" // Win3DSetViewport (FUN_00422610), FUN_00422910
+#include "../space_letterbox.h" // IsLetterboxVisible (FUN_0041a3e0)
+#include "../../interface/tooltip_hover.h" // FToolTipHoverInfo, NnToolTipFeedHover (FUN_004be370)
+#include "../../interface/win3d.h" // Win3DGetCamera (DAT_0067dbf8)
 
 #include "common_cequip.h"
 #include "common_cobject.h"

@@ -32,10 +32,10 @@ namespace Universe
 
 namespace NebulaVolume
 {
-    // StarSys [Nebula] loader (space/star_sys.cpp), after FNebulaEffect::Load: remembers the nebula
+    // StarSys [Nebula] loader (star_sys.cpp), after FNebulaEffect::Load: remembers the nebula
     // (the set the volume picks from) and its file name for the [NebulaOverride] file= match.
     void RegisterNebula(FNebulaEffect* Nebula, char const* File);
-    // NebulaDestroy (space/cli_nebula.cpp): forgets the nebula.
+    // NebulaDestroy (cli_nebula.cpp): forgets the nebula.
     void UnregisterNebula(FNebulaEffect* Nebula);
 
     // RenderEx (Startup and hot reload): (re)reads [Nebula] / [NebulaOverride] from the resolved
@@ -61,7 +61,7 @@ namespace NebulaVolume
     // light the strikes drove is left dark for retail.
     void BeginFrame(ICamera* Camera, FNebulaEffect* Controller, int Enclosure, bool bNebulaOption,
                     float SceneFar);
-    // NebulaAmbientTick (space/cli_nebula.cpp, FUN_005097c0): true while the volume's lightning
+    // NebulaAmbientTick (cli_nebula.cpp, FUN_005097c0): true while the volume's lightning
     // strikes drive this nebula's [DynamicLightning] GameLight (+0x270) -- the camera fully
     // inside it, the volume drawing it with lightning_enabled and lightning_lights_ships; the
     // retail random-direction flash then stays out. False on RP8 and whenever the volume is
@@ -99,7 +99,7 @@ namespace NebulaVolume
     // plane) and at least past the extended asteroid spawn distance, at most MaxFar. RetailFar
     // unchanged when inactive.
     float InsideFarPlane(float RetailFar, float MaxFar);
-    // CliAsteroidTickOne (space/cli_asteroid.cpp): the depth (metres along the view axis) out to which
+    // CliAsteroidTickOne (cli_asteroid.cpp): the depth (metres along the view axis) out to which
     // the cube asteroids of the field in FieldZone should be drawn so that their spawn boundary
     // lies where the volume's haze leaves [Nebula] asteroid_spawn_transmittance (plus the
     // camera's distance to the nebula when outside it), at most asteroid_max_spawn_distance;
@@ -123,7 +123,7 @@ namespace NebulaVolume
     // the volume adds the medium behind them for the part they let through.
     void NoteAsteroidFade(float FadeEnd, float FadeBand, float CubeSize);
 
-    // The far bucket's ZItemNebula node (FZItemNebula::Draw, space/space_scene_obj_draw.cpp): a nebula
+    // The far bucket's ZItemNebula node (FZItemNebula::Draw, space_scene_obj_draw.cpp): a nebula
     // the volume draws whose surface lies beyond the opaque scene's far plane is drawn here, in
     // painter order with the far solars, rings and asteroid bands, without a depth test.
     void DrawBackground(FNebulaEffect* Nebula, ICamera* Camera);

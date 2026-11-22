@@ -14,11 +14,11 @@
 
 #include "freelancer_client.h"
 
-#include "nn/best_path.h"                // objective map slots 71 / 72 / 73 (DAT_0067294c)
-#include "interface/character_select_equip.h"   // player-state setters (FUN_004c3e20 ..)
-#include "nn/chat_init.h"                // ChatDispatchIncoming (FUN_0046a150), FUN_0046b500/0046b520
-#include "space/gameobj.h"           // FClientGameobj / FClientShipGameobj
-#include "space/objdb.h"             // ClientObjDb_FindObject (FUN_005416c0)
+#include "nn/best_path.h"             // objective map slots 71 / 72 / 73 (DAT_0067294c)
+#include "interface/character_select_equip.h" // player-state setters (FUN_004c3e20 ..)
+#include "nn/chat_init.h" // ChatDispatchIncoming (FUN_0046a150), FUN_0046b500/0046b520
+#include "space/gameobj.h" // FClientGameobj / FClientShipGameobj
+#include "space/objdb.h" // ClientObjDb_FindObject (FUN_005416c0)
 #include "common_cobject.h"           // CEqObj
 #include "common_goods.h"             // EquipDescList, the mirror property classes
 #include "common_iface.h"             // ScriptBehavior
@@ -28,19 +28,19 @@
 #include "server_pub.h"            // IServer (DAT_0067ecd0)
 #include "common_misc.h"              // SinglePlayer
 #include "dacom.h"
-#include "space/hud/hud_target.h"               // G_bTradeRequested (DAT_00674b00)
+#include "space/hud/hud_target.h" // G_bTradeRequested (DAT_00674b00)
 #include "login_mgr.h"                // CLoginMgr G_LoginMgr (DAT_0067e7b8)
-#include "gf/menu_universe_base.h"       // LocationController setters (FUN_0043a5a0 ..)
-#include "cmn/misc_util.h"                // FmtStrSprintf (FUN_0041c970)
-#include "nn/nn_mission_vendor.h"        // NnMissionVendor, G_MissionVendorNoMissionsReason
-#include "nn/nn_modal.h"                 // NnMainButtonOnModalOpen (FUN_0045a460)
-#include "nn/nn_story_star.h"            // StoryStarOnMissionMessage (FUN_004b9c60, slot 70)
-#include "nn/nn_trade.h"                 // G_NnTrade (DAT_006724b4)
-#include "space/player_behavior.h"          // SetUnknownFloat673568 / 67356c (FUN_004c83a0/b0)
-#include "space/player_spawn.h"             // player ids (DAT_00673344 / DAT_00673378)
+#include "gf/menu_universe_base.h" // LocationController setters (FUN_0043a5a0 ..)
+#include "cmn/misc_util.h" // FmtStrSprintf (FUN_0041c970)
+#include "nn/nn_mission_vendor.h" // NnMissionVendor, G_MissionVendorNoMissionsReason
+#include "nn/nn_modal.h" // NnMainButtonOnModalOpen (FUN_0045a460)
+#include "nn/nn_story_star.h" // StoryStarOnMissionMessage (FUN_004b9c60, slot 70)
+#include "nn/nn_trade.h" // G_NnTrade (DAT_006724b4)
+#include "space/player_behavior.h" // SetUnknownFloat673568 / 67356c (FUN_004c83a0/b0)
+#include "space/player_spawn.h" // player ids (DAT_00673344 / DAT_00673378)
 #include "rpc_iclient_args.h"         // FServerSetReputationInfo (slot 66)
 #include "server_connect.h"           // GetLocalServerInterface (DAT_0067ecd0)
-#include "interface/win_factory.h"              // WinFactoryCreate (FUN_0059db20)
+#include "interface/win_factory.h" // WinFactoryCreate (FUN_0059db20)
 #include "float_bits.h"
 
 #include <list>

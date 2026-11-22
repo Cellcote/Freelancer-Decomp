@@ -72,7 +72,7 @@ struct SpaceApp : public IEnvironment
     void Slot06(unsigned A) override;
     int GetEnvironmentType() override;
     void PreInit() override;
-    void Shutdown() override;          // FUN_0054ab20 -- ShutdownSpaceState (space/space_state.cpp)
+    void Shutdown() override;          // FUN_0054ab20 -- ShutdownSpaceState (space_state.cpp)
     void Slot10() override;
     void Resize(int Width, int Height) override; // LAB_0054a540
     bool Init(int Param) override;     // FUN_0054ab40 -- InitSpaceState

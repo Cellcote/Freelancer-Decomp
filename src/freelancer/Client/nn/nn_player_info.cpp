@@ -7,15 +7,15 @@
 #include "nn_player_info.h"
 
 #include "../interface/character_select_equip.h" // GetPlayerSpawnSystemIdRetail (FUN_004c4670, the player's
-                                    // vibe DAT_0061226c), GetPlayerVisitFlagsRetail
-                                    // (FUN_004c4da0), SetPlayerVisitFlagsRetail (FUN_004c4e00)
-#include "../game_options.h"           // GetGameOption (FUN_005792b0)
-#include "../globals.h"                // GetClientFrameTimeCapped (FUN_0042d680)
-#include "../space/hud/hud_target.h"             // HudReputationBand (FUN_0045a6e0)
-#include "../ids_rdl.h"                // LoadIdsIntoRdl (FUN_0057da40), RdlAppendNode
-#include "../ids_strings.h"            // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../login_mgr.h"              // G_Server (DAT_0067ecd0)
-#include "../cmn/misc_util.h"              // FormatGroupedNumber (FUN_004779a0)
+// vibe DAT_0061226c), GetPlayerVisitFlagsRetail
+// (FUN_004c4da0), SetPlayerVisitFlagsRetail (FUN_004c4e00)
+#include "../game_options.h" // GetGameOption (FUN_005792b0)
+#include "../globals.h" // GetClientFrameTimeCapped (FUN_0042d680)
+#include "../space/hud/hud_target.h" // HudReputationBand (FUN_0045a6e0)
+#include "../ids_rdl.h" // LoadIdsIntoRdl (FUN_0057da40), RdlAppendNode
+#include "../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../login_mgr.h" // G_Server (DAT_0067ecd0)
+#include "../cmn/misc_util.h" // FormatGroupedNumber (FUN_004779a0)
 #include "nn_dealer.h"              // NnDealer::ApplyPlayerStatsFeeling (FUN_00483f30)
 #include "float_bits.h"
 #include "nn_modal.h"               // NnMainButtonOnModalOpen (FUN_0045a460)
@@ -23,14 +23,14 @@
 #include "nn_ui_pulse.h"            // G_HudChromeColorRgba (DAT_00679bb4),
                                     // NnReputationColorArgb (FUN_0045a650),
                                     // NnUiPulseBlendFromArgb (FUN_00561f20)
-#include "../space/player_spawn.h"           // GetPlayerConnectionId (DAT_00673344)
+#include "../space/player_spawn.h" // GetPlayerConnectionId (DAT_00673344)
 #include "../interface/rich_text_win.h"
-#include "../space/star_sphere.h"            // Win3DBindModelview (FUN_00422690)
+#include "../space/star_sphere.h" // Win3DBindModelview (FUN_00422690)
 #include "../interface/ui_scroll.h"
-#include "../interface/win3d.h"                  // Win3DReparent (FUN_0059dd00), Win3DDeleteTree
-                                    // (FUN_0043d2a0), Win3DGetCamera (DAT_0067dbf8)
-#include "../cmn/win3d_immediate.h"        // Win3DBegin / Win3DVertex3f / Win3DEnd / ...
-#include "../interface/wire_controls.h"          // WireControlsJoinColumn (FUN_005a4b50)
+#include "../interface/win3d.h" // Win3DReparent (FUN_0059dd00), Win3DDeleteTree
+// (FUN_0043d2a0), Win3DGetCamera (DAT_0067dbf8)
+#include "../cmn/win3d_immediate.h" // Win3DBegin / Win3DVertex3f / Win3DEnd / ...
+#include "../interface/wire_controls.h" // WireControlsJoinColumn (FUN_005a4b50)
 
 #include "DALib.h"
 #include "render/IRenderPipeline.h"

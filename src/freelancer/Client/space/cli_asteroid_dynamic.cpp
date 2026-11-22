@@ -29,12 +29,12 @@
 #include "render/IRenderPipeline.h"
 #include "render/mesh_iface.h"      // IMesh
 #include "render/rendcomp.h"        // IRenderableMesh, IRenderer2
-#include "../server_connect.h"         // GetLocalServerInterface (DAT_0067ecd0)
+#include "../server_connect.h" // GetLocalServerInterface (DAT_0067ecd0)
 #include "soundmanager.h"           // ISoundSource
-#include "camera/space_camera.h"           // AsCamera
+#include "camera/space_camera.h" // AsCamera
 #include "space_scene_obj_draw.h"   // GameobjSweepEffectListRetail (FUN_004fd040)
 #include "star_sys.h"               // StarSysGetActiveSystemId (FUN_00554e90)
-#include "../cmn/vis_effect_arch.h"        // FindEffectArch (FUN_0040f080)
+#include "../cmn/vis_effect_arch.h" // FindEffectArch (FUN_0040f080)
 #include "x86math.h"                // I3DMathEngine::MulTransform, FTransform
 
 #include <cstdint>

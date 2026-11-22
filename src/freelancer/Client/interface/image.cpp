@@ -7,11 +7,11 @@
 #include "image.h"
 
 #include "../dataconfig_progress.h" // GetIntroConfigState: TgaPath DAT_0067c18c
-#include "../globals.h"             // g_display.data_path DAT_00679e0c, G_RenderSurfaceWidth/Height
-#include "../widescreen.h"   // PORT(widescreen)
+#include "../globals.h" // g_display.data_path DAT_00679e0c, G_RenderSurfaceWidth/Height
+#include "../widescreen.h" // PORT(widescreen)
 #include "../cmn/pixel_format.h"
-#include "../cmn/screen_quad_state.h"    // ScreenQuadDrawBigImageTile (FUN_00404720)
-#include "../cmn/win3d_immediate.h"     // Win3DSetOrtho2D (FUN_004225e0)
+#include "../cmn/screen_quad_state.h" // ScreenQuadDrawBigImageTile (FUN_00404720)
+#include "../cmn/win3d_immediate.h" // Win3DSetOrtho2D (FUN_004225e0)
 
 #include "DALib.h"
 #include "dacom.h"

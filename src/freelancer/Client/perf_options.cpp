@@ -19,8 +19,8 @@
 #include "dacom.h"
 #include "DALib.h"
 #include "globals.h" // ApplyGammaRampOption / ApplyDitherControlOption / ApplyMipFilterControlOption
-#include "space/hud/hud_target.h"       // HudShipOfObjRw (FUN_00543320 chain)
-#include "space/player_behavior.h"  // GetPlayerObjRW (FUN_0054baf0)
+#include "space/hud/hud_target.h" // HudShipOfObjRw (FUN_00543320 chain)
+#include "space/player_behavior.h" // GetPlayerObjRW (FUN_0054baf0)
 #include "common_cobject.h"   // CShip / CEqObj::get_behavior_interface
 #include "common_iface.h"     // IBehaviorManager::set_turn_sensitivity
 #include "cmn/input_manager.h"

@@ -7,28 +7,28 @@
 #include "nn_repair.h"
 
 #include "../interface/character_select_equip.h" // GetPlayerCreditsRetail, GetPlayerHealthScaleRetail, the
-                                    // revisions, the collision-group and equipment lists,
-                                    // GetPlayerShipArchetypeIdRetail
-#include "../gf/base_market.h"     // ClientMarketGetPrice (FUN_00438060),
-                                    // GetClientLocationBaseMarket (FUN_0043a510),
-                                    // GetClientCurrentLocationBaseData (FUN_0043b630)
-#include "../cmn/cliobj.h"          // Archetype::CliObjMaterialPaths (companion +0x20)
-#include "../space/hud/hud_command_dispatch.h"   // HudPushCancelHandler (FUN_00576360)
-#include "../space/hud/hud_target.h"             // HudIsMousePickBlocked (FUN_0045a740),
-                                    // HudCollisionGroupTypeIds (FUN_0045a7c0)
-#include "../interface/menu_ui_init.h"           // PlayOrRewindUiSoundSlot (FUN_005645c0)
-#include "../gf/menu_universe_base.h"     // GetClientLocationCurrentBase (DAT_0066873c)
-#include "../cmn/misc_util.h"              // FormatGroupedNumber (FUN_004779a0)
-#include "../gf/nav_bar.h"                // NavBarCloseService (FUN_004424f0)
+// revisions, the collision-group and equipment lists,
+// GetPlayerShipArchetypeIdRetail
+#include "../gf/base_market.h" // ClientMarketGetPrice (FUN_00438060),
+// GetClientLocationBaseMarket (FUN_0043a510),
+// GetClientCurrentLocationBaseData (FUN_0043b630)
+#include "../cmn/cliobj.h" // Archetype::CliObjMaterialPaths (companion +0x20)
+#include "../space/hud/hud_command_dispatch.h" // HudPushCancelHandler (FUN_00576360)
+#include "../space/hud/hud_target.h" // HudIsMousePickBlocked (FUN_0045a740),
+// HudCollisionGroupTypeIds (FUN_0045a7c0)
+#include "../interface/menu_ui_init.h" // PlayOrRewindUiSoundSlot (FUN_005645c0)
+#include "../gf/menu_universe_base.h" // GetClientLocationCurrentBase (DAT_0066873c)
+#include "../cmn/misc_util.h" // FormatGroupedNumber (FUN_004779a0)
+#include "../gf/nav_bar.h" // NavBarCloseService (FUN_004424f0)
 #include "nn_inventory.h"           // ReqPlayerSpendCashRetail, ReqPlayerHullStatusRetail,
                                     // ReqPlayerCollisionGroupsRetail, ReqPlayerEquipmentRetail
 #include "nn_messaging.h"           // NnVoiceEnqueue (FUN_00489e80)
 #include "nn_ui_pulse.h"            // G_NnPaletteArgb_679bac
-#include "../interface/ship_view_control.h"      // ShipViewEquipmentHpClass (FUN_005835f0)
+#include "../interface/ship_view_control.h" // ShipViewEquipmentHpClass (FUN_005835f0)
 #include "../interface/ui_scroll.h"
-#include "../interface/win3d.h"                  // Win3DReparent, Win3DFindByName, Win3DDeleteTree
+#include "../interface/win3d.h" // Win3DReparent, Win3DFindByName, Win3DDeleteTree
 #include "../interface/win_factory.h"
-#include "../interface/wire_controls.h"          // WireControlsJoinColumn (FUN_005a4b50)
+#include "../interface/wire_controls.h" // WireControlsJoinColumn (FUN_005a4b50)
 
 #include "common_archetype.h"
 #include "common_goods.h"           // EquipDesc, EquipDescList, GoodInfo, BaseData, Arch2Good

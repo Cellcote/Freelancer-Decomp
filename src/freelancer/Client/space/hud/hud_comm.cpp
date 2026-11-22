@@ -6,33 +6,33 @@
 
 #include "hud_comm.h"
 
-#include "../../gf/character_info.h"   // GetCharacterInfoDb (FUN_004356c0), AcquireScriptByName (FUN_00434e90)
-#include "../gameobj.h"   // FClientGameobj : IObjInspectImpl
-#include "../objdb.h"     // ClientObjDb_FindObject (FUN_005416c0)
+#include "../../gf/character_info.h" // GetCharacterInfoDb (FUN_004356c0), AcquireScriptByName (FUN_00434e90)
+#include "../gameobj.h" // FClientGameobj : IObjInspectImpl
+#include "../objdb.h" // ClientObjDb_FindObject (FUN_005416c0)
 #include "../../cmn/engine_character.h" // G_EngineCharacterCache (DAT_006735b4), FEngineCharacterBody
 #include "../../cmn/engine_light.h"
-#include "../../cmn/font_string.h"      // FFontString
-#include "../../game_options.h"     // GetGameOption (FUN_005792b0)
-#include "../../globals.h"          // GetClientFrameTimeCapped, ShouldSkipLocalServerTick
+#include "../../cmn/font_string.h" // FFontString
+#include "../../game_options.h" // GetGameOption (FUN_005792b0)
+#include "../../globals.h" // GetClientFrameTimeCapped, ShouldSkipLocalServerTick
 #include "hud_target.h"       // GetShipPilotName, GetObjectIdsName, HudProjectScreenRect
-#include "../../ids_strings.h"      // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../../login_mgr.h"        // G_Server (DAT_0067ecd0)
+#include "../../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../../login_mgr.h" // G_Server (DAT_0067ecd0)
 #include "../../cmn/menu_sound_arch.h"
-#include "../../interface/menu_ui_init.h"     // PlayOrRewindUiSoundSlot (FUN_005645c0)
+#include "../../interface/menu_ui_init.h" // PlayOrRewindUiSoundSlot (FUN_005645c0)
 #include "../../nn/nn_button_control.h"
 #include "../../nn/nn_text_control.h"
-#include "../../nn/nn_text_scratch.h"  // G_NnTextScratchB (DAT_0066fc60)
-#include "../../nn/nn_ui_pulse.h"      // G_HudChromeColorRgba (DAT_00679bb4), G_NnPaletteArgb_679bb0
-#include "../../perf_options.h"     // GetPerfOptionSlot (FUN_005b3510)
-#include "../player_behavior.h"  // GetPlayerObjRW (FUN_0054baf0)
-#include "../../cmn/sound_config.h"     // the [CFG] comm ducking / dialogue pan values
-#include "../camera/space_camera.h"     // AsCamera, SpaceCameraSetHalfFovX, SpaceCameraSetViewportEx
-#include "../space_letterbox.h"  // IsLetterboxVisible (FUN_0041a3e0)
-#include "../star_sphere.h"      // Win3DBindModelview (FUN_00422690), Win3DIdentityRotation3x3
-#include "../../cmn/voice_profiles.h"   // LookupClientVoice (FUN_00430ab0), FVoiceProfile, FVoiceMsg
-#include "../../interface/win_factory.h"      // WinFactoryCreate (FUN_0059db20)
+#include "../../nn/nn_text_scratch.h" // G_NnTextScratchB (DAT_0066fc60)
+#include "../../nn/nn_ui_pulse.h" // G_HudChromeColorRgba (DAT_00679bb4), G_NnPaletteArgb_679bb0
+#include "../../perf_options.h" // GetPerfOptionSlot (FUN_005b3510)
+#include "../player_behavior.h" // GetPlayerObjRW (FUN_0054baf0)
+#include "../../cmn/sound_config.h" // the [CFG] comm ducking / dialogue pan values
+#include "../camera/space_camera.h" // AsCamera, SpaceCameraSetHalfFovX, SpaceCameraSetViewportEx
+#include "../space_letterbox.h" // IsLetterboxVisible (FUN_0041a3e0)
+#include "../star_sphere.h" // Win3DBindModelview (FUN_00422690), Win3DIdentityRotation3x3
+#include "../../cmn/voice_profiles.h" // LookupClientVoice (FUN_00430ab0), FVoiceProfile, FVoiceMsg
+#include "../../interface/win_factory.h" // WinFactoryCreate (FUN_0059db20)
 #include "../../cmn/win3d_immediate.h"
-#include "../../interface/win3d_render.h"     // Win3DApplyCamera (FUN_00422950)
+#include "../../interface/win3d_render.h" // Win3DApplyCamera (FUN_00422950)
 
 #include "common_cobject.h"   // CObject, CSimple, CShip
 #include "common_csys.h"      // EulerMatrix, Matrix

@@ -27,14 +27,14 @@
 #include "space/space_state.h"
 #include "interface/character_select_equip.h" // GetPlayerBaseIdRetail (FUN_004c4810's DAT_00673358)
 #include "main_command_handler.h"   // SetClientQuitRequested (DAT_0067ecbd)
-#include "nn/nn_modal.h"               // G_bNnScreenUp (DAT_0067dcc8)
-#include "space/player_spawn.h"           // ResetMissionOfferAnswerRetail (FUN_004c55b0)
-#include "cmn/fade_to_black.h"          // SetFadeImmediate / SetFadeTarget (FUN_00412070 / 00412050)
-#include "gf/gf_script_object.h"       // G_GfScriptManager (DAT_0066d2d0)
-#include "gf/menu_universe_base.h"     // ResetClientLocationController / EnterClientLocationBase
-#include "gf/nav_bar.h"                // NavBarDestroy (FUN_00442130)
-#include "cmn/sound_config.h"           // SetClientAudioMode (FUN_00428030)
-#include "interface/win3d.h"                  // Win3DFindByName (FUN_0059da10)
+#include "nn/nn_modal.h" // G_bNnScreenUp (DAT_0067dcc8)
+#include "space/player_spawn.h" // ResetMissionOfferAnswerRetail (FUN_004c55b0)
+#include "cmn/fade_to_black.h" // SetFadeImmediate / SetFadeTarget (FUN_00412070 / 00412050)
+#include "gf/gf_script_object.h" // G_GfScriptManager (DAT_0066d2d0)
+#include "gf/menu_universe_base.h" // ResetClientLocationController / EnterClientLocationBase
+#include "gf/nav_bar.h" // NavBarDestroy (FUN_00442130)
+#include "cmn/sound_config.h" // SetClientAudioMode (FUN_00428030)
+#include "interface/win3d.h" // Win3DFindByName (FUN_0059da10)
 
 #include "common_universe.h"        // Universe::get_base_id
 
@@ -51,7 +51,7 @@
 namespace
 {
     // Retail IntroFocus (DAT_0067a598), RTTI .?AUIntroFocus@@ (COL 0x005f04a0): the vftable
-    // pointer, then FMenuNavState (interface/menu_enter_state.h). Vftable 0x005e3034, fifteen slots (raw
+    // pointer, then FMenuNavState (menu_enter_state.h). Vftable 0x005e3034, fifteen slots (raw
     // PE dwords; the next dword is string data):
     //   0 0x0043d8f0 (XOR AL,AL / RET 0x10)  1 0x004b50e0 (XOR AL,AL / RET 0xc)  2 0x004b50e0
     //   3 0x0043d8f0  4 0x004b50e0  5 0x00401e90 (RET)  6 0x0053e4a0 (RET 4)

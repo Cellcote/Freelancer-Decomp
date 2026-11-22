@@ -13,31 +13,31 @@
 #endif
 
 #include "character_info.h"         // LoadCharacterInfo / PreloadCharacterScripts / ...
-#include "../nn/chat_init.h"              // ChatShowMsgWin (FUN_0046a4a0)
+#include "../nn/chat_init.h"        // ChatShowMsgWin (FUN_0046a4a0)
 #include "../interface/character_select_equip.h" // GetPlayerBaseIdRetail / SetPlayerBaseIdRetail / ...
-#include "../cmn/cliobj.h"          // Archetype::ReleaseMaterialEntrySlot (FUN_0041b030)
-#include "../frame_tick.h"      // FUN_00424f30 / FUN_00425080 / FUN_00425140, FUN_0041b2e0
+#include "../cmn/cliobj.h" // Archetype::ReleaseMaterialEntrySlot (FUN_0041b030)
+#include "../frame_tick.h" // FUN_00424f30 / FUN_00425080 / FUN_00425140, FUN_0041b2e0
 #include "../event_handler.h"
 #include "../cmn/fade_to_black.h"
-#include "../space/flash_light.h"            // LoadFlashlightTextures / ReleaseFlashlightTextures
+#include "../space/flash_light.h" // LoadFlashlightTextures / ReleaseFlashlightTextures
 #include "gf_character_object.h"    // ReleaseSharedCharacterLod (FUN_00443e90)
 #include "gf_hotspot.h"
 #include "gf_script_object.h"       // G_GfScriptManager (DAT_0066d2d0)
 #include "../globals.h"
-#include "../space/hud/hud_command_dispatch.h"   // HudCommandRecord (FUN_00576240)
+#include "../space/hud/hud_command_dispatch.h" // HudCommandRecord (FUN_00576240)
 #include "../cmn/input_manager.h"
-#include "../interface/loading_screen.h"         // FUN_00579190 / FUN_00579290
-#include "../main_command_handler.h"   // ClientQuitRequested (FUN_005b2c60)
-#include "../cmn/menu_sound_arch.h"        // TickClientSoundMixer (FUN_00428040)
+#include "../interface/loading_screen.h" // FUN_00579190 / FUN_00579290
+#include "../main_command_handler.h" // ClientQuitRequested (FUN_005b2c60)
+#include "../cmn/menu_sound_arch.h" // TickClientSoundMixer (FUN_00428040)
 #include "../interface/menu_ui_widgets.h"
 #include "menu_universe_base.h"     // the LocationController (DAT_00668708)
-#include "../nn/nn_arrival_text.h"        // NnArrivalTextShowBase (FUN_0045b2d0)
-#include "../nn/nn_modal.h"               // NnSystemInit / NnSystemShutdown (FUN_0045a100 / FUN_0045a140)
+#include "../nn/nn_arrival_text.h" // NnArrivalTextShowBase (FUN_0045b2d0)
+#include "../nn/nn_modal.h" // NnSystemInit / NnSystemShutdown (FUN_0045a100 / FUN_0045a140)
 #include "room_camera.h"             // FRoomCamera (FUN_0041a140's receiver)
 #include "room_control.h"
-#include "../cmn/sound_config.h"           // SetClientAudioMode (FUN_00428030)
+#include "../cmn/sound_config.h" // SetClientAudioMode (FUN_00428030)
 #include "../space/space_letterbox.h"
-#include "../interface/win3d.h"                  // Win3DDrawAll (FUN_0059e300)
+#include "../interface/win3d.h" // Win3DDrawAll (FUN_0059e300)
 #include "../cmn/win3d_immediate.h"
 #include "../interface/win3d_render.h"
 

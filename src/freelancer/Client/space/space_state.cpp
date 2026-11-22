@@ -19,29 +19,29 @@
 #include "dacom.h"                  // FDUMP
 #include "../interface/character_select_equip.h" // FUN_004c4a30 / FUN_004c4a60
 #include "equip_fx.h"
-#include "../frame_tick.h"      // FUN_00424f30 / FUN_00425080 / FUN_00425140, FUN_0041b2e0
-#include "../tick_profile.h"    // PORT(diag): owner-requested diagnostics
+#include "../frame_tick.h" // FUN_00424f30 / FUN_00425080 / FUN_00425140, FUN_0041b2e0
+#include "../tick_profile.h" // PORT(diag): owner-requested diagnostics
 #include "fuse.h"
-#include "gameobj.h"         // FClientGameobj (the player's object, FUN_0054a940)
+#include "gameobj.h" // FClientGameobj (the player's object, FUN_0054a940)
 #include "objdb.h"
 #include "cockpit_load.h"
 #include "effect_type_list.h"
 #include "../cmn/engine_light.h"
 #include "../cmn/fade_to_black.h"
 #include "../game_options.h"
-#include "hud/hud_command_dispatch.h"   // HudPostCommand (FUN_005763b0)
+#include "hud/hud_command_dispatch.h" // HudPostCommand (FUN_005763b0)
 #include "hud/hud_element_list.h"
-#include "hud/hud_status_core.h"        // GetHudStatus (DAT_00674aa0) +0x5b9 / +0x5ba
+#include "hud/hud_status_core.h" // GetHudStatus (DAT_00674aa0) +0x5b9 / +0x5ba
 #include "hud/hud_targetable_objects.h" // FUN_004ec400
 #include "../cmn/input_manager.h"
-#include "../gf/gameflow.h"               // ResetEngineInstanceCache (FUN_004348b0 on DAT_00667e50)
+#include "../gf/gameflow.h" // ResetEngineInstanceCache (FUN_004348b0 on DAT_00667e50)
 #include "gate_tunnel.h"            // FUN_004fe180
 #include "jump_effect.h"            // FUN_00502aa0
-#include "../interface/loading_screen.h"         // LoadingScreenReset (FUN_00579190)
+#include "../interface/loading_screen.h" // LoadingScreenReset (FUN_00579190)
 #include "../interface/menu_keymap_config.h"
 #include "../cmn/menu_sound_arch.h"
 #include "../interface/menu_ui_widgets.h"
-#include "../nn/nn_exit.h"                // NnExitPostShipLostMessage (FUN_00471e80)
+#include "../nn/nn_exit.h" // NnExitPostShipLostMessage (FUN_00471e80)
 #include "../nn/nn_modal.h"
 #include "player_behavior.h"
 #include "player_spawn.h"
@@ -53,7 +53,7 @@
 #include "star_sphere.h"
 #include "star_sys.h"
 #include "tradelane_fx.h"
-#include "../interface/win3d.h"                  // Win3DDrawAll (FUN_0059e300)
+#include "../interface/win3d.h" // Win3DDrawAll (FUN_0059e300)
 #include "../interface/win3d_renderables.h"
 #include "common_animdb.h"
 #include "common_iface.h"

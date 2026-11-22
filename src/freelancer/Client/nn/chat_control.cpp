@@ -19,16 +19,16 @@
 
 #include "chat_msg_win.h"          // MsgWin (HistoryDisplay, DAT_0066da80)
 #include "chat_text_input.h"       // ChatTextInputDisplay ("CTID")
-#include "../ids_rdl.h"               // LoadIdsTextIntoRdl, LoadIdsIntoRdl, RdlRemoveLastParagraph, RdlAppendNode, RdlClear
+#include "../ids_rdl.h" // LoadIdsTextIntoRdl, LoadIdsIntoRdl, RdlRemoveLastParagraph, RdlAppendNode, RdlClear
 #include "../interface/menu_ui_widgets.h"
 #include "nn_group_control.h"      // NnGroupControl::GroupMembers (DAT_0066da84 +0x340)
 #include "nn_modal.h"              // NnMainButtonOnModalOpen (FUN_0045a460)
 #include "nn_ui_pulse.h"           // G_HudChromeColorRgba (DAT_00679bb4)
-#include "../space/player_spawn.h"          // GetPlayerConnectionId (DAT_00673344)
+#include "../space/player_spawn.h" // GetPlayerConnectionId (DAT_00673344)
 #include "../interface/rich_text_win.h"
-#include "../interface/tooltip_hover.h"         // FToolTipHoverInfo
-#include "../interface/ui_page_desc.h"          // FUiPayloadTable
-#include "../interface/win3d.h"                 // Win3DReparent (FUN_0059dd00), Win3DFindByName (FUN_0059da10)
+#include "../interface/tooltip_hover.h" // FToolTipHoverInfo
+#include "../interface/ui_page_desc.h" // FUiPayloadTable
+#include "../interface/win3d.h" // Win3DReparent (FUN_0059dd00), Win3DFindByName (FUN_0059da10)
 #include "../interface/win_factory.h"
 
 #include <stdlib.h>

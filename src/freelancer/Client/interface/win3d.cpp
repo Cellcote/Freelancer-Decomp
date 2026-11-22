@@ -9,11 +9,11 @@
 #include "../gf/base_walk.h"
 #endif
 
-#include "../cmn/cliobj.h"   // ResolveMaterialEntryFromFs (FUN_0041ade0) / ReleaseMaterialEntrySlot
+#include "../cmn/cliobj.h" // ResolveMaterialEntryFromFs (FUN_0041ade0) / ReleaseMaterialEntrySlot
 #include "../space/mesh_load.h"
 #include "../cmn/engine_light.h"
 #include "../space/hud/hud_command_dispatch.h"
-#include "../space/hud/hud_widescreen.h"    // PORT(widescreen)
+#include "../space/hud/hud_widescreen.h" // PORT(widescreen)
 #include "../event_handler.h"
 #include "../cmn/input_manager.h"
 #include "../nn/nn_rollover.h"

@@ -14,10 +14,10 @@
 #include "../space/hud/hud_target.h"             // GetShipPilotName (FUN_005472d0), FHudWideText
 #include "../ids_rdl.h"                // RdlAppendNode, AppendTextMaybeXmlRdl (FUN_0057e2c0)
 #include "../cmn/input_manager.h"          // Get/SetClientMouseCursorDrawFlag, MouseSetCursor
-#include "../login_mgr.h"              // G_Server (DAT_0067ecd0)
-#include "../main_command_handler.h"   // SetClientQuitRequested (FUN_005b2c50)
-#include "../cmn/misc_util.h"              // FmtStrSprintf (FUN_0041c970)
-#include "../gf/nav_bar.h"                // NavBarCloseService (FUN_004424f0), NavBarHasServiceWindow (FUN_00442720)
+#include "../login_mgr.h"           // G_Server (DAT_0067ecd0)
+#include "../main_command_handler.h" // SetClientQuitRequested (FUN_005b2c50)
+#include "../cmn/misc_util.h"       // FmtStrSprintf (FUN_0041c970)
+#include "../gf/nav_bar.h" // NavBarCloseService (FUN_004424f0), NavBarHasServiceWindow (FUN_00442720)
 #include "nn_inventory.h"           // IsPlayerDockedRetail (FUN_004c4810)
 #include "nn_main_button.h"         // NN_MainButton::ResetPanel (FUN_0045cef0)
 #include "float_bits.h"
@@ -25,10 +25,10 @@
                                     // NnModalPauseGame / ResumeGame, NnMainButtonOnModalOpen,
                                     // NnMainButtonHasActivePanel
 #include "nn_text_scratch.h"        // G_NnTextScratchB (DAT_0066fc60), DAT_006119f8
-#include "../space/player_behavior.h"        // GetPlayerObjRW (FUN_0054baf0)
-#include "../space/player_spawn.h"           // GetPlayerConnectionId (DAT_00673344)
+#include "../space/player_behavior.h" // GetPlayerObjRW (FUN_0054baf0)
+#include "../space/player_spawn.h" // GetPlayerConnectionId (DAT_00673344)
 #include "../interface/rich_text_win.h"
-#include "../space/star_sys.h"               // GetAttitudeClass (FUN_0045a490)
+#include "../space/star_sys.h" // GetAttitudeClass (FUN_0045a490)
 #include "../interface/win3d.h"
 #include "../interface/win_factory.h"
 

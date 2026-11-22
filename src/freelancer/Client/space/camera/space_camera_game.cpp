@@ -21,33 +21,33 @@
 #include "space_camera_game.h"
 
 #include "../../interface/character_select_equip.h" // Get/SetPlayerVisitFlagsRetail, GetPlayerStarSystemIdRetail
-#include "../cli_projectile_fx.h"  // FCliEquipFirePacket, CliShipHandleEquipUpdate (FUN_00544d70)
-#include "../gameobj.h"     // FClientGameobj::ManagerKind (+0x1c)
-#include "../objdb.h"       // GetClientObjDb, ClientObjDb_GetKindHead (FUN_00540fc0)
+#include "../cli_projectile_fx.h" // FCliEquipFirePacket, CliShipHandleEquipUpdate (FUN_00544d70)
+#include "../gameobj.h" // FClientGameobj::ManagerKind (+0x1c)
+#include "../objdb.h" // GetClientObjDb, ClientObjDb_GetKindHead (FUN_00540fc0)
 #include "common_misc.h"        // Geometry::Sphere
 #include "common_reputation.h"  // Reputation::Vibe::GetAffiliation
 #include "common_universe.h"    // Universe::get_system, ISpatialPartition, SpatialFill
-#include "../cockpit_load.h"       // SetCockpitResourceStringLoading (FUN_004c7290)
+#include "../cockpit_load.h" // SetCockpitResourceStringLoading (FUN_004c7290)
 #include "common_cequip.h"      // CEGun, CEquipTraverser
 #include "common_cobject.h"     // CEqObj
 #include "common_iface.h"       // IObjRW
 #include "../../game_options.h"
-#include "../../globals.h"            // GetClientFrameTimeCapped (FUN_0042d680)
+#include "../../globals.h" // GetClientFrameTimeCapped (FUN_0042d680)
 #include "../hud/hud_command_dispatch.h"
 #include "../hud/hud_element_list.h"
-#include "../hud/hud_target.h"         // HudIsMousePickBlocked (FUN_0045a740)
+#include "../hud/hud_target.h" // HudIsMousePickBlocked (FUN_0045a740)
 #include "../hud/hud_targetable_objects.h" // G_HudTargetableObjects (DAT_00674b70), FUN_004f1da0
-#include "../../cmn/input_manager.h"      // MouseIsArrowCursor (FUN_0041ddb0)
-#include "../jump_effect.h"        // FJumpShipEffect::ShakeAmplitude (FUN_00503e20)
+#include "../../cmn/input_manager.h" // MouseIsArrowCursor (FUN_0041ddb0)
+#include "../jump_effect.h" // FJumpShipEffect::ShakeAmplitude (FUN_00503e20)
 #include "../../interface/menu_keymap_config.h" // (Un)RegisterAcceleratorGroup, KeyMapIsCommandHeld (FUN_005784a0)
-#include "../../nn/nn_modal.h"          // G_bNnScreenUp (DAT_0067dcc8)
-#include "../player_behavior.h"    // ToggleMouseFlightLock, SetPlayerBehaviorDirectionGated
-#include "../player_spawn.h"       // GetPlayerConnectionId (DAT_00673344)
+#include "../../nn/nn_modal.h" // G_bNnScreenUp (DAT_0067dcc8)
+#include "../player_behavior.h" // ToggleMouseFlightLock, SetPlayerBehaviorDirectionGated
+#include "../player_spawn.h" // GetPlayerConnectionId (DAT_00673344)
 #include "../space_letterbox.h"
 #include "../space_scene_obj_draw.h" // SpaceCameraRenderSlot78 (FUN_0051b250)
-#include "../../cmn/win3d_immediate.h"    // Win3DSetViewport (FUN_00422610), Win3DSetPipelineClearColor
-#include "../../interface/win3d.h"          // Win3DBroadcast (FUN_0059df40)
-#include "../../interface/win3d_render.h"       // Win3DApplyCamera (FUN_00422950)
+#include "../../cmn/win3d_immediate.h" // Win3DSetViewport (FUN_00422610), Win3DSetPipelineClearColor
+#include "../../interface/win3d.h" // Win3DBroadcast (FUN_0059df40)
+#include "../../interface/win3d_render.h" // Win3DApplyCamera (FUN_00422950)
 
 #include <cstddef>
 #include <math.h>

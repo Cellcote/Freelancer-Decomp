@@ -9,23 +9,23 @@
 #include "../interface/character_select_equip.h" // GetPlayerVisitFlagsRetail (FUN_004c4da0)
 #include "../globals.h"                // IsClientServerTickPaused (FUN_0042d730)
 #include "../space/hud/hud_command_dispatch.h"   // HudPostCommand (FUN_005763b0)
-#include "../space/hud/hud_target.h"             // HudIsMousePickBlocked (FUN_0045a740)
-#include "../ids_rdl.h"                // AppendTextMaybeXmlRdl (FUN_0057e2c0)
-#include "../ids_strings.h"            // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../cmn/input_manager.h"          // GetClientSoftwareCursor, GetClientMouseCursorDrawFlag
-#include "../cmn/misc_util.h"              // FormatGroupedNumber (FUN_004779a0)
-#include "../gf/nav_bar.h"                // NavBarHasServiceWindow (FUN_00442720), NavBarIsAnimating (FUN_00442790)
+#include "../space/hud/hud_target.h" // HudIsMousePickBlocked (FUN_0045a740)
+#include "../ids_rdl.h"             // AppendTextMaybeXmlRdl (FUN_0057e2c0)
+#include "../ids_strings.h"         // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../cmn/input_manager.h"   // GetClientSoftwareCursor, GetClientMouseCursorDrawFlag
+#include "../cmn/misc_util.h"       // FormatGroupedNumber (FUN_004779a0)
+#include "../gf/nav_bar.h" // NavBarHasServiceWindow (FUN_00442720), NavBarIsAnimating (FUN_00442790)
 #include "nn_inventory.h"           // IsPlayerDockedRetail (FUN_004c4810)
 #include "float_bits.h"
 #include "nn_modal.h"               // NnMainButtonHasActivePanel, G_bNnScreenUp
 #include "nn_navmap.h"              // NavMapRequestFocus (FUN_004a2aa0)
 #include "nn_text_scratch.h"        // DAT_0066dc60 / DAT_0066fc60 / DAT_006119f8
 #include "nn_ui_pulse.h"            // NnUiPulseBlendArgb (FUN_00561da0), palette colours
-#include "../space/player_behavior.h"        // GetPlayerObjRW (FUN_0054baf0)
-#include "../space/camera/space_camera.h"           // FSpaceCamera
-#include "../space/space_letterbox.h"        // IsLetterboxVisible (FUN_0041a3e0)
+#include "../space/player_behavior.h" // GetPlayerObjRW (FUN_0054baf0)
+#include "../space/camera/space_camera.h" // FSpaceCamera
+#include "../space/space_letterbox.h" // IsLetterboxVisible (FUN_0041a3e0)
 #include "../interface/ui_scroll.h"
-#include "../interface/win3d.h"                  // Win3DFindByName, Win3DDeleteTree, Win3DGetCamera
+#include "../interface/win3d.h" // Win3DFindByName, Win3DDeleteTree, Win3DGetCamera
 #include "../interface/win_factory.h"
 
 #include "common_archetype.h"

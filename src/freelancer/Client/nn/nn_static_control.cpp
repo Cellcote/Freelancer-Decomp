@@ -8,14 +8,14 @@
 #include "../space/hud/hud_widescreen.h"   // PORT(widescreen)
 
 #include "../cmn/engine_light.h"         // EngineLightClearRegisteredList (FUN_004101e0)
-#include "../game_options.h"         // GetGameOption (FUN_005792b0)
-#include "../globals.h"              // GetClientFrameTimeCapped, G_RenderSurfaceWidth / Height
+#include "../game_options.h"      // GetGameOption (FUN_005792b0)
+#include "../globals.h"           // GetClientFrameTimeCapped, G_RenderSurfaceWidth / Height
 #include "nn_ui_pulse.h"          // G_NnPaletteArgb_679bb0 / _679b94
-#include "../interface/tooltip_hover.h"        // FToolTipHoverInfo / NnToolTipFeedHover (FUN_004be370)
+#include "../interface/tooltip_hover.h" // FToolTipHoverInfo / NnToolTipFeedHover (FUN_004be370)
 #include "../interface/win3d.h"
-#include "../interface/win3d_engine_submit.h"  // FUN_0059efa0 / FUN_00434630 / FUN_00434670
-#include "../cmn/win3d_immediate.h"      // Win3DEnable / Disable, viewport and projection helpers
-#include "../interface/win3d_render.h"         // Win3DApplyCamera (FUN_00422950)
+#include "../interface/win3d_engine_submit.h" // FUN_0059efa0 / FUN_00434630 / FUN_00434670
+#include "../cmn/win3d_immediate.h" // Win3DEnable / Disable, viewport and projection helpers
+#include "../interface/win3d_render.h" // Win3DApplyCamera (FUN_00422950)
 #include "../interface/win_factory.h"
 
 #include "common_csys.h"          // Acquire3DMathEngine (FUN_005b73e0)

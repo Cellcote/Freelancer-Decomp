@@ -10,22 +10,22 @@
 #endif
 
 #include "../interface/cargo_bar_control.h" // ToolTipHoverInit / ToolTipHoverSetCaption
-#include "../cmn/cliobj.h"     // PushMaterialPathPair, ResolveMaterialEntry, ReleaseMaterialEntrySlot
-#include "../game_options.h"      // GetGameOption (FUN_005792b0)
+#include "../cmn/cliobj.h" // PushMaterialPathPair, ResolveMaterialEntry, ReleaseMaterialEntrySlot
+#include "../game_options.h" // GetGameOption (FUN_005792b0)
 #include "gf_script_object.h"  // G_GfScriptManager (DAT_0066d2d0), FGfScriptSequence
-#include "../globals.h"           // GetClientFrameTimeCapped (FUN_0042d680), G_RenderSurfaceWidth
+#include "../globals.h" // GetClientFrameTimeCapped (FUN_0042d680), G_RenderSurfaceWidth
 #include "../interface/character_select_equip.h" // GetPlayerVisitFlagsRetail / SetPlayerVisitFlagsRetail
-#include "../cmn/input_manager.h"     // MouseSetCursor (FUN_0041dde0)
+#include "../cmn/input_manager.h" // MouseSetCursor (FUN_0041dde0)
 #include "menu_universe_base.h" // GetClientLocationRoomScriptBehaviors (FUN_0043ad50)
 #include "mirror_property_bucket.h"
-#include "../cmn/misc_util.h"         // MiscUtilLoadEngineInstance, MiscUtilLoadIdsCopy, MiscUtilSphereInView
+#include "../cmn/misc_util.h" // MiscUtilLoadEngineInstance, MiscUtilLoadIdsCopy, MiscUtilSphereInView
 #include "nav_bar.h"           // NavBarCharacterClicked (FUN_00442810), NavBarOpenButton (FUN_00442200)
-#include "../nn/nn_tooltip.h"        // NnToolTipHideGlobal (FUN_004be390)
-#include "../space/player_spawn.h"      // GetPlayerConnectionId (DAT_00673344)
-#include "../server_connect.h"    // GetLocalServerInterface (DAT_0067ecd0)
-#include "../space/camera/space_camera.h"      // FSpaceCamera (DAT_0067dbf8)
-#include "../interface/tooltip_hover.h"     // FToolTipHoverInfo / NnToolTipFeedHover (FUN_004be370)
-#include "../widescreen.h"      // PORT(widescreen)
+#include "../nn/nn_tooltip.h" // NnToolTipHideGlobal (FUN_004be390)
+#include "../space/player_spawn.h" // GetPlayerConnectionId (DAT_00673344)
+#include "../server_connect.h" // GetLocalServerInterface (DAT_0067ecd0)
+#include "../space/camera/space_camera.h" // FSpaceCamera (DAT_0067dbf8)
+#include "../interface/tooltip_hover.h" // FToolTipHoverInfo / NnToolTipFeedHover (FUN_004be370)
+#include "../widescreen.h" // PORT(widescreen)
 #include "../interface/win3d.h"
 
 #include "DALib.h"

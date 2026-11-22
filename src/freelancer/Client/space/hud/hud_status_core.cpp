@@ -33,7 +33,7 @@
 #include "../../cmn/input_manager.h"
 #include "../../nn/nn_modal.h"
 #include "../../nn/nn_text_control.h"     // NnTextControl::SetNumberText (FUN_0058a580)
-#include "../../nn/nn_text_scratch.h"     // G_NnTextScratchA/B (DAT_0066dc60 / DAT_0066fc60), DAT_006119f8
+#include "../../nn/nn_text_scratch.h" // G_NnTextScratchA/B (DAT_0066dc60 / DAT_0066fc60), DAT_006119f8
 #include "../../nn/nn_ui_pulse.h"
 #include "../player_behavior.h"
 #include "../player_spawn.h"

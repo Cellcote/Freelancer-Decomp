@@ -14,31 +14,31 @@
 #include "nn_preferences.h"
 #include "msvcrt_compat.h" // MsvcrtAtoi: retail MSVCRT.DLL wraps mod 2^32, the UCRT saturates
 
-#include "../gf/gameflow.h"              // ResetGameflowRoomLetterbox (FUN_00558d60)
-#include "../globals.h"               // GetClientFrameTimeCapped, g_display, g_client, SetRenderModeWithFallback
-#include "../ids_rdl.h"               // LoadIdsIntoRdl (FUN_0057da40)
-#include "../ids_strings.h"           // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../login_mgr.h"             // G_Server (DAT_0067ecd0)
+#include "../gf/gameflow.h" // ResetGameflowRoomLetterbox (FUN_00558d60)
+#include "../globals.h" // GetClientFrameTimeCapped, g_display, g_client, SetRenderModeWithFallback
+#include "../ids_rdl.h" // LoadIdsIntoRdl (FUN_0057da40)
+#include "../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../login_mgr.h" // G_Server (DAT_0067ecd0)
 #include "../interface/menu_keymap_config.h"
-#include "../cmn/menu_sound_arch.h"       // BindClientBackgroundMusic (FUN_00428ba0)
-#include "../interface/menu_ui_init.h"          // PlayUiSoundSlot / PlayUiSoundSlotFlag1 / StopUiSoundSlot
+#include "../cmn/menu_sound_arch.h" // BindClientBackgroundMusic (FUN_00428ba0)
+#include "../interface/menu_ui_init.h" // PlayUiSoundSlot / PlayUiSoundSlotFlag1 / StopUiSoundSlot
 #include "nn_button_control.h"
 #include "float_bits.h"
 #include "nn_modal.h"              // G_bNnScreenUp (DAT_0067dcc8), NnModalResumeGame
 #include "../interface/cargo_bar_control.h"
-#include "../cmn/font_string.h"           // FontStringConstruct (FUN_004144b0)
+#include "../cmn/font_string.h" // FontStringConstruct (FUN_004144b0)
 #include "nn_rollover.h"           // NnRolloverShowIdsAtGlobal / NnRolloverShowHoverAtGlobal
-#include "../interface/tooltip_hover.h"         // FToolTipHoverInfo, ToolTipHoverReset (FUN_004963a0)
+#include "../interface/tooltip_hover.h" // FToolTipHoverInfo, ToolTipHoverReset (FUN_004963a0)
 #include "nn_text_control.h"
 #include "nn_ui_pulse.h"           // G_NnPaletteArgb_679bb0 / 679ba4 / 679b94
-#include "../perf_options.h"          // SavePerfOptions (FUN_005b3ec0), FindPerfOption*, ProbeMachineGraphicsLevel
-#include "../cmn/pixel_format.h"          // PixelFormatFromD3D / PixelFormatGetDesc (FUN_005b7010 / 005b7030)
-#include "../space/player_spawn.h"          // GetPlayerConnectionId (DAT_00673344)
+#include "../perf_options.h" // SavePerfOptions (FUN_005b3ec0), FindPerfOption*, ProbeMachineGraphicsLevel
+#include "../cmn/pixel_format.h" // PixelFormatFromD3D / PixelFormatGetDesc (FUN_005b7010 / 005b7030)
+#include "../space/player_spawn.h" // GetPlayerConnectionId (DAT_00673344)
 #include "../interface/rich_text_win.h"
 #include "../interface/ui_scroll.h"
-#include "../widescreen.h"            // PORT(widescreen)
+#include "../widescreen.h" // PORT(widescreen)
 #include "../interface/win3d.h"
-#include "../interface/win3d_renderables.h"     // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
+#include "../interface/win3d_renderables.h" // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
 #include "../interface/win_factory.h"
 #include "../interface/wire_controls.h"
 

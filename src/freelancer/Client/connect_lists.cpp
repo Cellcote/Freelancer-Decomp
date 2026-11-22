@@ -10,8 +10,8 @@
 #include "interface/character_select_equip.h" // the player-state lists (DAT_00672960 / DAT_0067296c / ...)
 #include "common_goods.h"           // EquipDescList
 #include "dacom.h"                  // FDUMP
-#include "nn/nn_story_star.h"          // StoryStarReset (FUN_004b9bb0), StoryStarSetRankUp (FUN_004b9b20)
-#include "space/player_spawn.h"           // ResetPlayerWaypointsRetail (FUN_004c46c0)
+#include "nn/nn_story_star.h" // StoryStarReset (FUN_004b9bb0), StoryStarSetRankUp (FUN_004b9b20)
+#include "space/player_spawn.h" // ResetPlayerWaypointsRetail (FUN_004c46c0)
 
 #include <list>
 
