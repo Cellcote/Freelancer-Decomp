@@ -46,21 +46,80 @@
 #include "common_misc.h"        // DamageList, the DAMAGEOBJECT payload member
 
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <new>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 class IClient;
 class IChatClient;
 
 // ===========================================================================
+// Argument slots
+// ===========================================================================
+
+// One slot of the sender's argument image: a plain value as its dword, a float as its bit
+// pattern (BitsFromFloat), a reference or pointer as its address (RpcArgFromPointer, read
+// back with RpcArgAs).
+//
+// On Win32 a slot is the retail stack dword, `unsigned int`, and the code compiles as it
+// always has. On x64 an address is 8 bytes, which a dword would truncate (docs/x64.md,
+// "Pointers held in integers"), so FRpcArg keeps the whole address. It converts to
+// `unsigned int` implicitly, so a slot that holds a value is still read as one.
+#if defined(_WIN64)
+class FRpcArg {
+public:
+    FRpcArg() = default;
+    constexpr FRpcArg(unsigned int Dword) : Value(Dword) {}
+
+    static constexpr FRpcArg FromAddress(std::uintptr_t Address) {
+        FRpcArg Slot(0u);
+        Slot.Value = Address;
+        return Slot;
+    }
+
+    constexpr operator unsigned int() const { return static_cast<unsigned int>(Value); }
+    constexpr std::uintptr_t Address() const { return Value; }
+
+private:
+    // The low dword comes first (little-endian), so the few readers that take a slot's
+    // address as a `float*` or copy four bytes out of it still read the value.
+    std::uintptr_t Value;
+};
+using RpcArg = FRpcArg;
+#else
+using RpcArg = unsigned int;
+#endif
+
+// The slot of a reference or pointer argument.
+inline RpcArg RpcArgFromPointer(const void* Pointer) {
+#if defined(_WIN64)
+    return FRpcArg::FromAddress(reinterpret_cast<std::uintptr_t>(Pointer));
+#else
+    return static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(Pointer));
+#endif
+}
+
+// A pointer argument read back from its slot: RpcArgAs<const XFoo*>(Args[1]).
+template<typename TPointer>
+inline TPointer RpcArgAs(RpcArg Slot) {
+    static_assert(std::is_pointer<TPointer>::value, "RpcArgAs reads a pointer");
+#if defined(_WIN64)
+    return reinterpret_cast<TPointer>(Slot.Address());
+#else
+    return reinterpret_cast<TPointer>(Slot);
+#endif
+}
+
+// ===========================================================================
 // Codec table entry
 // ===========================================================================
 
-// Packs the sender's raw argument dwords into the retail payload. Returns false when the
+// Packs the sender's argument slots into the retail payload. Returns false when the
 // arguments cannot be marshalled (a null struct pointer, a payload that is too small).
-typedef bool (*FRpcMarshalFn)(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount);
+typedef bool (*FRpcMarshalFn)(FPacketBase* Packet, const RpcArg* Args, unsigned int ArgCount);
 
 // Rebuilds the retail argument list out of the payload and makes the one call retail's
 // HandlePacket case makes. Returns false when the packet cannot be delivered.

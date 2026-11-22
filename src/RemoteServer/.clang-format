@@ -1,0 +1,6 @@
+# This module puts opening braces on the same line, writes `template<` and pads braced
+# initializers (`{ a, b }`); everything else follows the root file.
+BasedOnStyle: InheritParentConfig
+BreakBeforeBraces: Attach
+SpaceAfterTemplateKeyword: false
+Cpp11BracedListStyle: false
