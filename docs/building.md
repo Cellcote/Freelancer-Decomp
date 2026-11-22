@@ -92,7 +92,7 @@ vcpkg a module that is on is skipped with a warning, or fails the configure step
 
 Every module says what it is in its `fl_add_module()`: `RETAIL` (a rebuild of a retail module or
 resource DLL), `PORT` (port-only: RP9, RPGPU, FLDedicated, TexConvert) or `TOOL` (FLRegress,
-RpcCodecTest, TexConvertTest, DPNetCheck, MemoryDiagnostics). A retail module that asks for a
+RpcCodecTest, TexConvertTest, DPNetInteropTest, MemoryDiagnostics). A retail module that asks for a
 vcpkg package stops the configure step.
 
 ## The options, and why they are what they are

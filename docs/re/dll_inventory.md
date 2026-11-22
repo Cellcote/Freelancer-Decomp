@@ -62,12 +62,12 @@ Retail never loads them, and nothing retail depends on them; the code they add i
 | `TexConvert.lib` | PORT | replacement for D3DX 8.1's `D3DXLoadSurfaceFromMemory`, linked into RPGPU | `src/TexConvert` | [texconvert.md](texconvert.md) |
 | `FLDedicated.exe` | PORT | console dedicated server: `Server.dll` + `RemoteClient.dll` without MFC | `src/FLDedicated` (+ `src/ServerHost`) | [dedicated_server.md](../dedicated_server.md) |
 | DPNet | PORT | DirectPlay 8 protocol; compiled into `DALib.dll` on x64, Linux and macOS (Win32 keeps Microsoft's `dpnet.dll`), and a library with its own tests on Linux and macOS | `src/DPNet` | [dpnet.md](../dpnet.md) |
-| `DPNetCheck.exe` | TOOL | interoperability check: joins a server through Microsoft's DirectPlay 8 client, Win32 | `src/DPNetCheck` | [dpnet.md](../dpnet.md) |
+| `DPNetInteropTest.exe` | TOOL | interoperability check: joins a server through Microsoft's DirectPlay 8 client, Win32 | `src/DPNetInteropTest` | [dpnet.md](../dpnet.md) |
 | `FLRegress.exe` | TOOL | headless regression harness: runs `Server.dll` and dumps the game state | `src/FLRegress` | [flregress.md](../flregress.md) |
 | `RpcCodecTest.exe` | TOOL | runs every packet codec of `RemoteClient.dll` on fixed inputs | `src/RpcCodecTest` | [testing.md](../testing.md) |
 | `TexConvertTest.exe` | TOOL | compares TexConvert with D3DX 8.1, Win32 | `src/TexConvertTest` | [texconvert.md](texconvert.md) |
 | `MemoryDiagnostics.exe` | TOOL | drives UMDH to find heap leaks, Win32 | `src/MemoryDiagnostics` | [memory_diagnostics.md](../memory_diagnostics.md) |
-| PortTests | PORT | checks of the port's platform headers and of the ported modules, Linux and macOS only (ctest) | `src/PortTests` | [platform.md](../platform.md) |
+| PortTest | PORT | checks of the port's platform headers and of the ported modules, Linux and macOS only (ctest) | `src/PortTest` | [platform.md](../platform.md) |
 
 ## Shared source folders
 

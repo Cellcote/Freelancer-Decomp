@@ -1,4 +1,4 @@
-# PortTests: checks of the port's own platform headers on Linux and macOS -- PORT(macOS), not part
+# PortTest: checks of the port's own platform headers on Linux and macOS -- PORT(macOS), not part
 # of retail. Built only by the non-Windows build (CMakeLists.txt), with ctest.
 
 add_executable(port_tests port_tests.cpp)

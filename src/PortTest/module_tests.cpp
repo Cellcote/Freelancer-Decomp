@@ -1,7 +1,7 @@
 // Freelancer Decomp: a reimplementation of the Freelancer (2003) game client and engine,
 // faithful to the behaviour of the original game.
 
-// PORT(macOS): loads the client modules the non-Windows build makes (src/PortTests/CMakeLists.txt)
+// PORT(macOS): loads the client modules the non-Windows build makes (src/PortTest/CMakeLists.txt)
 // the way the game does, by their Windows names, and checks that their DllMains ran: dacom's
 // COManager exists, and the components the other modules register at load are there. The exit
 // code is the number of failures.

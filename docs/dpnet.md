@@ -66,7 +66,7 @@ stand-in `<dplay8.h>` and the sockets from a stand-in `<winsock2.h>` over BSD so
   retries, drops and message counts; the throughput fields are 0.
 - Methods `CDPServer` never calls return `DPNERR_UNSUPPORTED`.
 
-`DPNetCheck.exe` (`src/DPNetCheck/`, Win32 only) joins a running server through Microsoft's
+`DPNetInteropTest.exe` (`src/DPNetInteropTest/`, Win32 only) joins a running server through Microsoft's
 DirectPlay 8 client, as a retail client does: enumeration, connect, and one guaranteed message
 each way (`CDPServer` answers a 1-byte message with a 1-byte link-quality reply, through the
 server's game loop). CI runs it against FLDedicated on Microsoft's DirectPlay (Win32) and on
