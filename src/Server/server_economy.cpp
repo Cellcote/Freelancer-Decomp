@@ -119,10 +119,14 @@ long long MaxUnit(BaseData const* Base, unsigned int GoodId)
 
 long long MinUnit(BaseData const* Base, unsigned int GoodId)
 {
-    double Low = MarketPrice(Base, GoodId) * (1.0 - Variance(Base));
+    double const V = Variance(Base);
+    double Low = MarketPrice(Base, GoodId) * (1.0 - V);
     if (Low > kMaxClientPrice)
         Low = kMaxClientPrice;
-    long long const Unit = static_cast<long long>(Low) - 1;
+    // With no variance the client's scale is exactly 1.0f (Low = 1 - 0, Range = 0), so its
+    // price is the market price truncated, with nothing to round. Otherwise its float scale
+    // can land a hair under the bound: one credit of slack.
+    long long const Unit = static_cast<long long>(Low) - (V > 0.0 ? 1 : 0);
     return Unit > 0 ? Unit : 0;
 }
 
