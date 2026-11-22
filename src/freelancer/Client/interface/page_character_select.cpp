@@ -6,25 +6,25 @@
 
 #include "page_character_select.h"
 
-#include "../nn/chat_init.h"         // ChatAppendRdlCopy, ChatGetServerMotd*, ChatGetShip/SystemName
-#include "../connect_flow.h"      // ConnectToServer (FUN_005a8770)
-#include "../cmn/engine_light.h"      // ScaleVec3 (FUN_00411d60)
-#include "../globals.h"           // g_display (DAT_00679d04), GetClientFrameTimeCapped
-#include "../ids_rdl.h"           // AppendTextAsRdl, LoadIdsIntoRdl, RdlClear, RdlRemoveLastParagraph
+#include "../nn/chat_init.h"   // ChatAppendRdlCopy, ChatGetServerMotd*, ChatGetShip/SystemName
+#include "../connect_flow.h"   // ConnectToServer (FUN_005a8770)
+#include "../cmn/engine_light.h" // ScaleVec3 (FUN_00411d60)
+#include "../globals.h"        // g_display (DAT_00679d04), GetClientFrameTimeCapped
+#include "../ids_rdl.h" // AppendTextAsRdl, LoadIdsIntoRdl, RdlClear, RdlRemoveLastParagraph
 #include "intro_page_util.h"
 #include "loading_screen.h"    // LoadingScreenSetClear / LoadingScreenStart (FUN_00579280 / 290)
-#include "../login_mgr.h"         // G_LoginMgr (DAT_0067e7b8)
+#include "../login_mgr.h" // G_LoginMgr (DAT_0067e7b8)
 #include "menu_ui_init.h"      // PlayUiSoundSlot (FUN_00564570), PlayOrRewindUiSoundSlot (5645c0)
-#include "../nn/nn_confirm.h"        // NnConfirmOpenFormatted (FUN_00488a80)
-#include "../nn/nn_error.h"          // NnErrorRunModal (FUN_00473cb0)
-#include "../reg_key_stack.h"     // FRegKeyStack
-#include "../server_connect.h"    // ShutdownServerConnection (FUN_005a8260)
+#include "../nn/nn_confirm.h" // NnConfirmOpenFormatted (FUN_00488a80)
+#include "../nn/nn_error.h" // NnErrorRunModal (FUN_00473cb0)
+#include "../reg_key_stack.h" // FRegKeyStack
+#include "../server_connect.h" // ShutdownServerConnection (FUN_005a8260)
 #include "tooltip_hover.h"     // FToolTipHoverInfo
 #include "ui_fast_table.h"
 #include "ui_rich_text_win.h"
 #include "ui_scroll.h"
 #include "ui_text_msg_button.h"
-#include "../cmn/win3d_immediate.h"   // Win3DVec3Add (FUN_00423b30)
+#include "../cmn/win3d_immediate.h" // Win3DVec3Add (FUN_00423b30)
 
 #include "common_text.h"
 

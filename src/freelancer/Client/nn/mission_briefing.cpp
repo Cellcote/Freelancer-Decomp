@@ -11,18 +11,18 @@
 #include "best_path.h"              // BestPathGetWaypointCount (FUN_004c4fb0), G_BestPaths (DAT_00672950)
 #include "../interface/character_select_equip.h" // SetPlayerBaseIdRetail (FUN_004c4910), GetPlayerStarSystemIdRetail
 #include "chat_init.h"              // ChatIsInputOpen (FUN_0046a480)
-#include "../frame_tick.h"      // FUN_00424f30 / FUN_00425080 / FUN_00425140
-#include "../gf/gameflow.h"               // DAT_00668780 / DAT_00668781 / DAT_00668784
-#include "../cmn/input_manager.h"          // MouseSetCursor (FUN_0041dde0), SetClientMouseCursorDrawFlag
-#include "../interface/loading_screen.h"         // LoadingScreenReset (FUN_00579190)
-#include "../cmn/menu_sound_arch.h"        // TickClientSoundMixer (FUN_00428040), SetClientBackgroundMusic
-#include "../interface/menu_ui_init.h"           // IsAnyUiSoundPlaying (FUN_00564760)
+#include "../frame_tick.h" // FUN_00424f30 / FUN_00425080 / FUN_00425140
+#include "../gf/gameflow.h" // DAT_00668780 / DAT_00668781 / DAT_00668784
+#include "../cmn/input_manager.h" // MouseSetCursor (FUN_0041dde0), SetClientMouseCursorDrawFlag
+#include "../interface/loading_screen.h" // LoadingScreenReset (FUN_00579190)
+#include "../cmn/menu_sound_arch.h" // TickClientSoundMixer (FUN_00428040), SetClientBackgroundMusic
+#include "../interface/menu_ui_init.h" // IsAnyUiSoundPlaying (FUN_00564760)
 #include "nn_modal.h"               // NnSystemInit / NnSystemShutdown (FUN_0045a100 / FUN_0045a140)
 #include "nn_static_control.h"      // StaticControl::Init (FUN_00588540)
 #include "nn_story_star.h"          // StoryStarReset (FUN_004b9bb0)
-#include "../interface/win3d.h"                  // Win3DDrawAll (FUN_0059e300), Win3DDeleteTree (FUN_0043d2a0)
-#include "../interface/win3d_render.h"           // ClearWin3DBuffersToColor (FUN_00564f90)
-#include "../interface/win_factory.h"            // WinFactoryCreate (FUN_0059db20)
+#include "../interface/win3d.h" // Win3DDrawAll (FUN_0059e300), Win3DDeleteTree (FUN_0043d2a0)
+#include "../interface/win3d_render.h" // ClearWin3DBuffersToColor (FUN_00564f90)
+#include "../interface/win_factory.h" // WinFactoryCreate (FUN_0059db20)
 
 #include "common_universe.h"        // Universe::get_system
 #include "dacom.h"                  // FDUMP

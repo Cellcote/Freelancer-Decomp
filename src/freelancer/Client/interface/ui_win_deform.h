@@ -37,7 +37,7 @@
 //   size 0x3f4 (operator_new at 0x0059cad8)
 
 #include "../cmn/engine_character.h" // FEngineCharacterBody
-#include "../space/camera/space_camera.h"     // FSpaceCamera
+#include "../space/camera/space_camera.h" // FSpaceCamera
 #include "win3d.h"
 
 #include <string>

@@ -9,20 +9,20 @@
 #include "nn_story_star.h"
 
 #include "best_path.h"            // G_BestPaths (DAT_00672950), BestPathGetWaypoint(Count)
-#include "../state.h"         // QueueLoadGameCharacter (FUN_005b2c70)
-#include "../cmn/font_string.h"          // FFontString (+0x28 LayoutGen, +0x30 bMultiLine)
-#include "../globals.h"              // GetClientFrameTimeCapped (FUN_0042d680), ShouldSkipLocalServerTick
+#include "../state.h" // QueueLoadGameCharacter (FUN_005b2c70)
+#include "../cmn/font_string.h" // FFontString (+0x28 LayoutGen, +0x30 bMultiLine)
+#include "../globals.h" // GetClientFrameTimeCapped (FUN_0042d680), ShouldSkipLocalServerTick
 #include "../space/hud/hud_command_dispatch.h" // HudPostCommand (FUN_005763b0)
-#include "../space/hud/hud_target.h"           // HudIsMousePickBlocked (FUN_0045a740)
-#include "../ids_rdl.h"              // RdlAppendNode, AppendTextMaybeXmlRdl, LoadIdsIntoRdl
-#include "../ids_strings.h"          // FormatFmtStrMadLib, GetIdsStringWWithRawFallback
-#include "../cmn/input_manager.h"        // Get/SetClientMouseCursorDrawFlag, MouseSetCursor
+#include "../space/hud/hud_target.h" // HudIsMousePickBlocked (FUN_0045a740)
+#include "../ids_rdl.h" // RdlAppendNode, AppendTextMaybeXmlRdl, LoadIdsIntoRdl
+#include "../ids_strings.h" // FormatFmtStrMadLib, GetIdsStringWWithRawFallback
+#include "../cmn/input_manager.h" // Get/SetClientMouseCursorDrawFlag, MouseSetCursor
 #include "knowledge_map.h"        // KnowledgeMapRevealFmtStr (FUN_00459950)
-#include "../login_mgr.h"            // G_LoginMgr (DAT_0067e7b8), G_Server (DAT_0067ecd0)
+#include "../login_mgr.h" // G_LoginMgr (DAT_0067e7b8), G_Server (DAT_0067ecd0)
 #include "../main_command_handler.h" // SetClientQuitRequested (FUN_005b2c50)
-#include "../interface/menu_enter_state.h"     // MenuNavSetIntroModeRequest (FUN_00564b10)
-#include "../interface/menu_ui_init.h"         // PlayOrRewindUiSoundSlot (FUN_005645c0)
-#include "../gf/nav_bar.h"              // NavBarCloseService (FUN_004424f0), NavBarHasServiceWindow (FUN_00442720)
+#include "../interface/menu_enter_state.h" // MenuNavSetIntroModeRequest (FUN_00564b10)
+#include "../interface/menu_ui_init.h" // PlayOrRewindUiSoundSlot (FUN_005645c0)
+#include "../gf/nav_bar.h" // NavBarCloseService (FUN_004424f0), NavBarHasServiceWindow (FUN_00442720)
 #include "nn_arrival_text.h"      // NnArrivalText::IsCaptionVisible (FUN_0045b2c0)
 #include "nn_load_save.h"         // OpenNnLoadSave (FUN_00488970)
 #include "nn_main_button.h"       // NN_MainButton, G_bNnKeepPanelOpen (DAT_0066d359)
@@ -31,10 +31,10 @@
 #include "nn_text_control.h"
 #include "nn_text_scratch.h"      // G_NnTextScratchA / B (DAT_0066dc60 / DAT_0066fc60)
 #include "nn_ui_pulse.h"          // G_NnPaletteArgb_679bb0
-#include "../space/player_spawn.h"         // GetPlayerConnectionId (DAT_00673344)
+#include "../space/player_spawn.h" // GetPlayerConnectionId (DAT_00673344)
 #include "../interface/rich_text_win.h"
-#include "../server_connect.h"       // ShutdownServerConnection (FUN_005a8260)
-#include "../space/space_letterbox.h"      // SetLetterboxTarget (FUN_0041a0f0), IsLetterboxVisible
+#include "../server_connect.h" // ShutdownServerConnection (FUN_005a8260)
+#include "../space/space_letterbox.h" // SetLetterboxTarget (FUN_0041a0f0), IsLetterboxVisible
 #include "../interface/win3d.h"
 #include "../interface/win_factory.h"
 

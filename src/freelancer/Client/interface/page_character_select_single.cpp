@@ -6,17 +6,17 @@
 
 #include "page_character_select_single.h"
 
-#include "../cmn/font_string.h"       // FHudWideText, WideTextAssign (FUN_00413df0)
-#include "../globals.h"           // GetClientFrameTimeCapped (FUN_0042d680)
-#include "../ids_rdl.h"           // AppendTextAsRdl (FUN_0057db50), AppendTextMaybeXmlRdl (FUN_0057e2c0)
-#include "../ids_strings.h"       // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../cmn/font_string.h" // FHudWideText, WideTextAssign (FUN_00413df0)
+#include "../globals.h"        // GetClientFrameTimeCapped (FUN_0042d680)
+#include "../ids_rdl.h" // AppendTextAsRdl (FUN_0057db50), AppendTextMaybeXmlRdl (FUN_0057e2c0)
+#include "../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
 #include "intro_page_util.h"
 #include "loading_screen.h"    // LoadingScreenSetClear / LoadingScreenStart (FUN_00579280 / 290)
-#include "../login_mgr.h"         // G_LoginMgr (DAT_0067e7b8)
+#include "../login_mgr.h" // G_LoginMgr (DAT_0067e7b8)
 #include "menu_ui_init.h"      // PlayUiSoundSlot (FUN_00564570), PlayOrRewindUiSoundSlot (5645c0)
-#include "../nn/nn_confirm.h"        // NnConfirmOpenFormatted (FUN_00488a80)
-#include "../nn/nn_error.h"          // NnErrorRunModal (FUN_00473cb0)
-#include "../nn/nn_load_save.h"      // NnLoadSaveEntryText (FUN_00488b70)
+#include "../nn/nn_confirm.h" // NnConfirmOpenFormatted (FUN_00488a80)
+#include "../nn/nn_error.h" // NnErrorRunModal (FUN_00473cb0)
+#include "../nn/nn_load_save.h" // NnLoadSaveEntryText (FUN_00488b70)
 #include "ui_list_box.h"
 #include "ui_rich_text_win.h"
 #include "ui_scroll.h"

@@ -7,16 +7,16 @@
 #include "chat_text_input.h"
 
 #include "chat_init.h"             // FChatChannelTable, G_ChatChannelTable, chat ids, ChatSetInputOpen
-#include "../cmn/effect_vertex_batch.h"   // FEffectVertexBatch (FUN_0046ebc0 / FUN_0046eab0 / FUN_0046e9c0)
-#include "../space/hud/hud_command_dispatch.h"  // FHudCmdRecord, HudPostCommand (FUN_005763b0)
-#include "../ids_rdl.h"               // LoadIdsTextIntoRdl, RdlAppendNode, RdlClear
-#include "../login_mgr.h"             // G_ChatServer (DAT_0067ecd4)
+#include "../cmn/effect_vertex_batch.h" // FEffectVertexBatch (FUN_0046ebc0 / FUN_0046eab0 / FUN_0046e9c0)
+#include "../space/hud/hud_command_dispatch.h" // FHudCmdRecord, HudPostCommand (FUN_005763b0)
+#include "../ids_rdl.h" // LoadIdsTextIntoRdl, RdlAppendNode, RdlClear
+#include "../login_mgr.h" // G_ChatServer (DAT_0067ecd4)
 #include "../interface/menu_ui_widgets.h"
-#include "../interface/win3d.h"                 // Win3DFindByName (FUN_0059da10)
-#include "../cmn/misc_util.h"             // MiscUtilLoadTextureLibrary / MiscUtilReleaseTextureLibrary
+#include "../interface/win3d.h" // Win3DFindByName (FUN_0059da10)
+#include "../cmn/misc_util.h" // MiscUtilLoadTextureLibrary / MiscUtilReleaseTextureLibrary
 #include "nn_group_control.h"      // NnGroupControl::GroupMembers
-#include "../space/player_spawn.h"          // GetPlayerConnectionId (DAT_00673344)
-#include "../interface/win3d_renderables.h"     // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
+#include "../space/player_spawn.h" // GetPlayerConnectionId (DAT_00673344)
+#include "../interface/win3d_renderables.h" // Win3DFlushBeforeOverlayDraw (FUN_0045a9f0)
 #include "../interface/win_factory.h"
 
 #include "DALib.h"                 // DALib::TextureLib

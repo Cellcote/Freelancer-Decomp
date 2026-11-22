@@ -18,17 +18,17 @@
 
 #include "../space/gameobj.h"
 #include "../space/objdb.h"      // ClientObjDb_FindObject (FUN_005416c0)
-#include "../space/hud/hud_maneuvers.h"     // GetHudManeuvers (DAT_00674a58), RequestManeuver (FUN_004d8e20)
+#include "../space/hud/hud_maneuvers.h" // GetHudManeuvers (DAT_00674a58), RequestManeuver (FUN_004d8e20)
 #include "../ids_rdl.h"
-#include "../login_mgr.h"         // G_Server (DAT_0067ecd0), G_ChatServer (DAT_0067ecd4)
+#include "../login_mgr.h" // G_Server (DAT_0067ecd0), G_ChatServer (DAT_0067ecd4)
 #include "nn_main_button.h"    // NN_MainButton::SetGroupButtonAlert / SetGroupButtonMesh
 #include "nn_modal.h"          // G_NnMainButton (DAT_0066d3f0), NnMainButtonOnModalOpen
 #include "nn_ui_pulse.h"       // G_HudChromeColorRgba (DAT_00679bb4)
-#include "../space/player_behavior.h"   // GetPlayerObjRW (FUN_0054baf0)
-#include "../space/player_spawn.h"      // GetPlayerConnectionId / GetPlayerCharacterId
+#include "../space/player_behavior.h" // GetPlayerObjRW (FUN_0054baf0)
+#include "../space/player_spawn.h" // GetPlayerConnectionId / GetPlayerCharacterId
 #include "../interface/rich_text_win.h"
 #include "../interface/win_factory.h"
-#include "../interface/wire_controls.h"     // RichTextWireButtonControl
+#include "../interface/wire_controls.h" // RichTextWireButtonControl
 
 #include "common_cobject.h"
 #include "common_iface.h"

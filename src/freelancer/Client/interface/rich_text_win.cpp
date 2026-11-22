@@ -10,8 +10,8 @@
 #include "../globals.h"
 #include "../space/hud/hud_command_dispatch.h"
 #include "../ids_rdl.h"
-#include "../cmn/pixel_format.h"   // PixelFormatFromD3D / PixelFormatFind (FUN_005b7010 / 005b7050)
-#include "../cmn/screen_quad_state.h"   // ScreenQuadDrawBigImageTile (FUN_00404720)
+#include "../cmn/pixel_format.h" // PixelFormatFromD3D / PixelFormatFind (FUN_005b7010 / 005b7050)
+#include "../cmn/screen_quad_state.h" // ScreenQuadDrawBigImageTile (FUN_00404720)
 #include "../space/star_sphere.h"
 #include "ui_page_desc.h"
 #include "ui_scroll.h"

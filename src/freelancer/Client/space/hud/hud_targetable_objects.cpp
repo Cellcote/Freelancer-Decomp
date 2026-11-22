@@ -6,54 +6,54 @@
 
 #include "hud_targetable_objects.h"
 
-#include "../../nn/best_path.h"        // BestPathGetWaypointCount / BestPathGetWaypoint / resolvers
+#include "../../nn/best_path.h" // BestPathGetWaypointCount / BestPathGetWaypoint / resolvers
 #include "../../interface/cargo_bar_control.h" // ToolTipHoverInit
 #include "common_archetype.h" // Archetype::Munition
 #include "dalib_net.h"        // CDPClient::GetPingDelay
-#include "../../game_options.h"     // GetGameOption (FUN_005792b0)
-#include "../../interface/menu_ui_init.h"     // PlayOrRewindUiSoundSlot (FUN_005645c0)
-#include "../../nn/nn_messaging.h"     // NnVoiceEnqueue (FUN_00489e80)
-#include "../../nn/nn_tooltip.h"       // NnToolTipWasFedThisFrame (FUN_004be2d0)
-#include "../../interface/tooltip_hover.h"    // FToolTipHoverInfo, NnToolTipFeedHover (FUN_004be370)
+#include "../../game_options.h" // GetGameOption (FUN_005792b0)
+#include "../../interface/menu_ui_init.h" // PlayOrRewindUiSoundSlot (FUN_005645c0)
+#include "../../nn/nn_messaging.h" // NnVoiceEnqueue (FUN_00489e80)
+#include "../../nn/nn_tooltip.h" // NnToolTipWasFedThisFrame (FUN_004be2d0)
+#include "../../interface/tooltip_hover.h" // FToolTipHoverInfo, NnToolTipFeedHover (FUN_004be370)
 #include "../../interface/character_select_equip.h" // GetPlayerStarSystemIdRetail (FUN_004c4830)
-#include "../gameobj.h"   // FClientGameobj::Slot158 (player slot +0x158)
+#include "../gameobj.h"       // FClientGameobj::Slot158 (player slot +0x158)
 #include "../mesh_load.h"
-#include "../objdb.h"     // GetClientObjDb (DAT_00678a2c)
+#include "../objdb.h"         // GetClientObjDb (DAT_00678a2c)
 #include "common_id.h"        // CreateID
 #include "common_universe.h"  // Universe::ISystem
 #include "dacom.h"            // FDUMP
 #include "DALib.h"            // DALib::Pipeline
 #include "render/IRenderPipeline.h"  // IRenderPipeline::SetRenderState
-#include "../../cmn/engine_light.h"     // EngineLightClearRegisteredList (FUN_004101e0)
+#include "../../cmn/engine_light.h" // EngineLightClearRegisteredList (FUN_004101e0)
 #include "common_cequip.h"
 #include "common_csys.h"      // Acquire3DMathEngine
 #include "common_iface.h"     // IObjRW, IObjInspect, ObjRwFromWatchable
 #include "common_misc.h"      // ICamera, SUBOBJ_ID_NONE, SUBOBJ_ID_ROOT
 #include "common_physys.h"    // PhySys::FindRayCollisions, PhySys::RayHit
 #include "common_reputation.h" // Reputation::Vibe::GetAffiliation, Reputation::get_short_name
-#include "../../cmn/font_imp.h"         // FindMenuFontImp (FUN_004177b0)
-#include "../../globals.h"          // G_RenderSurfaceWidth / G_RenderSurfaceHeight
-#include "../../widescreen.h"   // PORT(widescreen)
+#include "../../cmn/font_imp.h" // FindMenuFontImp (FUN_004177b0)
+#include "../../globals.h"    // G_RenderSurfaceWidth / G_RenderSurfaceHeight
+#include "../../widescreen.h" // PORT(widescreen)
 #include "hud_comm.h"         // HudCommIsWatchedObjectId (FUN_004cc880)
 #include "hud_command_dispatch.h" // HudCommandRecord, FSpaceCommand, SpaceSendCommand
 #include "hud_status_core.h"  // HudSampleShieldHitPoints (FUN_004d4b50)
 #include "hud_target.h"       // G_HudObjectsMath, HudIsMousePickBlocked
 #include "hud_waypoint.h"     // HudWaypointSelectPlayerWaypoint / HudWaypointSelectBestPath
-#include "../../ids_strings.h"      // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../../cmn/input_manager.h"    // GetClientSoftwareCursor (DAT_00616840 / DAT_00616844)
-#include "../../cmn/menu_sound_arch.h"  // GetClientSoundListenerObject (FUN_0040f130)
-#include "../../nn/nn_montage_draw.h"  // FindButtonMontageTile (FUN_0055a360)
-#include "../../nn/nn_text_control.h"  // NnTextControl (+0x334 Font::String, FUN_0058a5d0 / FUN_0058a5e0)
-#include "../../nn/nn_ui_pulse.h"      // G_NnPaletteArgb_679ba8
-#include "../player_behavior.h"  // GetPlayerObjRW, IsMouseFlightHoldThresholdReached, IsMouseFlightLocked
-#include "../player_spawn.h"     // GetPlayerWaypointCountRetail / GetPlayerWaypointRetail
-#include "../camera/space_camera.h"     // FSpaceCamera, AsCamera
-#include "../space_letterbox.h"  // IsLetterboxVisible (FUN_0041a3e0)
-#include "../star_sphere.h"      // Win3DBindModelview (FUN_00422690)
-#include "../star_sys.h"         // StarSysGetActiveSystemId (FUN_00554e90), GetAttitudeClass
-#include "../../interface/win3d.h"            // Win3DGetHover
-#include "../../cmn/win3d_immediate.h"  // Win3DEnable / Win3DDisable / Win3DSetBlendFunc
-#include "../../interface/win3d_render.h"     // Win3DApplyCamera (FUN_00422950)
+#include "../../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../../cmn/input_manager.h" // GetClientSoftwareCursor (DAT_00616840 / DAT_00616844)
+#include "../../cmn/menu_sound_arch.h" // GetClientSoundListenerObject (FUN_0040f130)
+#include "../../nn/nn_montage_draw.h" // FindButtonMontageTile (FUN_0055a360)
+#include "../../nn/nn_text_control.h" // NnTextControl (+0x334 Font::String, FUN_0058a5d0 / FUN_0058a5e0)
+#include "../../nn/nn_ui_pulse.h" // G_NnPaletteArgb_679ba8
+#include "../player_behavior.h" // GetPlayerObjRW, IsMouseFlightHoldThresholdReached, IsMouseFlightLocked
+#include "../player_spawn.h" // GetPlayerWaypointCountRetail / GetPlayerWaypointRetail
+#include "../camera/space_camera.h" // FSpaceCamera, AsCamera
+#include "../space_letterbox.h" // IsLetterboxVisible (FUN_0041a3e0)
+#include "../star_sphere.h" // Win3DBindModelview (FUN_00422690)
+#include "../star_sys.h" // StarSysGetActiveSystemId (FUN_00554e90), GetAttitudeClass
+#include "../../interface/win3d.h" // Win3DGetHover
+#include "../../cmn/win3d_immediate.h" // Win3DEnable / Win3DDisable / Win3DSetBlendFunc
+#include "../../interface/win3d_render.h" // Win3DApplyCamera (FUN_00422950)
 #include "../../interface/win3d_renderables.h" // Win3DImmedDrawLine (FUN_005a2940)
 #include "x86math.h"
 

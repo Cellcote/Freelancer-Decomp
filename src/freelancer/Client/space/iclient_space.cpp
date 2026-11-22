@@ -15,12 +15,12 @@
 
 #include "freelancer_client.h"
 
-#include "../interface/character_select_equip.h"   // player equip / collision / health setters (0x004c4xxx)
+#include "../interface/character_select_equip.h" // player equip / collision / health setters (0x004c4xxx)
 #include "cli_projectile_fx.h"        // FCliLauncherFx::FireDirect (the dropper tails, slots 49..51)
-#include "../cmn/cliobj.h"            // Archetype::LoadMountedEquipmentCompanions (FUN_004252d0)
-#include "equip_fx.h"          // EquippedObjFindEquipFx / CliTractorEquipFxDropLoot (slot 64)
-#include "gameobj.h"           // FClientGameobj family
-#include "objdb.h"             // ClientObjDb_FindObject (FUN_005416c0)
+#include "../cmn/cliobj.h" // Archetype::LoadMountedEquipmentCompanions (FUN_004252d0)
+#include "equip_fx.h" // EquippedObjFindEquipFx / CliTractorEquipFxDropLoot (slot 64)
+#include "gameobj.h" // FClientGameobj family
+#include "objdb.h" // ClientObjDb_FindObject (FUN_005416c0)
 #include "common_archetype.h"
 #include "common_cequip.h"            // CEquip, CECargo
 #include "common_cobject.h"           // CObject / CSimple / CEqObj / CShip / CLoot
@@ -35,27 +35,27 @@
 #include "common_text.h"              // FmtStr (slot 47)
 #include "common_tstring.h"           // TString<16> (slot 82)
 #include "dacom.h"                    // FDUMP
-#include "../game_options.h"             // AssignGameSessionFlags (FUN_004c8190)
-#include "hud/hud_comm.h"                 // ClientSendComm / HudCommPreloadCostume
-#include "hud/hud_waypoint.h"             // EqObjCreateParmsDefaults (FUN_004f4930, slot 46)
-#include "hud/hud_weapon_groups.h"        // G_WeaponGroups (DAT_00674c0c)
-#include "../cmn/misc_util.h"                // FmtStrSprintf (FUN_0041c970, slot 47)
-#include "../cmn/menu_sound_arch.h"          // LookupClientSoundArch / PlayClientSoundArch
-#include "../interface/menu_ui_widgets.h"          // RetailU32QueueClear / PushBack (slot 120)
-#include "../nn/chat_init.h"                // ChatSetServerMotd (slot 115), player info (117..119)
-#include "../nn/nn_inventory.h"             // ReqPlayerHullStatusRetail (FUN_004c4f50)
-#include "../gf/gf_script_object.h"         // FGfScriptSequence::OnMissionOfferAnswered (FUN_004557d0)
-#include "../nn/nn_messaging.h"             // NnVoiceEnqueue (FUN_00489e80)
-#include "../nn/nn_mission_message.h"       // NnMissionMessagePopUp (slot 95), ShowScanNotice (109)
-#include "../nn/nn_navmap.h"                // G_bNavMapNoBestPath (DAT_006720a8), FUN_0048d8a0
-#include "../nn/nn_player_info.h"           // NnPlayerInfoOnPlayerStats (FUN_004a8e40, slot 94)
-#include "../nn/nn_story_star.h"            // StoryStarLoadHistory (slot 97), StoryStarSetRankUp (117)
+#include "../game_options.h" // AssignGameSessionFlags (FUN_004c8190)
+#include "hud/hud_comm.h" // ClientSendComm / HudCommPreloadCostume
+#include "hud/hud_waypoint.h" // EqObjCreateParmsDefaults (FUN_004f4930, slot 46)
+#include "hud/hud_weapon_groups.h" // G_WeaponGroups (DAT_00674c0c)
+#include "../cmn/misc_util.h" // FmtStrSprintf (FUN_0041c970, slot 47)
+#include "../cmn/menu_sound_arch.h" // LookupClientSoundArch / PlayClientSoundArch
+#include "../interface/menu_ui_widgets.h" // RetailU32QueueClear / PushBack (slot 120)
+#include "../nn/chat_init.h" // ChatSetServerMotd (slot 115), player info (117..119)
+#include "../nn/nn_inventory.h" // ReqPlayerHullStatusRetail (FUN_004c4f50)
+#include "../gf/gf_script_object.h" // FGfScriptSequence::OnMissionOfferAnswered (FUN_004557d0)
+#include "../nn/nn_messaging.h" // NnVoiceEnqueue (FUN_00489e80)
+#include "../nn/nn_mission_message.h" // NnMissionMessagePopUp (slot 95), ShowScanNotice (109)
+#include "../nn/nn_navmap.h" // G_bNavMapNoBestPath (DAT_006720a8), FUN_0048d8a0
+#include "../nn/nn_player_info.h" // NnPlayerInfoOnPlayerStats (FUN_004a8e40, slot 94)
+#include "../nn/nn_story_star.h" // StoryStarLoadHistory (slot 97), StoryStarSetRankUp (117)
 #include "player_behavior.h"          // GetPlayerObjRW (FUN_0054baf0)
 #include "player_spawn.h"             // IsPlayerShipId, player ids, waypoints
 #include "rpc_iclient_args.h"         // the slot argument structs shared with Server / rpclocal
 #include "server_createinfo.h"        // CEqObjCreateInfo (slots 46 / 47)
 #include "server_sysdb.h"             // FMineExplosion (SendServerExplodeAsteroidMine)
-#include "camera/space_camera.h"             // SetupSpaceScriptCamera / RequestSpaceCameraMode
+#include "camera/space_camera.h" // SetupSpaceScriptCamera / RequestSpaceCameraMode
 #include "space_state.h"              // EnterBaseFromDock
 #include "space_app.h"                // SpaceAppArmDeathCamera / SetStaticCameraTransform
 #include "star_sys.h"                 // StarSysSetMusicOverride / StarSysClearMusicOverride

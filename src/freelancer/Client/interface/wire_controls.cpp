@@ -10,12 +10,12 @@
 #include "../globals.h"             // GetClientFrameTimeCapped (FUN_0042d680)
 #include "../space/hud/hud_command_dispatch.h" // HudPostCommand (FUN_005763b0)
 #include "../ids_rdl.h"             // LoadIdsIntoRdl (FUN_0057da40), RdlAppendNode (FUN_0046c800)
-#include "../cmn/input_manager.h"       // GetClientSoftwareCursor (DAT_00616840 / DAT_00616844)
-#include "../cmn/menu_sound_arch.h"     // LookupClientSoundArch / PlayClientSoundArchIfIdle
+#include "../cmn/input_manager.h" // GetClientSoftwareCursor (DAT_00616840 / DAT_00616844)
+#include "../cmn/menu_sound_arch.h" // LookupClientSoundArch / PlayClientSoundArchIfIdle
 #include "menu_ui_init.h"        // FindUiSoundSlot / PlayOrRewindUiSoundSlot / PlayUiRolloverSound
-#include "../nn/nn_tooltip.h"          // NnToolTipHideGlobal (FUN_004be390)
-#include "../nn/nn_ui_pulse.h"         // NnUiPulseReset / NnUiPulseBlendArgb / idle palette
-#include "../space/camera/space_camera.h"        // FSpaceCamera (DAT_0067dbf8)
+#include "../nn/nn_tooltip.h" // NnToolTipHideGlobal (FUN_004be390)
+#include "../nn/nn_ui_pulse.h" // NnUiPulseReset / NnUiPulseBlendArgb / idle palette
+#include "../space/camera/space_camera.h" // FSpaceCamera (DAT_0067dbf8)
 #include "tooltip_hover.h"       // FToolTipHoverInfo / NnToolTipFeedHover (FUN_004be370)
 #include "win3d.h"
 #include "win3d_renderables.h"   // Win3DImmedBatchFlushAll / Win3DImmedBatchReset

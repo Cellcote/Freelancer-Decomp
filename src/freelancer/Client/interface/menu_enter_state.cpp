@@ -24,7 +24,7 @@
 #include "loading_screen.h"
 #include "../login_mgr.h"
 #include "../cmn/menu_sound_arch.h" // TickClientSoundMixer (FUN_00428040)
-#include "../nn/nn_preferences.h"  // NnPreferences::bClosed (+0x32c)
+#include "../nn/nn_preferences.h" // NnPreferences::bClosed (+0x32c)
 #include "../nn/nn_static_control.h"
 #include "../nn/nn_text_control.h"
 #include "page_account_select.h" // PageAccountSelect (DAT_0067aa10)
@@ -34,7 +34,7 @@
 #include "page_server_select.h"  // PageServerSelect (DAT_0067ab20)
 #include "page_options.h"
 #include "../space/player_spawn.h" // ResetMissionOfferAnswerRetail (FUN_004c55b0)
-#include "../gf/room_camera.h"  // FRoomCamera (FUN_0041a140's receiver)
+#include "../gf/room_camera.h" // FRoomCamera (FUN_0041a140's receiver)
 #include "../gf/room_control.h" // GetRoomObjectList (FUN_005593c0), FRoomObject
 #include "../server_connect.h"
 #include "../cmn/sound_config.h" // SetClientAudioMode (FUN_00428030)

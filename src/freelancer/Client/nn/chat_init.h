@@ -189,7 +189,7 @@ extern std::map<unsigned, RenderDisplayList*>* G_ChatNameCache70; // DAT_0066da7
 extern std::map<unsigned, RenderDisplayList*>* G_ChatNameCache74; // DAT_0066da74
 extern std::map<unsigned, RenderDisplayList*>* G_ChatNameCache78; // DAT_0066da78
 extern FChatChannelTable* G_ChatChannelTable;                 // DAT_0066da7c
-extern MsgWin* G_ChatMsgWin;                                  // DAT_0066da80 (nn/chat_msg_win.h)
+extern MsgWin* G_ChatMsgWin;                                  // DAT_0066da80 (chat_msg_win.h)
 extern NnGroupControl* G_ChatGroupControl;                    // DAT_0066da84
 extern bool G_bChatMsgWinWanted;                              // DAT_0066da88
 

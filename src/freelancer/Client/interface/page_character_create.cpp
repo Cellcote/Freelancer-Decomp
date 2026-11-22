@@ -6,16 +6,16 @@
 
 #include "page_character_create.h"
 
-#include "../nn/chat_init.h"            // ChatGetBaseName (FUN_0046b890), ChatGetShipArchName (FUN_0046b6c0)
-#include "../cmn/engine_character.h"     // FEngineCharacterBody
-#include "../globals.h"              // GetClientFrameTimeCapped (FUN_0042d680)
-#include "../ids_rdl.h"              // RdlClear, LoadIdsIntoRdl (FUN_0057da40), RdlRemoveLastParagraph
+#include "../nn/chat_init.h" // ChatGetBaseName (FUN_0046b890), ChatGetShipArchName (FUN_0046b6c0)
+#include "../cmn/engine_character.h" // FEngineCharacterBody
+#include "../globals.h" // GetClientFrameTimeCapped (FUN_0042d680)
+#include "../ids_rdl.h" // RdlClear, LoadIdsIntoRdl (FUN_0057da40), RdlRemoveLastParagraph
 #include "intro_page_util.h"
-#include "../login_mgr.h"            // G_LoginMgr (DAT_0067e7b8)
+#include "../login_mgr.h" // G_LoginMgr (DAT_0067e7b8)
 #include "menu_ui_init.h"         // PlayUiSoundSlot (FUN_00564570), PlayOrRewindUiSoundSlot (5645c0)
-#include "../nn/nn_error.h"             // NnErrorRunModal (FUN_00473cb0)
+#include "../nn/nn_error.h" // NnErrorRunModal (FUN_00473cb0)
 #include "page_character_select.h" // G_CharacterCreateSelection (DAT_0067bcf8)
-#include "../space/camera/space_camera.h"         // AsCamera, SpaceCameraSetHalfFovX (FUN_0040f8c0)
+#include "../space/camera/space_camera.h" // AsCamera, SpaceCameraSetHalfFovX (FUN_0040f8c0)
 #include "../space/space_scene_obj_draw.h" // SpaceCameraSetNearFar (FUN_0040fb60)
 #include "tooltip_hover.h"        // FToolTipHoverInfo
 #include "ui_rich_text_win.h"
@@ -24,7 +24,7 @@
 #include "ui_win_deform.h"
 #include "ui_win_object.h"
 #include "win3d.h"                // Win3DGetCamera (FUN_0059da60), Win3DGetMouseRay (FUN_0059da70)
-#include "../cmn/win3d_immediate.h"      // Win3DVec3Add (FUN_00423b30)
+#include "../cmn/win3d_immediate.h" // Win3DVec3Add (FUN_00423b30)
 
 #include "common_id.h"            // CreateID, ID_String
 #include "common_newchar.h"       // NewChar::TheDB, FNewCharPackage, FNewCharPilot

@@ -895,7 +895,7 @@ namespace Archetype
 
     // FUN_0041aa50(path, bForceApply, arg) — cdecl, returns cache entry*.
     // Callers: this file's companion material walk, and the mesh holder load FUN_00420dd0
-    // (space/mesh_load.cpp).
+    // (client_mesh_load.cpp).
         FCliMaterialEntry* ResolveMaterialEntry(char const* Path, bool bForceApply, unsigned Arg)
         {
             // 0x0041aa75 / 0x0041aa7e: a null or empty path -> null.

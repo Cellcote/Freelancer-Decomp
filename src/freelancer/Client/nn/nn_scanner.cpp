@@ -15,7 +15,7 @@
 #include "nn_modal.h"        // NnMainButtonOnModalOpen, NnMainButtonHasActivePanel, G_bNnScreenUp
 #include "../space/player_behavior.h" // GetPlayerObjRW (FUN_0054baf0)
 #include "../space/space_letterbox.h" // IsLetterboxVisible (FUN_0041a3e0)
-#include "../interface/win3d.h"           // Win3DFindByName (FUN_0059da10)
+#include "../interface/win3d.h" // Win3DFindByName (FUN_0059da10)
 #include "../interface/win_factory.h"
 
 // Retail WINFACTORY<NN_Scanner> DAT_00672294 "NN_Scanner" (static init LAB_004b6b30 -> ctor

@@ -15,9 +15,9 @@
 #include "effect_type_list.h"
 #include "../cmn/effect_vertex_batch.h" // G_EffectMathEngine (DAT_00674f50)
 #include "../cmn/engine_light.h"
-#include "../cmn/fade_to_black.h"       // FadeOutColoured / FadeInColoured / IsFadeOpaque (CameraParticles)
+#include "../cmn/fade_to_black.h" // FadeOutColoured / FadeInColoured / IsFadeOpaque (CameraParticles)
 #include "../game_options.h"
-#include "../globals.h"             // ShouldSkipLocalServerTick (FUN_0042d740)
+#include "../globals.h" // ShouldSkipLocalServerTick (FUN_0042d740)
 #include "../cmn/menu_sound_arch.h"
 #include "../perf_options.h"
 #include "camera/space_camera.h"

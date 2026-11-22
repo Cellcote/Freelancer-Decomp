@@ -15,36 +15,36 @@
 #include "hud_target.h"
 
 #include "../../interface/character_select_equip.h" // GetPlayerStarSystemIdRetail (FUN_004c4830)
-#include "../../nn/chat_init.h"              // ChatFindPlayerName (FUN_0046b400), ChatAcquireEntry, ...
-#include "../gameobj.h"         // FClientGameobj
-#include "../objdb.h"           // ClientObjDb_FindObject (FUN_005416c0)
-#include "../../cmn/font_imp.h"               // FindMenuFontImp (FUN_004177b0)
-#include "../../game_options.h"           // GetGameOption, Test/SetGameSessionFlags
-#include "../../globals.h"                // GetClientFrameTimeCapped (FUN_0042d680)
+#include "../../nn/chat_init.h" // ChatFindPlayerName (FUN_0046b400), ChatAcquireEntry, ...
+#include "../gameobj.h" // FClientGameobj
+#include "../objdb.h" // ClientObjDb_FindObject (FUN_005416c0)
+#include "../../cmn/font_imp.h" // FindMenuFontImp (FUN_004177b0)
+#include "../../game_options.h" // GetGameOption, Test/SetGameSessionFlags
+#include "../../globals.h" // GetClientFrameTimeCapped (FUN_0042d680)
 #include "hud_command_dispatch.h"   // HudPostCommand, SpaceSendCommand, FSpaceCommand
 #include "hud_status_core.h"        // G_HudTargetPanel (DAT_00674b04)
-#include "../../ids_rdl.h"                // RdlAppendNode, LoadIdsIntoRdl, RdlRemoveLastParagraph
-#include "../../ids_strings.h"            // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../../login_mgr.h"              // G_Server (DAT_0067ecd0)
-#include "../../interface/menu_ui_init.h"           // PlayOrRewindUiSoundSlot (FUN_005645c0)
-#include "../../interface/menu_ui_widgets.h"        // RetailU32Queue*
-#include "../../nn/nn_group_control.h"       // NnGroupSendWireMessage (FUN_0045e360)
-#include "../../nn/nn_help.h"                // NnHelp::ShowObjectInfo (FUN_004754a0)
-#include "../../nn/nn_messaging.h"           // NnVoiceEnqueue (FUN_00489e80)
-#include "../../nn/nn_text_control.h"        // NnTextControl::SetFont (FUN_0058a740)
-#include "../../nn/nn_text_scratch.h"        // G_NnTextScratchA/B (DAT_0066dc60 / DAT_0066fc60)
-#include "../../nn/nn_tooltip.h"             // NnToolTipHideGlobal (FUN_004be390)
-#include "../../nn/nn_scanner.h"             // OpenNnScanner (FUN_004b6b60)
-#include "../../nn/nn_trade.h"               // NnTradeIsOpen (DAT_006724b4 != 0)
-#include "../../nn/nn_ui_pulse.h"            // G_HudChromeColorRgba (DAT_00679bb4)
-#include "../player_behavior.h"        // GetPlayerObjRW (FUN_0054baf0)
-#include "../player_spawn.h"           // GetPlayerConnectionId (DAT_00673344)
-#include "../camera/space_camera.h"           // IsSpaceInitInProgress (FUN_0054bd40), AsCamera
-#include "../space_letterbox.h"        // IsLetterboxVisible (FUN_0041a3e0)
-#include "../star_sys.h"               // GetAttitudeClass (FUN_0045a490)
+#include "../../ids_rdl.h" // RdlAppendNode, LoadIdsIntoRdl, RdlRemoveLastParagraph
+#include "../../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../../login_mgr.h" // G_Server (DAT_0067ecd0)
+#include "../../interface/menu_ui_init.h" // PlayOrRewindUiSoundSlot (FUN_005645c0)
+#include "../../interface/menu_ui_widgets.h" // RetailU32Queue*
+#include "../../nn/nn_group_control.h" // NnGroupSendWireMessage (FUN_0045e360)
+#include "../../nn/nn_help.h" // NnHelp::ShowObjectInfo (FUN_004754a0)
+#include "../../nn/nn_messaging.h" // NnVoiceEnqueue (FUN_00489e80)
+#include "../../nn/nn_text_control.h" // NnTextControl::SetFont (FUN_0058a740)
+#include "../../nn/nn_text_scratch.h" // G_NnTextScratchA/B (DAT_0066dc60 / DAT_0066fc60)
+#include "../../nn/nn_tooltip.h" // NnToolTipHideGlobal (FUN_004be390)
+#include "../../nn/nn_scanner.h" // OpenNnScanner (FUN_004b6b60)
+#include "../../nn/nn_trade.h" // NnTradeIsOpen (DAT_006724b4 != 0)
+#include "../../nn/nn_ui_pulse.h" // G_HudChromeColorRgba (DAT_00679bb4)
+#include "../player_behavior.h" // GetPlayerObjRW (FUN_0054baf0)
+#include "../player_spawn.h" // GetPlayerConnectionId (DAT_00673344)
+#include "../camera/space_camera.h" // IsSpaceInitInProgress (FUN_0054bd40), AsCamera
+#include "../space_letterbox.h" // IsLetterboxVisible (FUN_0041a3e0)
+#include "../star_sys.h" // GetAttitudeClass (FUN_0045a490)
 #include "../../interface/win3d.h"
 #include "../../cmn/win3d_immediate.h"
-#include "../../interface/win3d_render.h"           // Win3DApplyCamera (FUN_00422950)
+#include "../../interface/win3d_render.h" // Win3DApplyCamera (FUN_00422950)
 
 #include "common_cequip.h"
 #include "common_cobject.h"

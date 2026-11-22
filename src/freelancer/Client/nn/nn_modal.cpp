@@ -9,19 +9,19 @@
 #include "float_bits.h"
 #include "../interface/character_select_equip.h" // GetPlayerBaseIdRetail (DAT_00673358), GetPlayerStarSystemIdRetail
 #include "../gf/base_market.h" // GetClientCurrentLocationBaseData (FUN_0043b630)
-#include "../globals.h"       // SetClientServerTickPause (FUN_0042d6f0), GetClientFrameTimeCapped
-#include "../space/hud/hud_comm.h"      // HudCommIsWindowOpen (FUN_004cc8d0)
-#include "../ids_strings.h"   // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../globals.h" // SetClientServerTickPause (FUN_0042d6f0), GetClientFrameTimeCapped
+#include "../space/hud/hud_comm.h" // HudCommIsWindowOpen (FUN_004cc8d0)
+#include "../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
 #include "../cmn/input_manager.h" // Get/SetClientMouseCursorDrawFlag (FUN_0041dd90 / FUN_0041dda0)
 #include "../gf/menu_universe_base.h" // GetClientCurrentBaseStridName (FUN_0043bbe0)
-#include "../interface/infocard_map.h"  // InfocardMapCreate / InfocardMapDestroy (FUN_00458790 / FUN_00458860)
+#include "../interface/infocard_map.h" // InfocardMapCreate / InfocardMapDestroy (FUN_00458790 / FUN_00458860)
 #include "knowledge_map.h" // KnowledgeMapCreate / KnowledgeMapDestroy (FUN_00459830 / FUN_00459900)
 #include "../interface/cargo_bar_control.h"
-#include "../cmn/font_string.h"   // FontStringConstruct (FUN_004144b0)
+#include "../cmn/font_string.h" // FontStringConstruct (FUN_004144b0)
 #include "../interface/menu_ui_widgets.h"
 #include "nn_rollover.h"   // NnRolloverShowHoverGlobal (FUN_004b62d0)
 #include "../interface/tooltip_hover.h" // FToolTipHoverInfo, ToolTipHoverReset (FUN_004963a0)
-#include "../gf/nav_bar.h"       // NavBarHasServiceWindow (FUN_00442720)
+#include "../gf/nav_bar.h" // NavBarHasServiceWindow (FUN_00442720)
 #include "nn_arrival_text.h"
 #include "nn_inventory.h"  // IsPlayerDockedRetail (FUN_004c4810)
 #include "nn_main_button.h"
@@ -32,10 +32,10 @@
 #include "nn_text_scratch.h" // G_NnTextScratchA/B, G_NnTextScratchCapacity
 #include "nn_ui_pulse.h"   // G_NnPaletteArgb_679b90 (DAT_00679b90)
 #include "../space/player_behavior.h" // OnMouseFlightRawMessage (FUN_004c80f0)
-#include "../gf/room_control.h"  // FRoomRuntime, GetRoomRuntimeRoomId (runtime +0x38)
+#include "../gf/room_control.h" // FRoomRuntime, GetRoomRuntimeRoomId (runtime +0x38)
 #include "../space/space_letterbox.h" // IsLetterboxVisible (FUN_0041a3e0)
-#include "../interface/win3d.h"         // Win3DDeleteTree (FUN_0043d2a0)
-#include "../interface/win_factory.h"   // WinFactoryCreate (FUN_0059db20)
+#include "../interface/win3d.h" // Win3DDeleteTree (FUN_0043d2a0)
+#include "../interface/win_factory.h" // WinFactoryCreate (FUN_0059db20)
 
 #include "common_goods.h"  // BaseData::get_base_id
 #include "common_id.h"     // CreateID, MakeLocationID

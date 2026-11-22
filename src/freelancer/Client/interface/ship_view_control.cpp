@@ -9,13 +9,13 @@
 
 #include "ship_view_control.h"
 
-#include "../cmn/engine_light.h"      // FEngineLight, EngineLight* (FUN_00410ca0 .. FUN_004114f0)
-#include "../gf/gf_object_ship.h"    // GfShipApplyCollisionDamage (FUN_004482b0)
-#include "../space/equip_visual_set.h"  // FEquipVisualSet (FUN_00457d60 .. FUN_004582c0)
-#include "../globals.h"           // GetClientFrameTimeCapped (FUN_0042d680)
-#include "../space/hud/hud_element_list.h"  // HudMatrixRotationY / RotateRows12 / RotateRows01
-#include "../space/hud/hud_target.h"        // FHudInstanceBounds, HudInverseTransformPoint
-#include "../nn/nn_ui_pulse.h"       // G_HudChromeColorRgba (DAT_00679bb4)
+#include "../cmn/engine_light.h" // FEngineLight, EngineLight* (FUN_00410ca0 .. FUN_004114f0)
+#include "../gf/gf_object_ship.h" // GfShipApplyCollisionDamage (FUN_004482b0)
+#include "../space/equip_visual_set.h" // FEquipVisualSet (FUN_00457d60 .. FUN_004582c0)
+#include "../globals.h" // GetClientFrameTimeCapped (FUN_0042d680)
+#include "../space/hud/hud_element_list.h" // HudMatrixRotationY / RotateRows12 / RotateRows01
+#include "../space/hud/hud_target.h" // FHudInstanceBounds, HudInverseTransformPoint
+#include "../nn/nn_ui_pulse.h" // G_HudChromeColorRgba (DAT_00679bb4)
 #include "../cmn/win3d_immediate.h"
 #include "win3d_render.h"      // Win3DApplyCamera (FUN_00422950)
 #include "win_factory.h"

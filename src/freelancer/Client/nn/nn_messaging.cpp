@@ -6,11 +6,11 @@
 
 #include "nn_messaging.h"
 
-#include "../cmn/menu_sound_arch.h"  // PlayClientSoundArchIfIdle (FUN_004285f0), SetClientSoundSourceType
-#include "../space/player_behavior.h"  // GetPlayerObjRW (FUN_0054baf0)
-#include "../space/space_letterbox.h"  // IsLetterboxVisible (FUN_0041a3e0)
-#include "../space/star_sys.h"         // StarSysHasVoiceMessage (FUN_00553660), StarSysPreloadVoiceMessage
-#include "../cmn/voice_profiles.h"   // LookupClientVoice (FUN_00430ab0), FVoiceProfile, FVoiceMsg
+#include "../cmn/menu_sound_arch.h" // PlayClientSoundArchIfIdle (FUN_004285f0), SetClientSoundSourceType
+#include "../space/player_behavior.h" // GetPlayerObjRW (FUN_0054baf0)
+#include "../space/space_letterbox.h" // IsLetterboxVisible (FUN_0041a3e0)
+#include "../space/star_sys.h" // StarSysHasVoiceMessage (FUN_00553660), StarSysPreloadVoiceMessage
+#include "../cmn/voice_profiles.h" // LookupClientVoice (FUN_00430ab0), FVoiceProfile, FVoiceMsg
 
 #include "common_id.h"        // CreateID
 #include "dacom.h"            // FDUMP

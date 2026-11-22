@@ -9,14 +9,14 @@
 
 #include "nn_navmap.h"
 #include "best_path.h"               // BestPathGetWaypointCount / BestPathGetWaypoint / First
-#include "../interface/character_select_equip.h"  // GetPlayerStarSystemIdRetail, GetPlayerVisitFlagsRetail
-#include "../space/hud/hud_target.h"              // NavMapSectorName (FUN_0048dc10)
-#include "../ids_rdl.h"                 // AppendTextMaybeXmlRdl (FUN_0057e2c0)
-#include "../ids_strings.h"             // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../cmn/misc_util.h"               // FmtStrSprintf (FUN_0041c970)
+#include "../interface/character_select_equip.h" // GetPlayerStarSystemIdRetail, GetPlayerVisitFlagsRetail
+#include "../space/hud/hud_target.h" // NavMapSectorName (FUN_0048dc10)
+#include "../ids_rdl.h" // AppendTextMaybeXmlRdl (FUN_0057e2c0)
+#include "../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../cmn/misc_util.h" // FmtStrSprintf (FUN_0041c970)
 #include "nn_text_scratch.h"         // DAT_0066dc60 / DAT_0066fc60 / DAT_006119f8
 #include "nn_ui_pulse.h"             // G_NnPaletteArgb_679bb0
-#include "../space/player_spawn.h"            // GetPlayerWaypointCountRetail / GetPlayerWaypointRetail
+#include "../space/player_spawn.h" // GetPlayerWaypointCountRetail / GetPlayerWaypointRetail
 #include "../interface/rich_text_win.h"
 #include "../interface/ui_scroll.h"
 #include "common_text.h"             // FmtStr, RenderDisplayList, StyleNode

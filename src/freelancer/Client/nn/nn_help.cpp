@@ -8,36 +8,36 @@
 
 #include "best_path.h"              // BestPathGetWaypoint (FUN_004c4ff0), FBestPathWaypoint
 #include "../interface/character_select_equip.h" // GetPlayerStarSystemIdRetail (FUN_004c4830),
-                                    // GetPlayerBaseIdRetail (*FUN_004c4900),
-                                    // GetPlayerVisitFlagsRetail (FUN_004c4da0)
-#include "../gf/base_market.h"     // ClientMarketFill (FUN_00437de0),
-                                    // ClientMarketCollectCategory (FUN_00437f70),
-                                    // ClientMarketGetPrice (FUN_00438060)
-#include "../space/gameobj.h"         // FClientGameobj
-#include "../space/objdb.h"           // ClientObjDb_FindObject (FUN_005416c0)
-#include "../space/hud/hud_status_core.h"        // HudSampleShieldHitPoints (FUN_004d4b50)
-#include "../space/hud/hud_target.h"             // HudObjectVisitFlags (FUN_004d4d00), HudObjectTypeIds
-                                    // (FUN_004d4d50), GetObjectIdsName (FUN_005472a0),
-                                    // GetShipPilotName (FUN_005472d0), NavMapSectorName
-                                    // (FUN_0048dc10), FHudWideText
-#include "../space/hud/hud_waypoint.h"           // GetHudWaypoint (DAT_00674bc8), GetWaypointEntry
-                                    // (FUN_004f42a0)
-#include "../ids_rdl.h"                // AppendTextMaybeXmlRdl (FUN_0057e2c0), LoadIdsIntoRdl
-                                    // (FUN_0057da40), RdlAppendNode
-#include "../ids_strings.h"            // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../interface/infocard_map.h"           // InfocardMapFind (FUN_00458890)
-#include "../gf/menu_universe_base.h"     // GetClientCurrentBaseStridName (FUN_0043bbe0)
-#include "../cmn/misc_util.h"              // FormatGroupedNumber (FUN_004779a0),
-                                    // FmtStrSprintf (FUN_0041c970)
+// GetPlayerBaseIdRetail (*FUN_004c4900),
+// GetPlayerVisitFlagsRetail (FUN_004c4da0)
+#include "../gf/base_market.h" // ClientMarketFill (FUN_00437de0),
+// ClientMarketCollectCategory (FUN_00437f70),
+// ClientMarketGetPrice (FUN_00438060)
+#include "../space/gameobj.h" // FClientGameobj
+#include "../space/objdb.h" // ClientObjDb_FindObject (FUN_005416c0)
+#include "../space/hud/hud_status_core.h" // HudSampleShieldHitPoints (FUN_004d4b50)
+#include "../space/hud/hud_target.h" // HudObjectVisitFlags (FUN_004d4d00), HudObjectTypeIds
+// (FUN_004d4d50), GetObjectIdsName (FUN_005472a0),
+// GetShipPilotName (FUN_005472d0), NavMapSectorName
+// (FUN_0048dc10), FHudWideText
+#include "../space/hud/hud_waypoint.h" // GetHudWaypoint (DAT_00674bc8), GetWaypointEntry
+// (FUN_004f42a0)
+#include "../ids_rdl.h" // AppendTextMaybeXmlRdl (FUN_0057e2c0), LoadIdsIntoRdl
+// (FUN_0057da40), RdlAppendNode
+#include "../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../interface/infocard_map.h" // InfocardMapFind (FUN_00458890)
+#include "../gf/menu_universe_base.h" // GetClientCurrentBaseStridName (FUN_0043bbe0)
+#include "../cmn/misc_util.h" // FormatGroupedNumber (FUN_004779a0),
+// FmtStrSprintf (FUN_0041c970)
 #include "../space/mission_created_solars.h" // LoadMissionCreatedSolars (FUN_00476c40)
 #include "nn_inventory.h"           // IsPlayerDockedRetail (FUN_004c4810)
 #include "nn_modal.h"               // NnMainButtonOnModalOpen (FUN_0045a460)
 #include "nn_navmap.h"              // NavMapZoneAt (FUN_004a1b50)
 #include "nn_text_scratch.h"        // G_NnTextScratchA / B, G_NnTextScratchCapacity
-#include "../space/player_behavior.h"        // GetPlayerObjRW (FUN_0054baf0)
+#include "../space/player_behavior.h" // GetPlayerObjRW (FUN_0054baf0)
 #include "../interface/rich_text_win.h"
-#include "../space/star_sys.h"               // GetAttitudeClass (FUN_0045a490)
-#include "../interface/win3d.h"                  // Win3DReparent (FUN_0059dd00), Win3DDeleteTree (FUN_0043d2a0)
+#include "../space/star_sys.h" // GetAttitudeClass (FUN_0045a490)
+#include "../interface/win3d.h" // Win3DReparent (FUN_0059dd00), Win3DDeleteTree (FUN_0043d2a0)
 #include "../interface/win_factory.h"
 
 #include "common_archetype.h"       // Archetype::GetEquipment / GetShip

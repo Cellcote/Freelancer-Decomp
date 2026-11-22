@@ -9,22 +9,22 @@
 
 #include "nn_navmap.h"
 #include "best_path.h"               // BestPathGetWaypointCount (FUN_004c4fb0)
-#include "../interface/character_select_equip.h"  // GetPlayerStarSystemIdRetail, GetPlayerVisitFlagsRetail
-#include "../cmn/font_string.h"             // FFontString (the item label's dtor)
-#include "../gf/gameflow.h"                // IsMissionBriefingNavMapUp / RequestMissionBriefingContinue
-#include "../space/hud/hud_command_dispatch.h"    // HudPostCommand (FUN_005763b0)
-#include "../ids_strings.h"             // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../login_mgr.h"               // G_Server (DAT_0067ecd0)
+#include "../interface/character_select_equip.h" // GetPlayerStarSystemIdRetail, GetPlayerVisitFlagsRetail
+#include "../cmn/font_string.h" // FFontString (the item label's dtor)
+#include "../gf/gameflow.h" // IsMissionBriefingNavMapUp / RequestMissionBriefingContinue
+#include "../space/hud/hud_command_dispatch.h" // HudPostCommand (FUN_005763b0)
+#include "../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../login_mgr.h" // G_Server (DAT_0067ecd0)
 #include "float_bits.h"
 #include "nn_modal.h"
 #include "nn_text_control.h"         // NnTextControl (+0x334 Font::String)
 #include "nn_text_scratch.h"         // DAT_0066dc60 / DAT_0066fc60 / DAT_006119f8
 #include "nn_ui_pulse.h"             // palette colours DAT_00679ba4 / DAT_00679bb0
-#include "../space/player_spawn.h"            // GetPlayerConnectionId, GetPlayerWaypointCountRetail
+#include "../space/player_spawn.h" // GetPlayerConnectionId, GetPlayerWaypointCountRetail
 #include "../interface/rich_text_win.h"
 #include "../interface/ui_scroll.h"
-#include "../interface/win3d.h"                   // Win3DReparent, Win3DDeleteTree
-#include "../interface/win3d_engine_submit.h"     // Win3DRayHitsAabbHalfExtents (FUN_005a1130)
+#include "../interface/win3d.h" // Win3DReparent, Win3DDeleteTree
+#include "../interface/win3d_engine_submit.h" // Win3DRayHitsAabbHalfExtents (FUN_005a1130)
 #include "../interface/win_factory.h"
 #include "x86math.h"                 // FTransform, I3DMathEngine
 #include "common_csys.h"             // Acquire3DMathEngine (FUN_005b73e0)

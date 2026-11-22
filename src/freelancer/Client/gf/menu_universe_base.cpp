@@ -12,16 +12,16 @@
 #include "../cmn/sound_config.h"
 #include "../interface/character_select_equip.h" // SetPlayerBaseIdRetail / SetPlayerFactionScratchRetail
 #include "gameflow.h"               // SetGameflowLocationBase (FUN_0043d590)
-#include "../login_mgr.h"              // WaitForServerResponse (FUN_005a89b0), G_bServerDisconnected
-#include "../main_command_handler.h"   // SetClientQuitRequested (FUN_005b2c50)
-#include "../interface/win3d.h"                  // Win3DFindByName (FUN_0059da10)
-#include "../interface/wincontrol_base.h"        // WinControl::SetProperty (slot 42)
+#include "../login_mgr.h" // WaitForServerResponse (FUN_005a89b0), G_bServerDisconnected
+#include "../main_command_handler.h" // SetClientQuitRequested (FUN_005b2c50)
+#include "../interface/win3d.h" // Win3DFindByName (FUN_0059da10)
+#include "../interface/wincontrol_base.h" // WinControl::SetProperty (slot 42)
 #include "nav_bar.h"                // NavBarDestroy (FUN_00442130)
-#include "../nn/nn_arrival_text.h"        // NnArrivalTextDestroy (FUN_0045b380)
-#include "../nn/nn_story_star.h"          // StoryStarForgetLastObjective (FUN_004b9b30)
-#include "../space/player_spawn.h"           // GetPlayerConnectionId (DAT_00673344)
+#include "../nn/nn_arrival_text.h" // NnArrivalTextDestroy (FUN_0045b380)
+#include "../nn/nn_story_star.h" // StoryStarForgetLastObjective (FUN_004b9b30)
+#include "../space/player_spawn.h" // GetPlayerConnectionId (DAT_00673344)
 #include "room_control.h"
-#include "../server_connect.h"         // GetLocalServerInterface (DAT_0067ecd0)
+#include "../server_connect.h" // GetLocalServerInterface (DAT_0067ecd0)
 #include "../cmn/scene_render_registry.h"
 #include "../interface/win3d_renderables.h"
 
@@ -87,7 +87,7 @@ namespace
         // HOLE as above, so the list stays empty. Read by NN_News (FUN_004a4fd0 through
         // FUN_0043a630).
         TMirrorPropertyBucket<NewsBroadcastProperties> News;          // +0x18
-        FClientMarket Market;     // +0x30 — FUN_0042abc0, filled by FUN_00437de0 (gf/base_market.h)
+        FClientMarket Market;     // +0x30 — FUN_0042abc0, filled by FUN_00437de0 (client_base_market.h)
         unsigned NewsId;          // +0x44 — the randomly picked news item, 0xffffffff = none
         unsigned StartLocationId; // +0x48 — where the base drops the player
     };

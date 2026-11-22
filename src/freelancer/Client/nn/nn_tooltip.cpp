@@ -19,7 +19,7 @@
 #include "../perf_options.h"
 #include "../space/camera/space_camera.h"
 #include "../space/space_letterbox.h"
-#include "../interface/win3d.h"              // Win3DGetMouseRay / Win3DScreenToNearPlane / Win3DTransformByMatrix
+#include "../interface/win3d.h" // Win3DGetMouseRay / Win3DScreenToNearPlane / Win3DTransformByMatrix
 #include "../interface/win3d_engine_submit.h"
 
 #include "common_csys.h"        // Acquire3DMathEngine (FUN_005b73e0)

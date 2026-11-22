@@ -13,14 +13,14 @@
 #include "../game_options.h"
 #include "../globals.h"                // GetClientFrameTimeCapped (FUN_0042d680)
 #include "../ids_strings.h"
-#include "../cmn/input_manager.h"          // GetClientSoftwareCursor (DAT_00616840 / DAT_00616844)
+#include "../cmn/input_manager.h" // GetClientSoftwareCursor (DAT_00616840 / DAT_00616844)
 #include "../interface/menu_ui_init.h"
 #include "nn_ui_pulse.h"
-#include "../space/camera/space_camera.h"           // FSpaceCamera (DAT_0067dbf8 fields)
+#include "../space/camera/space_camera.h" // FSpaceCamera (DAT_0067dbf8 fields)
 #include "../interface/text_win.h"
-#include "../interface/tooltip_hover.h"          // FToolTipHoverInfo, NnToolTipFeedHover (FUN_004be370)
+#include "../interface/tooltip_hover.h" // FToolTipHoverInfo, NnToolTipFeedHover (FUN_004be370)
 #include "../interface/win3d.h"
-#include "../interface/win3d_engine_submit.h"    // Win3DRayHitsAabbHalfExtents (FUN_005a1130)
+#include "../interface/win3d_engine_submit.h" // Win3DRayHitsAabbHalfExtents (FUN_005a1130)
 #include "../cmn/win3d_immediate.h"
 #include "../interface/win_factory.h"
 

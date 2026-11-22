@@ -8,11 +8,11 @@
 #include "objdb.h"
 
 #include "../interface/character_select_equip.h"
-#include "../cmn/cliobj.h"   // Archetype::LoadMountedEquipmentCompanions / HookUpInstanceTreeMaterials
+#include "../cmn/cliobj.h" // Archetype::LoadMountedEquipmentCompanions / HookUpInstanceTreeMaterials
 #include "fuse.h"
-#include "gameobj.h"  // FClientShipGameobj (FUN_00543380)
-#include "hud/hud_waypoint.h"    // HudWaypointOnPlayerWaypointsCleared (FUN_004f4cd0)
-#include "../interface/loading_screen.h"  // LoadingScreenStart (FUN_00579290)
+#include "gameobj.h" // FClientShipGameobj (FUN_00543380)
+#include "hud/hud_waypoint.h" // HudWaypointOnPlayerWaypointsCleared (FUN_004f4cd0)
+#include "../interface/loading_screen.h" // LoadingScreenStart (FUN_00579290)
 #include "../cmn/engine_light.h"
 #include "common_archetype.h"
 #include "common_cobject.h"
@@ -24,11 +24,11 @@
 #include "common_misc.h"     // SinglePlayer
 #include "common_universe.h"
 #include "gate_tunnel.h"     // GateTunnelIniLoad (FUN_004fe1c0)
-#include "../login_mgr.h"       // G_Server (DAT_0067ecd0)
-#include "../globals.h"         // g_display.gate_tunnels (DAT_0067a22c)
+#include "../login_mgr.h" // G_Server (DAT_0067ecd0)
+#include "../globals.h" // g_display.gate_tunnels (DAT_0067a22c)
 #include "../interface/menu_keymap_config.h"
-#include "../cmn/menu_sound_arch.h"  // PreloadClientSoundArchesByCategory (FUN_0042acb0)
-#include "../nn/nn_modal.h"         // NnSystemInit (FUN_0045a100)
+#include "../cmn/menu_sound_arch.h" // PreloadClientSoundArchesByCategory (FUN_0042acb0)
+#include "../nn/nn_modal.h" // NnSystemInit (FUN_0045a100)
 #include "../server_connect.h"
 #include "camera/space_camera.h"
 #include "space_scene_load.h"
@@ -45,7 +45,7 @@
 namespace
 {
     // Retail globals touched by FUN_0054b520 / FUN_0054ab40.
-    // DAT_0067337c (ship archetype) lives in interface/character_select_equip.cpp.
+    // DAT_0067337c (ship archetype) lives in character_select_equip.cpp.
     static unsigned G_PlayerCharacterId = 0;       // DAT_00673378
     static unsigned G_PlayerConnectionId = 0;        // DAT_00673344
     static unsigned G_PlayerShipCharMirror = 0;    // DAT_00679774
@@ -55,11 +55,11 @@ namespace
     static BaseWatcher G_PlayerShipWatcher;
     // DAT_00678b96 -- cleared by FUN_0054b520 before IServer::PlayerLaunch (0x0054b867), set
     // by the IClient launch handler (0x0053d87e / 0x0053d8da), waited on by FUN_0054ab40
-    // (FUN_005a89b0 at 0x0054ae30, space/space_state.cpp InitSpaceState). A byte, because the wait
+    // (FUN_005a89b0 at 0x0054ae30, space_state.cpp InitSpaceState). A byte, because the wait
     // takes it by address.
     static unsigned char G_bPlayerLaunchAcknowledged = 0;
 
-    // DAT_00672978 (99 records of 0x18, FPlayerWaypointRecord in space/player_spawn.h) and
+    // DAT_00672978 (99 records of 0x18, FPlayerWaypointRecord in player_spawn.h) and
     // DAT_00673374 (the count). The six accessors FUN_004c4690..FUN_004c4780 are public below.
     static constexpr int kMaxPlayerWaypoints = 0x63;
     static FPlayerWaypointRecord G_PlayerWaypoints[kMaxPlayerWaypoints] = {};
@@ -69,7 +69,7 @@ namespace
     static unsigned G_PlayerWaypointTailTag = 0;
 
     // DAT_00673348 / DAT_0067334c / DAT_00673350 -- the multiplayer group mission-offer answer
-    // (space/player_spawn.h). FUN_004c55b0 zeroes all three; IClient slot 114 stores the first two;
+    // (player_spawn.h). FUN_004c55b0 zeroes all three; IClient slot 114 stores the first two;
     // the offer sequence at 0x004559b0 stores the third (0x00455a07) and FUN_004557d0 clears it.
     static unsigned G_MissionOfferAnswered = 0;              // DAT_00673348
     static unsigned G_MissionOfferAcceptorId = 0;            // DAT_0067334c

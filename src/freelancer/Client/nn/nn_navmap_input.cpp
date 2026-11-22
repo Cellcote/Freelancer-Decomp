@@ -10,26 +10,26 @@
 
 #include "nn_navmap.h"
 #include "best_path.h"               // G_BestPaths (DAT_00672950), BestPathGetFirst / HasText
-#include "../interface/character_select_equip.h"  // GetPlayerStarSystemIdRetail, GetPlayerVisitFlagsRetail
+#include "../interface/character_select_equip.h" // GetPlayerStarSystemIdRetail, GetPlayerVisitFlagsRetail
 #include "commodity_by_base.h"       // IsCommodityByBaseListedName (FUN_004a2310)
-#include "../gf/gameflow.h"                // RequestMissionBriefingContinue (FUN_0043d580)
-#include "../space/hud/hud_command_dispatch.h"    // FSpaceCommand, SpaceSendCommand (FUN_0054bcb0)
-#include "../space/hud/hud_waypoint.h"            // HudWaypointSelectPlayerWaypoint / BestPath
-#include "../ids_rdl.h"                 // AppendTextMaybeXmlRdl (FUN_0057e2c0), LoadIdsIntoRdl
-#include "../ids_strings.h"             // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../interface/infocard_map.h"            // InfocardMapFind (FUN_00458890)
+#include "../gf/gameflow.h" // RequestMissionBriefingContinue (FUN_0043d580)
+#include "../space/hud/hud_command_dispatch.h" // FSpaceCommand, SpaceSendCommand (FUN_0054bcb0)
+#include "../space/hud/hud_waypoint.h" // HudWaypointSelectPlayerWaypoint / BestPath
+#include "../ids_rdl.h" // AppendTextMaybeXmlRdl (FUN_0057e2c0), LoadIdsIntoRdl
+#include "../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../interface/infocard_map.h" // InfocardMapFind (FUN_00458890)
 #include "nn_help.h"                 // NnHelpAppendBaseGoods (FUN_00476080)
-#include "../cmn/input_manager.h"           // GetClientSoftwareCursor (DAT_00616840 / DAT_00616844)
-#include "../login_mgr.h"               // G_Server (DAT_0067ecd0)
-#include "../interface/menu_ui_init.h"            // PlayOrRewindUiSoundSlot (FUN_005645c0)
-#include "../cmn/misc_util.h"               // FmtStrSprintf (FUN_0041c970)
+#include "../cmn/input_manager.h" // GetClientSoftwareCursor (DAT_00616840 / DAT_00616844)
+#include "../login_mgr.h" // G_Server (DAT_0067ecd0)
+#include "../interface/menu_ui_init.h" // PlayOrRewindUiSoundSlot (FUN_005645c0)
+#include "../cmn/misc_util.h" // FmtStrSprintf (FUN_0041c970)
 #include "nn_inventory.h"            // IsPlayerDockedRetail (FUN_004c4810)
 #include "nn_modal.h"                // NnMainButtonOnModalOpen (FUN_0045a460)
 #include "nn_story_star.h"           // StoryStarReset (FUN_004b9bb0)
 #include "nn_text_scratch.h"         // DAT_0066dc60 / DAT_0066fc60 / DAT_006119f8
 #include "nn_tooltip.h"              // NnToolTipHideGlobal (FUN_004be390)
-#include "../space/player_behavior.h"         // GetPlayerObjRW (FUN_0054baf0)
-#include "../space/player_spawn.h"            // the player's waypoints, RequestBestPathRetail
+#include "../space/player_behavior.h" // GetPlayerObjRW (FUN_0054baf0)
+#include "../space/player_spawn.h" // the player's waypoints, RequestBestPathRetail
 #include "../interface/rich_text_win.h"
 #include "../interface/ui_scroll.h"
 #include "common_cobject.h"          // CObject::beam_object
@@ -49,7 +49,7 @@
 namespace
 {
     // DAT_005d3dc8 (double) -- the map plane's depth in front of the camera (the same constant
-    // FUN_00492410 uses; nn/nn_navmap_update.cpp).
+    // FUN_00492410 uses; nn_navmap_update.cpp).
     double const kNavMapPlaneDepth = -0.55;
     // DAT_005d2edc -- a view switch's transition time.
     float const kNavMapViewSwitchSeconds = 0.4f;

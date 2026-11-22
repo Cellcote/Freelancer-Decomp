@@ -14,26 +14,26 @@
                                     // GetPlayerBaseIdRetail (DAT_00673358 via FUN_004c4900),
                                     // GetPlayerSpawnSystemIdRetail (FUN_004c4670)
 #include "../space/hud/hud_command_dispatch.h"   // HudPostCommand (FUN_005763b0)
-#include "../space/hud/hud_weapon_groups.h"      // G_WeaponGroups (DAT_00674c0c)
-#include "../ids_strings.h"            // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../login_mgr.h"              // G_Server (DAT_0067ecd0)
-#include "../interface/menu_ui_widgets.h"        // HudMessageQueueRequestRankRefresh (FUN_004c55f0)
-#include "../gf/menu_universe_base.h"     // GetClientLocationCurrentBase (DAT_0066873c)
-#include "../cmn/misc_util.h"              // FormatGroupedNumber (FUN_004779a0)
-#include "../gf/nav_bar.h"                // NavBarOpenButton (FUN_00442200), NavBarRefreshRepairTab (FUN_004427e0)
+#include "../space/hud/hud_weapon_groups.h" // G_WeaponGroups (DAT_00674c0c)
+#include "../ids_strings.h"         // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../login_mgr.h"           // G_Server (DAT_0067ecd0)
+#include "../interface/menu_ui_widgets.h" // HudMessageQueueRequestRankRefresh (FUN_004c55f0)
+#include "../gf/menu_universe_base.h" // GetClientLocationCurrentBase (DAT_0066873c)
+#include "../cmn/misc_util.h"       // FormatGroupedNumber (FUN_004779a0)
+#include "../gf/nav_bar.h" // NavBarOpenButton (FUN_00442200), NavBarRefreshRepairTab (FUN_004427e0)
 #include "nn_messaging.h"           // NnVoiceEnqueue (FUN_00489e80)
 #include "float_bits.h"
 #include "nn_modal.h"
 #include "nn_text_scratch.h"        // DAT_0066dc60 / DAT_0066fc60 / DAT_006119f8
 #include "nn_text_control.h"        // NnTextControl::GetFontString (Font::String +0x334)
 #include "nn_ui_pulse.h"            // G_NnPaletteArgb_679bac (DAT_00679bac)
-#include "../space/player_spawn.h"           // GetPlayerConnectionId (DAT_00673344)
+#include "../space/player_spawn.h" // GetPlayerConnectionId (DAT_00673344)
 #include "../interface/rich_text_win.h"
 #include "../interface/ship_view_control.h"
 #include "../interface/ui_scroll.h"
-#include "../interface/win3d.h"                  // Win3DFindByName (FUN_0059da10)
+#include "../interface/win3d.h" // Win3DFindByName (FUN_0059da10)
 #include "../interface/win_factory.h"
-#include "../interface/wire_controls.h"          // WireStaticControl::SoundSlot (+0x380)
+#include "../interface/wire_controls.h" // WireStaticControl::SoundSlot (+0x380)
 
 #include "common_archetype.h"       // Archetype::Gun / Munition (the equipment sort)
 #include "common_goods.h"           // Good2Arch / Arch2Good / GoodList

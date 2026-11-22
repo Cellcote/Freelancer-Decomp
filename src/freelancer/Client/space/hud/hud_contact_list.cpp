@@ -6,36 +6,36 @@
 
 #include "hud_contact_list.h"
 
-#include "../../nn/best_path.h"               // BestPath* (FUN_004c4fb0 / 004c4ff0 / 004c5110 / 004c52d0)
-#include "../../interface/character_select_equip.h"  // GetPlayerStarSystemIdRetail (FUN_004c4830), character name
-#include "../gameobj.h"          // FClientGameobj, GameobjWatchList (DAT_0066d33c)
-#include "../mesh_load.h"        // Win3DModelCachePreload (FUN_0059e980)
-#include "../objdb.h"            // ClientObjDb_* (FUN_00540fc0 / 00540a00 / 005416c0 ...)
-#include "../../cmn/font_imp.h"                // FindMenuFontImp (FUN_004177b0)
-#include "../../cmn/font_string.h"             // FontStringSetFont / SetScale / SetText
-#include "../../game_options.h"            // GetGameOption (FUN_005792b0)
-#include "../../globals.h"                 // GetClientFrameTimeCapped, ShouldSkipLocalServerTick
-#include "../../widescreen.h"   // PORT(widescreen)
+#include "../../nn/best_path.h"      // BestPath* (FUN_004c4fb0 / 004c4ff0 / 004c5110 / 004c52d0)
+#include "../../interface/character_select_equip.h" // GetPlayerStarSystemIdRetail (FUN_004c4830), character name
+#include "../gameobj.h" // FClientGameobj, GameobjWatchList (DAT_0066d33c)
+#include "../mesh_load.h" // Win3DModelCachePreload (FUN_0059e980)
+#include "../objdb.h" // ClientObjDb_* (FUN_00540fc0 / 00540a00 / 005416c0 ...)
+#include "../../cmn/font_imp.h" // FindMenuFontImp (FUN_004177b0)
+#include "../../cmn/font_string.h" // FontStringSetFont / SetScale / SetText
+#include "../../game_options.h" // GetGameOption (FUN_005792b0)
+#include "../../globals.h" // GetClientFrameTimeCapped, ShouldSkipLocalServerTick
+#include "../../widescreen.h" // PORT(widescreen)
 #include "hud_comm.h"                // HudCommIsWatchedObjectId (FUN_004cc880)
 #include "hud_command_dispatch.h"    // FSpaceCommand, SpaceSendCommand (FUN_0054bcb0)
 #include "hud_status_core.h"         // G_HudTargetPanel (DAT_00674b04)
 #include "hud_target.h"              // HudTarget, HudReputationColor, HudIsUnvisitedSolar ...
 #include "hud_waypoint.h"            // GetHudWaypoint (DAT_00674bc8), HudWaypointSelect*
-#include "../../ids_strings.h"             // GetIdsStringWWithRawFallback (FUN_004347e0)
-#include "../../cmn/input_manager.h"           // cursor flag / position (FUN_0041dd90, DAT_00616840)
-#include "../../interface/menu_ui_init.h"            // PlayOrRewindUiSoundSlot (FUN_005645c0)
-#include "../../interface/menu_ui_widgets.h"         // RetailU32QueueSize / At (FUN_004c5890 / 004c58b0)
-#include "../../cmn/misc_util.h"               // FmtStrSprintf (FUN_0041c970)
-#include "../../nn/nn_button_control.h"       // NnButtonControl::MontageTile (+0x338)
-#include "../../nn/nn_montage_draw.h"         // FindButtonMontageTile (FUN_0055a360)
-#include "../../nn/nn_text_control.h"         // NnTextControl (+0x334 Font::String)
-#include "../../nn/nn_ui_pulse.h"             // NnUiPulseBlendFromArgb (FUN_00561f20), palette
-#include "../player_behavior.h"         // GetPlayerObjRW (FUN_0054baf0)
-#include "../player_spawn.h"            // player waypoints (FUN_004c4690 / 004c46a0)
-#include "../camera/space_camera.h"            // FSpaceCamera
-#include "../space_letterbox.h"         // IsLetterboxVisible (FUN_0041a3e0)
+#include "../../ids_strings.h" // GetIdsStringWWithRawFallback (FUN_004347e0)
+#include "../../cmn/input_manager.h" // cursor flag / position (FUN_0041dd90, DAT_00616840)
+#include "../../interface/menu_ui_init.h" // PlayOrRewindUiSoundSlot (FUN_005645c0)
+#include "../../interface/menu_ui_widgets.h" // RetailU32QueueSize / At (FUN_004c5890 / 004c58b0)
+#include "../../cmn/misc_util.h" // FmtStrSprintf (FUN_0041c970)
+#include "../../nn/nn_button_control.h" // NnButtonControl::MontageTile (+0x338)
+#include "../../nn/nn_montage_draw.h" // FindButtonMontageTile (FUN_0055a360)
+#include "../../nn/nn_text_control.h" // NnTextControl (+0x334 Font::String)
+#include "../../nn/nn_ui_pulse.h" // NnUiPulseBlendFromArgb (FUN_00561f20), palette
+#include "../player_behavior.h" // GetPlayerObjRW (FUN_0054baf0)
+#include "../player_spawn.h" // player waypoints (FUN_004c4690 / 004c46a0)
+#include "../camera/space_camera.h" // FSpaceCamera
+#include "../space_letterbox.h" // IsLetterboxVisible (FUN_0041a3e0)
 #include "../../interface/ui_scroll.h"
-#include "../../interface/win3d.h"                   // Win3DGetCamera, Win3DTransformByMatrix
+#include "../../interface/win3d.h" // Win3DGetCamera, Win3DTransformByMatrix
 #include "x86math.h"                 // FVector, FMatrix, I3DMathEngine
 
 #include "common_archetype.h"

@@ -27,16 +27,16 @@
 #include "common_ini.h"
 #include "dacom.h"
 #include "engine/engbase.h"
-#include "../gameobj.h"   // FClientShipGameobj (+0x158 / +0x188, slot 0x18c)
-#include "../../cmn/engine_light.h"     // EngineLightClearRegisteredList / EngineLightSetAmbientRgbBytes
-#include "../../game_options.h"     // GetGameOption (FUN_005792b0)
-#include "../../globals.h"          // CopyBoundedString (FUN_00417c50)
-#include "../jump_effect.h"      // FJumpShipEffect::Ambient (FUN_00504870)
-#include "../player_behavior.h"  // GetPlayerObjRW (FUN_0054baf0)
-#include "../hud/hud_target.h"       // HudIsMousePickBlocked (FUN_0045a740)
-#include "../../perf_options.h"     // FindPerfOption (FUN_005b36b0)
+#include "../gameobj.h" // FClientShipGameobj (+0x158 / +0x188, slot 0x18c)
+#include "../../cmn/engine_light.h" // EngineLightClearRegisteredList / EngineLightSetAmbientRgbBytes
+#include "../../game_options.h" // GetGameOption (FUN_005792b0)
+#include "../../globals.h" // CopyBoundedString (FUN_00417c50)
+#include "../jump_effect.h" // FJumpShipEffect::Ambient (FUN_00504870)
+#include "../player_behavior.h" // GetPlayerObjRW (FUN_0054baf0)
+#include "../hud/hud_target.h" // HudIsMousePickBlocked (FUN_0045a740)
+#include "../../perf_options.h" // FindPerfOption (FUN_005b36b0)
 #include "../space_scene_obj_draw.h" // SpaceObjDrawPass (FUN_0051c200), FUN_0051c970 / FUN_0051c9e0
-#include "../../interface/win3d_render.h"     // ClearWin3DBuffers (FUN_004215e0)
+#include "../../interface/win3d_render.h" // ClearWin3DBuffers (FUN_004215e0)
 #include "x86math.h"
 
 #include <cstddef>
