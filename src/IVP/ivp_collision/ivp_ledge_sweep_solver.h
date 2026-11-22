@@ -15,7 +15,7 @@
 //
 //   1. 0x0635cbd0-0x0635d360 (items 3348-3354): the "IVP Broadphase" grid/
 //      octree insertion, query and removal logic already covered by a full
-//      behavioral (non-1:1) rewrite in src/Common/common_physys.cpp -- see
+//      behavioral (non-1:1) rewrite in src/Common/physics/physys.cpp -- see
 //      that file's own "IVP Broadphase" comment header and the per-item
 //      decomp-tracker notes for the exact retail formulas recovered this
 //      pass. Marked `skipped` there, not ported here.

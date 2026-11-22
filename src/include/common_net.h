@@ -655,10 +655,10 @@ struct COMMON_API AsteroidExclusionZone
     // config value: update_dist() (Common.dll.c 94101-94154) overwrites it every call with
     // (distance-to-observer minus zone radius)^2 (or 0 if inside/unrecognized shape), and
     // AsteroidExclusionZoneMgr::is_cliasteroid_excluded/is_cmnasteroid_excluded
-    // (common_exclusionzone.cpp) compare it against the Mgr's static MaxCliDist/MaxDynDist. Ctor default
+    // (Common/universe/exclusionzone.cpp) compare it against the Mgr's static MaxCliDist/MaxDynDist. Ctor default
     // 10000000.0f (0x4b189680) is a "far away" sentinel before the first update_dist call.
     float         MaxDistSq;          // +0x04
-    unsigned char bExcludeBillboards; // +0x08 — read by is_billboard_excluded (common_exclusionzone.cpp)
+    unsigned char bExcludeBillboards; // +0x08 — read by is_billboard_excluded (Common/universe/exclusionzone.cpp)
     // +0x09 — a SECOND, separate per-zone bool flag, distinct from bExcludeBillboards. Confirmed
     // by direct disasm cross-check (Common.dll.txt is_dynamic_asteroid_excluded @0x5c370 and the
     // inlined AsteroidExclusionZoneMgr::is_excluded case-3 body @0x5be70 both read byte[Zone+0x9]
@@ -705,7 +705,7 @@ struct COMMON_API NebulaExclusionZone
     // per-zone config limit here -- update_dist() (Common.dll.c 94511-94545) overwrites it every
     // call with the current shell-distance-squared (0 if inside the shell, computed distance^2
     // otherwise), and NebulaExclusionZoneMgr::is_in_exclusion_zone reads it back as a live proximity
-    // cache (`Zone->MaxDistSq <= 10.0f`, common_exclusionzone.cpp). Ctor default 10000000.0f
+    // cache (`Zone->MaxDistSq <= 10.0f`, Common/universe/exclusionzone.cpp). Ctor default 10000000.0f
     // (0x4b189680) is just a "far away" sentinel before the first update_dist call.
     float         MaxDistSq;          // +0x04
     // "fog_far" from the nebula INI: get_fog_far .text:06261da0 (FLD [this+8]) and

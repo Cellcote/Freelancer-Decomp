@@ -127,7 +127,7 @@ COMMON_API _GUID* __cdecl ParseGUID(char const* Text, _GUID* Out);
 // ============================================================================
 
 // FUN_062df7f0 (the unexported fast inverse square root) is ported next to its only two
-// callers as FastInvSqrtX87 in common_airaycast.cpp.
+// callers as FastInvSqrtX87 in Common/ai/airaycast.cpp.
 
 // ============================================================================
 // Frustum/sphere culling (Universe::IZone intersection tests)
@@ -145,7 +145,7 @@ COMMON_API bool __cdecl SphereCull(Geometry::Sphere const& Sphere, Universe::IZo
 
 // Retail layout, sizeof 0x8C: operator= (06262e10) copies 0x23 dwords; File::File
 // (0630b270) zeroes Name[0], +0x80, +0x84, +0x88. The ErrorHandler log node embeds one at
-// +0x14 (common_errorhandler.cpp). The members are public because the ErrorHandler code in the
+// +0x14 (Common/core/errorhandler.cpp). The members are public because the ErrorHandler code in the
 // same module reads Handle (+0x80 of the File, node +0x94) directly.
 class COMMON_API File
 {
@@ -308,7 +308,7 @@ FL_LAYOUT_ASSERT(sizeof(DamageEntry) == 0xC, "DamageEntry sizeof 0xC (retail, se
 
 // Retail Common.dll exports every member of this STL instantiation (VC6 std::list, 55
 // members, imported by name by FreeLancer.exe, Server.dll and rpclocal.dll). The port
-// exports the modern MSVC instantiation instead: the definition is in common_damagelist.cpp; other modules
+// exports the modern MSVC instantiation instead: the definition is in Common/object/damagelist.cpp; other modules
 // import it through this declaration. It must precede the first use that would implicitly
 // instantiate the class, which is why it sits directly after the element type.
 #ifndef COMMON_EXPORTS
@@ -410,7 +410,7 @@ COMMON_API extern ID_String SND_CARGO_JETTISONED;
 COMMON_API extern ID_String SpaceflightLocationID;
 
 // Constants
-// Values: NONE=0, ROOT=1, POWER=2 -- see common_misc.cpp for the retail-address verification note.
+// Values: NONE=0, ROOT=1, POWER=2 -- see Common/core/misc.cpp for the retail-address verification note.
 COMMON_API extern unsigned short const SUBOBJ_ID_NONE;   // .rdata:063a4aa4
 COMMON_API extern unsigned short const SUBOBJ_ID_ROOT;   // .rdata:063a4aa6
 COMMON_API extern unsigned short const SUBOBJ_ID_POWER;  // .rdata:063a4aa8
@@ -419,7 +419,7 @@ COMMON_API extern unsigned short const SUBOBJ_ID_POWER;  // .rdata:063a4aa8
 // `unsigned int const` (?SMM_TIMEOUT@@3IB ord 1949, ?SMM_CHANGE_STATE@@3IB ord 1948) but leaves
 // the .data slots uninitialised in the image and fills them from a CRT static initialiser that
 // inlines StateMachineMessage::GenerateUniqueMessageType() (.text:06332f70). Values are pinned
-// to 1 and 2 by CRT-table slot order -- see the derivation note in common_misc.cpp, where the
+// to 1 and 2 by CRT-table slot order -- see the derivation note in Common/core/misc.cpp, where the
 // definition order is load-bearing.
 COMMON_API extern unsigned const SMM_TIMEOUT;            // .data:0640a764 (assigned 2)
 COMMON_API extern unsigned const SMM_CHANGE_STATE;       // .data:0640a768 (assigned 1)
@@ -455,7 +455,7 @@ COMMON_API void __cdecl BuildDirectory(char const* Path);
 COMMON_API void __cdecl DebugPrint(char const* Format, ...);
 
 // CmnMisc.cpp file-system paths, single-player flag and CleanUpDatabases, defined in
-// common_misc.cpp. (SetIsMPServer / IsMPServer are declared in common_net.h.)
+// Common/core/misc.cpp. (SetIsMPServer / IsMPServer are declared in common_net.h.)
 struct IFileSystem;
 
 // Common.dll.c @ 0xa3220 / 0xa3210 — not Timing. Default GbSinglePlayer = true (.data 01h).

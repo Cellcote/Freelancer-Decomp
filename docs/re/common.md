@@ -148,7 +148,7 @@ sphere/ellipsoid/box/cylinder/ring/mesh, `size`, `edge_fraction`, `property_flag
 `[Object]` (`nickname`, `archetype`, `pos`, `base`, `dock_with`, `goto`, `reputation`, `next_ring`/
 `prev_ring`, `star`, `visit`). `goto` puts the object into the gate map (`get_gate_system`); the gate type
 is taken from the `OBJECT_TYPE` of the solar archetype. The zones of a system are gathered into a BSP
-partition (`ISpatialPartition`, `common_spatial.cpp`, built in `SYSTEM::BuildZoneTree`). Queries:
+partition (`ISpatialPartition`, `Common/physics/spatial.cpp`, built in `SYSTEM::BuildZoneTree`). Queries:
 `get_system/get_base/get_zone(+_id)`, `GetFirst/NextSystem/Base`, `first_zone/next_zone`.
 
 ## Reputation, costumes

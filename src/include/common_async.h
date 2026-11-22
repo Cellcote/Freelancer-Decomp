@@ -11,7 +11,7 @@
 #include <cstddef>
 #include <windows.h> // HANDLE
 
-// Async -- defined in common_async.cpp.
+// Async -- defined in Common/core/async.cpp.
 namespace Async
 {
     COMMON_API void __cdecl Startup();

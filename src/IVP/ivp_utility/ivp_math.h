@@ -268,7 +268,7 @@ inline double IVP_InvSqrtFloat(float Value)
 // FUN_0628bed0 (thiscall on Out, RET 8): Out = A x B. All six products stay on the x87 stack;
 // x = (a.y*b.z) - (a.z*b.y), y = (b.x*a.z) - (a.x*b.z), z = (a.x*b.y) - (a.y*b.x), each rounded
 // to float at its store; every operand is read before the first store (alias-safe). The
-// PhySys copy of the same retail function is PhySys_Vec3Cross (common_physys.cpp, on Vector).
+// PhySys copy of the same retail function is PhySys_Vec3Cross (Common/physics/physys.cpp, on Vector).
 inline void IVP_CalcCrossProduct(IVP_U_Point* Out, const IVP_U_Point* A, const IVP_U_Point* B)
 {
     const double Ax = A->k[0], Ay = A->k[1], Az = A->k[2];

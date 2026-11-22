@@ -123,19 +123,19 @@ The repeated `[Data] fuses` keys (dev ini: `fx\fuse.ini` and `fx\fuse_*.ini`) ar
 
 **Structure.** A file is a series of `[fuse]` sections each followed by *action* sections, until the next `[fuse]` ([ServerFuse::Read, L82](../../src/Server/server_fuse.cpp#L82)). Headers other than `fuse` that appear outside a fuse are skipped. The fuse is stored under its `name`; if a fuse with the same name was already loaded the later one is discarded (first wins). An action section whose header is not in the list below is ignored. Actions are ordered by their trigger time `at_t`.
 
-### `[fuse]`  ([common_fuses.cpp:538](../../src/Common/common_fuses.cpp#L538))
+### `[fuse]`  ([Common/equip/fuses.cpp:538](../../src/Common/equip/fuses.cpp#L538))
 
 | Key | Type | Default | Meaning | Source |
 |---|---|---|---|---|
-| `name` | id (whole value) | 0 | Fuse nickname. | [L551](../../src/Common/common_fuses.cpp#L550) |
-| `lifetime` | float | -1.0 | Duration of the fuse in seconds; the burn position advances by `dt / lifetime`. Not validated (a value of 0 or less is used as is). | [L553](../../src/Common/common_fuses.cpp#L552) |
-| `death_fuse` | bool | false | The fuse is a death fuse. | [L555](../../src/Common/common_fuses.cpp#L554) |
+| `name` | id (whole value) | 0 | Fuse nickname. | [L551](../../src/Common/equip/fuses.cpp#L550) |
+| `lifetime` | float | -1.0 | Duration of the fuse in seconds; the burn position advances by `dt / lifetime`. Not validated (a value of 0 or less is used as is). | [L553](../../src/Common/equip/fuses.cpp#L552) |
+| `death_fuse` | bool | false | The fuse is a death fuse. | [L555](../../src/Common/equip/fuses.cpp#L554) |
 
 ### Keys of every action section
 
 | Key | Type | Default | Meaning | Source |
 |---|---|---|---|---|
-| `at_t` | float `[0]`, optional float `[1]` | -1.0 (unset) | Trigger position along the fuse timeline (0..1 of the lifetime). With a second value the position is a **random** value between the two, picked when the fuse ignites. | [common_fuses.cpp:448](../../src/Common/common_fuses.cpp#L448) |
+| `at_t` | float `[0]`, optional float `[1]` | -1.0 (unset) | Trigger position along the fuse timeline (0..1 of the lifetime). With a second value the position is a **random** value between the two, picked when the fuse ignites. | [Common/equip/fuses.cpp:448](../../src/Common/equip/fuses.cpp#L448) |
 
 ### Action sections
 

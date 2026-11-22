@@ -11,7 +11,7 @@
 
 // Common.dll spatial partitions: NewSpatial / FreeSpatial and the two concrete partitions
 // behind them, BspPartition ("BSP") and LinearPartition ("Linear"). The implementation is
-// src/Common/common_spatial.cpp.
+// src/Common/physics/spatial.cpp.
 
 namespace Geometry { struct Sphere; struct Frustum; } // common_misc.h
 

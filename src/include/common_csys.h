@@ -88,7 +88,7 @@ COMMON_API Csys __cdecl operator*(Csys const& Left, Csys const& Right);
 
 // Port helpers, not retail exports. MatrixSetIdentity is header-inline (every module that
 // needs an identity 3x3 compiles its own, as retail's inline Matrix code did);
-// CsysFromPosOrient is Common.dll-internal (common_roomdata.cpp only).
+// CsysFromPosOrient is Common.dll-internal (Common/universe/roomdata.cpp only).
 inline void MatrixSetIdentity(Matrix& Out)
 {
     unsigned Row = 0;
@@ -129,8 +129,8 @@ COMMON_API Matrix __cdecl GetDirectionMatrix(Transform const& Xform, Vector cons
 // Retail signature is thiscall `void(Matrix const* this, Vector* Out)`, writing
 // Out->x/y/z = this->E[0][2]/E[1][2]/E[2][2] -- the RAW column 2 of an orthonormal
 // 3x3, with NO sign flip. Contrast with the many already-inlined "Forward =
-// -E[*][2]" sites elsewhere in this port (common_cobject.cpp, common_cequip.cpp,
-// common_aisteer.cpp), which negate column 2 for a forward-facing convention;
+// -E[*][2]" sites elsewhere in this port (Common/object/cobject.cpp, Common/equip/cequip.cpp,
+// Common/ai/aisteer.cpp), which negate column 2 for a forward-facing convention;
 // this helper does not negate. Ported as a plain by-value accessor.
 // Unexported in retail (FUN_*): Common.dll-internal, no caller outside Common.dll.
 Vector __cdecl MatrixColumn2(Matrix const& M);
@@ -150,7 +150,7 @@ Vector __cdecl MatrixColumn0(Matrix const& M);
 // return-pointer convention, this one reading raw column 1 (E[0][1]/E[1][1]/
 // E[2][1], no sign flip). Previously left `simplified` (decomp-tracker item
 // 1717) for lack of a concrete caller to attach it to; resolved while porting
-// FUN_062e1f40/FUN_062e0a60 (src/Common/common_aisteer.cpp), which both call it
+// FUN_062e1f40/FUN_062e0a60 (src/Common/ai/aisteer.cpp), which both call it
 // via the already-ported MatrixColumn0/MatrixColumn2 pattern.
 // Unexported in retail (FUN_*): Common.dll-internal, no caller outside Common.dll.
 Vector __cdecl MatrixColumn1(Matrix const& M);

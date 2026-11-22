@@ -270,14 +270,14 @@ File layout: a `[fuse]` section starts a fuse; every following section up to the
 
 ### 5.1 `[fuse]` and keys common to all actions
 
-These are implemented in Common ([common_fuses.cpp:538](../../src/Common/common_fuses.cpp#L538), [:448](../../src/Common/common_fuses.cpp#L448)) and shared with the server; see [world-data.md](world-data.md).
+These are implemented in Common ([Common/equip/fuses.cpp:538](../../src/Common/equip/fuses.cpp#L538), [:448](../../src/Common/equip/fuses.cpp#L448)) and shared with the server; see [world-data.md](world-data.md).
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `name` (`[fuse]`) | id (`str`) | empty | Fuse nickname (key of the database). | [common_fuses.cpp:550](../../src/Common/common_fuses.cpp#L550) |
-| `lifetime` (`[fuse]`) | float | -1 | Duration in seconds; the burn progress advances by `dt / lifetime`. Not validated. | [common_fuses.cpp:552](../../src/Common/common_fuses.cpp#L552) |
-| `death_fuse` (`[fuse]`) | bool | false | The fuse is a death fuse. | [common_fuses.cpp:554](../../src/Common/common_fuses.cpp#L554) |
-| `at_t` (every action) | float, optional second float | 0 | Trigger time. With a second value the time is a random choice in the range `[first, second]`. Handled before the action's own keys. | [common_fuses.cpp:453](../../src/Common/common_fuses.cpp#L453) |
+| `name` (`[fuse]`) | id (`str`) | empty | Fuse nickname (key of the database). | [Common/equip/fuses.cpp:550](../../src/Common/equip/fuses.cpp#L550) |
+| `lifetime` (`[fuse]`) | float | -1 | Duration in seconds; the burn progress advances by `dt / lifetime`. Not validated. | [Common/equip/fuses.cpp:552](../../src/Common/equip/fuses.cpp#L552) |
+| `death_fuse` (`[fuse]`) | bool | false | The fuse is a death fuse. | [Common/equip/fuses.cpp:554](../../src/Common/equip/fuses.cpp#L554) |
+| `at_t` (every action) | float, optional second float | 0 | Trigger time. With a second value the time is a random choice in the range `[first, second]`. Handled before the action's own keys. | [Common/equip/fuses.cpp:453](../../src/Common/equip/fuses.cpp#L453) |
 
 ### 5.2 `[start_explosion]`
 

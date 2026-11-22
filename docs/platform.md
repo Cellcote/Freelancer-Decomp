@@ -1,6 +1,6 @@
 # Platform layer
 
-`src/include/platform.h` (and `platform_folders.h` for per-user folders) puts the operating-system
+`src/include/platform.h` (and `Common/core/platform_folders.h` for per-user folders) puts the operating-system
 services the engine uses behind one set of functions in namespace `Platform`:
 
 | Area | Functions |
