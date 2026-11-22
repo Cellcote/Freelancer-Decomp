@@ -101,6 +101,9 @@ namespace
     }
 }
 
+// The constructor (ivp_vhash.h) sizes the table by IVP_VHashElem.
+static_assert(sizeof(FVHashElem) == sizeof(IVP_VHashElem), "IVP_VHash table slot");
+
 // Common.dll.c 0x6352320 / Common.dll.txt:430367-430440 (Common.dll.c
 // 208870-208905). Grows the table to exactly `param_1` buckets and rehashes
 // every occupied old entry back in through AddElem, then frees the old bucket

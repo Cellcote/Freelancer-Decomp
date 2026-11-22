@@ -30,6 +30,13 @@
 // the non-deleting FUN_063522f0.
 // ============================================================================
 
+// One table slot: 8 bytes on Win32 (tag at +0x0, value at +0x4).
+struct IVP_VHashElem
+{
+    unsigned hashTag; // +0x0
+    void* value;      // +0x4
+};
+
 class IVP_VHash
 {
 public:
@@ -40,9 +47,8 @@ public:
     // FUN_063522a0 (thiscall, RET 4): vtable 063a5648, SizeMm = Size - 1,
     // count and flags 0, Elems = FUN_06343f80(Size, 8) (zeroed allocation).
     explicit IVP_VHash(int Size)
-        : SizeMm(Size - 1)
-        , NElemsAndFlags(0)
-        , Elems(calloc(static_cast<size_t>(Size), 8))
+        : SizeMm(Size - 1), NElemsAndFlags(0),
+          Elems(calloc(static_cast<size_t>(Size), sizeof(IVP_VHashElem)))
     {
     }
 

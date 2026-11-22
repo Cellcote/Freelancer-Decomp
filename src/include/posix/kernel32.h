@@ -54,10 +54,23 @@
 
 namespace PosixWin32
 {
+// The calling thread's last error: one per thread for the whole process (a pthread key of the
+// platform's shared state; a thread_local would be one per module).
 inline DWORD& LastError()
 {
-    thread_local DWORD Value = ERROR_SUCCESS;
-    return Value;
+    const pthread_key_t Key = Platform::Detail::Shared().LastErrorKey;
+    DWORD* Value = static_cast<DWORD*>(pthread_getspecific(Key));
+    if (Value == nullptr)
+    {
+        Value = static_cast<DWORD*>(std::calloc(1, sizeof(DWORD)));
+        if (Value == nullptr)
+        {
+            static thread_local DWORD Fallback = ERROR_SUCCESS; // out of memory: per module
+            return Fallback;
+        }
+        pthread_setspecific(Key, Value);
+    }
+    return *Value;
 }
 
     // The Win32 error for an errno value.
@@ -350,6 +363,8 @@ namespace PosixWin32
     // as on Windows.
 struct FMapping : Platform::Detail::FObject
 {
+    static constexpr unsigned char kKind = Platform::Detail::kKindMapping;
+    FMapping() { Kind = kKind; }
     int Descriptor = -1;
     std::uint64_t Size = 0;
     ~FMapping() override
@@ -360,30 +375,24 @@ struct FMapping : Platform::Detail::FObject
 };
 
     // The length of each view (and VirtualAlloc block), for UnmapViewOfFile / VirtualFree.
-struct FRegions
-{
-    std::mutex Lock;
-    std::map<void const*, std::size_t> Lengths;
-};
-inline FRegions& Regions()
-{
-    static FRegions Table;
-    return Table;
-}
+// The view and block lengths are the process's (a view mapped in one module may be unmapped in
+// another): the platform's shared state.
 inline void Remember(void const* Address, std::size_t Length)
 {
-    std::lock_guard<std::mutex> Lock(Regions().Lock);
-    Regions().Lengths[Address] = Length;
+    Platform::Detail::FShared& State = Platform::Detail::Shared();
+    std::lock_guard<std::mutex> Lock(State.RegionsLock);
+    State.Regions[Address] = Length;
 }
     // The length of the region at Address (removed), or 0.
 inline std::size_t Forget(void const* Address)
 {
-    std::lock_guard<std::mutex> Lock(Regions().Lock);
-    auto const Found = Regions().Lengths.find(Address);
-    if (Found == Regions().Lengths.end())
+    Platform::Detail::FShared& State = Platform::Detail::Shared();
+    std::lock_guard<std::mutex> Lock(State.RegionsLock);
+    auto const Found = State.Regions.find(Address);
+    if (Found == State.Regions.end())
         return 0;
     std::size_t const Length = Found->second;
-    Regions().Lengths.erase(Found);
+    State.Regions.erase(Found);
     return Length;
 }
 }

@@ -7,6 +7,7 @@
 // and a HandleValue id one module makes must name the same object in the other.
 
 #include "handle_value.h"
+#include "platform.h"
 #include "x64_low_arena.h"
 
 #define FL_PROBE_JOIN2(A, B) A##B
@@ -41,4 +42,23 @@ extern "C" FlULong FL_PROBE(Id)(const void* Object)
 extern "C" const void* FL_PROBE(Object)(FlULong Id)
 {
     return HandleValue::ObjectOf(Id);
+}
+
+// The platform layer's state is the process's too: an event one module makes is set and waited on
+// in another, and a thread has one id in every module.
+extern "C" Platform::Handle FL_PROBE(EventCreate)()
+{
+    return Platform::EventCreate(true, false);
+}
+extern "C" bool FL_PROBE(EventSet)(Platform::Handle Event)
+{
+    return Platform::EventSet(Event);
+}
+extern "C" FlULong FL_PROBE(EventWait)(Platform::Handle Event)
+{
+    return Platform::WaitOne(Event, 0);
+}
+extern "C" FlULong FL_PROBE(ThreadId)()
+{
+    return Platform::CurrentThreadId();
 }

@@ -44,7 +44,8 @@ inline HRESULT SHGetFolderPathA(HWND, int Folder, HANDLE, DWORD, LPSTR Path)
 #if defined(__APPLE__)
         Result += "/Library/Application Support";
 #else
-        if (const char* Data = std::getenv("XDG_DATA_HOME"); Data != nullptr && Data[0] != 0)
+        // The XDG spec says a relative XDG_DATA_HOME is invalid and must be ignored.
+        if (const char* Data = std::getenv("XDG_DATA_HOME"); Data != nullptr && Data[0] == '/')
             Result = Data;
         else
             Result += "/.local/share";
@@ -62,7 +63,14 @@ inline HRESULT SHGetFolderPathA(HWND, int Folder, HANDLE, DWORD, LPSTR Path)
         {
             const std::string Part = Slash == std::string::npos ? Result : Result.substr(0, Slash);
             struct stat Info;
-            if (stat(Part.c_str(), &Info) != 0 && mkdir(Part.c_str(), 0755) != 0 && errno != EEXIST)
+            if (stat(Part.c_str(), &Info) != 0)
+            {
+                if (mkdir(Part.c_str(), 0755) != 0 && errno != EEXIST)
+                    return E_FAIL;
+                if (stat(Part.c_str(), &Info) != 0)
+                    return E_FAIL;
+            }
+            if (!S_ISDIR(Info.st_mode))
                 return E_FAIL;
             if (Slash == std::string::npos)
                 break;

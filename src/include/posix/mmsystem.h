@@ -22,7 +22,7 @@ typedef UINT MMRESULT;
 
 inline DWORD timeGetTime()
 {
-    static const auto Start = std::chrono::steady_clock::now();
+    const auto Start = Platform::Detail::Shared().Start; // one zero for the whole process
     return (DWORD)std::chrono::duration_cast<std::chrono::milliseconds>(
                std::chrono::steady_clock::now() - Start)
         .count();

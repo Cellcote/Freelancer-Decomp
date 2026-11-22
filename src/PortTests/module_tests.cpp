@@ -433,6 +433,33 @@ int main(int argc, char** argv)
               SphereVolume(0.0f, 1.0f, 5.0f) == 4.1887903f,
           "Common's GetSphereIntersectVol");
 
+    using FEventCreate = Platform::Handle (*)();
+    using FEventSet = bool (*)(Platform::Handle);
+    using FEventWait = FlULong (*)(Platform::Handle);
+    using FThreadId = FlULong (*)();
+    auto const EventCreateA =
+        reinterpret_cast<FEventCreate>(Platform::ModuleSymbol(ProbeA, "Probe_a_EventCreate"));
+    auto const EventSetB =
+        reinterpret_cast<FEventSet>(Platform::ModuleSymbol(ProbeB, "Probe_b_EventSet"));
+    auto const EventWaitA =
+        reinterpret_cast<FEventWait>(Platform::ModuleSymbol(ProbeA, "Probe_a_EventWait"));
+    auto const ThreadIdA =
+        reinterpret_cast<FThreadId>(Platform::ModuleSymbol(ProbeA, "Probe_a_ThreadId"));
+    auto const ThreadIdB =
+        reinterpret_cast<FThreadId>(Platform::ModuleSymbol(ProbeB, "Probe_b_ThreadId"));
+    if (EventCreateA != nullptr && EventSetB != nullptr && EventWaitA != nullptr)
+    {
+        Platform::Handle const Event = EventCreateA();
+        Check(Event != nullptr && EventWaitA(Event) == Platform::kWaitTimeout && EventSetB(Event) &&
+                  EventWaitA(Event) == Platform::kWaitSignaled &&
+                  Platform::WaitOne(Event, 0) == Platform::kWaitSignaled,
+              "an event made in one module is set in another and seen by all");
+        Platform::CloseHandle(Event);
+    }
+    Check(ThreadIdA != nullptr && ThreadIdB != nullptr && ThreadIdA() == ThreadIdB() &&
+              ThreadIdA() == Platform::CurrentThreadId(),
+          "a thread has one id in every module");
+
     // SearchPathA finds a module by its Windows name (DACOM's AddLibrary looks it up so).
     char Found[1024] = {};
     char* FilePart = nullptr;

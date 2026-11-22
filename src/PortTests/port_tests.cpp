@@ -11,6 +11,7 @@
 // port_tests uses the arena without dacom, so it holds the process's arena itself.
 FL_LOW_ARENA_DEFINE_SHARED()
 FL_HANDLE_VALUE_DEFINE_SHARED()
+FL_PLATFORM_DEFINE_SHARED()
 
 #include <cstdint>
 #include <cstdio>
