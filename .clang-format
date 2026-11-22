@@ -18,6 +18,7 @@ AccessModifierOffset: -4
 NamespaceIndentation: None
 IndentCaseLabels: false
 AllowShortFunctionsOnASingleLine: Inline
+BreakTemplateDeclarations: Yes
 AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
 AllowShortBlocksOnASingleLine: Never

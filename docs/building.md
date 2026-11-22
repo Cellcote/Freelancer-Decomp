@@ -170,7 +170,7 @@ Windows. Making more modules portable is the non-Windows port (on hold; see
   `git clang-format origin/master`. Reformat a whole file only in a commit that changes nothing
   else. The modules that put opening braces on the same line (rpclocal, RemoteClient,
   RemoteServer, RemoteCommon) have a `.clang-format` of their own that inherits the root file
-  and changes only that.
+  and changes only their local habits (attached braces, `template<`, `{ a, b }`).
 - **clang-tidy.** `.clang-tidy` lists bug-finding checks; checks that would push changes to
   retail layout or ownership (`modernize-*` and the like) are left out. Configure with
   `-DFL_CLANG_TIDY=ON` to run it while building (needs clang-tidy 19 or later on `PATH`; on
