@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "diagnostics.h"
+#include "port_scope.h"
 #include <commdlg.h>
 #include <shellapi.h>
 #include <shlobj.h>
@@ -220,7 +221,7 @@ namespace
 
 	unsigned __stdcall Worker(void* Parameter)
 	{
-		const HRESULT Com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+		const FComInit Com;
 		FJob* Job = static_cast<FJob*>(Parameter);
 		const bool bFlags = Job->Action == EAction::Enable || Job->Action == EAction::Disable;
 		std::wstring Arguments;
@@ -261,7 +262,6 @@ namespace
 			}
 		}
 		PostMessageW(Job->Owner, GFinishedMessage, 0, reinterpret_cast<LPARAM>(Job));
-		if (SUCCEEDED(Com)) CoUninitialize();
 		return 0;
 	}
 
@@ -647,9 +647,9 @@ int VerifyApplicationWindow()
 
 int WINAPI wWinMain(HINSTANCE Instance, HINSTANCE, wchar_t*, int Show)
 {
-	const HRESULT Com = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+	const FComInit Com;
 	HWND Window = CreateApplicationWindow(Instance);
-	if (!Window) { if (SUCCEEDED(Com)) CoUninitialize(); return 1; }
+	if (!Window) return 1;
 	ShowWindow(Window, Show);
 	MSG Message = {};
 	while (GetMessageW(&Message, nullptr, 0, 0) > 0)
@@ -659,6 +659,5 @@ int WINAPI wWinMain(HINSTANCE Instance, HINSTANCE, wchar_t*, int Show)
 			TranslateMessage(&Message); DispatchMessageW(&Message);
 		}
 	}
-	if (SUCCEEDED(Com)) CoUninitialize();
 	return static_cast<int>(Message.wParam);
 }

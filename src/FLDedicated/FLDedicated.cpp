@@ -40,6 +40,7 @@
 #include "common_server_types.h"  // SStartupInfo, ServerStats
 #include "dacom.h"                // FDUMP
 #include "dalib_core.h"           // DALib::Startup / OpenData / CloseData / Shutdown, CriticalWarningFn
+#include "port_scope.h"           // TScopeExit, FComInit
 #include "remoteclient.h"         // GetNumClients, SetServerLogFunction
 #include "server_host.h"          // the host shared with FLServer (src/ServerHost)
 #include "server_iserverimpl.h"   // Server
@@ -722,8 +723,12 @@ namespace
         }
     }
 
+    // DALib and COM are torn down by guards when Run returns, on any path.
     int Run()
     {
+        // AfxOleInit in InitInstance.
+        const FComInit Com;
+
         char ModulePath[MAX_PATH] = {};
         if (!EnterModuleDirectory(ModulePath))
         {
@@ -766,6 +771,10 @@ namespace
             fprintf(stderr, "FLDedicated: DALib::Startup failed\n");
             return 1;
         }
+        const TScopeExit ShutdownDALib([] {
+            DALib::CloseData();
+            DALib::Shutdown(nullptr);
+        });
         const bool bDataPath = ReadFreelancerIni(IniPath);
         const bool bLocalDataPath = ReadFreelancerIni(LocalIniPath);
         if (!bDataPath && !bLocalDataPath)
@@ -775,8 +784,6 @@ namespace
 
         if (!ConfigureServer())
         {
-            DALib::CloseData();
-            DALib::Shutdown(nullptr);
             return 2;
         }
 
@@ -785,8 +792,6 @@ namespace
         HANDLE StartupThread = CreateThread(nullptr, 0, StartupThreadProc, nullptr, 0, nullptr);
         if (StartupThread == nullptr)
         {
-            DALib::CloseData();
-            DALib::Shutdown(nullptr);
             return 1;
         }
         WaitForSingleObject(StartupThread, INFINITE);
@@ -833,8 +838,6 @@ namespace
         }
 
         StopServer();
-        DALib::CloseData();
-        DALib::Shutdown(nullptr);
         LogStatus(Result == 0 ? "Server stopped." : "Server failed to start.");
         return Result;
     }
@@ -891,13 +894,7 @@ int wmain(int Argc, wchar_t** Argv)
     CloseHandle(StopSignalThread);
 #endif
 
-    // AfxOleInit in InitInstance.
-    const HRESULT ComResult = CoInitialize(nullptr);
     const int Result = Run();
-    if (ComResult == S_OK || ComResult == S_FALSE)
-    {
-        CoUninitialize();
-    }
 
     if (GLogFile != nullptr)
     {

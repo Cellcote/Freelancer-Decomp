@@ -27,7 +27,7 @@ unless the row says otherwise. "Off" in the compatibility column means the switc
 | DPNet (`dpnet`) | `FREELANCER_DPNET`, set by `src/DALib/CMakeLists.txt` for x64 | x64 only | `src/DPNet`, `DALib/DPNetAdapter.*`, `DALib/CDPServer.cpp`, `src/DPNetInteropTest` | Win32 keeps Microsoft's `dpnet.dll`; the x64 server is wire-compatible with retail clients | [dpnet.md](../dpnet.md) |
 | FLRegress (`flregress`) | Own program | Built | `src/FLRegress` | Changes no retail module | [flregress.md](../flregress.md) |
 | FLDedicated (`dedicated`) | Own program | Built | `src/FLDedicated` | Loads the same modules as FLServer.exe; retail clients see the same server | [dedicated_server.md](../dedicated_server.md) |
-| Test tools (`tools`) | Own programs | Built | `src/RpcCodecTest`, `src/MemoryDiagnostics` | Changes no retail module | [testing.md](../testing.md), [memory_diagnostics.md](../memory_diagnostics.md) |
+| Test tools (`tools`) | Own programs | Built | `src/RpcCodecTest`, `src/MemoryDiagnostics`; `include/port_scope.h` (scope guards for the port's programs) | Changes no retail module | [testing.md](../testing.md), [memory_diagnostics.md](../memory_diagnostics.md) |
 | Platform layer (untagged) | None | On | `include/platform.h`, `platform_folders.h` | Each function is the single Win32 call retail made, with the same arguments | [platform.md](../platform.md) |
 | Single-instance guard (`deviation`) | `FL_SINGLE_INSTANCE` (nothing defines it) | Undefined: guard off | `freelancer/Client/main.cpp` | Several clients can run on one machine; defining it restores retail | [below](#client-single-instance-guard-behind-fl_single_instance) |
 
