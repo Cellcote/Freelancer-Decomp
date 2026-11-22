@@ -349,7 +349,8 @@ without the Windows API. Milestones:
   Server compiles against the same stand-ins, plus the CRT calls it makes on its account and
   save files (`fopen`, `_unlink`, `_findfirst`: Windows paths, resolved as the platform layer
   resolves them; `fopen` is a macro over the C library's for that reason). A phantom's
-  handle crosses `PhantomEnter` / `PhantomExit` as a HandleValue id. A loaded module stays
+  handle is a 32-bit id on 64-bit builds, as `PhantomEnter` / `PhantomExit` carry it in a
+  dword to Content. A loaded module stays
   mapped until the process ends (`RTLD_NODELETE`): handles in the platform's table and what a
   module registered with dacom outlive `FreeLibrary`. `wchar_t` is 4 bytes here; the wire and
   file formats carry UTF-16, so the codecs convert at that boundary (RemoteClient, next).
