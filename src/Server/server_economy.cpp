@@ -244,9 +244,25 @@ long long ShipCeiling(PlayerSlot const& Slot, FLedger const& Ledger)
             PlayerData_SetCash(Slot, ClampCash(Ceiling));
     }
 
+    // The lowest price paid for a good this dock: an honest client pays one price per good per
+    // dock, so a higher one can only raise the resale cap of the units bought earlier.
+    void NotePricePaid(FLedger& Ledger, unsigned int GoodId, long long Unit)
+    {
+        std::map<unsigned int, long long>::iterator It = Ledger.UnitPaid.find(GoodId);
+        if (It == Ledger.UnitPaid.end())
+            Ledger.UnitPaid[GoodId] = Unit;
+        else if (Unit < It->second)
+            It->second = Unit;
+    }
+
 void SettleAll(PlayerSlot& Slot, FLedger& Ledger)
 {
     Ledger.bRefusedBuy = false;
+    // A purchase settled before its payment arrived is charged the least it could cost, and
+    // that is the price it may resell for this dock.
+    if (Ledger.PricedCount > 0)
+        NotePricePaid(Ledger, Ledger.PricedGood,
+                      MinUnit(FindBaseData(Slot.current_base), Ledger.PricedGood) + 1);
     Ledger.PricedGood = 0;
     Ledger.PricedCount = 0;
     SettleBuys(Slot, Ledger);
@@ -539,8 +555,8 @@ bool Ledger_OnChangeCash(PlayerSlot& Slot, unsigned int SessionId, int Delta)
         if (Ledger.PricedCount > 0)
         {
             // The client paid package price x count (BuyFromDealer); one credit of slack.
-            Ledger.UnitPaid[Ledger.PricedGood] =
-                -static_cast<long long>(Delta) / Ledger.PricedCount + 1;
+            NotePricePaid(Ledger, Ledger.PricedGood,
+                          -static_cast<long long>(Delta) / Ledger.PricedCount + 1);
             Ledger.PricedGood = 0;
             Ledger.PricedCount = 0;
         }
