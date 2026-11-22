@@ -107,33 +107,48 @@ void TestReadFile(ICOManager* Manager)
     Open.Path = Missing.c_str();
     Check(FileSystem->OpenByDesc(&Open) == -1, "a missing file does not open");
 
-    // Not FindFirst: the DOS file system's FindFirst takes JoinRoot's success for a failure
-    // (ReadFile.cpp, slot 0x48), on Windows as here, so it finds nothing; to be checked
-    // against retail. Platform::FindFirst itself is in port_tests.
-    FileSystem->Release();
-    std::system(("rm -rf '" + Root + "'").c_str());
-}
+    // EngBase's engine: a compound archetype and an instance of it, which are LowArena blocks
+    // whose encoded values key the engine's maps (the root-instance map walked here).
+    void TestEngine(ICOManager* Manager)
+    {
+        AGGDESC Desc = {8, "Engine"};
+        IEngine* Engine = nullptr;
+        Check(Manager->CreateInstance(&Desc, (void**)(&Engine)) == GR_OK && Engine != nullptr,
+              "EngBase makes an Engine");
+        if (Engine == nullptr)
+            return;
+        FEngineName Name = {nullptr, 0}; // no CRC: the engine names it (anonymous compound)
+        void* const Archetype = Engine->CreateCompoundArchetype(&Name);
+        Check(Archetype != nullptr && Archetype != G_InvalidEngineHandle,
+              "CreateCompoundArchetype");
+        bool const bArchetype = Archetype != nullptr && Archetype != G_InvalidEngineHandle;
+        void* const Parent = bArchetype ? Engine->CreateInstance(Archetype, nullptr) : nullptr;
+        void* const Child = bArchetype ? Engine->CreateInstance(Archetype, nullptr) : nullptr;
+        bool const bInstances = Parent != nullptr && Parent != G_InvalidEngineHandle &&
+                                Child != nullptr && Child != G_InvalidEngineHandle;
+        Check(bInstances, "CreateInstance");
+        if (bInstances)
+        {
+            Check(Engine->GetInstanceArchetype(Parent) == Archetype, "the instance's archetype");
+            // A joint makes Parent a root: the root map holds it under its encoded key.
+            FlULong const Payload[G_EngineJointPayloadDwords] = {};
+            Check(Engine->CreateJoint(Parent, Child, Payload) == 1, "CreateJoint");
+            Check(Engine->GetInstanceParent(Child) == Parent, "the child's parent");
+            Check(Engine->FindMappedInstance(G_InvalidEngineHandle) == Parent,
+                  "the root-instance map gives the parent back (its encoded key decodes)");
+            Check(Engine->FindMappedInstance(Parent) == G_InvalidEngineHandle, "one root instance");
+            Check(Engine->DestroyJoint(Parent, Child) == 1 &&
+                      Engine->FindMappedInstance(G_InvalidEngineHandle) == G_InvalidEngineHandle,
+                  "DestroyJoint takes the root out of the map");
+            Engine->DestroyInstance(Child);
+            Engine->DestroyInstance(Parent);
+        }
+        if (Archetype != nullptr && Archetype != G_InvalidEngineHandle)
+            Engine->ReleaseHandle(Archetype);
+        Engine->Release();
+    }
 
-// EngBase's engine: a compound archetype and an instance of it, which are LowArena blocks
-// whose encoded values key the engine's maps (the root-instance map walked here).
-void TestEngine(ICOManager* Manager)
-{
-    AGGDESC Desc = {8, "Engine"};
-    IEngine* Engine = nullptr;
-    Check(Manager->CreateInstance(&Desc, (void**)(&Engine)) == GR_OK && Engine != nullptr,
-          "EngBase makes an Engine");
-    if (Engine == nullptr)
-        return;
-    FEngineName Name = {nullptr, 0}; // no CRC: the engine names it (anonymous compound)
-    void* const Archetype = Engine->CreateCompoundArchetype(&Name);
-    Check(Archetype != nullptr && Archetype != G_InvalidEngineHandle, "CreateCompoundArchetype");
-    bool const bArchetype = Archetype != nullptr && Archetype != G_InvalidEngineHandle;
-    void* const Parent = bArchetype ? Engine->CreateInstance(Archetype, nullptr) : nullptr;
-    void* const Child = bArchetype ? Engine->CreateInstance(Archetype, nullptr) : nullptr;
-    bool const bInstances = Parent != nullptr && Parent != G_InvalidEngineHandle &&
-                            Child != nullptr && Child != G_InvalidEngineHandle;
-    Check(bInstances, "CreateInstance");
-    if (bInstances)
+    int __cdecl CountComponent(IDAComponent* Factory, const char* Name, void*, void* Context)
     {
         Check(Engine->GetInstanceArchetype(Parent) == Archetype, "the instance's archetype");
         // A joint makes Parent a root: the root map holds it under its encoded key.
