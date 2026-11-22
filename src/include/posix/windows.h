@@ -290,6 +290,9 @@ inline DWORD SearchPathA(LPCSTR Path, LPCSTR FileName, LPCSTR Extension, DWORD B
             if (!IsFile(Candidate))
                 continue;
         }
+        // The file's own spelling on disk (the search is without regard to case), so that the
+        // path works on a case-sensitive file system too.
+        Candidate = Platform::Detail::ResolvePath(Candidate.c_str());
         char Full[4096];
         char* Name = nullptr;
         DWORD const Length = Platform::FullPath(Candidate.c_str(), Full, sizeof(Full), &Name);
