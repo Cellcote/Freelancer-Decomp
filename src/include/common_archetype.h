@@ -671,9 +671,9 @@ namespace Archetype
         // constraint documented for DockingSpheres/VibeValue, avoided here by using a pointer
         // like ShieldLinks/CollisionGroup::Fuses already do instead of growing the struct).
         // CONSUMER: freelancer.exe FUN_00533e10 (EquippedObjScanFuseIgnitions,
-        // client_equip_fx.cpp) walks this list and CollisionGroup::Fuses, compares HitPts
+        // Client/space/equip_fx.cpp) walks this list and CollisionGroup::Fuses, compares HitPts
         // against the Fuse{Id,Value1,Value2} thresholds, ignites the named fuse through
-        // FUN_00534240 (a copy of the exe's ClientFuse prototype, client_fuse.h) and
+        // FUN_00534240 (a copy of the exe's ClientFuse prototype, Client/space/fuse.h) and
         // Fuse::Load's the prototype. Common.dll's Fuse/FuseAction (common_fuses.h) are the
         // runtime base classes; Server.dll's own fuse database (FUN_06cfd4b0) is not ported.
         std::vector<FGroupFuse>* Fuses;           // +0x74 heap (retail VC6 list dummy slot)
@@ -1940,5 +1940,5 @@ COMMON_API unsigned __cdecl DecodeType(char const* Name);
 
 struct IEngine;
 
-// (ArchetypeLoadFromPath moved to freelancer.exe -- src/freelancer/Client/client_mesh_load.h.
+// (ArchetypeLoadFromPath moved to freelancer.exe -- src/freelancer/Client/space/mesh_load.h.
 // It is a client-only port helper; retail Common.dll does not export it.)

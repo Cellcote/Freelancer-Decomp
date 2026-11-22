@@ -10,8 +10,8 @@
 #include "DALib.h"
 #include "common_misc.h" // GetScreenShotPath
 #include "dacom.h"
-#include "hud_command_dispatch.h"
-#include "nn_pause.h"              // NnPauseOpen (FUN_004a75c0)
+#include "space/hud/hud_command_dispatch.h"
+#include "nn/nn_pause.h"              // NnPauseOpen (FUN_004a75c0)
 #include "render/IRenderPipeline.h"
 
 #include <io.h>

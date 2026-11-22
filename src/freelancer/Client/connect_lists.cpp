@@ -6,12 +6,12 @@
 
 #include "connect_lists.h"
 
-#include "best_path.h"              // G_BestPaths -- DAT_0067294c
-#include "character_select_equip.h" // the player-state lists (DAT_00672960 / DAT_0067296c / ...)
+#include "nn/best_path.h"              // G_BestPaths -- DAT_0067294c
+#include "interface/character_select_equip.h" // the player-state lists (DAT_00672960 / DAT_0067296c / ...)
 #include "common_goods.h"           // EquipDescList
 #include "dacom.h"                  // FDUMP
-#include "nn_story_star.h"          // StoryStarReset (FUN_004b9bb0), StoryStarSetRankUp (FUN_004b9b20)
-#include "player_spawn.h"           // ResetPlayerWaypointsRetail (FUN_004c46c0)
+#include "nn/nn_story_star.h"          // StoryStarReset (FUN_004b9bb0), StoryStarSetRankUp (FUN_004b9b20)
+#include "space/player_spawn.h"           // ResetPlayerWaypointsRetail (FUN_004c46c0)
 
 #include <list>
 
@@ -28,7 +28,7 @@ namespace
         GetPlayerEquipDescListRetail().Items.clear();
         // 0x004c4afe..0x004c4b11 / 0x004c4c0f..0x004c4c22: FUN_004c5a80 erases the objective map
         // DAT_0067294c from its first node to its head -- the whole map (G_BestPaths,
-        // best_path.h).
+        // nn/best_path.h).
         G_BestPaths.clear();
         // 0x004c4b16..0x004c4ba1 / 0x004c4c27..0x004c4ca2: the visit map DAT_00673320 cleared
         // (the whole tree at once when the erase range is begin..end, else node by node).

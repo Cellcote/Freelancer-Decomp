@@ -64,7 +64,7 @@ void ApplyChangedPerfOptions();
 bool LoadPerfOptions(char const* FileName, FPerfDisplaySettings* Display);
 void SavePerfOptions(char const* FileName);
 
-// The first-run seed FUN_004a9380 is NnPreferences::SeedGraphicsDefaults (nn_preferences.h):
+// The first-run seed FUN_004a9380 is NnPreferences::SeedGraphicsDefaults (nn/nn_preferences.h):
 // optlist walk on a bare NN_Preferences, this probe, then FUN_004b0370's row cascade.
 // FUN_004a92a0 -- the machine's graphics score in {0.25, 0.5, 0.6, 0.75, 1.0}.
 float ProbeMachineGraphicsLevel();

@@ -196,7 +196,7 @@ COMMON_API void __cdecl DALib_Engine_set_csys(FlLong Handle, Csys const& InCsys)
 // include set.
 //
 // Not exported: retail Common.dll's copy is the unexported FUN_06391cf0, and freelancer.exe
-// carries its own (FUN_005b73e0, defined in src/freelancer/Client/engine_init.cpp). This
+// carries its own (FUN_005b73e0, defined in src/freelancer/Client/cmn/engine_init.cpp). This
 // declaration is shared; each module that calls it defines it.
 struct I3DMathEngine;
 I3DMathEngine* __cdecl Acquire3DMathEngine();

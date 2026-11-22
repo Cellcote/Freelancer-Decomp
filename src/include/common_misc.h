@@ -333,7 +333,7 @@ extern template class COMMON_API std::list<DamageEntry>;
 // list node, with no 8-entry cap. It also auto-sets bDestroyed when SubObjId==1 (the
 // root/hull entry) reaches HitPts<=0. get_hit_pts_left (0x5bbd0) returns the first (only)
 // matching entry's HitPts, or -1.0f (not 0) if the SubObjId isn't present. Per this
-// codebase's "no retail ABI" convention (see dalib_net.h CDPMsgList, engine_character.h) the list is
+// codebase's "no retail ABI" convention (see dalib_net.h CDPMsgList, Client/cmn/engine_character.h) the list is
 // ported as std::list<DamageEntry> rather than reproducing the VC6 node layout.
 struct COMMON_API DamageList
 {
@@ -490,7 +490,7 @@ COMMON_API void __cdecl DAEngine_release_filesystem(IFileSystem** Filesys);
 
 // "1.11_ICamera" -- the client camera. Two classes in freelancer.exe implement it:
 //   * the 20-slot table PTR_LAB_005c8944 (0x005c8944..0x005c8990), which is the one
-//     src/freelancer/Client/space_camera.h models as FSpaceCamera, and whose slot roles are
+//     src/freelancer/Client/space/camera/space_camera.h models as FSpaceCamera, and whose slot roles are
 //     recovered one by one from their own bodies -- that is where the names below come from;
 //   * the 22-slot table 0x005e12a4 (and its sibling 0x005e1304), whose slot 0 LAB_00558600 is
 //     the QueryInterface that strcmps "1.11_ICamera". Its field layout is different, and only

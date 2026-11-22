@@ -6,14 +6,14 @@
 
 #include "connect_flow.h"
 
-#include "chat_init.h"      // ChatResetForConnect (FUN_0046b2b0)
+#include "nn/chat_init.h"      // ChatResetForConnect (FUN_0046b2b0)
 #include "common_ini.h"     // RefreshLoadingProgress
 #include "server_pub.h"  // IServer
 #include "common_misc.h"    // SinglePlayer
 #include "connect_lists.h"  // PreConnectReset (FUN_004c4a80)
 #include "login_mgr.h"
-#include "nn_error.h"       // NnErrorRunModal (FUN_00473cb0)
-#include "player_spawn.h"   // GetPlayerConnectionId (DAT_00673344)
+#include "nn/nn_error.h"       // NnErrorRunModal (FUN_00473cb0)
+#include "space/player_spawn.h"   // GetPlayerConnectionId (DAT_00673344)
 #include "server_connect.h"
 
 // FUN_005a8770 (cdecl).

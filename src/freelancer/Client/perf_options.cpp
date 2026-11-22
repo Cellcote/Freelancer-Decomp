@@ -6,11 +6,11 @@
 
 #include "perf_options.h"
 #include "msvcrt_compat.h" // MsvcrtFtol
-#include "gf_script_object.h" // LAB_004548f0 / FUN_00454910: one transition-script latch.
+#include "gf/gf_script_object.h" // LAB_004548f0 / FUN_00454910: one transition-script latch.
 
-#include "cli_asteroid.h"
-#include "cli_nebula.h"
-#include "client_cliobj.h"
+#include "space/cli_asteroid.h"
+#include "space/cli_nebula.h"
+#include "cmn/cliobj.h"
 #include "common_archetype.h"
 #include "common_ini.h"
 #include "common_newchar.h"
@@ -19,17 +19,17 @@
 #include "dacom.h"
 #include "DALib.h"
 #include "globals.h" // ApplyGammaRampOption / ApplyDitherControlOption / ApplyMipFilterControlOption
-#include "hud_target.h"       // HudShipOfObjRw (FUN_00543320 chain)
-#include "player_behavior.h"  // GetPlayerObjRW (FUN_0054baf0)
+#include "space/hud/hud_target.h"       // HudShipOfObjRw (FUN_00543320 chain)
+#include "space/player_behavior.h"  // GetPlayerObjRW (FUN_0054baf0)
 #include "common_cobject.h"   // CShip / CEqObj::get_behavior_interface
 #include "common_iface.h"     // IBehaviorManager::set_turn_sensitivity
-#include "input_manager.h"
-#include "menu_sound_arch.h"
+#include "cmn/input_manager.h"
+#include "cmn/menu_sound_arch.h"
 #include "render/IRenderPipeline.h"
 #include "render/shading.h"
-#include "space_solar_world.h"
-#include "star_sphere.h"
-#include "star_sys.h"
+#include "space/space_solar_world.h"
+#include "space/star_sphere.h"
+#include "space/star_sys.h"
 
 #include <iterator>
 #include <math.h>

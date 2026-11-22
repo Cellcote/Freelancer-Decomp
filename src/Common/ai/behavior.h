@@ -697,7 +697,7 @@ public:
     // into a function this port has had at `ready_unverified` for days, and the empty stub
     // meant the twenty vtable slots that hold this address -- plus the PLAYER's own strafe
     // burst, which reaches here through IBehaviorManager::update_current_behavior_slide_
-    // strafe_burst from src/freelancer/Client/player_behavior.cpp -- all did nothing.
+    // strafe_burst from src/freelancer/Client/space/player_behavior.cpp -- all did nothing.
     virtual void slide_strafe_burst(StrafeDir Dir);                         // 17 +0x44
     virtual void brake_reverse(bool bOn) { (void)bOn; }                     // 18 +0x48
     // 19 +0x4C. Retail's base body is `MOV AL,1; RET` -- it answers TRUE. The old comment

@@ -1035,5 +1035,5 @@ namespace Archetype
 }
 
 // (ArchetypeLoadFromPath, a client-only port helper that used to be exported from here, now
-// lives in freelancer.exe: src/freelancer/Client/client_mesh_load.cpp. Retail Common.dll
+// lives in freelancer.exe: src/freelancer/Client/space/mesh_load.cpp. Retail Common.dll
 // exports no such function.)

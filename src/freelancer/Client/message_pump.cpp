@@ -5,8 +5,8 @@
 // Author: Giperion.
 
 #include "globals.h"
-#include "input_manager.h"
-#include "menu_keymap_config.h" // KeyMapRouteInputMessage (FUN_00577850)
+#include "cmn/input_manager.h"
+#include "interface/menu_keymap_config.h" // KeyMapRouteInputMessage (FUN_00577850)
 
 #include "imeui.h"
 

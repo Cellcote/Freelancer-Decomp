@@ -6,23 +6,23 @@
 
 #include "dataconfig_progress.h"
 
-#include "client_debris.h" // LoadDebrisArchFile (FUN_00530d20)
+#include "space/debris.h" // LoadDebrisArchFile (FUN_00530d20)
 #include "common_ini.h"
 #include "common_misc.h" // GetFileSysPath
 #include "dacom.h"
 #include "DALib.h"
 #include "globals.h"
-#include "font_imp.h"
-#include "graph_library.h"
-#include "hud_element_list.h"
+#include "cmn/font_imp.h"
+#include "cmn/graph_library.h"
+#include "space/hud/hud_element_list.h"
 #include "ids_strings.h"   // RegisterIdsResourceModule (FUN_0057d800)
-#include "menu_fonts_load.h"
-#include "menu_sound_arch.h"
+#include "interface/menu_fonts_load.h"
+#include "cmn/menu_sound_arch.h"
 #include "platform.h"
-#include "sound_config.h"  // LoadClientSoundCfgIni (FUN_00427a70)
-#include "texture_shapes.h"
-#include "vis_effect_arch.h"
-#include "voice_profiles.h"
+#include "cmn/sound_config.h"  // LoadClientSoundCfgIni (FUN_00427a70)
+#include "cmn/texture_shapes.h"
+#include "cmn/vis_effect_arch.h"
+#include "cmn/voice_profiles.h"
 
 #include <stdlib.h>
 #include <string.h>

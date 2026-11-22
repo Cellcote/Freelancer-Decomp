@@ -471,7 +471,7 @@ namespace PhySys
     // detaches via FUN_06349030 -> FUN_06349110. It therefore derives from IVP_Controller, and
     // its full definition lives in Common/physics/controllergolem.cpp rather than here: this header is pulled
     // into Server.dll and Freelancer.exe translation units (common_cobject.h, server_pub.h,
-    // space_scene_load.cpp) that have no src/IVP include path, and dragging ivp_controller.h
+    // Client/space/space_scene_load.cpp) that have no src/IVP include path, and dragging ivp_controller.h
     // across that boundary is not worth it for three call sites. The three entry points below
     // are port-local free functions standing in for retail's __thiscall methods. None of the
     // four functions below is a retail export (all are FUN_ addresses), so none is COMMON_API.
