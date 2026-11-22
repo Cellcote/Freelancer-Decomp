@@ -179,7 +179,7 @@ static float ComputeBatchDepth(const FBatchRecord& Record)
 {
     if ((Record.Flags & 0x20) != 0)
     {
-        const FlULong Bits = (FlULong)Record.Unused;
+        const FlULong Bits = (FlULong)(std::uintptr_t)Record.Unused; // depth bits, not an address
         float Depth;
         std::memcpy(&Depth, &Bits, sizeof(Depth));
         return -Depth;

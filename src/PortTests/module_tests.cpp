@@ -179,6 +179,7 @@ int main(int argc, char** argv)
     Check(Thorn != nullptr, "Thorn.dll loads");
     Platform::Module const EngBase = Platform::ModuleLoad((Folder + "EngBase.dll").c_str());
     Check(EngBase != nullptr, "EngBase.dll loads");
+    Check(Platform::ModuleLoad((Folder + "ximage.dll").c_str()) != nullptr, "ximage.dll loads");
 
     Platform::Module const Dacom = Platform::ModuleFind((Folder + "dacom.dylib").c_str()) != nullptr
                                        ? Platform::ModuleFind((Folder + "dacom.dylib").c_str())
@@ -199,12 +200,21 @@ int main(int argc, char** argv)
         Count = 0;
         Manager->EnumerateComponents("IScriptEngine", &CountComponent, &Count);
         Check(Count >= 1, "Thorn's DllMain registered its script engine");
-        for (const char* Component : {"Engine", "Animation", "Hardpoint", "ChannelArchetype"})
+        for (const char* Component :
+             {"Engine", "Animation", "Hardpoint", "ChannelArchetype", "BigImage"})
         {
             Count = 0;
             Manager->EnumerateComponents(Component, &CountComponent, &Count);
-            Check(Count == 1, "EngBase's DllMain registered its components");
+            Check(Count == 1, "EngBase's and ximage's DllMains registered their components");
         }
+        // Shading registers the material, texture-library and batcher components as it loads.
+        int Before = 0;
+        Manager->EnumerateComponents(nullptr, &CountComponent, &Before);
+        Check(Platform::ModuleLoad((Folder + "Shading.dll").c_str()) != nullptr,
+              "Shading.dll loads");
+        int After = 0;
+        Manager->EnumerateComponents(nullptr, &CountComponent, &After);
+        Check(After > Before, "Shading's DllMain registered its components");
         if (EngBase != nullptr)
             TestEngine(Manager);
         if (Files != nullptr)

@@ -334,9 +334,8 @@ GENRESULT DACOM_API FMaterialLibrary::LoadFromFileSystem(void* FileSystem, void*
                             "Unable to load material '%s' as type '%s'\n", ChildName, Type);
                         FDUMP(0x100003, "%s(%d) : NOTICE:General:%s",
                               SourceFile, 0x1C1, Message);
-                        FlULong Record[2] = {
-                            (FlULong)ChildName, Crc};
-                        RemoveMaterial(0, Record);
+                        FMaterialCrcQuery Record = {ChildName, Crc};
+                        RemoveMaterial(0, &Record);
                     }
                 }
             }
@@ -572,7 +571,7 @@ GENRESULT DACOM_API FMaterialLibrary::FindMaterialByCrc(void* Query, IMaterial**
 
 GENRESULT DACOM_API FMaterialLibrary::AddMaterial(int GroupId, void* Record, IMaterial* Material)
 {
-    const FlULong Crc = ((FlULong*)Record)[1];
+    const FlULong Crc = static_cast<const FMaterialCrcQuery*>(Record)->Crc;
     FMaterialGroup* Group = nullptr;
     if (GroupId != 0)
     {
@@ -603,7 +602,7 @@ GENRESULT DACOM_API FMaterialLibrary::AddMaterial(int GroupId, void* Record, IMa
 
 GENRESULT DACOM_API FMaterialLibrary::RemoveMaterial(FlULong GroupId, void* Record)
 {
-    const FlULong Crc = ((FlULong*)Record)[1];
+    const FlULong Crc = static_cast<const FMaterialCrcQuery*>(Record)->Crc;
     FCrcSlot* Slot = FindByCrc(Crc);
     GENRESULT Result = GR_OK;
     if (GroupId != 0)

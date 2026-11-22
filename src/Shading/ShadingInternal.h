@@ -18,6 +18,7 @@
 #include <cstring>
 #include <new>
 #include "MaterialRegex.h"
+#include "x64_low_arena.h" // texture handles are LowArena blocks of the pipeline
 #include <utility>
 #include <string>
 #include <vector>
@@ -158,7 +159,7 @@ inline GENRESULT PipeGetTextureFormat(IRenderPipeline* Pipeline, FlULong Handle,
 {
     if (Pipeline == nullptr || OutFormat == nullptr)
         return GR_GENERIC;
-    return Pipeline->GetTextureFormat((void*)Handle, OutFormat);
+    return Pipeline->GetTextureFormat(LowArena::Decode<void>((FlLong)Handle), OutFormat);
 }
 
 static constexpr FlULong kPixelFormatField04[15] = {
@@ -203,8 +204,7 @@ inline void PipeSetTss(IRenderPipeline* Pipeline, FlULong Stage, FlULong Type,
 inline void PipeSetTexture(IRenderPipeline* Pipeline, FlULong Stage, FlULong Handle)
 {
     if (Pipeline != nullptr)
-        Pipeline->SetTextureStageTexture((int)Stage,
-                                         (void*)Handle);
+        Pipeline->SetTextureStageTexture((int)Stage, LowArena::Decode<void>((FlLong)Handle));
 }
 
 // IRenderPipeline +0x100 slot 64 — set_texture_stage_transform (FUN_06d0fdd2).

@@ -255,6 +255,26 @@ inline int wsprintfA(LPSTR Buffer, LPCSTR Format, ...)
     return Length < 0 ? 0 : (Length > 1023 ? 1023 : Length);
 }
 
+// SetRect / SetRectEmpty / IsRectEmpty.
+inline BOOL SetRect(LPRECT Rect, int Left, int Top, int Right, int Bottom)
+{
+    if (Rect == nullptr)
+        return FALSE;
+    Rect->left = Left;
+    Rect->top = Top;
+    Rect->right = Right;
+    Rect->bottom = Bottom;
+    return TRUE;
+}
+inline BOOL SetRectEmpty(LPRECT Rect)
+{
+    return SetRect(Rect, 0, 0, 0, 0);
+}
+inline BOOL IsRectEmpty(const RECT* Rect)
+{
+    return Rect == nullptr || Rect->right <= Rect->left || Rect->bottom <= Rect->top;
+}
+
 // No message loop yet (M3): nothing to post to.
 inline void PostQuitMessage(int) {}
 

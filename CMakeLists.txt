@@ -97,7 +97,7 @@ else()
   # client modules ported so far (M2: the stand-in <windows.h> of src/include/posix), and
   # PortTests, the checks of the port's platform headers and of those modules (last: its
   # module_tests depend on them).
-  set(FL_PROJECTS qhull TexConvert DPNet dacom zlib x86math system ReadFile luaprofile Thorn EngBase PortTests)
+  set(FL_PROJECTS qhull TexConvert DPNet dacom zlib x86math system ReadFile luaprofile Thorn EngBase ximage Shading PortTests)
   enable_testing()
 endif()
 foreach(_project IN LISTS FL_PROJECTS)

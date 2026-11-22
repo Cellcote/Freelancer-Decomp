@@ -89,8 +89,7 @@ static constexpr FlULong GBindTable_06ed1c54[] = {0x89, 0x1, 0x1D, 0x0, 0x1B, 0x
 static void BindDetailTexture(IRenderPipeline* Pipeline, const FTexBlock& Block,
                               FlULong Stage)
 {
-    Pipeline->SetTextureStageTexture((int)Stage,
-                                    (void*)(Block.Handle));
+    Pipeline->SetTextureStageTexture((int)Stage, LowArena::Decode<void>((FlLong)Block.Handle));
     Pipeline->SetTextureStageState((int)Stage, D3DTSS_TEXCOORDINDEX,
                                   Block.Flags >= 4 ? Block.Flags - 4 : 0);
     Pipeline->SetTextureStageState((int)Stage, D3DTSS_ADDRESSU, Block.AddressU + 1);
@@ -321,7 +320,7 @@ void ReleaseSchemaPayload(FShadingPropertyValue& Value)
 {
     if (Value.Type == 6)
     {
-        IDAComponent* Component = (IDAComponent*)(Value.Payload0);
+        IDAComponent* Component = ShadingPayloadTo<IDAComponent>(Value.Payload0);
         Value.Payload0 = 0;
         if (Component != nullptr)
             Component->Release();
@@ -726,11 +725,11 @@ void AssignOverlappingZeroAddressMode(void* TypeAddress, FlULong& Payload)
         if (PreviousType == 5 || PreviousType == 7)
         {
             if (Payload != 0)
-                HeapFree(GetProcessHeap(), 0, (void*)Payload);
+                ShadingPayloadFreeString(Payload);
         }
         else if (PreviousType == 6)
         {
-            IDAComponent* Component = (IDAComponent*)Payload;
+            IDAComponent* Component = ShadingPayloadTo<IDAComponent>(Payload);
             Payload = 0;
             if (Component != nullptr)
                 Component->Release();
@@ -802,7 +801,9 @@ void InitializeBtDetailPropertySchema()
     // following words overlap record zero and are published in setter order.
     GbAtmospherePropertySchemaInitialized = false;
     FShadingPropertyRecord& Atmosphere = GAtmospherePropertySchema[0];
-    Atmosphere.Flags = (FlULong)("Bt_flags");
+    // Retail stores the string's address as the flags (an oddity); 64-bit builds keep its low
+    // 32 bits, as the field holds.
+    Atmosphere.Flags = (FlULong)(std::uintptr_t)("Bt_flags");
     Atmosphere.Name = "DetailTexture V Address Mode";
     Atmosphere.Description = GPropertyMetadata_06ed56c4;
     AssignOverlappingZeroAddressMode(&Atmosphere.Callback, Atmosphere.Current.Type);
@@ -1453,7 +1454,8 @@ GENRESULT DACOM_API FMaterial::SaveProperties(void* FileSystem)
         case 5:
         case 7:
         case 6:
-            Value.Assign(Value.Type, (const void*)(Target[0]));
+            // The parameter holds the string or component pointer itself (pointer-sized).
+            Value.Assign(Value.Type, *(const void* const*)Target);
             break;
         }
         GENRESULT WriteResult = GR_OK;
@@ -1471,7 +1473,7 @@ GENRESULT DACOM_API FMaterial::SaveProperties(void* FileSystem)
         case 5:
         case 7:
         {
-            const char* Text = (const char*)(Value.Payload0);
+            const char* Text = ShadingPayloadTo<const char>(Value.Payload0);
             WriteResult = WriteMaterialPropertyBytes(Files, Record.Name, Text,
                 (FlULong)(std::strlen(Text) + 1));
             break;
@@ -1513,15 +1515,15 @@ GENRESULT FMaterial::ApplyVerifyMatAnim()
     const GENRESULT QueryResult = Pipeline->QueryInterface(Iids::MatAnimLibrary, (void**)&AnimationLibrary);
     if (QueryResult >= 0)
     {
-        FlULong Query[2];
-        Query[0] = (FlULong)InstanceName;
-        Query[1] = DACOM_CRC::GetCRC32(InstanceName);
+        FMaterialCrcQuery Query;
+        Query.Name = InstanceName;
+        Query.Crc = DACOM_CRC::GetCRC32(InstanceName);
         if (MatAnim != nullptr)
         {
             MatAnim->Release();
             MatAnim = nullptr;
         }
-        AnimationLibrary->CreateAnimationInstance(-1, Query, &MatAnim);
+        AnimationLibrary->CreateAnimationInstance(-1, &Query, &MatAnim);
     }
     Setup();
     Bind(nullptr);
@@ -2593,23 +2595,23 @@ static void CopyPropertyValue(FShadingPropertyValue* Destination, const FShading
     case 5:
     case 7:
     {
-        const char* Text = (const char*)(Source->Payload0);
+        const char* Text = ShadingPayloadTo<const char>(Source->Payload0);
         if (Destination->Payload0 != 0)
-            HeapFree(GetProcessHeap(), 0, (void*)(Destination->Payload0));
+            ShadingPayloadFreeString(Destination->Payload0);
         Destination->Payload0 = 0;
         if (Text != nullptr)
         {
             char* Copy = (char*)(HeapAlloc(GetProcessHeap(), 0, std::strlen(Text) + 1));
-            Destination->Payload0 = (FlULong)Copy;
+            Destination->Payload0 = ShadingPayloadOf(Copy);
             std::strcpy(Copy, Text);
         }
         break;
     }
     case 6:
     {
-        IDAComponent* Component = (IDAComponent*)(Source->Payload0);
-        IDAComponent* Previous = (IDAComponent*)(Destination->Payload0);
-        Destination->Payload0 = (FlULong)Component;
+        IDAComponent* Component = ShadingPayloadTo<IDAComponent>(Source->Payload0);
+        IDAComponent* Previous = ShadingPayloadTo<IDAComponent>(Destination->Payload0);
+        Destination->Payload0 = ShadingPayloadOf(Component);
         if (Component != nullptr)
             Component->AddRef();
         if (Previous != nullptr)
@@ -2681,13 +2683,13 @@ GENRESULT DACOM_API FMaterial::GetParameterValue(FlULong Index, void* InOutDesc)
         // before making a ProcessHeap copy of the NUL-terminated live value.
         const char* Source = *(const char* const*)Target;
         if (Result->Payload0 != 0)
-            HeapFree(GetProcessHeap(), 0, (void*)(Result->Payload0));
+            ShadingPayloadFreeString(Result->Payload0);
         Result->Payload0 = 0;
         if (Source != nullptr)
         {
             const size_t Size = std::strlen(Source) + 1;
             char* Copy = (char*)(HeapAlloc(GetProcessHeap(), 0, Size));
-            Result->Payload0 = (FlULong)Copy;
+            Result->Payload0 = ShadingPayloadOf(Copy);
             std::strcpy(Copy, Source);
         }
         break;
@@ -2695,8 +2697,8 @@ GENRESULT DACOM_API FMaterial::GetParameterValue(FlULong Index, void* InOutDesc)
     case 6:
     {
         IDAComponent* Component = *(IDAComponent**)Target;
-        IDAComponent* Previous = (IDAComponent*)(Result->Payload0);
-        Result->Payload0 = (FlULong)Component;
+        IDAComponent* Previous = ShadingPayloadTo<IDAComponent>(Result->Payload0);
+        Result->Payload0 = ShadingPayloadOf(Component);
         if (Component != nullptr)
             Component->AddRef();
         if (Previous != nullptr)
@@ -2813,7 +2815,7 @@ GENRESULT __thiscall FMaterial::Setup()
     const FlULong Handle = TexBlocks[0].Handle;
     if (Handle == 0)
         return GR_OK;
-    if (Pipeline->GetTextureFormat((void*)Handle, &FormatIndex) < 0)
+    if (Pipeline->GetTextureFormat(LowArena::Decode<void>((FlLong)Handle), &FormatIndex) < 0)
         return GR_OK;
     bAlphatest = PixelFormatAlphaBits(FormatIndex) == 1 ? 1 : 0;
     const bool bHasAlpha = (FormatIndex >= 10 && FormatIndex <= 14) ||
@@ -2899,14 +2901,14 @@ GENRESULT __thiscall FMaterial::StoreParameterValue(FlULong Index, void* Entry, 
             char** TextTarget = (char**)Target;
             delete[] *TextTarget;
             *TextTarget = nullptr;
-            const char* Source = (const char*)(Typed->Payload0);
+            const char* Source = ShadingPayloadTo<const char>(Typed->Payload0);
             if (Source != nullptr)
             {
                 const size_t Size = std::strlen(Source) + 1;
                 char* Copy = new char[Size];
                 *TextTarget = Copy;
                 // 248a rereads the value after publishing the allocated target.
-                std::strcpy(Copy, (const char*)(Typed->Payload0));
+                std::strcpy(Copy, ShadingPayloadTo<const char>(Typed->Payload0));
             }
             break;
         }
@@ -2914,7 +2916,7 @@ GENRESULT __thiscall FMaterial::StoreParameterValue(FlULong Index, void* Entry, 
         {
             IDAComponent** ComponentTarget = (IDAComponent**)Target;
             IDAComponent* Previous = *ComponentTarget;
-            IDAComponent* Component = (IDAComponent*)(Typed->Payload0);
+            IDAComponent* Component = ShadingPayloadTo<IDAComponent>(Typed->Payload0);
             *ComponentTarget = Component;
             if (Component != nullptr)
                 Component->AddRef();
@@ -3251,7 +3253,8 @@ void FMaterial::ApplyOcFlag()
         return;
     // FUN_06ed0b60(0) → index of DAT_06ed51d8 value 0 = 0. Pipeline +0xC8 overwrites.
     int FormatIndex = 0;
-    const GENRESULT Result = Pipeline->GetTextureFormat((void*)Handle, &FormatIndex);
+    const GENRESULT Result =
+        Pipeline->GetTextureFormat(LowArena::Decode<void>((FlLong)Handle), &FormatIndex);
     if (Result < 0)
         return;
     bAlphatest = (PixelFormatAlphaBits(FormatIndex) == 1) ? 1 : 0;
@@ -3337,14 +3340,14 @@ GENRESULT DACOM_API FBatchedFace::CreateInnerMaterial(void* Name)
 GENRESULT DACOM_API FBatchedFace::SetBatchBin(void* Value)
 {
     FBatchedMaterial* Owner = OwnerFromThis();
-    Owner->Field8 = (FlULong)Value;
+    Owner->Field8 = (FlULong)(std::uintptr_t)Value; // a bin number carried in the pointer
     return GR_OK;
 }
 
 GENRESULT DACOM_API FBatchedFace::GetBatchBin(void** Out)
 {
     FBatchedMaterial* Owner = OwnerFromThis();
-    *Out = (void*)(Owner->Field8);
+    *Out = (void*)(std::intptr_t)(FlLong)Owner->Field8; // -1 stays -1
     return GR_OK;
 }
 
@@ -3588,8 +3591,9 @@ GENRESULT DACOM_API FBatchedMaterial::Submit(void* Context, FlULong PrimType, Fl
         std::memcpy(&DepthBits, &Depth, sizeof(Depth));
     }
     // 4201/4221 reread the batcher and inner after the foreign math callback.
-    return ((IMaterialBatcher2*)Batcher)->Submit(Inner, Context, PrimType, Start, Count, Zero, Field,
-                                                         (void*)DepthBits, Flags);
+    return ((IMaterialBatcher2*)Batcher)
+        ->Submit(Inner, Context, PrimType, Start, Count, Zero, Field,
+                 (void*)(std::uintptr_t)DepthBits, Flags);
 }
 
 GENRESULT DACOM_API FBatchedMaterial::SetName(const char* Name)

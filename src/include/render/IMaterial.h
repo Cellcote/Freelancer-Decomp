@@ -58,16 +58,16 @@ struct IMaterial : IDAComponent
 static constexpr FlULong kMaterialParamDescSize = 0x4C;
 // Material factories take dacom.h's FAGGDESC14 (formerly FMaterialAggregateDesc here).
 // Material properties retain their contiguous 17-float storage.
-FL_LAYOUT_ASSERT(sizeof(D3DMATERIAL8) == 17 * sizeof(float), "material render block size");
+FL_LAYOUT_ASSERT(sizeof(RpMaterial) == 17 * sizeof(float), "material render block size");
 
 inline GENRESULT SetMaterialBlock(IRenderPipeline* Pipeline, const float* Block)
 {
-    return Pipeline->SetMaterial((const D3DMATERIAL8*)Block);
+    return Pipeline->SetMaterial((const RpMaterial*)Block);
 }
 
 inline GENRESULT GetMaterialBlock(IRenderPipeline* Pipeline, float* Block)
 {
-    return Pipeline->GetMaterial((D3DMATERIAL8*)Block);
+    return Pipeline->GetMaterial((RpMaterial*)Block);
 }
 
 // Borrowed index-buffer handle and draw offset.
