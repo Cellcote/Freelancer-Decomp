@@ -158,8 +158,9 @@ int main(int argc, char** argv)
     char Found[1024] = {};
     char* FilePart = nullptr;
     DWORD const FoundLength = SearchPathA(Folder.c_str(), "SYSTEM.DLL", nullptr, sizeof(Found), Found, &FilePart);
-    Check(FoundLength > 0 && FilePart != nullptr && Platform::ModuleFind(Found) != nullptr,
-          "SearchPathA finds system.dll as the module this platform built");
+    Check(FoundLength > 0 && FilePart != nullptr && strncasecmp(FilePart, "system.", 7) == 0 &&
+              Platform::ModuleFind(Found) != nullptr,
+          "SearchPathA finds system.dll as the module this platform built, by a path that opens");
     Check(SearchPathA(Folder.c_str(), "nothing.dll", nullptr, sizeof(Found), Found, nullptr) == 0,
           "SearchPathA: a missing module");
 
