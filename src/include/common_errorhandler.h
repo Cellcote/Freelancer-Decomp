@@ -31,10 +31,10 @@ enum SeverityLevel
 namespace ErrorHandler
 {
     // Common.dll.c ErrorHandler::activate @ 0xaad30. Installs the FDUMP hook
-    // (LAB_0630abd0, Common/core/errorhandler.cpp FdumpHook): each FDUMP call goes to every
+    // (LAB_0630abd0, common_errorhandler.cpp FdumpHook): each FDUMP call goes to every
     // active channel whose LogId is -1 or equals flags >> 4 and whose severity limit
     // is not below the flags' low nibble. A non-null AssertHandler is stored into
-    // PTR_LAB_063ed214 (Common/core/errorhandler.cpp g_ErrorAssertHandler, default = the
+    // PTR_LAB_063ed214 (common_errorhandler.cpp g_ErrorAssertHandler, default = the
     // MessageBoxA wrapper LAB_0630ab90); retail Common never reads that pointer back.
     COMMON_API void __cdecl activate(char const* IniPath,
                                       int (__cdecl* AssertHandler)(char const*, char const*, bool));

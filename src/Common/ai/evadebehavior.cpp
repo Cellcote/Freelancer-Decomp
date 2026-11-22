@@ -10,7 +10,7 @@
                                    // GetIfaceVectorMagnitude
 #include "common_csys.h"           // Transform
 #include "common_iface.h"          // IObjInspect, IObjRW, ObjInspectOf, ObjRwFromWatchable
-#include "iustategraph.h"   // FindClosestHostileTarget
+#include "iustategraph.h" // FindClosestHostileTarget
 #include "common_systemmanager.h"  // SystemManager -- what NavHelperPtr24 points at
 
 #include <cmath>

@@ -7,7 +7,7 @@
 #include "largeshipbehavior.h"
 #include "common_iface.h" // FL_OBJRW_WATCHABLE_OFFSET
 #include "common_aisteer.h"        // ComputeWeaponSlotStat (item 1846), FAiTarget, GetCachedRange, RaySphereIntersect
-#include "iustategraph.h"   // BuildAiTargetList / GetAiTargetList (item 1800)
+#include "iustategraph.h" // BuildAiTargetList / GetAiTargetList (item 1800)
 #include "common_systemmanager.h"  // SystemManager, FAiTargetVector
 #include "common_ini.h"            // Vec3Assign (FUN_0628b030, item 763)
 #include "aisteer_internal.h" // CmnAiSteer::InlineFastLength

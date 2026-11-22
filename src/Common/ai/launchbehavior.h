@@ -367,7 +367,7 @@ private:
     // watcher target is gone); the only caller ignores it.
     bool StartLaunchSequence();
     void SetApproachSpeedParam(float Value);   // ICF-mislabeled `DeviceTRC::bind_to_dc(SubObjectA,
-                                                // Value)` -- see ai/buzzbehavior.h's own
+                                                // Value)` -- see common_buzzbehavior.h's own
                                                 // documented ICF-mislabel precedent for this exact
                                                 // retail symbol; real callee/class unidentified.
     // FUN_062d5980(SubObjectA, Flag). WIRED FOR REAL 2026-09-11 (d312:common-port):

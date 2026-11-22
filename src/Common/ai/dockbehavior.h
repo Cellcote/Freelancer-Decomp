@@ -661,7 +661,7 @@ public:
                                        // (claude:abi-pass50): ctor FUN_062d9bf0, vtable
                                        // .rdata:063a0568, COL at [-4] == 063a0564 ->
                                        // 063a9c18 -> SplineMoveIdea::RTTI_Type_Descriptor
-                                       // (ai/idea.h). sizeof(SplineMoveIdea) == 0x174
+                                       // (common_idea.h). sizeof(SplineMoveIdea) == 0x174
                                        // matches this field's long-confirmed span exactly,
                                        // and 0x168 + 0x174 == 0x2dc lands precisely on
                                        // GotoDirective below. Its own two embedded Idea

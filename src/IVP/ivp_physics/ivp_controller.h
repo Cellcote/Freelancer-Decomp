@@ -233,7 +233,7 @@ public:
 
 class IVP_Real_Object;
 class Vector;
-struct FLControllerGolemParms;  // the stack-built tuning block, src/Common/physics/physys.cpp
+struct FLControllerGolemParms;  // the stack-built tuning block, src/Common/common_physys.cpp
 
 // ============================================================================
 // IVP_Controller_Dependent -- RTTI-CONFIRMED NAME, the direct base of PhySys::Controller.

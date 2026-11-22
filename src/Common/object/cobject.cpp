@@ -246,7 +246,7 @@ namespace CmnCobject
     // lazily-created IVP math-helper singleton (vtable slot +0x2c off DAT_063fcXXX)
     // to rotate a world-space AngularVelocity into object space before handing it to
     // PhySys::AddToAngularVelocityOS, which stores an object-space delta (see
-    // AddToAngularVelocityOS/GetAngularVelocityOS in physics/physys.cpp). Same
+    // AddToAngularVelocityOS/GetAngularVelocityOS in common_physys.cpp). Same
     // transpose-multiply pattern as CShip::check_formation_follower_status, which
     // uses it (in the opposite, local-to-world direction) to place formation
     // followers. Identical singleton-call pattern in CGuided, CMine,

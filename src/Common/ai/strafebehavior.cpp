@@ -10,7 +10,7 @@
 #include "common_iface.h"          // IObjInspect, IObjRW, ObjRwFromWatchable, ObjInspectOf
 #include "common_systemmanager.h"  // SystemManager -- what NavHelperPtr24 actually points at
 #include "common_misc.h"           // random_sphere_constrained_2
-#include "behavior.h"       // Behavior_GetIfaceMaxScalarAttribute and friends
+#include "behavior.h" // Behavior_GetIfaceMaxScalarAttribute and friends
 #include "common_aisteer.h"        // GetIfacePositionOrZero, GetObjectTypeOrZero, FAiTarget,
                                    // BearingAngleToIface
 #include "common_cobjdb.h"         // IObjDB::GetZoneDb

@@ -194,9 +194,9 @@ public:
     // Watcher2c's own true size is not independently confirmed (see
     // IdleBehavior's identical caveat).
     // ------------------------------------------------------------------
-    // +0x04..+0x29 is Behavior's own block, declared once on Behavior (ai/behavior.h).
+    // +0x04..+0x29 is Behavior's own block, declared once on Behavior (common_behavior.h).
 
-    IdleIdea Watcher2c;        // +0x2c. IdleIdea (ai/idea.h; ctor FUN_062d9b10 at
+    IdleIdea Watcher2c;        // +0x2c. IdleIdea (common_idea.h; ctor FUN_062d9b10 at
                                // .text:062d0a42), identified 2026-10-08, 0x14 bytes.
     float Field40;             // +0x40. Zeroed by SetContext(); set to Param->Field_0c by
                                // ApplyDirective(); compared (FCOMP) against Field44 in Update().

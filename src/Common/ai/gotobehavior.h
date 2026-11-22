@@ -161,14 +161,14 @@ public:
     // lives on the GotoBehaviorFields intermediate base above.
 
     MoveIdea SubObjectA;               // +0x2c, ends +0xa4. RTTI-identified as MoveIdea
-                                       // (ctor FUN_062d4e60, ai/idea.h) -- was an
+                                       // (ctor FUN_062d4e60, common_idea.h) -- was an
                                        // opaque `unsigned char[0x78]` byte-blob prior to
                                        // this pass. sizeof(MoveIdea) == 0x78 confirmed
                                        // exactly matches this span. Its own BaseWatcher
                                        // lives at relative +0x14 (absolute +0x40), per the
                                        // real destructor's own confirmed unwatch call.
     FaceIdea SubObjectB;               // +0xa4, ends +0x164. RTTI-identified as FaceIdea
-                                       // (ctor FUN_062d6750, ai/idea.h) -- was an
+                                       // (ctor FUN_062d6750, common_idea.h) -- was an
                                        // opaque `unsigned char[0xc0]` byte-blob prior to
                                        // this pass. sizeof(FaceIdea) == 0xc0 confirmed
                                        // exactly matches this span. Its own BaseWatcher
@@ -178,7 +178,7 @@ public:
                                        // SplineMoveIdea 2026-09-17 (ctor FUN_062d9bf0,
                                        // vtable .rdata:063a0568, COL 063a9c18 ->
                                        // SplineMoveIdea::RTTI_Type_Descriptor; see
-                                       // ai/idea.h) -- was an opaque
+                                       // common_idea.h) -- was an opaque
                                        // `unsigned char[0x174]` byte-blob before.
                                        // sizeof(SplineMoveIdea) == 0x174 matches this span
                                        // exactly. The two BaseWatchers the real destructor
@@ -203,7 +203,7 @@ public:
     unsigned char Flag2eb;             // +0x2eb. Zeroed by ctor's own write, but
                                         // OVERWRITTEN to 1 by FreeFlightBehavior's own ctor
                                         // AFTER it re-installs its own vtable on top of
-                                        // GotoBehavior's -- see ai/freeflightbehavior.cpp.
+                                        // GotoBehavior's -- see common_freeflightbehavior.cpp.
     unsigned char Flag2ec;              // +0x2ec. Zeroed by ctor.
     unsigned char Pad2ed[0x2f0 - 0x2ed]; // unconfirmed span
     float Field2f0;               // +0x2f0. Set to 1.5f by ctor (retail: 0x3fc00000).

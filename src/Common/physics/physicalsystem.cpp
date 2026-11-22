@@ -54,7 +54,7 @@
 #include <utility>
 #include <vector>
 
-#include <mmsystem.h>  // timeGetTime (PhysicalSystem::Update, .text:0628ca84); winmm is linked by player/playeraccount.cpp
+#include <mmsystem.h> // timeGetTime (PhysicalSystem::Update, .text:0628ca84); winmm is linked by player/playeraccount.cpp
 #include "platform.h"
 
 

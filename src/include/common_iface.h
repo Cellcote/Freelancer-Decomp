@@ -1017,7 +1017,7 @@ FL_LAYOUT_ASSERT(sizeof(IObjInspectImpl) == 0x14, "IObjInspectImpl sizeof 0x14")
 // StateGraph after get_state_graph's exported name; that name is retail's, and
 // says nothing about the FUN_062ed780 cluster.
 class IBehaviorManager;
-class Behavior;   // Common/ai/behavior.h -- what the dispatch table holds
+class Behavior;   // common_behavior.h -- what the dispatch table holds
 
 COMMON_API IBehaviorManager* __cdecl GetBehaviorManager(IObjRW* Obj);
 
