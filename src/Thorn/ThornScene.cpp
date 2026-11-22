@@ -8669,11 +8669,17 @@ namespace
         double Payload;
         std::memcpy(&Payload, Words, sizeof(Payload));
         char Temporary[512];
+#if defined(_MSC_VER)
         // Native current-MSVC Win32 va_list reads the actual double object.
         // Passing it by value would add FLD64/FSTP64 before CRT consumption.
         va_list Args = reinterpret_cast<va_list>(&Payload);
         std::vsprintf(Temporary, "%.6f", Args);
         va_end(Args);
+#else
+        // PORT(macOS): a va_list is no pointer to the arguments outside MSVC; the double goes by
+        // value (no x87 here to change its bits on the way).
+        std::sprintf(Temporary, "%.6f", Payload);
+#endif
         return SaveBufAppendText(Buf, Temporary);
     }
 
@@ -9046,10 +9052,16 @@ namespace
         Arguments[2] = static_cast<double>(M20);
         Arguments[1] = static_cast<double>(M10);
         Arguments[0] = static_cast<double>(M00);
+#if defined(_MSC_VER)
         // Current x86 va_list reads these nine actual double objects in order.
         va_list Args = reinterpret_cast<va_list>(const_cast<double*>(Arguments));
         std::vsprintf(Temporary, Format, Args);
         va_end(Args);
+#else
+        // PORT(macOS): the nine doubles by value (see SaveBufAppendIntegerAsDouble).
+        std::sprintf(Temporary, Format, Arguments[0], Arguments[1], Arguments[2], Arguments[3], Arguments[4],
+                     Arguments[5], Arguments[6], Arguments[7], Arguments[8]);
+#endif
         return SaveBufAppendText(Buf, Temporary);
     }
 
