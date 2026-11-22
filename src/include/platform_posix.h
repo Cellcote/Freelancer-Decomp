@@ -1156,6 +1156,19 @@ namespace Platform
         return Detail::As<Detail::FThread>(Thread) != nullptr;
     }
 
+    // GetExitCodeThread: the thread's result, or kStillActive while it runs. False for a handle
+    // that is not a thread.
+    constexpr FlULong kStillActive = 0x103;
+    inline bool ThreadExitCode(Handle Thread, FlULong* ExitCode)
+    {
+        Detail::FThread* const Object = Detail::As<Detail::FThread>(Thread);
+        if (Object == nullptr || ExitCode == nullptr)
+            return false;
+        std::lock_guard<std::mutex> Lock(Detail::WaitLock());
+        *ExitCode = Object->bDone ? Object->ExitCode : kStillActive;
+        return true;
+    }
+
     // TerminateThread: POSIX has no safe equivalent, so it fails.
     inline bool ThreadTerminate(Handle Thread, FlULong ExitCode)
     {

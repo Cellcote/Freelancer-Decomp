@@ -29,6 +29,13 @@
 #include <string>
 #include <vector>
 
+#if !defined(_WIN32)
+#include <clocale>
+#include <csignal>
+
+#include <pthread.h>
+#endif
+
 #include "common_ini.h"           // INI_Reader, ILoadingScreen, RegisterLoadingScreen
 #include "common_net.h"           // SetIsMPServer
 #include "common_server_types.h"  // SStartupInfo, ServerStats
@@ -325,6 +332,11 @@ namespace
         char Directory[MAX_PATH];
         strcpy(Directory, ModulePath);
         char* Slash = strrchr(Directory, '\\');
+        if (char* const Forward = strrchr(Directory, '/');
+            Forward != nullptr && (Slash == nullptr || Forward > Slash))
+        {
+            Slash = Forward; // PORT(macOS): a native path
+        }
         if (Slash == nullptr)
         {
             return false;
@@ -600,6 +612,7 @@ namespace
         return 0;
     }
 
+#if defined(_WIN32)
     BOOL WINAPI ConsoleCtrlHandler(DWORD Type)
     {
         SetEvent(GStopEvent);
@@ -611,6 +624,34 @@ namespace
         }
         return TRUE;
     }
+#else
+    // PORT(macOS): the console handler's job on macOS and Linux. SIGINT, SIGTERM and SIGHUP are
+    // blocked in every thread (BlockStopSignals, before the first thread starts) and taken by
+    // this one with sigwait, which may set the stop event (a signal handler may not: it locks).
+    // The process then stops as from the "quit" command and saves the players.
+    sigset_t GStopSignals;
+
+    void BlockStopSignals()
+    {
+        sigemptyset(&GStopSignals);
+        sigaddset(&GStopSignals, SIGINT);
+        sigaddset(&GStopSignals, SIGTERM);
+        sigaddset(&GStopSignals, SIGHUP);
+        pthread_sigmask(SIG_BLOCK, &GStopSignals, nullptr);
+    }
+
+    DWORD WINAPI StopSignalThreadProc(LPVOID)
+    {
+        for (;;)
+        {
+            int Signal = 0;
+            if (sigwait(&GStopSignals, &Signal) == 0)
+            {
+                SetEvent(GStopEvent);
+            }
+        }
+    }
+#endif
 
     // FLServer's BeginShutdown (.text:0040b510) without the UI pumping: stop the server thread
     // (killed after 600 waits of 100 ms), then IServerImpl::Shutdown on its own thread.
@@ -624,7 +665,14 @@ namespace
                 if (WaitForSingleObject(GServerThread, 600 * 100) == WAIT_TIMEOUT)
                 {
                     LogStatus("The server thread does not stop; ending it.");
-                    TerminateThread(GServerThread, 0);
+                    if (TerminateThread(GServerThread, 0) == FALSE)
+                    {
+                        // No TerminateThread on macOS and Linux: Shutdown must not run beside
+                        // a server thread that is still running, so the process ends here.
+                        LogStatus("The server thread cannot be ended; exiting without shutdown.");
+                        std::fflush(nullptr);
+                        std::_Exit(3);
+                    }
                 }
                 CloseHandle(GServerThread);
                 GServerThread = nullptr;
@@ -761,6 +809,9 @@ namespace
 
 int wmain(int Argc, wchar_t** Argv)
 {
+#if !defined(_WIN32)
+    BlockStopSignals(); // before any thread starts, so that every thread inherits the mask
+#endif
     ReserveLowAddressSpaceIfRequested();
 
     if (!ParseOptions(Argc, Argv, GOptions))
@@ -792,7 +843,11 @@ int wmain(int Argc, wchar_t** Argv)
     // FLServer's console view routes DACOM's FDUMP into ServerLogf (CFLServerView ctor).
     FDUMP = (void(__cdecl*)(int, const char*, ...))ServerLog;
     CriticalWarningFn = CriticalWarning;
+#if defined(_WIN32)
     SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
+#else
+    CloseHandle(CreateThread(nullptr, 0, StopSignalThreadProc, nullptr, 0, nullptr));
+#endif
 
     // AfxOleInit in InitInstance.
     const HRESULT ComResult = CoInitialize(nullptr);
@@ -810,3 +865,43 @@ int wmain(int Argc, wchar_t** Argv)
     SetEvent(GDoneEvent);
     return Result;
 }
+
+#if !defined(_WIN32)
+// PORT(macOS): no wmain outside Windows. The arguments are widened from the locale's encoding
+// (UTF-8), as the Windows console hands them to wmain.
+int main(int Argc, char** Argv)
+{
+    std::setlocale(LC_CTYPE, "");
+    std::vector<std::wstring> Wide;
+    Wide.reserve(static_cast<size_t>(Argc));
+    for (int Index = 0; Index < Argc; ++Index)
+    {
+        std::wstring Text;
+        std::mbstate_t State{};
+        const char* Source = Argv[Index];
+        const size_t Length = std::mbsrtowcs(nullptr, &Source, 0, &State);
+        if (Length != static_cast<size_t>(-1))
+        {
+            Text.resize(Length);
+            Source = Argv[Index];
+            State = std::mbstate_t{};
+            std::mbsrtowcs(&Text[0], &Source, Length, &State);
+        }
+        else
+        {
+            for (const char* Cursor = Argv[Index]; *Cursor != 0; ++Cursor)
+            {
+                Text += static_cast<wchar_t>(static_cast<unsigned char>(*Cursor));
+            }
+        }
+        Wide.push_back(Text);
+    }
+    std::vector<wchar_t*> Pointers;
+    for (std::wstring& Text : Wide)
+    {
+        Pointers.push_back(&Text[0]);
+    }
+    Pointers.push_back(nullptr);
+    return wmain(Argc, Pointers.data());
+}
+#endif

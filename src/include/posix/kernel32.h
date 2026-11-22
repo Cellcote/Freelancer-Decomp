@@ -22,6 +22,7 @@
 #include <cerrno>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <cwchar>
 #include <map>
 #include <mutex>
@@ -688,4 +689,151 @@ inline BOOL GetStringTypeW(DWORD InfoType, const wchar_t* Text, int Count, WORD*
         Types[Index] = bSpace ? C1_SPACE : 0;
     }
     return TRUE;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Threads, events and mutexes (the dedicated server's host): the platform layer's, under the
+// Win32 names. Security attributes are ignored, as the platform layer has none.
+// ---------------------------------------------------------------------------------------------
+typedef DWORD(WINAPI* LPTHREAD_START_ROUTINE)(LPVOID);
+#define CREATE_SUSPENDED 0x00000004
+#define STILL_ACTIVE 0x103
+#define THREAD_PRIORITY_LOWEST (-2)
+#define THREAD_PRIORITY_BELOW_NORMAL (-1)
+#define THREAD_PRIORITY_NORMAL 0
+#define THREAD_PRIORITY_ABOVE_NORMAL 1
+#define THREAD_PRIORITY_HIGHEST 2
+
+inline HANDLE CreateThread(void*, std::size_t StackSize, LPTHREAD_START_ROUTINE Start,
+                           LPVOID Parameter, DWORD Flags, LPDWORD ThreadId)
+{
+    FlULong Id = 0;
+    HANDLE const Thread = Platform::ThreadCreate(reinterpret_cast<Platform::ThreadProc>(Start),
+                                                 Parameter, static_cast<FlULong>(StackSize),
+                                                 (Flags & CREATE_SUSPENDED) != 0, &Id);
+    if (ThreadId != nullptr)
+        *ThreadId = Id;
+    return Thread;
+}
+inline DWORD ResumeThread(HANDLE Thread)
+{
+    return Platform::ThreadResume(Thread);
+}
+inline BOOL SetThreadPriority(HANDLE Thread, int Priority)
+{
+    return Platform::ThreadSetPriority(Thread, Priority) ? TRUE : FALSE;
+}
+inline BOOL GetExitCodeThread(HANDLE Thread, LPDWORD ExitCode)
+{
+    FlULong Code = 0;
+    if (ExitCode == nullptr || !Platform::ThreadExitCode(Thread, &Code))
+        return FALSE;
+    *ExitCode = Code;
+    return TRUE;
+}
+// No safe equivalent on POSIX: it fails, and the caller has to handle a thread that runs on.
+inline BOOL TerminateThread(HANDLE Thread, DWORD ExitCode)
+{
+    return Platform::ThreadTerminate(Thread, ExitCode) ? TRUE : FALSE;
+}
+
+inline HANDLE CreateEventA(void*, BOOL ManualReset, BOOL InitialState, LPCSTR Name)
+{
+    return Platform::EventCreate(ManualReset != FALSE, InitialState != FALSE, Name);
+}
+inline BOOL SetEvent(HANDLE Event)
+{
+    return Platform::EventSet(Event) ? TRUE : FALSE;
+}
+inline BOOL ResetEvent(HANDLE Event)
+{
+    return Platform::EventReset(Event) ? TRUE : FALSE;
+}
+// bInitialOwner is not supported (the code makes its mutexes unowned).
+inline HANDLE CreateMutexA(void*, BOOL InitialOwner, LPCSTR Name)
+{
+    HANDLE const Mutex = Platform::MutexCreate(Name);
+    if (Mutex != nullptr && InitialOwner != FALSE)
+        Platform::WaitOne(Mutex, 0);
+    return Mutex;
+}
+inline BOOL ReleaseMutex(HANDLE Mutex)
+{
+    return Platform::MutexRelease(Mutex) ? TRUE : FALSE;
+}
+inline DWORD WaitForSingleObject(HANDLE Object, DWORD Milliseconds)
+{
+    return Platform::WaitOne(Object, Milliseconds);
+}
+inline DWORD SleepEx(DWORD Milliseconds, BOOL)
+{
+    Platform::SleepMs(Milliseconds);
+    return 0;
+}
+inline LONG InterlockedExchange(LONG volatile* Target, LONG Value)
+{
+    return __atomic_exchange_n(Target, Value, __ATOMIC_SEQ_CST);
+}
+
+// The executable's own path (Module nullptr) or a loaded module's.
+inline DWORD GetModuleFileNameA(HMODULE Module, LPSTR Path, DWORD Size)
+{
+    return Platform::ModulePath(Module, Path, Size);
+}
+inline BOOL SetCurrentDirectoryA(LPCSTR Path)
+{
+    return Platform::ChangeDirectory(Path) ? TRUE : FALSE;
+}
+
+// No error boxes here to switch off.
+#define SEM_FAILCRITICALERRORS 0x0001
+#define SEM_NOGPFAULTERRORBOX 0x0002
+#define SEM_NOOPENFILEERRORBOX 0x8000
+inline UINT SetErrorMode(UINT)
+{
+    return 0;
+}
+
+// WideCharToMultiByte to UTF-8 for any code page (CP_ACP is UTF-8 on these systems); the
+// default-character arguments are ignored. As Windows: Count -1 includes the terminator, and
+// a zero OutSize asks for the size.
+#define CP_ACP 0
+#define CP_UTF8 65001
+inline int WideCharToMultiByte(UINT, DWORD, const wchar_t* Text, int Count, LPSTR Out, int OutSize,
+                               LPCSTR, LPBOOL)
+{
+    if (Text == nullptr)
+        return 0;
+    std::size_t const Length = Count < 0 ? std::wcslen(Text) + 1 : static_cast<std::size_t>(Count);
+    std::string Utf8;
+    for (std::size_t Index = 0; Index < Length; ++Index)
+    {
+        std::uint32_t const C = static_cast<std::uint32_t>(Text[Index]);
+        if (C < 0x80)
+            Utf8 += static_cast<char>(C);
+        else if (C < 0x800)
+        {
+            Utf8 += static_cast<char>(0xC0 | (C >> 6));
+            Utf8 += static_cast<char>(0x80 | (C & 0x3F));
+        }
+        else if (C < 0x10000)
+        {
+            Utf8 += static_cast<char>(0xE0 | (C >> 12));
+            Utf8 += static_cast<char>(0x80 | ((C >> 6) & 0x3F));
+            Utf8 += static_cast<char>(0x80 | (C & 0x3F));
+        }
+        else
+        {
+            Utf8 += static_cast<char>(0xF0 | (C >> 18));
+            Utf8 += static_cast<char>(0x80 | ((C >> 12) & 0x3F));
+            Utf8 += static_cast<char>(0x80 | ((C >> 6) & 0x3F));
+            Utf8 += static_cast<char>(0x80 | (C & 0x3F));
+        }
+    }
+    if (OutSize == 0)
+        return static_cast<int>(Utf8.size());
+    if (Out == nullptr || static_cast<std::size_t>(OutSize) < Utf8.size())
+        return 0;
+    std::memcpy(Out, Utf8.data(), Utf8.size());
+    return static_cast<int>(Utf8.size());
 }
