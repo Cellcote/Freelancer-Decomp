@@ -47,9 +47,8 @@ static void RpcFreePacketBlock(void* Block) {
 //   payload+0x14 = Quaternion arg+0x04 (FUN_06d8f4f0)
 //   payload+0x24 = dword arg+0x20        payload+0x28 = dword arg+0x24
 // ===========================================================================
-static bool MarshalUpdateObject(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    const FCommonUpdateObjectInfo* Info =
-        reinterpret_cast<const FCommonUpdateObjectInfo*>(Args[1]);
+static bool MarshalUpdateObject(FPacketBase* Packet, const RpcArg* Args, unsigned int ArgCount) {
+    const FCommonUpdateObjectInfo* Info = RpcArgAs<const FCommonUpdateObjectInfo*>(Args[1]);
     FPayloadCommonUpdateObject Wire;
     Wire.Field_0x00 = Info->Field_0x28;
     Wire.Pad_0x01[0] = 0;
@@ -84,8 +83,8 @@ static bool DeliverUpdateObject(const FPacketBase* Packet, IClient* Client, ICha
 // Sender 0x06d8b310 (IClient+0x000, RET 8), receiver case 2.
 // Argument struct = XFireWeaponInfo (see common_server_types.h).
 // ===========================================================================
-static bool MarshalFireWeapon(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    const XFireWeaponInfo* Info = reinterpret_cast<const XFireWeaponInfo*>(Args[1]);
+static bool MarshalFireWeapon(FPacketBase* Packet, const RpcArg* Args, unsigned int ArgCount) {
+    const XFireWeaponInfo* Info = RpcArgAs<const XFireWeaponInfo*>(Args[1]);
     FPayloadCommonFireWeapon Wire;
     Wire.ObjectId = Info->ObjectId;
     Wire.TargetPos = Info->TargetPos;
@@ -136,8 +135,8 @@ static bool DeliverFireWeapon(const FPacketBase* Packet, IClient* Client, IChatC
 // Sender 0x06d8bd50 (IClient+0x010, RET 8), receiver caseD_4 at 0x06d838c9.
 // Argument struct = XSetTarget (В§3.5).
 // ===========================================================================
-static bool MarshalSetTarget(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    const XSetTarget* Info = reinterpret_cast<const XSetTarget*>(Args[1]);
+static bool MarshalSetTarget(FPacketBase* Packet, const RpcArg* Args, unsigned int ArgCount) {
+    const XSetTarget* Info = RpcArgAs<const XSetTarget*>(Args[1]);
     FPayloadCommonSetTarget Wire;
     Wire.ObjectId = Info->ObjectId;
     Wire.TargetObjectId = Info->TargetObjectId;
@@ -164,7 +163,7 @@ static bool DeliverSetTarget(const FPacketBase* Packet, IClient* Client, IChatCl
 // Sender 0x06d8c470 (IChatClient+0x000, RET 0x10), receiver caseD_5 at 0x06d83900.
 // The only channel-1 type that goes to the chat client rather than to IClient.
 // ===========================================================================
-static bool MarshalChatMsg(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalChatMsg(FPacketBase* Packet, const RpcArg* Args, unsigned int ArgCount) {
     FPayloadCommonChatMsg Wire;
     Wire.Field_0x00 = Args[0];
     Wire.Field_0x04 = Args[1];
@@ -172,7 +171,7 @@ static bool MarshalChatMsg(FPacketBase* Packet, const unsigned int* Args, unsign
     Wire.Size = 0;
     Wire.Buffer = nullptr;
     const unsigned int Size = Args[2];
-    void* Source = reinterpret_cast<void*>(Args[3]);
+    void* Source = RpcArgAs<void*>(Args[3]);
     if (Source != nullptr && Size != 0) {                   // 06d8c499 / 06d8c4a1
         Wire.Size = Size;                                   // 06d8c4a8
         Wire.Buffer = RpcCopyIntoPacketBlock(Source, Size); // 06d8c4aa, bare
@@ -195,8 +194,8 @@ static bool DeliverChatMsg(const FPacketBase* Packet, IClient*, IChatClient* Cha
 // ch1 op 0x08 FLPACKET_COMMON_ACTIVATEEQUIP -- sender 0x06d8bbb0, receiver case 8.
 // Argument struct = XActivateEquip (В§3.2).
 // ===========================================================================
-static bool MarshalActivateEquip(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    const XActivateEquip* Info = reinterpret_cast<const XActivateEquip*>(Args[1]);
+static bool MarshalActivateEquip(FPacketBase* Packet, const RpcArg* Args, unsigned int ArgCount) {
+    const XActivateEquip* Info = RpcArgAs<const XActivateEquip*>(Args[1]);
     FPayloadCommonActivateEquip Wire;
     Wire.ObjectId = Info->ObjectId;
     Wire.bActivate = Info->bActivate ? 1u : 0u;
@@ -220,8 +219,8 @@ static bool DeliverActivateEquip(const FPacketBase* Packet, IClient* Client, ICh
 // ch1 op 0x0e FLPACKET_COMMON_ACTIVATECRUISE -- sender 0x06d8bc10, receiver case 0xe.
 // Argument struct = XActivateCruise (В§3.3).
 // ===========================================================================
-static bool MarshalActivateCruise(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    const XActivateCruise* Info = reinterpret_cast<const XActivateCruise*>(Args[1]);
+static bool MarshalActivateCruise(FPacketBase* Packet, const RpcArg* Args, unsigned int ArgCount) {
+    const XActivateCruise* Info = RpcArgAs<const XActivateCruise*>(Args[1]);
     FPayloadCommonActivateCruise Wire;
     Wire.ObjectId = Info->ObjectId;
     Wire.bActivate = Info->bActivate ? 1u : 0u;
@@ -247,8 +246,8 @@ static bool DeliverActivateCruise(const FPacketBase* Packet, IClient* Client, IC
 // ch1 op 0x0f FLPACKET_COMMON_GOTRADELANE -- sender 0x06d8bcb0, receiver case 0xf.
 // Argument struct = XGoTradelane (В§3.7).
 // ===========================================================================
-static bool MarshalGoTradelane(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    const XGoTradelane* Info = reinterpret_cast<const XGoTradelane*>(Args[1]);
+static bool MarshalGoTradelane(FPacketBase* Packet, const RpcArg* Args, unsigned int ArgCount) {
+    const XGoTradelane* Info = RpcArgAs<const XGoTradelane*>(Args[1]);
     FPayloadCommonGoTradelane Wire;
     Wire.ObjectId = Info->ObjectId;
     Wire.TradelaneRing1 = Info->TradelaneRing1;
@@ -278,7 +277,7 @@ static bool DeliverGoTradelane(const FPacketBase* Packet, IClient* Client, IChat
 // ch1 op 0x10 FLPACKET_COMMON_STOPTRADELANE -- sender 0x06d8bd10, receiver caseD_10.
 // Four arguments in, one dword out: see the note on FPayloadCommonStopTradelane.
 // ===========================================================================
-static bool MarshalStopTradelane(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalStopTradelane(FPacketBase* Packet, const RpcArg* Args, unsigned int ArgCount) {
     FPayloadCommonStopTradelane Wire;
     Wire.Field_0x00 = Args[1];
     Wire.Field_0x04 = 0;   // retail never writes these two
@@ -296,24 +295,24 @@ static bool DeliverStopTradelane(const FPacketBase* Packet, IClient* Client, ICh
 // The buffer family. One marshaller pair, parameterised by whether retail copies and
 // whether the packet takes ownership (payload+0x08, see FPayloadCommonBuffer).
 // ===========================================================================
-static bool MarshalBufferCommon(FPacketBase* Packet, const unsigned int* Args,
-                                unsigned int ArgCount, bool bCopy, unsigned char bOwns) {
+static bool MarshalBufferCommon(FPacketBase* Packet, const RpcArg* Args, unsigned int ArgCount,
+                                bool bCopy, unsigned char bOwns) {
     FPayloadCommonBuffer Wire;
-    Wire.Buffer = reinterpret_cast<void*>(Args[1]);
+    Wire.Buffer = RpcArgAs<void*>(Args[1]);
     Wire.Size = Args[2];
     Wire.bOwnsBuffer = bOwns;
     Wire.Pad_0x09[0] = 0;
     Wire.Pad_0x09[1] = 0;
     Wire.Pad_0x09[2] = 0;
     if (bCopy) {
-        Wire.Buffer = RpcCopyIntoPacketBlock(reinterpret_cast<const void*>(Args[1]), Args[2]);
+        Wire.Buffer = RpcCopyIntoPacketBlock(RpcArgAs<const void*>(Args[1]), Args[2]);
     }
     return RpcPayloadWrite(Packet, 0, Wire);
 }
 
 // op 0x11 FLPACKET_COMMON_SET_WEAPON_GROUP -- sender 0x06d8b4f0, receiver caseD_11.
 // The one sender in the family that leaves payload+0x08 at zero.
-static bool MarshalSetWeaponGroup(FPacketBase* P, const unsigned int* A, unsigned int N) {
+static bool MarshalSetWeaponGroup(FPacketBase* P, const RpcArg* A, unsigned int N) {
     return MarshalBufferCommon(P, A, N, false, 0);
 }
 static bool DeliverSetWeaponGroup(const FPacketBase* Packet, IClient* Client, IChatClient*) {
@@ -326,7 +325,7 @@ static bool DeliverSetWeaponGroup(const FPacketBase* Packet, IClient* Client, IC
 // Stores the caller's pointer and sets the flag (06d8b561 / 06d8b56c / 06d8b573): the
 // packet takes the caller's operator-new block over. Same for 0x17 (06d8b7d3), 0x19
 // (06d8b823), 0x1c (06d8b873) and 0x1a (06d8b8c3).
-static bool MarshalSetVisitedState(FPacketBase* P, const unsigned int* A, unsigned int N) {
+static bool MarshalSetVisitedState(FPacketBase* P, const RpcArg* A, unsigned int N) {
     return MarshalBufferCommon(P, A, N, false, 1);
 }
 static bool DeliverSetVisitedState(const FPacketBase* Packet, IClient* Client, IChatClient*) {
@@ -337,7 +336,7 @@ static bool DeliverSetVisitedState(const FPacketBase* Packet, IClient* Client, I
 
 // op 0x16 FLPACKET_COMMON_REQUEST_BEST_PATH -- sender 0x06d8b590, receiver caseD_16.
 // operator_new(Size) + REP MOVSD/MOVSB at 0x06d8b5b1..0x06d8b5d6: the packet owns the bytes.
-static bool MarshalRequestBestPath(FPacketBase* P, const unsigned int* A, unsigned int N) {
+static bool MarshalRequestBestPath(FPacketBase* P, const RpcArg* A, unsigned int N) {
     return MarshalBufferCommon(P, A, N, true, 1);
 }
 static bool DeliverRequestBestPath(const FPacketBase* Packet, IClient* Client, IChatClient*) {
@@ -347,7 +346,7 @@ static bool DeliverRequestBestPath(const FPacketBase* Packet, IClient* Client, I
 }
 
 // op 0x17 FLPACKET_COMMON_REQUEST_GROUP_POSITIONS -- sender 0x06d8b7a0, receiver caseD_17.
-static bool MarshalRequestGroupPositions(FPacketBase* P, const unsigned int* A, unsigned int N) {
+static bool MarshalRequestGroupPositions(FPacketBase* P, const RpcArg* A, unsigned int N) {
     return MarshalBufferCommon(P, A, N, false, 1);
 }
 static bool DeliverRequestGroupPositions(const FPacketBase* Packet, IClient* Client, IChatClient*) {
@@ -358,7 +357,7 @@ static bool DeliverRequestGroupPositions(const FPacketBase* Packet, IClient* Cli
 
 // op 0x18 FLPACKET_COMMON_REQUEST_PLAYER_STATS -- sender 0x06d8b610, receiver caseD_18.
 // Same operator_new + copy as 0x16.
-static bool MarshalRequestPlayerStats(FPacketBase* P, const unsigned int* A, unsigned int N) {
+static bool MarshalRequestPlayerStats(FPacketBase* P, const RpcArg* A, unsigned int N) {
     return MarshalBufferCommon(P, A, N, true, 1);
 }
 static bool DeliverRequestPlayerStats(const FPacketBase* Packet, IClient* Client, IChatClient*) {
@@ -368,7 +367,7 @@ static bool DeliverRequestPlayerStats(const FPacketBase* Packet, IClient* Client
 }
 
 // op 0x19 FLPACKET_COMMON_SET_MISSION_LOG -- sender 0x06d8b7f0, receiver caseD_19.
-static bool MarshalSetMissionLog(FPacketBase* P, const unsigned int* A, unsigned int N) {
+static bool MarshalSetMissionLog(FPacketBase* P, const RpcArg* A, unsigned int N) {
     return MarshalBufferCommon(P, A, N, false, 1);
 }
 static bool DeliverSetMissionLog(const FPacketBase* Packet, IClient* Client, IChatClient*) {
@@ -378,7 +377,7 @@ static bool DeliverSetMissionLog(const FPacketBase* Packet, IClient* Client, ICh
 }
 
 // op 0x1a FLPACKET_COMMON_REQUEST_RANK_LEVEL -- sender 0x06d8b890, receiver caseD_1a.
-static bool MarshalRequestRankLevel(FPacketBase* P, const unsigned int* A, unsigned int N) {
+static bool MarshalRequestRankLevel(FPacketBase* P, const RpcArg* A, unsigned int N) {
     return MarshalBufferCommon(P, A, N, false, 1);
 }
 static bool DeliverRequestRankLevel(const FPacketBase* Packet, IClient* Client, IChatClient*) {
@@ -388,7 +387,7 @@ static bool DeliverRequestRankLevel(const FPacketBase* Packet, IClient* Client, 
 }
 
 // op 0x1c FLPACKET_COMMON_SET_INTERFACE_STATE -- sender 0x06d8b840, receiver caseD_1c.
-static bool MarshalSetInterfaceState(FPacketBase* P, const unsigned int* A, unsigned int N) {
+static bool MarshalSetInterfaceState(FPacketBase* P, const RpcArg* A, unsigned int N) {
     return MarshalBufferCommon(P, A, N, false, 1);
 }
 static bool DeliverSetInterfaceState(const FPacketBase* Packet, IClient* Client, IChatClient*) {
@@ -404,7 +403,7 @@ static bool DeliverSetInterfaceState(const FPacketBase* Packet, IClient* Client,
 // arguments -- see FLocalClientProxy::SendTradePacket. That mirrors retail, where each of
 // the eight slots writes its own literal into payload+0x00.
 // ===========================================================================
-static bool MarshalPlayerTrade(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
+static bool MarshalPlayerTrade(FPacketBase* Packet, const RpcArg* Args, unsigned int ArgCount) {
     FPayloadCommonPlayerTrade Wire;
     Wire.SubType = Args[0];
     Wire.Field_0x04 = 0;
@@ -428,7 +427,8 @@ static bool MarshalPlayerTrade(FPacketBase* Packet, const unsigned int* Args, un
     // Both senders always hand over a zero-filled array of at least three
     // (SendTradePacket's Marshalled[4], RpcSendTradeToServer's Args[3]).
     const unsigned int A1 = Args[1];
-    const unsigned int A2 = Args[2];
+    // A pointer for sub-types 0x08 / 0x10 (an EquipDesc), a value for the others.
+    const RpcArg A2 = Args[2];
 
     switch (Wire.SubType) {
     case 0x01:   // 0x06d8b8e0 InitiateTrade-shaped
@@ -452,7 +452,7 @@ static bool MarshalPlayerTrade(FPacketBase* Packet, const unsigned int* Args, un
         // 06d8ba48 / 06d8ba52 / 06d8ba5c / 06d8ba71: direct loads off the caller's
         // EquipDesc (+0x04, +0x14, float +0x10, word +0x02); 0x06d8baa0 skips the float.
         Wire.Field_0x08 = A1;
-        const EquipDesc* Desc = reinterpret_cast<const EquipDesc*>(A2);
+        const EquipDesc* Desc = RpcArgAs<const EquipDesc*>(A2);
         Wire.EquipArchId = Desc->ArchId;
         Wire.EquipCount = (unsigned int)Desc->Count;
         Wire.EquipId = Desc->Id;
@@ -522,8 +522,8 @@ static bool DeliverPlayerTrade(const FPacketBase* Packet, IClient* Client, IChat
 // ch1 op 0x14 FLPACKET_COMMON_JETTISONCARGO -- sender 0x06d8bdb0, receiver caseD_14.
 // Argument struct = XJettisonCargo (В§3.8).
 // ===========================================================================
-static bool MarshalJettisonCargo(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    const XJettisonCargo* Info = reinterpret_cast<const XJettisonCargo*>(Args[1]);
+static bool MarshalJettisonCargo(FPacketBase* Packet, const RpcArg* Args, unsigned int ArgCount) {
+    const XJettisonCargo* Info = RpcArgAs<const XJettisonCargo*>(Args[1]);
     FPayloadCommonJettisonCargo Wire;
     Wire.ObjectId = Info->ObjectId;
     Wire.ItemId = Info->ItemId;
@@ -547,8 +547,9 @@ static bool DeliverJettisonCargo(const FPacketBase* Packet, IClient* Client, ICh
 // ch1 op 0x15 FLPACKET_COMMON_ACTIVATETHRUSTERS -- sender 0x06d8bc60, receiver caseD_15.
 // Argument struct = XActivateThrusters (В§3.4).
 // ===========================================================================
-static bool MarshalActivateThrusters(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    const XActivateThrusters* Info = reinterpret_cast<const XActivateThrusters*>(Args[1]);
+static bool MarshalActivateThrusters(FPacketBase* Packet, const RpcArg* Args,
+                                     unsigned int ArgCount) {
+    const XActivateThrusters* Info = RpcArgAs<const XActivateThrusters*>(Args[1]);
     FPayloadCommonActivateThrusters Wire;
     Wire.ObjectId = Info->ObjectId;
     Wire.bActivate = Info->bActivate ? 1u : 0u;
@@ -590,9 +591,9 @@ static bool DeliverActivateThrusters(const FPacketBase* Packet, IClient* Client,
 // Arguments: Args[0] session id (never serialized), Args[1]/Args[2] FmtStr*, Args[3] the
 // dword at packet+0x30 (06d8b780).
 // ===========================================================================
-static bool MarshalPopUpDialog(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    const FmtStr* SourceA = reinterpret_cast<const FmtStr*>(Args[1]);
-    const FmtStr* SourceB = reinterpret_cast<const FmtStr*>(Args[2]);
+static bool MarshalPopUpDialog(FPacketBase* Packet, const RpcArg* Args, unsigned int ArgCount) {
+    const FmtStr* SourceA = RpcArgAs<const FmtStr*>(Args[1]);
+    const FmtStr* SourceB = RpcArgAs<const FmtStr*>(Args[2]);
     FPayloadCommonPopUpDialog Wire;
     Wire.SizeA = 0;
     Wire.SizeB = 0;
@@ -617,8 +618,8 @@ static bool DeliverPopUpDialog(const FPacketBase* Packet, IClient* Client, IChat
 // ch1 op 0x1d FLPACKET_COMMON_TRACTOROBJECTS -- sender 0x06d8be10, receiver caseD_1d.
 // Argument struct = XTractorObjects (В§3.6).
 // ===========================================================================
-static bool MarshalTractorObjects(FPacketBase* Packet, const unsigned int* Args, unsigned int ArgCount) {
-    const XTractorObjects* Info = reinterpret_cast<const XTractorObjects*>(Args[1]);
+static bool MarshalTractorObjects(FPacketBase* Packet, const RpcArg* Args, unsigned int ArgCount) {
+    const XTractorObjects* Info = RpcArgAs<const XTractorObjects*>(Args[1]);
     FPayloadCommonTractorObjects Wire;
     Wire.ObjectId = Info->ObjectId;
     Wire.TractorEquipId = Info->TractorEquipId;
