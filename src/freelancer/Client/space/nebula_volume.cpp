@@ -81,7 +81,7 @@ struct FNebulaVolumeExclusionAccess
 
 namespace
 {
-    const char kNebulaVolumeSource[] = "space/nebula_volume.cpp";
+    const char kNebulaVolumeSource[] = "nebula_volume.cpp";
     // DATA_EXTRA-relative (RenderEx::GetExtraData). Shared helpers: SHADERS\nebula_volume.hlsli.
     const char kNebulaVolumeShader[] = "SHADERS\\nebula_volume.hlsl";
     const char kNebulaCompositeShader[] = "SHADERS\\nebula_composite.hlsl";

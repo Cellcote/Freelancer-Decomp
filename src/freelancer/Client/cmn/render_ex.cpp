@@ -31,7 +31,7 @@
 
 namespace
 {
-    const char kRenderExSource[] = "cmn/render_ex.cpp";
+    const char kRenderExSource[] = "render_ex.cpp";
     // The port's own data lives outside the retail DATA tree, in DATA_EXTRA next to it
     // ([Freelancer] data path "..\DATA" -> "..\DATA_EXTRA"), so an install only adds the folder.
     const char kExtraDataDir[] = "DATA_EXTRA";
