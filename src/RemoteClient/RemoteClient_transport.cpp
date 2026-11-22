@@ -130,12 +130,11 @@ bool CClientImpl::Startup(unsigned int MaxPlayers, unsigned int Port)
 {
     NumClients = 0;
     Host = CreateRemoteClientHost();
-    Host->BeginHosting(Port);
-    Host->SetSessionName(L"Freelancer Default Session Name");
     // PORT(deviation) SERVER-STARTUP-PASSWORD: retail hosts with no password here, and the
     // server's own password is set only once startup finishes (PublishServerSession, after
     // IServerImpl::Startup returns). A client could join in between and stay. Until the
-    // session is published, a random password nobody knows keeps everyone out.
+    // session is published, a random password nobody knows keeps everyone out. It goes in
+    // before BeginHosting, whose Host call takes the session description as it stands.
     {
         std::random_device Random;
         wchar_t Placeholder[33];
@@ -143,6 +142,8 @@ bool CClientImpl::Startup(unsigned int MaxPlayers, unsigned int Port)
             swprintf(Placeholder + i, 9, L"%08x", static_cast<unsigned int>(Random()));
         Host->SetPassword(Placeholder);
     }
+    Host->BeginHosting(Port);
+    Host->SetSessionName(L"Freelancer Default Session Name");
     Host->SetMaxPlayers(static_cast<int>(MaxPlayers));
     Serializer = RpcGetRemotePacketSerializer();
 
