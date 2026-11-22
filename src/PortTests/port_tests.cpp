@@ -85,22 +85,27 @@ namespace
     }
 #endif
 
-    // A scratch directory under the temp folder, removed again by the test that made it.
+    // A new private scratch directory under the temp folder (mkdtemp), removed again by the test
+    // that made it. Empty on failure.
     std::string ScratchDirectory()
     {
         char Temp[1024];
-        Platform::TempDirectory(Temp, sizeof(Temp));
-        std::string Directory = std::string(Temp) + "port_tests_" + std::to_string(getpid());
-        mkdir(Directory.c_str(), 0755);
-        return Directory;
+        if (Platform::TempDirectory(Temp, sizeof(Temp)) == 0)
+            return {};
+        std::string Template = std::string(Temp) + "port_tests_XXXXXX";
+        if (mkdtemp(Template.data()) == nullptr)
+            return {};
+        return Template;
     }
 
     // Retail paths use '\' and spell names in another case than the disk does.
     void TestPlatformFiles()
     {
         std::string const Root = ScratchDirectory();
-        mkdir((Root + "/Data").c_str(), 0755);
-        mkdir((Root + "/Data/Sub").c_str(), 0755);
+        Check(!Root.empty() && mkdir((Root + "/Data").c_str(), 0755) == 0 && mkdir((Root + "/Data/Sub").c_str(), 0755) == 0,
+              "scratch directory made");
+        if (Root.empty())
+            return;
         std::string const Written = Root + "/Data/Sub/File.TXT";
         Platform::Handle File = Platform::FileOpen(Written.c_str(), Platform::kAccessWrite, 0, Platform::kCreateAlways);
         Check(File != Platform::InvalidHandle(), "FileOpen creates a file");
@@ -125,7 +130,17 @@ namespace
 
         Check(Platform::FileCopy(Retail.c_str(), (Root + "/Data/Copy.txt").c_str(), true), "FileCopy");
         Check(!Platform::FileCopy(Retail.c_str(), (Root + "/Data/Copy.txt").c_str(), true), "FileCopy fails onto an existing file");
+        Check(!Platform::FileCopy(Retail.c_str(), (Root + "/DATA/sub/FILE.txt").c_str(), false) &&
+                  Platform::FileGetSize(File = Platform::FileOpen(Written.c_str(), Platform::kAccessRead, 0, Platform::kOpenExisting)) == 10,
+              "FileCopy onto itself fails and leaves the file whole");
+        Platform::CloseHandle(File);
+        Check(Platform::FileOpen(Written.c_str(), Platform::kAccessRead, 0, Platform::kTruncateExisting) == Platform::InvalidHandle(),
+              "truncation needs write access");
+        Check(Platform::FileCopy(Retail.c_str(), (Root + "/Data/Other.txt").c_str(), true), "FileCopy to a second name");
+        Check(!Platform::FileMove((Root + "/Data/Copy.txt").c_str(), (Root + "/Data/Other.txt").c_str()),
+              "FileMove fails onto an existing file");
         Check(Platform::FileMove((Root + "/Data/Copy.txt").c_str(), (Root + "/Data/Moved.txt").c_str()), "FileMove");
+        std::remove((Root + "/Data/Other.txt").c_str());
 
         Platform::FindData Found;
         int Matches = 0;
@@ -139,6 +154,11 @@ namespace
                 break;
         }
         Check(Matches == 1, "FindFirst / FindNext see only the matching files");
+        Check(Platform::Detail::Matches("*.*", "README") && Platform::Detail::Matches("A*b?C", "axxBzc") &&
+                  !Platform::Detail::Matches("*.ini", "flplayer.in") && Platform::Detail::Matches("**x", "x"),
+              "the wildcard rules");
+        Check(!Platform::Detail::Matches("*a*a*a*a*a*a*a*a*a*a*b", std::string(4000, 'a').c_str()),
+              "a pathological wildcard is rejected quickly");
         if (Search != Platform::InvalidHandle())
             Platform::FindClose(Search);
 
@@ -151,6 +171,18 @@ namespace
     {
         G_ThreadResult = *static_cast<FlULong*>(Parameter) * 2;
         return 7;
+    }
+
+    FlULong TakeAndEnd(void* Mutex)
+    {
+        return Platform::WaitOne(Mutex, Platform::kWaitForever);
+    }
+
+    FlULong SetLater(void* Event)
+    {
+        Platform::SleepMs(20);
+        Platform::EventSet(Event);
+        return 0;
     }
 
     void TestPlatformThreadsAndWaits()
@@ -178,12 +210,47 @@ namespace
         Platform::CloseHandle(Events[0]);
         Platform::CloseHandle(Events[1]);
 
+        Platform::Handle const NamedA = Platform::EventCreate(true, false, "PortTestsEvent");
+        Platform::Handle const NamedB = Platform::EventCreate(false, true, "PortTestsEvent");
+        Check(NamedA != nullptr && NamedA == NamedB, "a named event opens the existing one");
+        Check(Platform::MutexCreate("PortTestsEvent") == nullptr, "a name taken by an event is no mutex");
+        Platform::EventSet(NamedB);
+        Platform::CloseHandle(NamedB);
+        Check(Platform::WaitOne(NamedA, 0) == Platform::kWaitSignaled, "a named event lives until its last handle closes");
+        Platform::CloseHandle(NamedA);
+        Platform::Handle const Fresh = Platform::EventCreate(false, false, "PortTestsEvent");
+        Check(Platform::WaitOne(Fresh, 0) == Platform::kWaitTimeout, "closing the last handle frees the name");
+        Platform::CloseHandle(Fresh);
+
         Platform::Handle Mutex = Platform::MutexCreate();
         Check(Platform::WaitOne(Mutex, 0) == Platform::kWaitSignaled && Platform::WaitOne(Mutex, 0) == Platform::kWaitSignaled,
               "a mutex is recursive for its owner");
         Check(Platform::MutexRelease(Mutex) && Platform::MutexRelease(Mutex) && !Platform::MutexRelease(Mutex),
               "MutexRelease fails once the mutex is free");
+        Thread = Platform::ThreadCreate(&TakeAndEnd, Mutex);
+        Check(Platform::WaitOne(Thread, Platform::kWaitForever) == Platform::kWaitSignaled, "the mutex taker ends");
+        Platform::CloseHandle(Thread);
+        Check(Platform::WaitOne(Mutex, 1000) == Platform::kWaitAbandoned, "a mutex whose owner ended is abandoned");
+        Check(Platform::MutexRelease(Mutex) && Platform::WaitOne(Mutex, 0) == Platform::kWaitSignaled,
+              "an abandoned mutex is owned afterwards, and abandoned only once");
+        Platform::MutexRelease(Mutex);
         Platform::CloseHandle(Mutex);
+
+        // A thread whose handle closes first still runs to its end.
+        Platform::Handle const Done = Platform::EventCreate(true, false);
+        Platform::CloseHandle(Platform::ThreadCreate(&SetLater, Done));
+        Check(Platform::WaitOne(Done, 5000) == Platform::kWaitSignaled, "a thread outlives its closed handle");
+        Platform::CloseHandle(Done);
+
+        std::string const Root = ScratchDirectory();
+        Platform::Handle const File = Root.empty() ? Platform::InvalidHandle()
+                                                   : Platform::FileOpen((Root + "/f").c_str(), Platform::kAccessWrite, 0,
+                                                                        Platform::kCreateAlways);
+        Check(File != Platform::InvalidHandle() && Platform::WaitOne(File, 0) == Platform::kWaitFailed,
+              "waiting on a file fails");
+        Platform::CloseHandle(File);
+        if (!Root.empty())
+            std::system(("rm -rf '" + Root + "'").c_str());
 
         Platform::CriticalSection Lock;
         Platform::LockInit(&Lock);
