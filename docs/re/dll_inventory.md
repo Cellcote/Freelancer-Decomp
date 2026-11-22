@@ -42,7 +42,45 @@ Retail DLLs are never loaded: `bin/DACOM.INI` sets `DllPath = .\` and every `[Li
 | `rpclocal.dll` | local SP server, a thin wrapper over `Server.dll` (`IServer`) | `src/rpclocal` | port |
 | `Server.dll` | server side of the world (SP and dedicated) | `src/Server` | port |
 | `FLServer.exe` | dedicated server | `src/FLServer` | port |
-| `remoteserver.dll` / `RemoteClient.dll` | MP transport (client and server sides of one `Network\` code base) | `src/RemoteServer`, `src/RemoteClient`, `src/RemoteCommon` | port |
+| `remoteserver.dll` | MP transport, loaded by the **client**: `IServer` over DirectPlay (the client's view of a remote server) | `src/RemoteServer` (+ `src/RemoteCommon`) | port |
+| `RemoteClient.dll` | MP transport, loaded by the **server**: `IClient`/`IChatClient` over DirectPlay (the server's view of its remote clients) | `src/RemoteClient` (+ `src/RemoteCommon`) | port |
+
+The two names describe the far end, not the side the DLL runs on: `RemoteServer` runs in the client and
+`RemoteClient` runs in the server. They are retail names and stay. Both compile the packet codecs of
+`src/RemoteCommon` (one `Network\` code base in retail). More in [server.md](server.md).
+
+## Port-only modules
+
+Modules with no retail counterpart (`fl_add_module` kind `PORT` or `TOOL`, cmake/Freelancer.cmake).
+Retail never loads them, and nothing retail depends on them; the code they add is tagged `PORT(...)`
+(see [deviations.md](deviations.md)).
+
+| Module | Kind | Role | Sources | Docs |
+|--------|------|------|---------|------|
+| `RP9.dll` | PORT | Direct3D 9 renderer (volumetric nebula), Win32, built with `FreelancerRp9=1` | `src/RP9` | [rp9.md](rp9.md) |
+| `RPGPU.dll` | PORT | SDL3 + SDL_GPU renderer, built with `FreelancerRpGpu=1` (default on x64) | `src/RPGPU` | [rpgpu.md](rpgpu.md) |
+| `TexConvert.lib` | PORT | replacement for D3DX 8.1's `D3DXLoadSurfaceFromMemory`, linked into RPGPU | `src/TexConvert` | [texconvert.md](texconvert.md) |
+| `FLDedicated.exe` | PORT | console dedicated server: `Server.dll` + `RemoteClient.dll` without MFC | `src/FLDedicated` (+ `src/ServerHost`) | [dedicated_server.md](../dedicated_server.md) |
+| DPNet | PORT | DirectPlay 8 protocol; compiled into `DALib.dll` on x64, Linux and macOS (Win32 keeps Microsoft's `dpnet.dll`), and a library with its own tests on Linux and macOS | `src/DPNet` | [dpnet.md](../dpnet.md) |
+| `DPNetCheck.exe` | TOOL | interoperability check: joins a server through Microsoft's DirectPlay 8 client, Win32 | `src/DPNetCheck` | [dpnet.md](../dpnet.md) |
+| `FLRegress.exe` | TOOL | headless regression harness: runs `Server.dll` and dumps the game state | `src/FLRegress` | [flregress.md](../flregress.md) |
+| `RpcCodecTest.exe` | TOOL | runs every packet codec of `RemoteClient.dll` on fixed inputs | `src/RpcCodecTest` | [testing.md](../testing.md) |
+| `TexConvertTest.exe` | TOOL | compares TexConvert with D3DX 8.1, Win32 | `src/TexConvertTest` | [texconvert.md](texconvert.md) |
+| `MemoryDiagnostics.exe` | TOOL | drives UMDH to find heap leaks, Win32 | `src/MemoryDiagnostics` | [memory_diagnostics.md](../memory_diagnostics.md) |
+| PortTests | PORT | checks of the port's platform headers and of the ported modules, Linux and macOS only (ctest) | `src/PortTests` | [platform.md](../platform.md) |
+
+## Shared source folders
+
+Folders under `src/` that are not modules: they have no `CMakeLists.txt` of their own, and their
+sources or headers are compiled into the modules named here.
+
+| Folder | Compiled into | Contents |
+|--------|---------------|----------|
+| `src/include` | every module (include path) | the cross-module ABI: one header per exported interface; `posix/` holds the stand-in Windows headers of the Linux and macOS build |
+| `src/IVP` | `Common` | Ipion Virtual Physics (IVP), statically linked into `Common.dll` as in retail ([common_physys.md](common_physys.md)) |
+| `src/RemoteCommon` | `RemoteClient`, `RemoteServer`, `RpcCodecTest` | the packet codecs both transport DLLs share |
+| `src/ServerHost` | `FLServer`, `FLDedicated` | the server host both server programs share |
+| `src/pch` | `Common`, `freelancer`, `Content` | the build-time precompiled header (system headers only) |
 
 ## Resource DLLs
 
