@@ -291,7 +291,10 @@ without the Windows API. Milestones:
   (LowArena, HandleValue) become a 64-bit test (`FL_PTR64`, #118). Apple Silicon gives a 64-bit
   process no address below 4 GB, so there LowArena is one 2 GB reservation anywhere and the
   32-bit fields hold offsets into it: the handle sites go through `LowArena::Encode` / `Decode`,
-  plain casts on Windows (decided 2026-11-22; checked by `src/PortTests` on Linux and macOS). Clang reports the direct pointer-to-32-bit
+  plain casts on Windows (decided 2026-11-22; checked by `src/PortTests` on Linux and macOS).
+  There is one arena per process, held by dacom (`FL_LOW_ARENA_DEFINE_SHARED`): a header's
+  statics are per module on macOS and Linux, and an offset has to decode the same in every
+  module. Clang reports the direct pointer-to-32-bit
   casts as errors, but not the ones that narrow on purpose through `uintptr_t` / `intptr_t`
   (`PointerToDword`, `PhySys_InstanceId` and the like), so those get an audit of their own. The
   sites CodeRabbit listed on #108, #109 and #111 are the starting list.

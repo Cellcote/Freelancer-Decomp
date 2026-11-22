@@ -8,6 +8,9 @@
 #include "platform.h"
 #include "x64_low_arena.h"
 
+// port_tests uses the arena without dacom, so it holds the process's arena itself.
+FL_LOW_ARENA_DEFINE_SHARED()
+
 #include <cstdint>
 #include <cstdio>
 #include <cstring>

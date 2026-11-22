@@ -163,6 +163,22 @@ int main(int argc, char** argv)
     auto const Stricmp = reinterpret_cast<int (*)(const char*, const char*)>(Platform::ModuleSymbol(Dacom, "stricmp"));
     Check(Stricmp != nullptr && Stricmp("Freelancer", "FREELANCER") == 0, "dacom exports stricmp");
 
+    // One LowArena per process: a block made in one module decodes in another, and a block freed
+    // in one is reused by the other (arena_probe.cpp, two copies).
+    Platform::Module const ProbeA = Platform::ModuleLoad((Folder + "arena_probe_a.dll").c_str());
+    Platform::Module const ProbeB = Platform::ModuleLoad((Folder + "arena_probe_b.dll").c_str());
+    auto const MakeA = reinterpret_cast<FlLong (*)(int)>(Platform::ModuleSymbol(ProbeA, "Probe_a_Make"));
+    auto const ReadB = reinterpret_cast<int (*)(FlLong)>(Platform::ModuleSymbol(ProbeB, "Probe_b_Read"));
+    auto const FreeB = reinterpret_cast<void (*)(FlLong)>(Platform::ModuleSymbol(ProbeB, "Probe_b_Free"));
+    Check(MakeA != nullptr && ReadB != nullptr && FreeB != nullptr, "the arena probes load");
+    if (MakeA != nullptr && ReadB != nullptr && FreeB != nullptr)
+    {
+        FlLong const Made = MakeA(4242);
+        Check(Made > 0 && ReadB(Made) == 4242, "a LowArena block encoded in one module decodes in another");
+        FreeB(Made);
+        Check(MakeA(7) == Made, "a block freed in one module is reused by another");
+    }
+
     // SearchPathA finds a module by its Windows name (DACOM's AddLibrary looks it up so).
     char Found[1024] = {};
     char* FilePart = nullptr;

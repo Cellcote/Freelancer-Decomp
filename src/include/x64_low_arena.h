@@ -60,13 +60,13 @@ namespace LowArena
             std::map<std::size_t, void*> FreeHeads; // block size -> first free block
         };
 
+#if defined(_WIN64)
         inline FState& State()
         {
             static FState Instance;
             return Instance;
         }
 
-#if defined(_WIN64)
         // The first free range below Limit that holds a whole chunk, reserved and committed. A
         // block larger than a chunk gets a chunk of its own size.
         inline bool NewChunk(FState& Arena, std::size_t MinBytes)
@@ -105,6 +105,11 @@ namespace LowArena
         // one reservation of Limit bytes wherever the system puts it, and the 32-bit fields hold
         // offsets from its start (Encode, Decode). Chunks are committed from it in order; the
         // first Granularity bytes are never handed out, so offset 0 stays null.
+        //
+        // An offset is only worth something if every module decodes it against the same base,
+        // and a header's statics are per module there (each .dylib / .so has its own). So the
+        // whole arena is one FShared per process, made by FL_LOW_ARENA_DEFINE_SHARED in one
+        // module, dacom (which every game module links), and found through FlLowArenaShared.
         struct FReservation
         {
             char* Base = nullptr;
@@ -112,23 +117,38 @@ namespace LowArena
             char* End = nullptr;
         };
 
-        inline FReservation& Reservation()
+        struct FShared
         {
-            static FReservation Instance = [] {
-                FReservation Made;
-                void* const Base = mmap(nullptr, Limit, PROT_NONE, MAP_PRIVATE | MAP_ANON, -1, 0);
-                if (Base == MAP_FAILED)
-                {
-                    std::fprintf(stderr, "LowArena: cannot reserve the 2 GB arena\n");
-                    std::abort();
-                }
-                Made.Base = static_cast<char*>(Base);
-                Made.Next = Made.Base + Granularity;
-                Made.End = Made.Base + Limit;
-                return Made;
-            }();
-            return Instance;
+            FState State;
+            FReservation Reservation;
+        };
+
+        inline FReservation MakeReservation()
+        {
+            FReservation Made;
+            void* const Base = mmap(nullptr, Limit, PROT_NONE, MAP_PRIVATE | MAP_ANON, -1, 0);
+            if (Base == MAP_FAILED)
+            {
+                std::fprintf(stderr, "LowArena: cannot reserve the 2 GB arena\n");
+                std::abort();
+            }
+            Made.Base = static_cast<char*>(Base);
+            Made.Next = Made.Base + Granularity;
+            Made.End = Made.Base + Limit;
+            return Made;
         }
+    }
+}
+
+// The process's arena (FL_LOW_ARENA_DEFINE_SHARED, in dacom).
+extern "C" LowArena::Detail::FShared* FlLowArenaShared();
+
+namespace LowArena
+{
+    namespace Detail
+    {
+        inline FState& State() { return FlLowArenaShared()->State; }
+        inline FReservation& Reservation() { return FlLowArenaShared()->Reservation; }
 
         // The next chunk of the reservation, committed. A block larger than a chunk gets a chunk
         // of its own size.
@@ -239,6 +259,18 @@ namespace LowArena
 #endif
     }
 }
+
+#if defined(FL_PTR64) && !defined(_WIN32)
+// Defines the process's arena: in dacom, and in a test that uses the arena without dacom.
+#define FL_LOW_ARENA_DEFINE_SHARED()                                                               \
+    extern "C" __attribute__((visibility("default"))) LowArena::Detail::FShared* FlLowArenaShared() \
+    {                                                                                              \
+        static LowArena::Detail::FShared Instance{{}, LowArena::Detail::MakeReservation()};         \
+        return &Instance;                                                                          \
+    }
+#else
+#define FL_LOW_ARENA_DEFINE_SHARED()
+#endif
 
 #if defined(FL_PTR64)
 #define FL_LOW_ARENA_NEW                                                                           \
