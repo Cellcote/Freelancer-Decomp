@@ -2644,7 +2644,9 @@ void IServerImpl::AddTradeEquip(unsigned int session_id, const EquipDesc& equip)
                  ++It)
                 if (It->ArchId == equip.ArchId)
                     Held += It->Count;
-            if (Offered > Held)
+            // The offer's own int count must not wrap either, even when the slot holds more
+            // than INT_MAX of the archetype across several entries.
+            if (Offered > Held || Offered > 0x7fffffffLL)
                 return;
         }
         CPlayerTradeOffer* const PartnerOffer = Offer->GetTargetOffer();
