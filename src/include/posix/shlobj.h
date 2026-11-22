@@ -10,8 +10,11 @@
 
 #include <windows.h>
 
+#include <cerrno>
 #include <cstdlib>
 #include <string>
+
+#include <sys/stat.h>
 
 typedef LONG HRESULT_SH;
 #define CSIDL_APPDATA 0x001a
@@ -52,6 +55,19 @@ inline HRESULT SHGetFolderPathA(HWND, int Folder, HANDLE, DWORD, LPSTR Path)
     }
     if (Result.size() >= MAX_PATH)
         return E_FAIL;
+    if ((Folder & CSIDL_FLAG_CREATE) != 0)
+    {
+        // Create the folder and any missing parents, as Windows does for CSIDL_FLAG_CREATE.
+        for (std::size_t Slash = Result.find('/', 1);; Slash = Result.find('/', Slash + 1))
+        {
+            const std::string Part = Slash == std::string::npos ? Result : Result.substr(0, Slash);
+            struct stat Info;
+            if (stat(Part.c_str(), &Info) != 0 && mkdir(Part.c_str(), 0755) != 0 && errno != EEXIST)
+                return E_FAIL;
+            if (Slash == std::string::npos)
+                break;
+        }
+    }
     std::memcpy(Path, Result.c_str(), Result.size() + 1);
     return S_OK;
 }

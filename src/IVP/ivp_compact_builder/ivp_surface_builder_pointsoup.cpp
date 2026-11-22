@@ -469,7 +469,10 @@ IVP_Compact_Ledge* IVP_SurfaceBuilder_Pointsoup::convert_pointsoup_to_compact_le
 {
     const int32_t NInput = Points->n_elems;
     IVP_U_Vector<IVP_U_Float_Point> Reduced(
-        NInput != 0 ? static_cast<IVP_U_Float_Point**>(malloc(static_cast<size_t>(NInput) * 4)) : nullptr, NInput);
+        NInput != 0 ? static_cast<IVP_U_Float_Point**>(
+                          malloc(static_cast<size_t>(NInput) * sizeof(IVP_U_Float_Point*)))
+                    : nullptr,
+        NInput);
     double* const Coords = static_cast<double*>(calloc(static_cast<size_t>(Points->n_elems) * 4, 8));
     {
         FPointsoupPointHash Hash(0x400);
@@ -735,7 +738,8 @@ namespace
 
 // FUN_0636ca00 (.text:0636ca00-0636ca21).
 FLedgeConvexHullBuilder::FLedgeConvexHullBuilder()
-    : Ledges(static_cast<IVP_Compact_Ledge**>(malloc(0x200)), 0x80) // FUN_06343f70 = malloc
+    : Ledges(static_cast<IVP_Compact_Ledge**>(malloc(0x80 * sizeof(IVP_Compact_Ledge*))),
+             0x80) // FUN_06343f70 = malloc
 {
 }
 

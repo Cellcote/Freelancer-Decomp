@@ -447,7 +447,8 @@ COMMON_API void __cdecl Add(int PlaybackId)
     {
         // 0627d9c8..0627d9db: IChannel slot 16 (+0x40) GetHeader(&Header, channel).
         FlULong Header[4];
-        DALib::Channel->GetHeader(Header, (FlULong)(std::uintptr_t)*ChanIt); // an IChannel key
+        DALib::Channel->GetHeader(Header,
+                                  (FlULong)LowArena::Encode(*ChanIt)); // the typed channel's key
         // 0627d9de..0627d9e4: Header[0] != 0 -> next channel.
         if (Header[0] != 0)
             continue;

@@ -466,6 +466,15 @@ namespace
         JointEnumNode* Head;            // +0x04  sentinel
         int Count;                      // +0x08
     };
+
+#if defined(FL_PTR64)
+    // PORT(x64): retail passes JointEnumCallback itself as the engine's child callback, the
+    // engine's (parent, child, 0, context) arriving as (Param1, Param2, Joint, Context) with the
+    // handles cut to 32 bits. 64-bit builds go through this adapter instead, which encodes the
+    // handles as the ids HardpointPositionA decodes; the engine's third argument is always 0, a
+    // null Joint.
+    int __cdecl JointEnumChildren(void* Parent, void* Child, int Zero, void* Context);
+#endif
 } // namespace
 
 COMMON_API bool __cdecl JointEnumCallback(FlLong Param1, FlLong Param2, struct JointInfo const* Joint, void* Context)
@@ -492,6 +501,20 @@ COMMON_API bool __cdecl JointEnumCallback(FlLong Param1, FlLong Param2, struct J
     return true;
 }
 
+#if defined(FL_PTR64)
+namespace
+{
+int __cdecl JointEnumChildren(void* Parent, void* Child, int Zero, void* Context)
+{
+    (void)Zero;
+    return JointEnumCallback(EngineIdFromHandle(Parent), EngineIdFromHandle(Child), nullptr,
+                             Context)
+               ? 1
+               : 0;
+}
+}
+#endif
+
 bool __cdecl HardpointPositionA(FlLong Instance, char const* HpName, Vector* OutPos, Matrix* OutOrient)
 {
     // Common.dll.txt 0630eda0-0630ef2a. Engine +0x4c (IsCompoundArchetype) non-zero: collect
@@ -510,11 +533,16 @@ bool __cdecl HardpointPositionA(FlLong Instance, char const* HpName, Vector* Out
         Children.Head->Next = Children.Head;
         Children.Head->Prev = Children.Head;
         Children.Count = 0;
+#if defined(FL_PTR64)
+        DALib::Engine->EnumerateArchetypeChildren(EngineHandleFromId(Instance), &JointEnumChildren,
+                                                  &Children);
+#else
         // Retail passes JointEnumCallback itself; its exported signature differs from the
         // engine's callback type only in parameter and return types of the same width.
         DALib::Engine->EnumerateArchetypeChildren(
             EngineHandleFromId(Instance),
             (int(__cdecl*)(void*, void*, int, void*)) & JointEnumCallback, &Children);
+#endif
 
         for (JointEnumNode* Node = Children.Head->Next; Node != Children.Head; Node = Node->Next)
         {

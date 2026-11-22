@@ -256,7 +256,7 @@ void CShip::init(CreateParms const& Parms)
     if (ShipArch->BayDoorAnim.Value[0] != '\0')
     {
         FlULong const PlayId = DALib::Anim->PlayScript(
-            AnimScriptFromId(Archetype->AnimIndex), AsOpaqueDword(EngineInstanceId),
+            AnimScriptFromId(Archetype->AnimIndex), EngineHandleFromId(EngineInstanceId),
             ShipArch->BayDoorAnim.Value, nullptr, nullptr);
         BayAnim.Index = (int)PlayId;
     }

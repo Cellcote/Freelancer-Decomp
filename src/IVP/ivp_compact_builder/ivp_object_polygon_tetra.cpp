@@ -875,7 +875,8 @@ IVP_Object_Polygon_Tetra::IVP_Object_Polygon_Tetra(IVP_Template_Polygon* Templ)
     std::memset(Field_0x1c, 0, sizeof(Field_0x1c));
 
     n_points = Templ->n_points;
-    points = static_cast<IVP_Poly_Point*>(calloc(static_cast<size_t>(n_points), 0x18));
+    points = static_cast<IVP_Poly_Point*>(
+        calloc(static_cast<size_t>(n_points), sizeof(IVP_Poly_Point))); // 0x18 on Win32
     for (int32_t I = 0; I < n_points; ++I)
     {
         const IVP_U_Float_Point& Source = Templ->points[I];
@@ -887,7 +888,8 @@ IVP_Object_Polygon_Tetra::IVP_Object_Polygon_Tetra(IVP_Template_Polygon* Templ)
     }
 
     n_surfaces = Templ->n_surfaces;
-    surfaces = static_cast<IVP_Poly_Surface*>(calloc(static_cast<size_t>(n_surfaces), 0xc));
+    surfaces = static_cast<IVP_Poly_Surface*>(
+        calloc(static_cast<size_t>(n_surfaces), sizeof(IVP_Poly_Surface))); // 0xc on Win32
     for (int32_t I = 0; I < n_surfaces; ++I)
     {
         surfaces[I].set(&Templ->surfaces[I], this);

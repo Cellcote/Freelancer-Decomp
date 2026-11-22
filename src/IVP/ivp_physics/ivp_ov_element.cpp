@@ -244,7 +244,8 @@ IVP_OV_Element::IVP_OV_Element(IVP_Real_Object* Owner)
     // takes the free path in practice.
     collision_fvector.memsize = 0x10;
     collision_fvector.n_elems = 0;
-    collision_fvector.elems = static_cast<IVP_Collision**>(std::malloc(0x40));
+    collision_fvector.elems =
+        static_cast<IVP_Collision**>(std::malloc(0x10 * sizeof(IVP_Collision*))); // 0x40 on Win32
 
     node = nullptr;         // :0635c044
     CenterX = 0.0f;         // :0635c04d
