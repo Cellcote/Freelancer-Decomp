@@ -281,8 +281,9 @@ namespace DPNet
         {
             // [MC-DPL8R] 3.1.5.1.1: a CONNECT from an unknown address is a new connection.
             FCommandFrame Frame;
+            // Only a CONNECT the link will take may evict a handshake to make room.
             if (DecodeCommandFrame(Data, Size, Frame) && Frame.Op == ExtOp::Connect &&
-                JoiningFrom(From) < MaxJoiningPerHost &&
+                FLink::IsAcceptable(Frame.Connect) && JoiningFrom(From) < MaxJoiningPerHost &&
                 (Peers.size() - Players.size() < MaxJoining || EvictHandshake()))
             {
                 auto Peer = std::make_unique<FPeer>(*this, From);

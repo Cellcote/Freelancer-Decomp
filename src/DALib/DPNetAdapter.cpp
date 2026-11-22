@@ -565,8 +565,9 @@ namespace
             if (!OpenSocket((unsigned short)Port))
                 return DPNERR_INVALIDDEVICEADDRESS;
             // Once per session: a host-name lookup can block, and every enumeration query and
-            // connect names the device address.
-            Local = ResolveLocalEndpoint();
+            // connect names the device address. A failed lookup is retried (LocalEndpoint).
+            LocalTriedAt = NowMs();
+            bLocalResolved = ResolveLocalEndpoint(Local);
 
             LARGE_INTEGER Counter;
             QueryPerformanceCounter(&Counter);
@@ -895,25 +896,35 @@ namespace
             BoundPort = 0;
         }
 
-        // The address the clients reach, resolved when the session started.
-        DPNet::FAddress LocalEndpoint() const { return Local; }
-
-        // The first IPv4 address of this host, else loopback.
-        DPNet::FAddress ResolveLocalEndpoint() const
+        // The address the clients reach, resolved when the session started. Until a lookup
+        // succeeds it is loopback, and the lookup is tried again at most every 10 s, so a
+        // failing resolver cannot stall every query.
+        DPNet::FAddress LocalEndpoint()
         {
-            DPNet::FAddress Endpoint = DPNet::FAddress::Ipv4(127, 0, 0, 1, BoundPort);
+            if (!bLocalResolved && NowMs() - LocalTriedAt >= kLocalRetryMs)
+            {
+                LocalTriedAt = NowMs();
+                bLocalResolved = ResolveLocalEndpoint(Local);
+            }
+            return Local;
+        }
+
+        // Out: the first IPv4 address of this host, else loopback (and false).
+        bool ResolveLocalEndpoint(DPNet::FAddress& Out) const
+        {
+            Out = DPNet::FAddress::Ipv4(127, 0, 0, 1, BoundPort);
             char HostName[256] = {};
             if (gethostname(HostName, sizeof(HostName)) != 0)
-                return Endpoint;
+                return false;
             addrinfo Hints{};
             Hints.ai_family = AF_INET;
             addrinfo* Found = nullptr;
             if (getaddrinfo(HostName, nullptr, &Hints, &Found) != 0 || Found == nullptr)
-                return Endpoint;
-            Endpoint = FromSockaddr(*reinterpret_cast<const sockaddr_in*>(Found->ai_addr));
-            Endpoint.Port = BoundPort;
+                return false;
+            Out = FromSockaddr(*reinterpret_cast<const sockaddr_in*>(Found->ai_addr));
+            Out.Port = BoundPort;
             freeaddrinfo(Found);
-            return Endpoint;
+            return true;
         }
 
         void NetLoop()
@@ -972,7 +983,10 @@ namespace
         std::unique_ptr<DPNet::FServer> Server;
         SOCKET Socket = INVALID_SOCKET;
         unsigned short BoundPort = 0;
+        static constexpr uint32_t kLocalRetryMs = 10000;
         DPNet::FAddress Local;
+        bool bLocalResolved = false;
+        uint32_t LocalTriedAt = 0;
         std::thread NetThread;
         std::atomic<bool> bStop{false};
         std::map<DPNHANDLE, DPNet::FBytes> ReceiveBuffers;

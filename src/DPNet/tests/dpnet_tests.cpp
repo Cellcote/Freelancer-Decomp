@@ -1125,20 +1125,27 @@ static void TestSendQueueLimit()
     FTestClient A(World.Net, FAddress::Ipv4(10, 0, 0, 2, 2302));
     FTestClient B(World.Net, FAddress::Ipv4(10, 0, 0, 3, 2302));
     World.Clients.push_back(&A);
+    FTestClient C(World.Net, FAddress::Ipv4(10, 0, 0, 4, 2302));
     World.Clients.push_back(&B);
+    World.Clients.push_back(&C);
     CHECK(ConnectClient(World, A, Request("A"), 0x3201) && A.Result == Result::Ok);
     CHECK(ConnectClient(World, B, Request("B"), 0x3202) && B.Result == Result::Ok);
-    CHECK(World.RunUntil(
-        [&]
-        {
-            return Server.Players.size() == 2 && Server.Players[0]->bAlive &&
-                   Server.Players[1]->bAlive;
-        },
-        10000));
-    if (Server.Players.size() != 2)
+    CHECK(ConnectClient(World, C, Request("C"), 0x3203) && C.Result == Result::Ok);
+    auto AllAlive = [&](bool bAlive)
+    {
+        if (Server.Players.size() != 3)
+            return false;
+        for (const auto& Player : Server.Players)
+            if (Player->bAlive != bAlive)
+                return false;
+        return true;
+    };
+    CHECK(World.RunUntil([&] { return AllAlive(true); }, 10000));
+    if (Server.Players.size() != 3)
         return;
     const uint32_t PA = Server.Players[0]->Dpnid;
     const uint32_t PB = Server.Players[1]->Dpnid;
+    const uint32_t PC = Server.Players[2]->Dpnid;
     const FBytes Big = Pattern(1, 20000);
     CHECK(Server.Server.SendTo(PB, Big.data(), Big.size(), SendFlags::Guaranteed, nullptr, nullptr,
                                World.Net.Now));
@@ -1159,10 +1166,15 @@ static void TestSendQueueLimit()
                                  nullptr, World.Net.Now))
             ++Accepted;
     CHECK(Accepted == 50);
-    CHECK(World.RunUntil([&] { return !Server.Players[0]->bAlive && !Server.Players[1]->bAlive; },
-                         5000));
-    CHECK(Server.Players[0]->DestroyReason == DestroyReason::ConnectionLost);
-    CHECK(Server.Players[1]->DestroyReason == DestroyReason::ConnectionLost);
+    // Unreliable messages count until their frames are acknowledged, not just until sent.
+    Accepted = 0;
+    for (int i = 0; i < 60; ++i)
+        if (Server.Server.SendTo(PC, &Ping, 1, 0, nullptr, nullptr, World.Net.Now))
+            ++Accepted;
+    CHECK(Accepted == 50);
+    CHECK(World.RunUntil([&] { return AllAlive(false); }, 5000));
+    for (const auto& Player : Server.Players)
+        CHECK(Player->DestroyReason == DestroyReason::ConnectionLost);
     CHECK(Server.Server.GetPlayerCount() == 1);
 }
 

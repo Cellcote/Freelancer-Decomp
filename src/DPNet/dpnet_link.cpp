@@ -13,6 +13,21 @@ namespace DPNet
         Stats.RttMs = RttMs;
     }
 
+    // The messages release their budget into the counters, which must still be alive.
+    FLink::~FLink()
+    {
+        InFlight.clear();
+        Queue.clear();
+    }
+
+    FLink::FOutMessage::~FOutMessage()
+    {
+        if (Owner == nullptr)
+            return;
+        --Owner->OutstandingMessages;
+        Owner->OutstandingBytes -= Data.size();
+    }
+
     // ---------------------------------------------------------------------------------------
     // Handshake (3.1.4.2, 3.1.5.1.1, 3.1.5.1.2)
 
@@ -30,12 +45,16 @@ namespace DPNet
         Flush();
     }
 
+    bool FLink::IsAcceptable(const FConnectFrame& Connect)
+    {
+        return Connect.Op == ExtOp::Connect &&
+               (Connect.Version & kProtocolMajorMask) == kProtocolMajor;
+    }
+
     bool FLink::Accept(const FConnectFrame& Connect, uint32_t Now)
     {
         LastNow = Now;
-        if (State != ELinkState::Idle || Connect.Op != ExtOp::Connect)
-            return false;
-        if ((Connect.Version & kProtocolMajorMask) != kProtocolMajor)
+        if (State != ELinkState::Idle || !IsAcceptable(Connect))
             return false;
         bConnector = false;
         SessId = Connect.SessId;
@@ -633,6 +652,7 @@ namespace DPNet
         Msg->Id = NextMessageId++;
         Msg->Data = std::move(Message);
         Msg->Flags = (uint8_t)(Flags & (MsgFlags::Mask | MsgFlags::Coalesce));
+        Msg->Owner = this;
         ++OutstandingMessages;
         OutstandingBytes += Msg->Data.size();
         Queue.push_back(Msg);
@@ -911,8 +931,6 @@ namespace DPNet
         if (Msg.bDone)
             return;
         Msg.bDone = true;
-        --OutstandingMessages;
-        OutstandingBytes -= Msg.Data.size();
         if (bOk)
             ++Stats.MessagesSent;
         else

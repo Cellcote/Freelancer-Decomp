@@ -123,11 +123,14 @@ namespace DPNet
     {
     public:
         FLink(ILinkEvents& InEvents, const FLinkConfig& InConfig);
+        ~FLink();
         FLink(const FLink&) = delete;
         FLink& operator=(const FLink&) = delete;
 
         // Outbound: send CONNECT (SessId must not be zero).
         void Connect(uint32_t InSessId, uint32_t Now);
+        // True when Accept would take this CONNECT (a supported protocol major version).
+        static bool IsAcceptable(const FConnectFrame& Connect);
         // Inbound: answer a CONNECT that arrived from a new address. False (and the link stays
         // Idle) when the frame is not an acceptable CONNECT.
         bool Accept(const FConnectFrame& Connect, uint32_t Now);
@@ -159,6 +162,11 @@ namespace DPNet
     private:
         struct FOutMessage
         {
+            // Counted in the owner's queue budget from Send until the last frame holding the
+            // message is dropped: completion alone does not free an unreliable message, whose
+            // frames stay in flight until acknowledged.
+            FLink* Owner = nullptr;
+            ~FOutMessage();
             uint64_t Id = 0;
             FBytes Data;
             uint8_t Flags = 0;
@@ -266,7 +274,7 @@ namespace DPNet
         std::deque<std::shared_ptr<FOutMessage>> Queue;
         std::deque<FOutFrame> InFlight;
         uint64_t NextMessageId = 1;
-        uint32_t OutstandingMessages = 0; // sent with Send, not yet completed
+        uint32_t OutstandingMessages = 0; // FOutMessages still held (queued or in a frame)
         size_t OutstandingBytes = 0;
         uint8_t NextSend = 0;
         uint8_t SendBase = 0;   // the partner's last bNRcv: oldest sequence not yet acknowledged
