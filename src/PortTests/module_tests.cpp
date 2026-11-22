@@ -324,10 +324,14 @@ int main(int argc, char** argv)
           "VirtualAlloc / VirtualFree");
 
     // SSE's scalar conversions (posix/xmmintrin.h on Apple Silicon, the real ones on x86).
-    Check(_mm_cvtss_si32(_mm_set_ss(2.5f)) == 2 && _mm_cvtss_si32(_mm_set_ss(3.5f)) == 4 &&
-              _mm_cvtss_si32(_mm_set_ss(-2.5f)) == -2,
+    // The inputs are volatile so the compiler runs the conversions instead of folding them (GCC
+    // folds an out-of-range constant as C++'s undefined conversion, not as the instruction).
+    volatile float const Half = 2.5f, OneAndHalf = 3.5f, MinusHalf = -2.5f, Fraction = -1.7f,
+                         Big = 3.0e9f;
+    Check(_mm_cvtss_si32(_mm_set_ss(Half)) == 2 && _mm_cvtss_si32(_mm_set_ss(OneAndHalf)) == 4 &&
+              _mm_cvtss_si32(_mm_set_ss(MinusHalf)) == -2,
           "_mm_cvtss_si32 rounds to nearest even");
-    Check(_mm_cvtt_ss2si(_mm_set_ss(-1.7f)) == -1 && _mm_cvtt_ss2si(_mm_set_ss(3.0e9f)) == INT_MIN,
+    Check(_mm_cvtt_ss2si(_mm_set_ss(Fraction)) == -1 && _mm_cvtt_ss2si(_mm_set_ss(Big)) == INT_MIN,
           "_mm_cvtt_ss2si truncates; out of range is 0x80000000");
     unsigned long BitIndex = 0;
     Check(_BitScanReverse(&BitIndex, 0x00F0u) && BitIndex == 7 &&
