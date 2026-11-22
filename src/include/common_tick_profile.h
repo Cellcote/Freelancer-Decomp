@@ -8,6 +8,7 @@
 
 #include "common_exports.h"
 #include <stdint.h>
+#include <utility>
 
 // Shared switch for the client and Common/IVP. Disabled unless explicitly enabled.
 #ifndef FREELANCER_ENABLE_TICK_PROFILE
@@ -29,7 +30,7 @@ enum class EPhysicsTickSection
 
 struct FPhysicsTickProfile
 {
-    int64_t Ticks[static_cast<int>(EPhysicsTickSection::Count)] = {};
+    int64_t Ticks[std::to_underlying(EPhysicsTickSection::Count)] = {};
 };
 
 namespace PhySys
