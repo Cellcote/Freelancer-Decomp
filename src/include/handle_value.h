@@ -111,6 +111,26 @@ namespace HandleValue
         Table.Objects.erase(Found->second);
         Table.Ids.erase(Found);
     }
+
+    // Forget for every object in [Begin, End): the ids of addresses inside a buffer that is
+    // being freed.
+    inline void ForgetRange(const void* Begin, const void* End)
+    {
+        if (Begin == nullptr || End <= Begin)
+            return;
+        Detail::FTable& Table = Detail::Table();
+        std::lock_guard<std::mutex> Guard(Table.Lock);
+        for (auto It = Table.Ids.begin(); It != Table.Ids.end();)
+        {
+            if (It->first >= Begin && It->first < End)
+            {
+                Table.Objects.erase(It->second);
+                It = Table.Ids.erase(It);
+            }
+            else
+                ++It;
+        }
+    }
 #else
     inline FlULong Of(const void* Object)
     {
@@ -125,6 +145,8 @@ namespace HandleValue
     inline void Forget(const void*)
     {
     }
+
+    inline void ForgetRange(const void*, const void*) {}
 #endif
 
     // ObjectOf, typed.

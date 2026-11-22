@@ -13,6 +13,7 @@
 #include "luaprofile.h"
 #include "engine/engbase.h"
 #include "x86math.h"
+#include "handle_value.h"
 #include "x64_low_arena.h"
 
 #include <cstddef>
@@ -441,13 +442,27 @@ protected:
     ~FAnimScript() = default;
 };
 
-// Bind descriptor: kind, sink, context token and target instance.
+// Bind descriptor: kind, sink, context token and target instance. Retail's four dwords on every
+// platform: a typed channel's Kind..Field14 are read as one (TypedBindDesc), and callers pass
+// one to IChannel::CreateTyped and IAnimation2::FindObject. PORT(x64): the sink (an
+// IChannelSink) and its context are HandleValue ids, the instance is LowArena-encoded
+// (engine/engbase.h); the accessors convert, and are the plain casts on Win32.
 struct FAnimBindOut
 {
     FlULong Kind;
-    void* Extra;
-    void* Typed;
-    FEngineInstance* Instance;
+    FlULong ExtraValue; // the sink
+    FlULong TypedValue; // its context
+    FlULong InstanceValue; // the target instance
+
+    void* Extra() const { return const_cast<void*>(HandleValue::ObjectOf(ExtraValue)); }
+    void* Typed() const { return const_cast<void*>(HandleValue::ObjectOf(TypedValue)); }
+    FEngineInstance* Instance() const
+    {
+        return LowArena::Decode<FEngineInstance>((FlLong)InstanceValue);
+    }
+    void SetExtra(void* Sink) { ExtraValue = HandleValue::Of(Sink); }
+    void SetTyped(void* Context) { TypedValue = HandleValue::Of(Context); }
+    void SetInstance(FEngineInstance* Target) { InstanceValue = (FlULong)LowArena::Encode(Target); }
 };
 
 // Constructors leave unspecified members uninitialized; release the archetype before freeing.
@@ -861,6 +876,10 @@ struct FChannelArchetypeObject : IChannelArchetype
     FlULong Stride;
     float Duration;
     FlULong RefCount;
+#if defined(FL_PTR64)
+    // PORT(x64): the size of Frames when this archetype owns it (event keys point into it).
+    std::size_t FramesBytes = 0;
+#endif
 
     GENRESULT DACOM_API QueryInterface(const char* Iid, void** Out) override;
     FlULong DACOM_API AddRef() override;

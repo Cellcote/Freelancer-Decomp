@@ -373,11 +373,11 @@ FMixerOverlay::FMixerOverlay(const FAnimBindOut* Desc)
     Type = MixerOverlayNode;                                                    // 0661d5cd
     if (Desc->Kind == 0)                                         // 0661d5d8 -> 0661d678
     {
-        const FlULong* Relative = G_AnimEngine->GetInstanceRelative(Desc->Instance);
+        const FlULong* Relative = G_AnimEngine->GetInstanceRelative(Desc->Instance());
         if (Relative != nullptr)                                 // 0661d68a
         {
             Count = MixerJointValueCount(Relative[0]);           // 0661d68e..c5
-            G_AnimEngine->GetJointParams(Desc->Instance, 0, Values); // 0661d6c8..d6
+            G_AnimEngine->GetJointParams(Desc->Instance(), 0, Values); // 0661d6c8..d6
         }
         // Relative == null leaves Count as operator new handed it over (0661d68c -> 0661d6dc);
         // retail writes nothing there either.
@@ -386,11 +386,11 @@ FMixerOverlay::FMixerOverlay(const FAnimBindOut* Desc)
     if (Desc->Kind == 1)                                         // 0661d5df -> 0661d5ef
     {
         Count = 7;
-        const float* Position = G_AnimEngine->GetInstancePosition(Desc->Instance); // IEngine+0x90
+        const float* Position = G_AnimEngine->GetInstancePosition(Desc->Instance()); // IEngine+0x90
         Values[0] = Position[0];
         Values[1] = Position[1];
         Values[2] = Position[2];
-        const float* Orientation = G_AnimEngine->GetInstanceOrientation(Desc->Instance); // +0x98
+        const float* Orientation = G_AnimEngine->GetInstanceOrientation(Desc->Instance()); // +0x98
         I3DMathEngine* Math = Acquire3DMathEngine();             // DAT_0662b0f8
         FQuaternion Quat;
         Math->MatrixToQuaternion(Quat,
@@ -441,9 +441,10 @@ bool FAnimBindLess::operator()(const FAnimBindOut& Left, const FAnimBindOut& Rig
     if (Left.Kind != Right.Kind)                                 // 06612b29..3b SETL: signed
         return (FlLong)(Left.Kind) < (FlLong)(Right.Kind);
     if (Left.Kind == 0 || Left.Kind == 1)                        // 06612b31 / 06612b49: SETL
-        return (ptrdiff_t)(Left.Instance) < (ptrdiff_t)(Right.Instance);
+        return (FlLong)(Left.InstanceValue) <
+               (FlLong)(Right.InstanceValue); // signed, as the pointers
     if (Left.Kind == 2)                                          // 06612b5f..6a: SBB, unsigned
-        return (size_t)(Left.Extra) < (size_t)(Right.Extra);
+        return Left.ExtraValue < Right.ExtraValue; // unsigned, as the pointers
     return false;                                                // 06612b6f
 }
 
@@ -581,7 +582,7 @@ void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FM
                 if ((Blend->Flags & 2) != 0)                     // 06615340..6b
                 {
                     FTypedChannel* PrevTyped = ((FMixerLeaf*)(Blend->Prev))->Typed;
-                    const float* Position = G_AnimEngine->GetInstancePosition(Desc->Instance);
+                    const float* Position = G_AnimEngine->GetInstancePosition(Desc->Instance());
                     PrevTyped->SetOverlayPos(Position);
                 }
                 if ((Blend->Flags & 1) != 0)                     // 06615372
@@ -668,7 +669,7 @@ void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FM
         FlULong Kind = 0;
         if (Desc->Kind == 0)                                     // 06615578..94
         {
-            const FlULong* Relative = G_AnimEngine->GetInstanceRelative(Desc->Instance);
+            const FlULong* Relative = G_AnimEngine->GetInstanceRelative(Desc->Instance());
             if (Relative != nullptr)
                 Kind = MixerJointValueCount(Relative[0]);
         }
@@ -687,15 +688,15 @@ void MixerWalkPlayback(FAnimationObject* Animation, const FAnimBindOut* Desc, FM
         MixerStackEvaluate(&Stack, Out, Kind);                   // 066155c2..cf
 
         if (Desc->Kind == 0)                                     // 06615631..44
-            G_AnimEngine->SetJointParams(Desc->Instance, 0, Out);
+            G_AnimEngine->SetJointParams(Desc->Instance(), 0, Out);
         else if (Desc->Kind == 1)                                // 066155de..2f
         {
-            G_AnimEngine->SetInstancePosition(Desc->Instance, Out);        // IEngine+0x8C
+            G_AnimEngine->SetInstancePosition(Desc->Instance(), Out); // IEngine+0x8C
             FMatrix Matrix;
             I3DMathEngine* Math = Acquire3DMathEngine();                   // DAT_0662ace8
             Math->QuaternionToMatrix(Matrix,
                                      *(const FQuaternion*)(Out + 3)); // +0x54
-            G_AnimEngine->SetInstanceOrientation(Desc->Instance, &Matrix.D[0][0]); // IEngine+0x94
+            G_AnimEngine->SetInstanceOrientation(Desc->Instance(), &Matrix.D[0][0]); // IEngine+0x94
         }
     }
 
