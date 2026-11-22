@@ -314,7 +314,8 @@ HRESULT WINAPI IgnoreMessages(PVOID, DWORD, PVOID)
 }
 
 // Waits up to two seconds for Done.
-template <typename FDone> bool WaitFor(FDone Done)
+template <typename FDone>
+bool WaitFor(FDone Done)
 {
     for (int Try = 0; Try < 200; ++Try)
     {
@@ -372,8 +373,12 @@ void TestDPNetCloseFromHandler(Platform::Module DALib)
 
     // The closed object initialises and hosts again (its finished network thread is joined).
     HRESULT Initialised = DPNERR_ALREADYCLOSING;
-    WaitFor([&] { return (Initialised = Server->Initialize(nullptr, IgnoreMessages, 0)) !=
-                         DPNERR_ALREADYCLOSING; });
+    WaitFor(
+        [&]
+        {
+            return (Initialised = Server->Initialize(nullptr, IgnoreMessages, 0)) !=
+                   DPNERR_ALREADYCLOSING;
+        });
     Check(Initialised == S_OK, "the server initialises again after that Close");
     unsigned short const Port2 = FreeUdpPort();
     Check(HostOn(Server, Device, Port2) == S_OK, "and hosts again");

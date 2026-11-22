@@ -1099,7 +1099,7 @@ namespace
         uint32_t LocalTriedAt = 0;
         std::thread NetThread;
         std::atomic<bool> bStop{false};
-        int ClosesUnderWay = 0;       // Closes from other threads that have not returned yet
+        int ClosesUnderWay = 0; // Closes from other threads that have not returned yet
         bool bTeardownOnExit = false; // a Close on the network thread left the teardown to NetLoop
         bool bDeleteOnExit = false;
         std::map<DPNHANDLE, DPNet::FBytes> ReceiveBuffers;
