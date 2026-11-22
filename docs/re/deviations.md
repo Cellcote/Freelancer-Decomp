@@ -409,7 +409,7 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
   - **Cash ceiling:** the cash before the purchase, less the least the hull costs, plus the old hull's price and the highest price of every old or package item the new loadout left behind.
   - **On a valid hull:** the cash is capped at that ceiling.
   - **When it fails:** a negative ceiling, a wrong hull, or a purchase that never sends its hull (closed at the next purchase, sale or BaseExit) is undone: the old loadout and cash are restored.
-- **Other docked changes:** `ReqEquipment` may only rearrange or repair what the player has. `ReqModifyItem` may not raise an item's count or health. `ReqAddItem` needs an allowance.
+- **Other docked changes:** `ReqEquipment` may only rearrange or repair what the player has. `ReqModifyItem` may not raise an item's count or health. `ReqAddItem` needs an allowance. `ReqRemoveItem` must remove at least one; a negative count grew the stack (`remove_equipment_item` subtracts it).
 - **BaseEnter:** must name the base the server placed the player in (character load), the base its own ship just landed on, or, with no ship in space, its last base (respawn).
 - **MineAsteroid:** must be in the player's own system, with its ship there.
 - **Refusals:** a refused request changes nothing, and the client is sent its real cash, equipment or ship.

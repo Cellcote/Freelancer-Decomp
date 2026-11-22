@@ -556,6 +556,15 @@ bool Ledger_OnChangeCash(PlayerSlot& Slot, unsigned int SessionId, int Delta)
 
 void Ledger_RemoveItem(PlayerSlot& Slot, unsigned int SessionId, unsigned short EquipId, int Count)
 {
+    // The client removes at least one (SellSelected is its only sender). remove_equipment_item
+    // subtracts the count, so a negative one other than -1 (the whole stack) grows the stack.
+    if (!SinglePlayer() && Count < 1)
+    {
+        FLedger& Ledger = LedgerOf(SessionId);
+        DropCredit(Slot, Ledger);
+        ResyncEquipment(Slot);
+        return;
+    }
     unsigned int ArchId = 0;
     int Held = 0;
     if (EquipDesc const* const Item = Slot.equipment.find_equipment_item(EquipId))
