@@ -348,7 +348,7 @@ namespace Platform
     // GetTempPathA: the length written (with the trailing backslash).
     inline FlULong TempDirectory(char* Path, FlULong Size) { return ::GetTempPathA(Size, Path); }
 
-    // Per-user folders (UserFolder) are in platform_folders.h: it needs the shell headers.
+    // Per-user folders (UserFolder) are in Common/core/platform_folders.h: it needs the shell headers.
 } // namespace Platform
 
 #endif // _WIN32

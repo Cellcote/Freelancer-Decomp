@@ -157,7 +157,7 @@ FL_LAYOUT_ASSERT(offsetof(FAiTarget, Iface) == 0x84, "FAiTarget+0x84 Iface");
 //                     hardpoint records) plus the already-ported
 //                     LauncherFireCacheSlot[16] array at GunGroups+0x1098
 //                     (CheckLauncherLineOfFireCached, item 1838,
-//                     common_aifirecontrol.cpp) -- this CONFIRMS that struct's
+//                     Common/ai/aifirecontrol.cpp) -- this CONFIRMS that struct's
 //                     owner is SystemManager itself, at exactly this offset.
 //   +0x1364 (0xC8)  byte GunConvergenceState[0xC8]
 //                     ctor = FUN_062ebbc0 = the ALREADY-PORTED
@@ -172,7 +172,7 @@ FL_LAYOUT_ASSERT(offsetof(FAiTarget, Iface) == 0x84, "FAiTarget+0x84 Iface");
 //                     IObjInspect::SubtargetEnumerator): { enumerate_equip
 //                     LAB_062ee9d0, enumerate_subpart 0x0632c0c0 }. The old
 //                     note here filed it under an "IUStateGraph cluster"; there
-//                     is no such class (see common_targetmanager.cpp's FUN_062ed780
+//                     is no such class (see Common/ai/targetmanager.cpp's FUN_062ed780
 //                     cluster header). Ported for real 2026-09-24.
 //   +0x1498         4 bytes, not written by this ctor: the first dword of the
 //                     loot sub-object at +0x1498 (FUN_062e6490 stores the
@@ -194,14 +194,14 @@ FL_LAYOUT_ASSERT(offsetof(FAiTarget, Iface) == 0x84, "FAiTarget+0x84 Iface");
 //   +0x1584 (0x3D8) pub::AI::Personality PersonalityData
 //                     Already-real type (common_pub.h). Matches
 //                     IBehaviorManager::get_personality/set_personality's
-//                     existing `Sys+0x1584` raw-offset access (common_behaviormanager.cpp).
+//                     existing `Sys+0x1584` raw-offset access (Common/ai/behaviormanager.cpp).
 //
 // Total: 0x195C bytes, matching the ctor's sole caller's `operator_new(0x195C)`
 // exactly (see static_assert below).
 //
 // Retail has no out-of-line destructor: ~IBehaviorManager (FUN_062d2530) inlines it at
 // .text:062d25bf-062d265d as the member unwind (see ~SystemManager in
-// common_systemmanager.cpp).
+// Common/ai/systemmanager.cpp).
 // ============================================================================
 
 // ---------------------------------------------------------------------------
@@ -274,7 +274,7 @@ FL_LAYOUT_ASSERT(offsetof(FAiTarget, Iface) == 0x84, "FAiTarget+0x84 Iface");
 //
 // Every method below is __thiscall on the ThrustManager in retail (callers form
 // `ECX = Sys + 0x18`); they were free `Behavior_*` functions taking a `void*
-// ComponentThis` until CMN-S2 AI4 (2026-10-14). Definitions: common_thrustmanager.cpp.
+// ComponentThis` until CMN-S2 AI4 (2026-10-14). Definitions: Common/ai/thrustmanager.cpp.
 // ---------------------------------------------------------------------------
 // Retail exports only engage_cruise (no class-level export: no operator=).
 struct ThrustManager
@@ -423,7 +423,7 @@ void InitThrustManager(ThrustManager* Self, SystemManager* Owner);
 // ---------------------------------------------------------------------------
 // FAiTargetVector — the MSVC 7.0 `std::vector<FAiTarget>` embedded at
 // SystemManagerTimerTable+0x0C (absolute SystemManager+0x40). Defined here
-// rather than in common_iustategraph.h so that the timer table can hold it by
+// rather than in Common/ai/iustategraph.h so that the timer table can hold it by
 // value; that header's own FAiTargetList is an alias of the table (see below).
 // ---------------------------------------------------------------------------
 struct FAiTargetVector
@@ -457,7 +457,7 @@ struct SustainedThresholdTimer
     // formerly UpdateSustainedThresholdTimer(Timer, DeltaTime, Level) -- FUN_062e6a20 (item
     // 1790), thiscall, RET 8. Latches when Level > 0 and Level > TriggerThreshold; while
     // latched, accumulates DeltaTime and answers true until the unrounded sum exceeds Duration,
-    // which clears the latch and answers false. Definition: common_aifirecontrol.cpp.
+    // which clears the latch and answers false. Definition: Common/ai/aifirecontrol.cpp.
     bool Update(float DeltaTime, float Level);
 };
 FL_LAYOUT_ASSERT(sizeof(SustainedThresholdTimer) == 0x10, "SustainedThresholdTimer must match retail's 16-byte raw layout");
@@ -474,7 +474,7 @@ FL_LAYOUT_ASSERT(sizeof(SustainedThresholdTimer) == 0x10, "SustainedThresholdTim
 // target list the 0x062e7580-0x062e8400 cluster works on (items 1800/1802/1805,
 // ported in common_iustategraph.{h,cpp}), which independently resolved its own
 // owner to SystemManager+0x34 -- the same object. The two models are merged
-// here; common_iustategraph.h's FAiTargetList is now an alias of this struct.
+// here; Common/ai/iustategraph.h's FAiTargetList is now an alias of this struct.
 //
 // Byte-level proof, all from this table's own retail constructor FUN_062e6af0
 // (Common.dll.txt, .text:062e6af0-):
@@ -495,7 +495,7 @@ FL_LAYOUT_ASSERT(sizeof(SustainedThresholdTimer) == 0x10, "SustainedThresholdTim
 //     same two dwords" note was describing without knowing it;
 //   * item 1786's "JustifyNode::Execute call over that exact range" is the ICF
 //     fold of the vector's own destroy-a-range helper (DestroyAiTargetRange,
-//     common_iustategraph.h) -- not a render cache.
+//     Common/ai/iustategraph.h) -- not a render cache.
 // ---------------------------------------------------------------------------
 struct SystemManagerTimerTable
 {
@@ -579,7 +579,7 @@ struct SystemManagerTimerTable
     ~SystemManagerTimerTable();
 
     // The Active byte of Timers[0..5] (+0x28 + 0x10 * N); retail `MOV AL,[ECX+disp]; RET`.
-    // Defined in common_sysmgr_timertable.cpp (CMN-SPLIT 2026-10-14).
+    // Defined in Common/ai/sysmgr_timertable.cpp (CMN-SPLIT 2026-10-14).
     bool IsTimer0Active() const;    // formerly FUN_062e8810 ([ECX+0x28])
     bool IsTimer1Active() const;    // formerly FUN_062e8820 ([ECX+0x38])
     bool IsTimer2Active() const;    // formerly FUN_062e8860 ([ECX+0x48])
@@ -594,21 +594,21 @@ struct SystemManagerTimerTable
     // formerly the free FindObjectDockingAtBase(ObjDbSlot, BaseIface) -- FUN_062e7400 (item
     // 1797), thiscall on Sys+0x34, RET 4: for a moon/planet base (type & 3), walks ObjectDb's
     // docking rings (type mask 0x20) and returns the first whose get_dock_target equals the
-    // base's get_base id; null otherwise. Defined in common_aiintercept.cpp.
+    // base's get_base id; null otherwise. Defined in Common/ai/aiintercept.cpp.
     IObjRW* FindObjectDockingAtBase(IObjInspect const* BaseIface) const;
 
     // formerly the free HasTargetInForwardArc(Self, MaxAngle, MaxRange) -- FUN_062e8400 (item
     // 1806), RET 8. True when some target of BuildAiTargetList with a type in 0x7f0000 lies
     // ahead of the own ship (Owner's +0x14FC record) within MaxRange, moves faster than 10,
     // heads the same way (forward dot > 0.95f), is hostile (attitude <= -0.6f) and lies within
-    // MaxAngle radians of the own forward axis. Definition: common_aifirecontrol.cpp.
+    // MaxAngle radians of the own forward axis. Definition: Common/ai/aifirecontrol.cpp.
     bool HasTargetInForwardArc(float MaxAngle, float MaxRange);
 
     // formerly ObstacleCandidateSource_Resolve(Self, OutParam, FilterMask) -- FUN_062e74e0
     // (item 1799), RET 8. Unless the own ship (Owner->Watcher) is missing or its scanner
     // (ScannerEquipId) reports EquipStatusFlagDestroyed, OutList = the ship's
     // get_scanlist(FilterMask, bKeepCache); true when that answered 0. Callers test OutList.
-    // Definition: common_obstacleavoidance.cpp.
+    // Definition: Common/ai/obstacleavoidance.cpp.
     bool GetOwnScanList(ScanList const*& OutList, unsigned FilterMask);
 };
 FL_LAYOUT_ASSERT(sizeof(SystemManagerTimerTable) == 0xF8,
@@ -631,7 +631,7 @@ void ConstructSystemManagerTimerTable(SystemManagerTimerTable* Self);
 
 // 2026-09-11 d250:common-port -- SystemManagerTimerTable-scoped functions from
 // the 0x062e6260-0x062ea450 blocked-item pass, ported now that this table's
-// own layout (above) is real. See common_sysmgr_timertable.cpp for each one's
+// own layout (above) is real. See Common/ai/sysmgr_timertable.cpp for each one's
 // full raw-disasm derivation.
 
 // FUN_062e8720, item 1808. Source is an id block {OwnerId, missile id}
@@ -1081,14 +1081,14 @@ bool RefreshRepairManagerFromPersonality(RepairManager* Self);
 // ---------------------------------------------------------------------------
 // SystemManager+0x1364, the 0xC8-byte formation / follow-leader record (its ctor is
 // FUN_062ebbc0). Every function on it is reached with ECX = Sys + 0x1364; definitions in
-// common_gunconvergence.cpp unless noted.
+// Common/ai/gunconvergence.cpp unless noted.
 //
 // Its destructor is FUN_062d27d0 (item 1546): retail reaches it from the SystemManager
 // ctor's EH unwind funclets 06395097 / 06395385 (`ADD ECX,0x1364; JMP FUN_062d27d0`), and
 // IBehaviorManager's dtor inlines the same two steps (.text:062d25e2-062d2603): the
 // BaseWatcher at +0x14, then the one at +0x0C -- the members' reverse declaration order.
 // ---------------------------------------------------------------------------
-struct FormationFollowerEnvelope; // common_gotobehavior.h
+struct FormationFollowerEnvelope; // Common/ai/gotobehavior.h
 
 struct FGunConvergenceStateBlock
 {
@@ -1156,7 +1156,7 @@ struct FGunConvergenceStateBlock
 
     // The accessors below are thiscall on this block at every retail call site (`ADD ECX,0x1364`
     // or `LEA ECX,[Sys+0x1364]` on the owning SystemManager). Definitions:
-    // common_gunconvergence.cpp. +0x08 is the owning SystemManager, +0x0C the formation-leader
+    // Common/ai/gunconvergence.cpp. +0x08 is the owning SystemManager, +0x0C the formation-leader
     // watcher (SetFormationLeader), +0x14 the follow-leader watcher (SetFollowLeader).
 
     // FUN_062ec520 (item 1856), RET 4: is WantedId among the owning ship's formation followers
@@ -1215,7 +1215,7 @@ struct FGunConvergenceStateBlock
     // FUN_062ebf50 (item 1855), RET 4, `ECX = Sys + 0x1364` at all three call sites
     // (062c4806, 062d9d35, 062fe2bd). Folds every formation follower of the owning ship into
     // one speed / throttle / angular envelope; false (leaving *Out as written so far) when the
-    // owner has no watched object or no followers. Definition: common_gotobehavior.cpp.
+    // owner has no watched object or no followers. Definition: Common/ai/gotobehavior.cpp.
     bool ComputeFormationFollowerEnvelope(FormationFollowerEnvelope* Out);
 };
 FL_LAYOUT_ASSERT(sizeof(FGunConvergenceStateBlock) == 0xC8, "FGunConvergenceStateBlock sizeof 0xC8");
@@ -1322,7 +1322,7 @@ FL_LAYOUT_ASSERT(offsetof(SystemManager, PersonalityData) == 0x1584, "SystemMana
 // 0x062e6260-0x062ea450 blocked-item pass, ported now that the class layout
 // above is real (superseding the stale "whole-class-deferral" blocker note
 // still quoted on several sibling items in the decomp tracker). See
-// common_systemmanager.cpp for each one's full raw-disasm derivation.
+// Common/ai/systemmanager.cpp for each one's full raw-disasm derivation.
 
 // FUN_062e68e0, item 1787. Stores one shared list-head pointer into two
 // slots: Self->ObjectDb (.text:062e68e6) and Timers::ObjectDb

@@ -31,7 +31,7 @@ It is read in four places:
 
 | Reader | When | What it reads |
 |---|---|---|
-| `Reputation::Startup` ([common_reputation.cpp](../../src/Common/common_reputation.cpp)) | at start-up, from `[Data] Groups = ...` (client and server) | the `[Group]` headers: group identity and string IDs |
+| `Reputation::Startup` ([Common/player/reputation.cpp](../../src/Common/player/reputation.cpp)) | at start-up, from `[Data] Groups = ...` (client and server) | the `[Group]` headers: group identity and string IDs |
 | `Server_LoadWorldState` ([IServerImpl.cpp](../../src/Server/IServerImpl.cpp)) | multiplayer server start-up; in single-player the same step runs on the loaded character save instead | `[Time]`, then `Reputation::LoadFeelings` (`rep` lines of `[Group]`), then the open reader is handed to all controllers as the *LoadGame* message |
 | Content `GameSupport` (message *LoadGame*) | right after the above | `[DynBaseInfo]`, `[locked_gates]`, `[DynSysInfo]` (see below) |
 | `PlayerDB::create_restart_file` ([server_playerdb.cpp](../../src/Server/server_playerdb.cpp)) | creating `Restart.fl` | the whole file is copied verbatim behind the `NewPlayer.fl` template |
@@ -42,7 +42,7 @@ Group identity is read **positionally** by `Reputation::Startup`: the reader doe
 
 | Line (in this order) | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| 1. `nickname` | string (max 15 characters) | none | Group nickname. Its 16-bit group ID is a lower-cased CRC of the name (`MakeId`), so two nicknames with equal CRC would collide. The key name is not checked. | [common_reputation.cpp](../../src/Common/common_reputation.cpp) (`ReadGroupBlock`) |
+| 1. `nickname` | string (max 15 characters) | none | Group nickname. Its 16-bit group ID is a lower-cased CRC of the name (`MakeId`), so two nicknames with equal CRC would collide. The key name is not checked. | [Common/player/reputation.cpp](../../src/Common/player/reputation.cpp) (`ReadGroupBlock`) |
 | 2. `ids_name` | int | 0 | String-resource ID of the group's name. The key name is not checked. | same |
 | 3. `ids_info` | int | 0 | String-resource ID of the group's info card. Only taken if this line's key is `ids_info`; otherwise 0 (the line is consumed either way). | same |
 | 4. `ids_short_name` | int | 0 | String-resource ID of the short name. Same rule as `ids_info`. | same |

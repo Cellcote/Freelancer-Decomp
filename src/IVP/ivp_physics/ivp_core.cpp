@@ -1234,7 +1234,7 @@ void IVP_Core::init_world_transform_from_local_csys(const IVP_U_Matrix* LocalCsy
 
 // FUN_06347410. D-rotinertia-selector pass (2026-09-10). See this method's
 // own declaration comment (ivp_core.h) for why this duplicates (against real
-// named fields) rather than calls common_physys.cpp's file-local
+// named fields) rather than calls Common/physics/physys.cpp's file-local
 // PhySys_RecomputeInverseInertia, which is the SAME retail function ported
 // for the separate PhySys reimplementation's own callers. Body re-derived
 // from that existing, already-verified port (itself traced from

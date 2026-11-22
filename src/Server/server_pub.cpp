@@ -5437,7 +5437,7 @@ SERVER_API unsigned int __cdecl GetSpaceflightLocation() {
     // PTR_SpaceflightLocationID_06d647b0 (COMMON.DLL data export
     // ?SpaceflightLocationID@@3UID_String@@A) and dereference it. The port had a private
     // `static unsigned int g_SpaceflightLocationID = 0;` that nothing ever wrote, so this
-    // always returned 0. The real global is already ported: common_misc.cpp's
+    // always returned 0. The real global is already ported: Common/core/misc.cpp's
     // SpaceflightLocationID = CreateID("Spaceflight"). Fixed.
     return ::SpaceflightLocationID.Id;
 }
@@ -5645,7 +5645,7 @@ SERVER_API const char* __cdecl GetCharacterPlacementName(unsigned int location_i
 // pub::GF::GetCharacterPlacementOccupancy — retail 0x38170
 // FUN_06d127b0 + offset 0x34: reads occupancy from placement struct
 // CharPlaceInfo+0x34 is CharType (-1=none, 0=npc, 1=pc, 2=rpc; see common_goods.h and
-// RoomData::read_set_script's Setpoints->CharacterPlacements derivation in common_roomdata.cpp).
+// RoomData::read_set_script's Setpoints->CharacterPlacements derivation in Common/universe/roomdata.cpp).
 SERVER_API FlULong __cdecl GetCharacterPlacementOccupancy(unsigned int location_id, int index) {
     // .text:06d1818c FUN_06d127b0 (unchecked `placements[index]`) then
     // .text:06d18191 `MOV EAX,[EAX+0x34]`. Bounds/null guards removed 2026-09-24.
@@ -5850,7 +5850,7 @@ SERVER_API float __cdecl GetRtcPerformanceSlider() {
     // [COMMON.DLL::RtcSlider::get_slider]; otherwise FLD that 1.0f.
     // The port used SinglePlayer() (a different predicate) and returned a hard-coded
     // 1.0f on BOTH branches, so the real slider was never read. RtcSlider::get_slider is
-    // already ported (src/include/common_newchar.h, src/Common/common_rtcslider.cpp).
+    // already ported (src/include/common_newchar.h, src/Common/core/rtcslider.cpp).
     if (!::IsMPServer()) {
         return ::RtcSlider::get_slider();
     }
@@ -6644,7 +6644,7 @@ SERVER_API int __cdecl GetLootableInfo(unsigned int zone_id, ID_String& out_arch
         // Retail 0x06cfbc5f: CALL [vtable+0x7c] (ZONE::GetLootableInfo, Common .text:06262dd0,
         // ICF-folded with File::tell, `MOV EAX,[this+0x84]; RET`): the owned loot record the
         // +0x8c setter (ZONE::Slot8C, FUN_0633aea0) installs -- IZone::OwnedLootEntry, a
-        // CmnAsteroid::LootableZoneEntry (common_casteroidfield.cpp "[LootableZone]"). When
+        // CmnAsteroid::LootableZoneEntry (Common/universe/casteroidfield.cpp "[LootableZone]"). When
         // non-null (.text:06cfbc64): out_archetype <- [rec+0x08], out_loot_table <-
         // [rec+0x0c], out_min_level <- [rec+0x20], out_max_level <- [rec+0x10], field6 <-
         // [rec+0x14] (.text:06cfbc66 .. 06cfbc82). A null record falls through to the same
@@ -7022,7 +7022,7 @@ namespace AI {
 // IDirectiveInfo is three dwords no module names (common_iface.h keeps it as bytes).
 // SubmitDirective builds it at S+0x10: word 0 = kind (0 cancel, 1 behavior, 2 player
 // maneuver), word 1 = BaseOp::Priority, word 2 = the behavior id (-1 until a branch sets
-// it). Common's own builders use the same three words (e.g. common_launchaction.cpp).
+// it). Common's own builders use the same three words (e.g. Common/object/launchaction.cpp).
 static IDirectiveInfo Server_MakeDirectiveInfo(unsigned int Kind, unsigned int OpField08,
                                                unsigned int BehaviorId) {
     IDirectiveInfo Dir;
@@ -7146,7 +7146,7 @@ SERVER_API OP_RTYPE __cdecl SubmitState(unsigned int Flid, BaseOp* Op) {
             Behavior->Pathfind->Flag245 = Params->bValue;
         } else if (Params->FlagId == 1) {
             // 06d5c921: byte SystemManager+0x11c0 == GunGroups (+0x12c) + 0x1094, the
-            // "fire control active" byte common_aifirecontrol.cpp tests.
+            // "fire control active" byte Common/ai/aifirecontrol.cpp tests.
             Behavior->Sys->GunGroups.bEnabled = Params->bValue;
         }
         return static_cast<OP_RTYPE>(4);

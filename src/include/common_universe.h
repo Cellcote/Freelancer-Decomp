@@ -127,7 +127,7 @@ namespace Universe
 
     // Universe::ISystem -- the interface of Common.dll's SYSTEM (RTTI .?AUSYSTEM@@, primary
     // vftable .rdata:063a5144, 22 slots, no destructor slot). Retail ISystem carries no data;
-    // SYSTEM (src/Common/common_universe_internal.h, common_universe_system.cpp) is ISystem + CommReferrable + the tables the
+    // SYSTEM (src/Common/universe/universe_internal.h, Common/universe/universe_system.cpp) is ISystem + CommReferrable + the tables the
     // slots hand out. The data members below are the port's storage for the scalar slots
     // (0, 2, 3, 4, 5, 17, 18/19, 20): they stay on the interface because about seventy
     // readers across Common, Server and freelancer read them directly. SYSTEM's slots return
@@ -259,9 +259,9 @@ namespace Universe
     // 0x18 (PTR_LAB_063a5094+0x18, Common.dll.txt:568507) is ICF-folded byte-identical
     // with Archetype::Root::GetRef, `MOV EAX,[this+0x3c]; RET` -- i.e. it just returns
     // this enum's value directly, matching the field this port names `Shape` below
-    // exactly (populated by ParseZoneShape, common_universe.cpp). See
+    // exactly (populated by ParseZoneShape, Common/universe/universe.cpp). See
     // CmnAsteroid::CAsteroidField::load's "exclude_dynamic_asteroids" key
-    // (src/Common/common_casteroidfield.cpp) for the one confirmed live consumer.
+    // (src/Common/universe/casteroidfield.cpp) for the one confirmed live consumer.
     enum EZoneShape
     {
         ZoneShapeInvalid = 0,
@@ -277,8 +277,8 @@ namespace Universe
     // .?AUZONE@@ : .?AUIZone@Universe@@ : .?AUIZoneImmersion@Universe@@, single inheritance,
     // one vftable .rdata:063a5094 of 37 slots +0x00..+0x90). There is NO destructor slot:
     // ZONE's destructor FUN_06339010 is non-virtual and is called directly (06337dee,
-    // 0639774d). The concrete class is ZONE (src/Common/common_zone.h,
-    // src/Common/common_zone.cpp); nothing outside Common.dll constructs one.
+    // 0639774d). The concrete class is ZONE (src/Common/universe/zone.h,
+    // src/Common/universe/zone.cpp); nothing outside Common.dll constructs one.
     //
     // Retail interfaces carry no data. The data members below are the port's storage for the
     // getter slots: they stay on the interface, in retail ZONE's offset order, because about

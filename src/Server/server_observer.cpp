@@ -774,7 +774,7 @@ void SystemPlayerView_Update(Observer* View, double Dt)
         //   .text:06cf61d2  c78424840...  MOV dword ptr [ESP + 0x84],0x19
         // with the record base at S+0x6c, so +0x84 is exactly +0x10, the field
         // DamageList::get_cause reads. What was wrong was the enum it was being
-        // measured against: the old six-case DmgCauseToString (now common_damagelist.cpp) was a
+        // measured against: the old six-case DmgCauseToString (now Common/object/damagelist.cpp) was a
         // fabrication. Retail's body (.text:062bbce0) is `MOV EAX,
         // .rdata:0639ed24 / RET` and that .rdata holds the three bytes 3f 3f 3f
         // -- the string "???". There is no table in Common.dll at all, and

@@ -92,7 +92,7 @@ Which layers are drawn follows the star-sphere detail setting ([star_sys.cpp:698
 
 ### 1.7 `[LightSource]`
 
-Each `[LightSource]` section creates one game light, feeds every key to the light parser below and then enables the light ([star_sys.cpp:388](../../src/freelancer/Client/star_sys.cpp#L388), `GameLightLoad` [engine_light.cpp:1803](../../src/freelancer/Client/engine_light.cpp#L1803)). Key names here are compared with a case-insensitive string compare; an unrecognised key is ignored without a message. Positional numbers are read with `atof` on the comma-separated value text (`ValueNum`, [common_ini.cpp:326](../../src/Common/common_ini.cpp#L326)), so hexadecimal and base-N forms that `get_value_float` accepts are **not** understood here.
+Each `[LightSource]` section creates one game light, feeds every key to the light parser below and then enables the light ([star_sys.cpp:388](../../src/freelancer/Client/star_sys.cpp#L388), `GameLightLoad` [engine_light.cpp:1803](../../src/freelancer/Client/engine_light.cpp#L1803)). Key names here are compared with a case-insensitive string compare; an unrecognised key is ignored without a message. Positional numbers are read with `atof` on the comma-separated value text (`ValueNum`, [Common/core/ini.cpp:326](../../src/Common/core/ini.cpp#L326)), so hexadecimal and base-N forms that `get_value_float` accepts are **not** understood here.
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
@@ -257,7 +257,7 @@ outer_color = 1, 0.5, 0.2
 
 ## 3. Asteroid field files (`[Asteroids] file =`)
 
-Loaded by `CliAsteroidLoadFieldIni` ([cli_asteroid.cpp:858](../../src/freelancer/Client/cli_asteroid.cpp#L858)). The same file is read in full by several other readers: the server reads `[Field]` (`cube_size`, `fill_dist`, `empty_cube_frequency`) itself ([server.md](server.md)), and Common's `CAsteroidField::load` ([common_casteroidfield.cpp:74](../../src/Common/common_casteroidfield.cpp#L74)) reads `[Cube]`, `[Exclusion Zones]` and `[LootableZone]` from the same open file after the client sections (see [archetypes-and-equipment.md](archetypes-and-equipment.md) and [server.md](server.md)). The `[DynamicAsteroids]` section is described in 3.5.
+Loaded by `CliAsteroidLoadFieldIni` ([cli_asteroid.cpp:858](../../src/freelancer/Client/cli_asteroid.cpp#L858)). The same file is read in full by several other readers: the server reads `[Field]` (`cube_size`, `fill_dist`, `empty_cube_frequency`) itself ([server.md](server.md)), and Common's `CAsteroidField::load` ([Common/universe/casteroidfield.cpp:74](../../src/Common/universe/casteroidfield.cpp#L74)) reads `[Cube]`, `[Exclusion Zones]` and `[LootableZone]` from the same open file after the client sections (see [archetypes-and-equipment.md](archetypes-and-equipment.md) and [server.md](server.md)). The `[DynamicAsteroids]` section is described in 3.5.
 
 Behaviour:
 

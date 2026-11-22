@@ -35,11 +35,11 @@ Both files are read by the same function, `LoadPilotPersonalities` ([PilotPerson
 * 16 **block sections** that each describe one behaviour module (`[EvadeDodgeBlock]`, `[EvadeBreakBlock]`, `[BuzzHeadTowardBlock]`, `[BuzzPassByBlock]`, `[TrailBlock]`, `[StrafeBlock]`, `[EngineKillBlock]`, `[RepairBlock]`, `[GunBlock]`, `[MineBlock]`, `[MissileBlock]`, `[DamageReactionBlock]`, `[MissileReactionBlock]`, `[CountermeasureBlock]`, `[FormationBlock]`, `[JobBlock]`);
 * `[Pilot]` sections that name one block of each kind.
 
-Each block starts from the default values of the matching `pub::AI::Personality` sub-structure (constructors in [common_pub.cpp](../../src/Common/common_pub.cpp#L42); the "Default" columns below are those constructor values), then applies the keys it finds. A block is stored under `CreateID(nickname)`; a block without `nickname`, or with a nickname that is already stored, is discarded (first definition wins, per block kind). Because the files are loaded in a fixed order, a nickname defined in `pilots_population.ini` cannot be redefined in `pilots_story.ini`.
+Each block starts from the default values of the matching `pub::AI::Personality` sub-structure (constructors in [Common/ai/pub.cpp](../../src/Common/ai/pub.cpp#L42); the "Default" columns below are those constructor values), then applies the keys it finds. A block is stored under `CreateID(nickname)`; a block without `nickname`, or with a nickname that is already stored, is discarded (first definition wins, per block kind). Because the files are loaded in a fixed order, a nickname defined in `pilots_population.ini` cannot be redefined in `pilots_story.ini`.
 
 Conventions in the block tables: **deg** = the file value is in degrees and is multiplied by pi/180 on load (the default is given in degrees too); "weight key" = `key = NAME, weight` where `NAME` is one of the listed words (case-insensitive, an unlisted word is ignored) and `weight` is value 1 as float; `trueFalse` = the text rule `TRUE` -> true, `FALSE` -> false, **any other text -> true** (case-insensitive, value 0). Every block also accepts `nickname` (string, hashed id of the block).
 
-### 1.1 `[EvadeDodgeBlock]` ([PilotPersonalities.cpp:126](../../src/Content/PilotPersonalities.cpp#L126), defaults [common_pub.cpp:42](../../src/Common/common_pub.cpp#L42))
+### 1.1 `[EvadeDodgeBlock]` ([PilotPersonalities.cpp:126](../../src/Content/PilotPersonalities.cpp#L126), defaults [Common/ai/pub.cpp:42](../../src/Common/ai/pub.cpp#L42))
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
@@ -60,7 +60,7 @@ Conventions in the block tables: **deg** = the file value is in degrees and is m
 | `evade_dodge_direction_weight` | weight key | all 0 | Names `RIGHT`, `LEFT`, `UP`, `DOWN`. |
 | `evade_dodge_style_weight` | weight key | all 0 | Names `WAGGLE`, `WAGGLE_RANDOM`, `SLIDE`, `CORKSCREW`. |
 
-### 1.2 `[EvadeBreakBlock]` ([:193](../../src/Content/PilotPersonalities.cpp#L193), defaults [common_pub.cpp:74](../../src/Common/common_pub.cpp#L74))
+### 1.2 `[EvadeBreakBlock]` ([:193](../../src/Content/PilotPersonalities.cpp#L193), defaults [Common/ai/pub.cpp:74](../../src/Common/ai/pub.cpp#L74))
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
@@ -75,7 +75,7 @@ Conventions in the block tables: **deg** = the file value is in degrees and is m
 | `evade_break_attempt_reverse_time` | float | 4.0 | Time spent trying to reverse. |
 | `evade_break_reverse_distance` | float | 150 | Reverse distance. |
 
-### 1.3 `[BuzzHeadTowardBlock]` ([:246](../../src/Content/PilotPersonalities.cpp#L246), defaults [common_pub.cpp:99](../../src/Common/common_pub.cpp#L99))
+### 1.3 `[BuzzHeadTowardBlock]` ([:246](../../src/Content/PilotPersonalities.cpp#L246), defaults [Common/ai/pub.cpp:99](../../src/Common/ai/pub.cpp#L99))
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
@@ -99,7 +99,7 @@ Conventions in the block tables: **deg** = the file value is in degrees and is m
 | `buzz_dodge_interval_time` | float | 2.0 | Interval. |
 | `buzz_dodge_interval_time_variance_percent` | float | 0 | Variance. |
 
-### 1.4 `[BuzzPassByBlock]` ([:318](../../src/Content/PilotPersonalities.cpp#L318), defaults [common_pub.cpp:133](../../src/Common/common_pub.cpp#L133))
+### 1.4 `[BuzzPassByBlock]` ([:318](../../src/Content/PilotPersonalities.cpp#L318), defaults [Common/ai/pub.cpp:133](../../src/Common/ai/pub.cpp#L133))
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
@@ -116,22 +116,22 @@ Conventions in the block tables: **deg** = the file value is in degrees and is m
 
 | Section | Key | Type | Default | Source |
 |---|---|---|---|---|
-| `[TrailBlock]` | `trail_lock_cone_angle` | float deg | 30 | [:367](../../src/Content/PilotPersonalities.cpp#L367), [defaults](../../src/Common/common_pub.cpp#L156) |
+| `[TrailBlock]` | `trail_lock_cone_angle` | float deg | 30 | [:367](../../src/Content/PilotPersonalities.cpp#L367), [defaults](../../src/Common/ai/pub.cpp#L156) |
 | | `trail_break_time` | float | 2.5 | |
 | | `trail_min_no_lock_time` | float | 4.0 | |
 | | `trail_break_roll_throttle` | float | 0 | |
 | | `trail_break_afterburner` | trueFalse | false | |
 | | `trail_max_turn_throttle` | float | 1.0 | |
 | | `trail_distance` | float | 150 | |
-| `[StrafeBlock]` | `strafe_run_away_distance` | float | 150 | [:393](../../src/Content/PilotPersonalities.cpp#L393), [defaults](../../src/Common/common_pub.cpp#L173) |
+| `[StrafeBlock]` | `strafe_run_away_distance` | float | 150 | [:393](../../src/Content/PilotPersonalities.cpp#L393), [defaults](../../src/Common/ai/pub.cpp#L173) |
 | | `strafe_attack_throttle` | float | 1.0 | |
 | | `strafe_turn_throttle` | float | 1.0 | |
-| `[EngineKillBlock]` | `engine_kill_search_time` | float | 6.0 | [:411](../../src/Content/PilotPersonalities.cpp#L411), [defaults](../../src/Common/common_pub.cpp#L186) |
+| `[EngineKillBlock]` | `engine_kill_search_time` | float | 6.0 | [:411](../../src/Content/PilotPersonalities.cpp#L411), [defaults](../../src/Common/ai/pub.cpp#L186) |
 | | `engine_kill_face_time` | float | 3.0 | |
 | | `engine_kill_use_afterburner` | trueFalse | false | Stored as float 1.0 / 0.0. |
 | | `engine_kill_afterburner_time` | float | 0.5 | |
 | | `engine_kill_max_target_distance` | float | 700 | |
-| `[RepairBlock]` | `use_shield_repair_pre_delay` | float | 2.0 | [:436](../../src/Content/PilotPersonalities.cpp#L436), [defaults](../../src/Common/common_pub.cpp#L201) |
+| `[RepairBlock]` | `use_shield_repair_pre_delay` | float | 2.0 | [:436](../../src/Content/PilotPersonalities.cpp#L436), [defaults](../../src/Common/ai/pub.cpp#L201) |
 | | `use_shield_repair_post_delay` | float | 3.0 | |
 | | `use_shield_repair_at_damage_percent` | float | 0.5 | |
 | | `use_hull_repair_pre_delay` | float | 1.0 | |
@@ -142,7 +142,7 @@ Conventions in the block tables: **deg** = the file value is in degrees and is m
 
 | Section | Key | Type | Default | Meaning / allowed values |
 |---|---|---|---|---|
-| `[GunBlock]` ([:460](../../src/Content/PilotPersonalities.cpp#L460), [defaults](../../src/Common/common_pub.cpp#L223)) | `gun_fire_interval_time` | float | 0 | |
+| `[GunBlock]` ([:460](../../src/Content/PilotPersonalities.cpp#L460), [defaults](../../src/Common/ai/pub.cpp#L223)) | `gun_fire_interval_time` | float | 0 | |
 | | `gun_fire_interval_variance_percent` | float | 0.5 | |
 | | `gun_fire_burst_interval_time` | float | 1.5 | |
 | | `gun_fire_burst_interval_variance_percent` | float | 0.1 | |
@@ -158,10 +158,10 @@ Conventions in the block tables: **deg** = the file value is in degrees and is m
 | | `auto_turret_burst_interval_time` | float | 1.0 | |
 | | `auto_turret_no_burst_interval_time` | float | 0 | |
 | | `fire_style` | string | `MULTIPLE` | `MULTIPLE` stores 0; **any other text stores 1** (`SINGLE` is the documented word). |
-| `[MineBlock]` ([:515](../../src/Content/PilotPersonalities.cpp#L515), [defaults](../../src/Common/common_pub.cpp#L249)) | `mine_launch_interval` | float | 0 | |
+| `[MineBlock]` ([:515](../../src/Content/PilotPersonalities.cpp#L515), [defaults](../../src/Common/ai/pub.cpp#L249)) | `mine_launch_interval` | float | 0 | |
 | | `mine_launch_cone_angle` | float deg | 22.5 | |
 | | `mine_launch_range` | float | 400 | |
-| `[MissileBlock]` ([:533](../../src/Content/PilotPersonalities.cpp#L533), [defaults](../../src/Common/common_pub.cpp#L262)) | `missile_launch_range` | float | -1 | |
+| `[MissileBlock]` ([:533](../../src/Content/PilotPersonalities.cpp#L533), [defaults](../../src/Common/ai/pub.cpp#L262)) | `missile_launch_range` | float | -1 | |
 | | `missile_launch_allow_out_of_range` | trueFalse | false | |
 | | `missile_launch_interval_time` | float | 5.0 | |
 | | `missile_launch_interval_variance_percent` | float | 0.4 | |
@@ -175,7 +175,7 @@ Conventions in the block tables: **deg** = the file value is in degrees and is m
 
 | Section | Key | Type | Default | Source |
 |---|---|---|---|---|
-| `[DamageReactionBlock]` | `evade_break_damage_trigger_percent` | float | 1.0 | [:563](../../src/Content/PilotPersonalities.cpp#L563), [defaults](../../src/Common/common_pub.cpp#L281) |
+| `[DamageReactionBlock]` | `evade_break_damage_trigger_percent` | float | 1.0 | [:563](../../src/Content/PilotPersonalities.cpp#L563), [defaults](../../src/Common/ai/pub.cpp#L281) |
 | | `evade_dodge_more_damage_trigger_percent` | float | 0.2 | |
 | | `drop_mines_damage_trigger_percent` | float | 1.0 | |
 | | `drop_mines_damage_trigger_time` | float | 1.0 | |
@@ -190,14 +190,14 @@ Conventions in the block tables: **deg** = the file value is in degrees and is m
 | | `fire_guns_damage_trigger_time` | float | 1.0 | |
 | | `fire_missiles_damage_trigger_percent` | float | 1.0 | |
 | | `fire_missiles_damage_trigger_time` | float | 0.5 | |
-| `[MissileReactionBlock]` | `evade_missile_distance` | float | 250 | [:606](../../src/Content/PilotPersonalities.cpp#L606), [defaults](../../src/Common/common_pub.cpp#L308) |
+| `[MissileReactionBlock]` | `evade_missile_distance` | float | 250 | [:606](../../src/Content/PilotPersonalities.cpp#L606), [defaults](../../src/Common/ai/pub.cpp#L308) |
 | | `evade_break_missile_reaction_time` | float | 0 | |
 | | `evade_slide_missile_reaction_time` | float | 0 | |
 | | `evade_afterburn_missile_reaction_time` | float | 0 | |
-| `[CountermeasureBlock]` | `countermeasure_active_time` | float | 1.0 | read inline in [:1121](../../src/Content/PilotPersonalities.cpp#L1121), [defaults](../../src/Common/common_pub.cpp#L322) |
+| `[CountermeasureBlock]` | `countermeasure_active_time` | float | 1.0 | read inline in [:1121](../../src/Content/PilotPersonalities.cpp#L1121), [defaults](../../src/Common/ai/pub.cpp#L322) |
 | | `countermeasure_unactive_time` | float | 0 | |
 
-### 1.8 `[FormationBlock]` ([:627](../../src/Content/PilotPersonalities.cpp#L627), defaults [common_pub.cpp:334](../../src/Common/common_pub.cpp#L334))
+### 1.8 `[FormationBlock]` ([:627](../../src/Content/PilotPersonalities.cpp#L627), defaults [Common/ai/pub.cpp:334](../../src/Common/ai/pub.cpp#L334))
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
@@ -227,7 +227,7 @@ Conventions in the block tables: **deg** = the file value is in degrees and is m
 | `formation_exit_max_time` | float | 0 | |
 | `leader_makes_me_tougher` | trueFalse | false | |
 
-### 1.9 `[JobBlock]` ([:772](../../src/Content/PilotPersonalities.cpp#L772), defaults [common_pub.cpp:372](../../src/Common/common_pub.cpp#L372))
+### 1.9 `[JobBlock]` ([:772](../../src/Content/PilotPersonalities.cpp#L772), defaults [Common/ai/pub.cpp:372](../../src/Common/ai/pub.cpp#L372))
 
 A "toughness word" is `EASIEST` (0), `EASY` (1), `EQUAL` (2), `HARD` (3) or `HARDEST` (4); any other text reads as `EQUAL` (2). Ship class words are `FIGHTER`, `FREIGHTER`, `TRANSPORT`, `GUNBOAT`, `CRUISER`, `CAPITAL`, `TRADELANE`, `JUMPGATE`, `WEAPONS_PLATFORM`, `DESTROYABLE_DEPOT`, `SOLAR`, `ANYTHING` (table in the source at [PilotPersonalities.cpp:83](../../src/Content/PilotPersonalities.cpp#L83)).
 

@@ -72,9 +72,10 @@ documents that name the old path and the tracker's `ported_file`.
   dll_inventory.md lists for it.
 - **One style per module.** The engine modules name their files in PascalCase (`MaterialBatcher.cpp`,
   `RpGpuDraw.cpp`), the game modules (Common, Server, the client) in snake_case
-  (`dock_behavior.cpp`). A new file follows its module; a module is not converted to the other style.
-- **No module prefix inside the module.** The folder already names the module: `Common/ai/dock_behavior.cpp`,
-  not `Common/common_dockbehavior.cpp`. The prefix is only for the shared namespace of
+  (`ai/sysmgr_gungroups.cpp`). A new file follows its module; a module is not converted to the other style.
+- **No module prefix inside the module.** The folder already names the module: `Common/ai/dockbehavior.cpp`,
+  not `Common/ai/common_dockbehavior.cpp`. Dropping the prefix is the only rename a move makes,
+  so the old name stays easy to find. The prefix is only for the shared namespace of
   `src/include`.
 - **Subfolders by subsystem.** A module with more than about a hundred files groups them in
   subfolders, one per subsystem (`Common/ai`, `freelancer/Client/hud`). A file's subsystem is what

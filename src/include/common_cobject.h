@@ -246,7 +246,7 @@ public:
     virtual Vector get_velocity() const;
     // Listing 0x1d150. Returns angular velocity from IVP body or zero. Retail vtable+0x58,
     // immediately after get_velocity (+0x54) -- confirmed via this port's own named vtable
-    // dump (??_7CObject@@6B@, Common.dll.txt 557774+) and by common_iobjinspectimpl.cpp's
+    // dump (??_7CObject@@6B@, Common.dll.txt 557774+) and by Common/object/iobjinspectimpl.cpp's
     // IObjInspectImpl::get_angular_velocity comment ("vcall delegate vtable+0x58"). Previously
     // mis-declared after get_mass/get_surface_extents below; moved here to match retail.
     virtual Vector get_angular_velocity() const;
@@ -494,7 +494,7 @@ public:
     explicit CSimple(Class ObjectClass = ClassSimple);
     // Common.dll.c 40405-40505 (0x211b0), tracker id 10557. Delegates the CObject-owned
     // portion to CObject::CObject(CObject const&) then copies CSimple's own fields below,
-    // including the map/tree cluster at OpaqueBc -- see common_csimple.cpp for field-by-field
+    // including the map/tree cluster at OpaqueBc -- see Common/object/csimple.cpp for field-by-field
     // detail and the parts left as an intentional documented gap (map key/value types).
     CSimple(CSimple const& Other);
     virtual ~CSimple();
@@ -588,13 +588,13 @@ public:
     unsigned char PadBcSet[FL_LAYOUT_PAD(0x14 - sizeof(std::set<CacheString, FCacheStringLess>))]; // keeps +0xd0
     // +0xd0 / +0xdc: already identified and consumed elsewhere in this port (predates this
     // pass) as the lazily-cached center-of-mass/radius pair -- CSimple::cache_physical_props
-    // (common_csimple.cpp, Common.dll.c 0x55ed0) writes both via raw `this+0xd0`/`this+0xdc`
+    // (Common/object/csimple.cpp, Common.dll.c 0x55ed0) writes both via raw `this+0xd0`/`this+0xdc`
     // pointer arithmetic, CSimple::get_physical_radius_r (Common.dll.c 87507) reads them back
     // and lazily recomputes when CachedRadius is still the ctor's -1.0f "uncached" sentinel.
     // This pass's copy-ctor archaeology independently confirms the SAME 12-byte Vector shape
     // at +0xd0 (copied via the identical LEA+3xMOV dword-triplet pattern used for
     // WorldPosition/RadiusCenter above) and the same 4-byte scalar at +0xdc -- now given real
-    // names/types instead of raw byte blobs + reinterpret_cast (see common_csimple.cpp for the
+    // names/types instead of raw byte blobs + reinterpret_cast (see Common/object/csimple.cpp for the
     // two call sites updated to use these fields directly instead of pointer arithmetic).
     Vector CachedCenterOfMass;          // +0xd0 .. +0xdb
     float CachedRadius;                 // +0xdc .. +0xdf  -1.0f = not yet cached
@@ -1657,7 +1657,7 @@ public:
     // this was previously left as a bare `return false` were both stale by the time they were
     // re-checked: the equip branch's +0x70 slot is CExternalEquip::GetCenterOfMass (declared
     // in common_cequip.h, overridden by CAttachedEquip), and CArchGroup::GetCenterOfMass now
-    // exists (common_carchgroup.cpp, listing 0x40360). Retail leaves Out untouched on failure.
+    // exists (Common/equip/carchgroup.cpp, listing 0x40360). Retail leaves Out untouched on failure.
     virtual bool get_sub_obj_center_of_mass(unsigned short SubObjId, Vector& Out) const;
     // Common.dll.c 0x4b820 (79147-79179). Fully faithful: both GetMaxHitPoints (CEquip base
     // virtual) and CArchGroup::GetMaxHitPoints are real, unambiguous calls.
@@ -1717,7 +1717,7 @@ public:
                                       float& OutReverse) const;
     // Listing 0x4a980. Resolves a docking/launch hardpoint by index to a world position and
     // orientation (spread-adjusted); false + this object's own transform when HardpointIndex
-    // is out of range. See common_ceqobj.cpp for the retail asm trace.
+    // is out of range. See Common/object/ceqobj.cpp for the retail asm trace.
     bool launch_pos(Vector& OutPos, Matrix& OutOrient, int HardpointIndex) const;
     // Listing 0x4bd50. Lazily-cached bounding sphere used by the explosion-damage-impulse
     // system; see compute_explosion_dmg_bounding_sphere for the one-time computation.
@@ -1786,10 +1786,10 @@ protected:
 
 private:
     // Common.dll.c 78494-78550 (raw asm 0x062aab50-0x062aad29, private in retail). Called
-    // from update() every tick; see common_ceqobj.cpp for the full trace.
+    // from update() every tick; see Common/object/ceqobj.cpp for the full trace.
     void update_docking_animations(float Dt);
     // Common.dll.c 79321-79380 (raw asm 0x062abaa0-0x062abbc7, private in retail). Called by
-    // the public destroy_sub_objs() virtual above; see common_ceqobj.cpp for the full trace.
+    // the public destroy_sub_objs() virtual above; see Common/object/ceqobj.cpp for the full trace.
     void destroy_equipment(DamageList const& Damage, bool bParam2);
 
 public:
@@ -1991,7 +1991,7 @@ public:
     CShip();
     // Common.dll.c 46575 (retail 0x27bb0). Zero real callers anywhere in Common.dll/
     // Server.dll/freelancer.exe (only exported because CShip is a dllexport class) --
-    // see common_cship.cpp for the port rationale (delegates to CEqObj/PhySys::Controller's
+    // see Common/object/cship.cpp for the port rationale (delegates to CEqObj/PhySys::Controller's
     // own already-ported copy ctors rather than re-inlining their bodies).
     CShip(CShip const& Other);
     virtual ~CShip();

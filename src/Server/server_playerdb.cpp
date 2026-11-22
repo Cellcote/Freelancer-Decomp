@@ -485,7 +485,7 @@ static void LoadCheatMessage() {
 //
 //  (4) a line appended to <UserDataPath>\Accts[\MultiPlayer]\cheaters.log.
 //
-// BinaryRDLWriter::write_buffer is ported (src/Common/common_rdlio.cpp, retail
+// BinaryRDLWriter::write_buffer is ported (src/Common/text/rdlio.cpp, retail
 // 0x0632a970); the three nodes encode as a Type 6 record and two Type 2 records.
 //
 // CORRECTED 2026-09-17 (wave 8). This block used to say the caller was
@@ -1710,7 +1710,7 @@ void __cdecl PlayerData_SetShipArch(PlayerSlot& Slot, unsigned int ShipArch) {
     //   ?get_undamaged_collision_group_list@EqObj@Archetype@@QBE_NAAV?$list@
     //    UCollisionGroupDesc@@V?$allocator@UCollisionGroupDesc@@@std@@@std@@@Z
     // i.e. Archetype::EqObj::get_undamaged_collision_group_list, which the port
-    // ALREADY has (common_archetype.h, implemented in common_archetype_ships.cpp).
+    // ALREADY has (common_archetype.h, implemented in Common/archetype/archetype_ships.cpp).
     // So slot+0x26c is a std::list<CollisionGroupDesc> -- the hull's undamaged
     // collision groups -- and NOT a "per-hardpoint list" as this port's notes
     // (and server_playerdata.h's declaration comment) have been calling it.

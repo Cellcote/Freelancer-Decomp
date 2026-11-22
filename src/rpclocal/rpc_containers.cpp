@@ -3562,7 +3562,7 @@ unsigned int RpcDecodeClientDbgCreateShip(FPacketBase& Packet, const unsigned ch
 // It is already declared for this translation unit -- common_goods.h above includes
 // common_net.h, which is where COMMON_API bool __cdecl IsMPServer() lives, and that
 // same chain is what makes the symbol exported from our Common.dll at all (the
-// definition in src/Common/common_misc.cpp carries no macro of its own and relies on
+// definition in src/Common/core/misc.cpp carries no macro of its own and relies on
 // the declaration common_goods.h drags in). Restated here only because a reader of this
 // codec should not have to trace four headers to find out where the call comes from;
 // the signature is common_net.h's, verbatim, so the redeclaration is a no-op.

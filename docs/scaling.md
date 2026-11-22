@@ -21,7 +21,7 @@ rest are open.
 | A1 | **Done (#9).** `ClientObjDb_FindObject` / `FindObjectInKind` (`freelancer/Client/client_objdb.cpp`) | Walks the kind's intrusive list (kind 0: kinds 1, 4, 5, 6, 7, 2). Called for every incoming position update (`IClientImpl::SendCommonUpdateObject`), every destroy, launcher lookups, and per HUD entry per frame (`hud_targetable_objects.cpp`). O(N) per call, about O(N²) per update interval. | Per-kind map id → object, kept in `LinkGameobj` / `UnlinkGameobj`; kind 0 does the lookups in the same kind order. | First hit in list order wins; the id must be final when the object is linked; the map lives outside `FGameobjList`. |
 | A2 | **Done (#9).** `IObjDB::FindById` (`client_objdb.cpp`) | Same walk. Common uses it for fire control, pathfinding and timers. | Route through A1. | As A1. |
 | A3 | `ClientObjDb_FindByCObject` (`client_objdb.cpp`) | Walks the bucket for the matching `cobject()`, once per collision event. | Map `CObject*` → object, kept with A1. | `cobject()` stable while linked. |
-| A4 | `CObject::Find` (both overloads) and `RemoveFromClassList` (`Common/common_cobject.cpp`) | Walk `G_ClassLists`; removal is O(n). Used by client and server. | Per-class maps to list iterators. The `std::list` and the shared `FindFirst`/`FindNext` cursor stay. | `CSimple::Id` and `EngineInstanceId` are plain fields: every write after the object is listed must update the map. First match in list order, with its `AddRef`. |
+| A4 | `CObject::Find` (both overloads) and `RemoveFromClassList` (`Common/object/cobject.cpp`) | Walk `G_ClassLists`; removal is O(n). Used by client and server. | Per-class maps to list iterators. The `std::list` and the shared `FindFirst`/`FindNext` cursor stay. | `CSimple::Id` and `EngineInstanceId` are plain fields: every write after the object is listed must update the map. First match in list order, with its `AddRef`. |
 | A5 | `FSoundManager::FindInstanceByKey` / `FindAttached` (`SoundManager/SoundManager.cpp`) | Linear walk per lookup; `MixerTick` does it per source, so O(sources × instances) per frame. | Map `PlayKey` → node. | First match in list order; voice assignment unchanged because the lists stay. |
 | A6 | Contact list watch-list merge in `RebuildContacts` (`freelancer/Client/hud_contact_list.cpp`) | O(watched × contacts) per rebuild (every 3 s). | Temporary map during the merge. | Low priority; the watch list is small. |
 | A7 | **Mostly done (#10)**: `ObjectList::find_by_id` answers from a side table, so a miss now costs about 7 hash lookups per loaded system plus the in-transit walk. `Server_FindObject` (`Server/server_space.cpp`), `StarSystem::find_object` (`Server/server_starsystem.cpp`) | Before #10: one-entry cache, then the cached system's 7 lists, then the in-transit list, then **every system**: up to O(all objects in the universe) per call. Used by the observer, the near-ships pass and collision resolution. | Remaining: (1) skip systems whose lists are all empty (every universe system is in `SysDB::SysMap`, loaded or not); (2) update #10's per-list index on each edit instead of marking it stale (every death moves an object to `Deferred`, so busy lists are often stale). A global id map is not worth it: it saves hash lookups per system, not per object, and is hard to keep exact (lists appended before their id is readable, systems re-created at the same address). | Keep the one-entry cache, its hit/miss counters and every write to it. When an id exists in more than one place, return what the walk would. |
@@ -32,7 +32,7 @@ rest are open.
 
 Algorithmic, but **not** safe today:
 
-- **Ships in a spatial index for scanner queries** (`ScanList::add_in_range`, `Common/common_cescanner.cpp`).
+- **Ships in a spatial index for scanner queries** (`ScanList::add_in_range`, `Common/equip/cescanner.cpp`).
   The scanner keeps the first 256 hits in list order, so a different candidate order changes *which*
   ships it keeps.
 - **Spatial grid for the server observer's visibility test** (`SystemPlayerView_ShouldBeVisible`). It
@@ -77,7 +77,7 @@ Hard caps; things silently disappear when they fill up:
 | Scanner list 256 | `ScanList` (`include/common_cequip.h`), `ScanList::add_in_range` | Radar and targeting miss ships; the 256 kept are first in list order, not nearest. Applies to NPC scanners too. | Layout shared across DLLs: grow it or use a vector, and prefer the nearest. |
 | Particle pools, 8 × 1000 | `alchemy/alchemy_common.cpp` | New particles not emitted (engine trails, weapon fire). | Pool size is INI-configurable; raise it in data, or let pools grow. |
 | Sound channels | `FSoundManager::MixerTick` (`SoundManager/SoundManager.cpp`) | Sources beyond the cap muted in attach order. | Choose voices by distance and priority. |
-| IVP spawned mindists 100 | `PhySys::MAX_SPAWNED_MINDIST_COUNT` (`Common/common_constants.cpp`), written over IVP's own default of 1000 by `PhysicalSystem::AddRef` | Coarser collision. | Already INI-configurable (`MAX_SPAWNED_MINDIST_COUNT` in `[PhySysConsts]`). |
+| IVP spawned mindists 100 | `PhySys::MAX_SPAWNED_MINDIST_COUNT` (`Common/archetype/constants.cpp`), written over IVP's own default of 1000 by `PhysicalSystem::AddRef` | Coarser collision. | Already INI-configurable (`MAX_SPAWNED_MINDIST_COUNT` in `[PhySysConsts]`). |
 | Spatial query result 2048 | `FSpatialQueryResult` (`include/common_spatial.h`) | Solars only on the client. | Grow if more objects go into the index. |
 
 Per-frame costs with no level of detail:
@@ -114,7 +114,7 @@ Hard caps:
 |-----|-------|--------|--------|
 | Near-ships query 0x800 | `StarSystem_UpdateNearShips` (`Server/IServerImpl.cpp`) | Results beyond 2048 dropped. | Vector. |
 | `scan_objects` bucket 0x800; `pub::` callers 0x400 | `Server/server_starsystem.cpp`, `Server/server_pub.cpp` | Same. | Same; the `pub::` signatures are a plugin API. |
-| Object id counter | `CFLIDMaker::AllocateObjectID` (`Common/common_id.cpp`) | `NextDynamicId++ & 0x3FFFFFFF`: never reused, no check against live objects, can return 0 (= "none"). Projectiles and loot use the same counter, so a busy long-running server wraps after about 1.07 billion allocations and can collide with live objects. | Free list or generation scheme; skip 0. A 64-bit id is a wire change. |
+| Object id counter | `CFLIDMaker::AllocateObjectID` (`Common/core/id.cpp`) | `NextDynamicId++ & 0x3FFFFFFF`: never reused, no check against live objects, can return 0 (= "none"). Projectiles and loot use the same counter, so a busy long-running server wraps after about 1.07 billion allocations and can collide with live objects. | Free list or generation scheme; skip 0. A 64-bit id is a wire change. |
 
 Per-tick costs:
 

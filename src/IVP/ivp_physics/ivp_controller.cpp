@@ -206,7 +206,7 @@ void IVP_Controller_Reconcile_Associated_Cores(IVP_Environment* const* Environme
 // IVP_Controller_Independent / IVP_Controller_Motion (2026-09-25, claude-code:h-ivp).
 // Declared in ivp_controller.h with their RTTI and vftable evidence. Until this pass the
 // Motion share lived folded inside IVP_Controller_Golem's constructor/destructor in
-// src/Common/common_physys.cpp, and Motion's own slot 4 (LAB_06342d60) was not ported.
+// src/Common/physics/physys.cpp, and Motion's own slot 4 (LAB_06342d60) was not ported.
 // ============================================================================
 
 // DAT_0658a9e8: the one IVP_U_Vector<IVP_Core> every independent controller hands out from
@@ -310,7 +310,7 @@ IVP_CONTROLLER_PRIORITY IVP_Controller_Motion::get_controller_priority()
 // Vftable slot 4, LAB_06342d60 (.text:06342d60-06342fb0, RET 0x8). Read instruction by
 // instruction, x87 stack tracked. EDI = EventSim (`MOV EDI,[ESP+0x68]` at .text:06342d78);
 // EventSim+0x00 = dt and +0x04 = 1/dt. The same PD servo as IVP_Controller_Golem's slot 4
-// (LAB_06343150, common_physys.cpp) MINUS its extrapolation step, its body-shift correction,
+// (LAB_06343150, Common/physics/physys.cpp) MINUS its extrapolation step, its body-shift correction,
 // its error accumulator and both teleport gates, and with ONE term that differs: the angular
 // damping uses AngularDampFactor (+0x50, .text:06342efa) where the golem uses DampFactor.
 // Retail never dispatches this body on a live golem (the golem overrides slot 4), but the

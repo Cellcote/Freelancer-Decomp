@@ -17,7 +17,7 @@ are not reproduced; our DLLs use the modern STL between them.
 | What | Where |
 |---|---|
 | `MsvcrtAtoi`, `MsvcrtWtoi` (+ `MsvcrtWideCharToDigit`, `MsvcrtIsWideSpace`) | `src/include/msvcrt_compat.h` |
-| `MsvcrtAtof` (decimal branch, integer mantissa) | `src/Common/msvcrt_atof.h/.cpp` |
+| `MsvcrtAtof` (decimal branch, integer mantissa) | `src/Common/core/msvcrt_atof.h/.cpp` |
 | `MsvcrtLegacyVsnprintf`, `MsvcrtFormatLuaNumber`, `MsvcrtNumericVsnprintf` | `src/include/msvcrt_numeric_format.h` |
 
 Consumers: `MsvcrtAtoi` — every direct decimal integer parse in the game sources

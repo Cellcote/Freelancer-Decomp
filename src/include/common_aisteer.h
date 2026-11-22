@@ -22,20 +22,20 @@
 // capsule tests, the intercept / clearance / heading-cone predicates on an FAiTarget,
 // the steering-frame builders (BuildOrientationBasis, ComputeBankedSteeringFrame,
 // TurnHelper) and GenericWeightedPick. The idea classes themselves (BaseIdea and its
-// eleven subclasses) are in common_idea.h; SystemManager, its ThrustManager, FAiTarget
+// eleven subclasses) are in Common/ai/idea.h; SystemManager, its ThrustManager, FAiTarget
 // and the timer table are in common_systemmanager.h. Per-function evidence lives in the
 // decomp-tracker items.
 //
-// Definitions: src/Common/common_obstacleavoidance.cpp (ObstacleAvoidance, obstacle
-// candidates / heading blend, FindClosestObstacleToAvoid), common_crspline.cpp
-// (ICRSplineSegment), common_aiintercept.cpp (intercept / clearance / heading cones /
-// GetIfacePositionOrZero), common_aifirecontrol.cpp (SustainedThresholdTimer, weapon fire
-// control, the CM-dropper watcher), common_airaycast.cpp (ray / box / capsule tests,
-// bearings), common_aisteer.cpp (steering frames, TurnHelper), common_aitarget.cpp
-// (FAiTarget), common_gunconvergence.cpp (the SystemManager+0x1364 block), the idea
-// Update bodies in common_faceidea.cpp / common_dodgeidea.cpp / common_splinemoveidea.cpp,
-// and common_idea.cpp (GenericWeightedPick). Shared file-local helpers:
-// src/Common/common_aisteer_internal.h.
+// Definitions: src/Common/ai/obstacleavoidance.cpp (ObstacleAvoidance, obstacle
+// candidates / heading blend, FindClosestObstacleToAvoid), Common/core/crspline.cpp
+// (ICRSplineSegment), Common/ai/aiintercept.cpp (intercept / clearance / heading cones /
+// GetIfacePositionOrZero), Common/ai/aifirecontrol.cpp (SustainedThresholdTimer, weapon fire
+// control, the CM-dropper watcher), Common/ai/airaycast.cpp (ray / box / capsule tests,
+// bearings), Common/ai/aisteer.cpp (steering frames, TurnHelper), Common/ai/aitarget.cpp
+// (FAiTarget), Common/ai/gunconvergence.cpp (the SystemManager+0x1364 block), the idea
+// Update bodies in Common/ai/faceidea.cpp / Common/ai/dodgeidea.cpp / Common/ai/splinemoveidea.cpp,
+// and Common/ai/idea.cpp (GenericWeightedPick). Shared file-local helpers:
+// src/Common/ai/aisteer_internal.h.
 // ============================================================================
 
 // ----------------------------------------------------------------------------
@@ -219,7 +219,7 @@ Vector RotateTowardBySlerp(Vector const& From, Vector const& To, float Angle);
 //   +0x260 unsigned CachedObstacleId
 //   +0x264 bool     HasCachedObstacle
 //
-// Independently confirms (from the opposite direction) common_obstacleavoidance.cpp's
+// Independently confirms (from the opposite direction) Common/ai/obstacleavoidance.cpp's
 // own already-documented ObstacleAvoidance::Update comment ("IBehaviorManager
 // +0xc: ... pointer whose own +0x200 caches the ship's last resolved target
 // world position"): ClassifyShipObstaclePhase is one of that field's writers
@@ -288,10 +288,10 @@ bool ResolveObstacleCandidateSlot(IObjRW* Candidate, ObstacleAvoidance::Slot& Ou
 
 // FUN_062e74e0 (item 1799) is SystemManagerTimerTable::GetOwnScanList (formerly
 // ObstacleCandidateSource_Resolve), declared in common_systemmanager.h and defined in
-// common_obstacleavoidance.cpp.
+// Common/ai/obstacleavoidance.cpp.
 
 // FUN_062dc840 / FUN_062dc590 (items 1681 / 1680) are PathfindManager::ClassifyObstaclePhase /
-// UpdateHeadingBlend (common_pathfind.h), defined in common_obstacleavoidance.cpp.
+// UpdateHeadingBlend (common_pathfind.h), defined in Common/ai/obstacleavoidance.cpp.
 
 // ----------------------------------------------------------------------------
 // ICRSplineSegment -- Common.dll.c/.txt 0x063327e0-0x06332eab ("0xd27e0" ..
@@ -766,7 +766,7 @@ bool TransformedBoxesIntersect(Transform const& XformA, float const* AabbA, Tran
 
 // ---------------------------------------------------------------------------
 // Intercept-clearance cluster (items 1745-1751, Common.dll.c 0x062e4350-0x062e4ea0),
-// common_aiintercept.cpp. Every "Elem" is an FAiTarget (common_systemmanager.h): the
+// Common/ai/aiintercept.cpp. Every "Elem" is an FAiTarget (common_systemmanager.h): the
 // own ship's SystemManager::SelfTarget or an element of the timer table's target
 // vector. The clearance is the distance between two cached centres minus the sum of
 // the cached radii, clamped to >= 0, through retail's inlined fast-length idiom; when
@@ -784,7 +784,7 @@ double GetInterceptClearance(FAiTarget* Elem, FAiTarget* Target); // FUN_062e4d0
 // byte and instead re-queries TargetIface's flags unconditionally every
 // call. Gate condition also differs from the twin (TargetFlags&0x207 alone
 // is independently sufficient, not just the twin's 0x30000-on-both check).
-// See common_aiintercept.cpp's own doc comment for the complete per-instruction
+// See Common/ai/aiintercept.cpp's own doc comment for the complete per-instruction
 // derivation.
 bool IsWithinInterceptRangeOfIface(FAiTarget* Elem, IObjInspect const* TargetIface, float Threshold); // FUN_062e4500, item 1746
 
@@ -794,10 +794,10 @@ bool IsWithinInterceptRangeOfIface(FAiTarget* Elem, IObjInspect const* TargetIfa
 // body, returning the clamped clearance distance instead of comparing it against
 // a threshold. Ghidra reported both parameters "<UNASSIGNED>" because MSVC reuses
 // both parameter home slots as float scratch inside the body -- not register
-// corruption; see common_aiintercept.cpp's doc comment for the per-instruction
+// corruption; see Common/ai/aiintercept.cpp's doc comment for the per-instruction
 // derivation. This is the function MoveIdea::Update (item 1577) needs on its
 // TargetKind48 == 1 arm, where it is now reached through NavInterceptClearanceOfIface
-// (common_idea_internal.h; the 0x7effffff sentinel stand-in that once stood there is gone).
+// (Common/ai/idea_internal.h; the 0x7effffff sentinel stand-in that once stood there is gone).
 // Returns double: retail leaves the clearance in ST0 (FUN_062e4bb0 never stores it to a float).
 double GetInterceptClearanceOfIface(FAiTarget* Elem, IObjInspect const* TargetIface); // FUN_062e4bb0, item 1749
 
@@ -948,7 +948,7 @@ void GetCachedRange(FAiTarget* Elem, float* OutLow, float* OutHigh); // FUN_062e
 // 1746, 1749 and 1755 in this file.
 //
 // The FAiTarget sibling of Behavior_GetIfaceMaxScalarAttribute (FUN_062e6010,
-// item 1769, common_behavior.cpp): where that one re-queries the interface
+// item 1769, Common/ai/behavior.cpp): where that one re-queries the interface
 // every call, this one goes through the record's bPosValid cache. Returns the
 // larger of the object's physical radius (+0x18, refreshed through the same
 // slot-11 get_physical_radius guard RefreshPos uses) and its atmosphere range
@@ -1226,8 +1226,8 @@ unsigned GetObjectTypeOrZero(IObjInspect const* Iface); // FUN_062e6200, item 17
 // this function reads through it is `*(IObjDB**)this`. So the parameter is
 // "the address of the NavHelper field that holds the system's IObjDB".
 // The enumeration is byte-for-byte the SAME IObjDB candidate walk already
-// ported in ScanList::add_in_range (common_cescanner.cpp) and CAsteroidSystem::update
-// (common_casteroid.cpp): IObjDB vtable slot 0, taking a 3-dword
+// ported in ScanList::add_in_range (Common/equip/cescanner.cpp) and CAsteroidSystem::update
+// (Common/universe/casteroid.cpp): IObjDB vtable slot 0, taking a 3-dword
 // {cursor, cursor, TypeMask} state struct and returning the next matching
 // IObjRW* (null when exhausted). TypeMask here is 0x20 and the entry guard
 // masks the base's own type against 0x3, so in Freelancer's OBJECT_TYPE bit
@@ -1271,7 +1271,7 @@ bool BuildPerpendicularFrame(Vector const& Direction, Matrix* OutFrame, float Do
 Vector TransformVectorByMatrix(Matrix const& M, Vector const& V);
 
 // Common.dll.txt:236889-237493 (FUN_062e2c70), item 1740. 571 instructions and
-// NO Ghidra pseudocode whatsoever -- the implementation in common_aisteer.cpp
+// NO Ghidra pseudocode whatsoever -- the implementation in Common/ai/aisteer.cpp
 // is a hand trace of the raw bytes and carries the full derivation, including
 // the .rdata constants decoded from their bytes and the ESP-delta accounting
 // that fixes the nine __cdecl arguments.
@@ -1296,7 +1296,7 @@ Vector* LimitAxisThrottleForTurn(Vector& Out, IObjInspect const* Obj, Vector Com
 
 // ----------------------------------------------------------------------------
 // FUN_062e8e60 (item 1822, formerly BlendNudgeIntoPredictedDirection) is
-// ThrustManager::BlendNudgeDirection (common_systemmanager.h, common_thrustmanager.cpp).
+// ThrustManager::BlendNudgeDirection (common_systemmanager.h, Common/ai/thrustmanager.cpp).
 // Retail callers: DodgeIdea::Update (062d849e) and PathfindManager (062dd8f7).
 
 // ----------------------------------------------------------------------------
@@ -1320,7 +1320,7 @@ Vector* LimitAxisThrottleForTurn(Vector& Out, IObjInspect const* Obj, Vector Com
 bool ComputeBankedSteeringFrame(FAiTarget* Elem, Vector const& TargetDir, Matrix& WorkingFrame, Vector& BankVector, unsigned char Mode);
 
 // LAB_062d9d00 (item 1649, formerly the free UpdateSplineSteeringTask(void* Self, float Dt))
-// is SplineMoveIdea::Update (common_idea.h, common_splinemoveidea.cpp).
+// is SplineMoveIdea::Update (Common/ai/idea.h, Common/ai/splinemoveidea.cpp).
 
 // SustainedThresholdTimer (FUN_062e6a20) is declared in common_systemmanager.h, next to the
 // timer table that holds eleven of them.
@@ -1330,7 +1330,7 @@ bool ComputeBankedSteeringFrame(FAiTarget* Elem, Vector const& TargetDir, Matrix
 // corrupted (reads a bogus "unaff_ESI" -- a plain register-allocation
 // artifact); fully re-derived here from the raw disassembly directly. Widely
 // used leaf helper (21 call sites across the module, one of them right here
-// in this cluster -- CanFireLauncherAtTarget's fast path, common_aifirecontrol.cpp,
+// in this cluster -- CanFireLauncherAtTarget's fast path, Common/ai/aifirecontrol.cpp,
 // where it is currently stubbed as a documented no-op TODO for item 1771; now
 // resolved, that stub can be wired up to this real port): fetches a position
 // Vector3 through an unidentified interface pointer's vtable slot 0x2c
@@ -1345,7 +1345,7 @@ void GetIfacePositionOrZero(Vector* OutPos, IObjInspect const* Iface);
 
 // The AI fire-control functions FUN_062ea050..FUN_062ebb10 are members of
 // SystemManagerGunGroupManager / FCmDropperWatcher (common_systemmanager.h); their
-// definitions are in common_aifirecontrol.cpp. FUN_062e8400 is
+// definitions are in Common/ai/aifirecontrol.cpp. FUN_062e8400 is
 // SystemManagerTimerTable::HasTargetInForwardArc.
 
 // Common.dll.c 0x062eb020 (FUN_062eb020), Common.dll.txt 062eb020-062eb068 (27 insns).
@@ -1356,7 +1356,7 @@ Vector* TransformInversePoint(Transform const* Self, Vector* Out, Vector const* 
 // The SystemManager+0x1364 block's ctor / Update / SetFormationLeader / SetFollowLeader /
 // SyncFormationLeader (FUN_062ebbc0 / 062ebcb0 / 062ec870 / 062ec970 / 062ec6b0) are
 // FGunConvergenceStateBlock members now (common_systemmanager.h,
-// common_gunconvergence.cpp).
+// Common/ai/gunconvergence.cpp).
 
 FL_LAYOUT_ASSERT(offsetof(ICRSplineSegment, P0) == 0x00, "ICRSplineSegment+0x00 P0");
 FL_LAYOUT_ASSERT(offsetof(ICRSplineSegment, P1) == 0x0c, "ICRSplineSegment+0x0c P1");
@@ -1368,7 +1368,7 @@ FL_LAYOUT_ASSERT(offsetof(ICRSplineSegment, Reserved38) == 0x38, "ICRSplineSegme
 FL_LAYOUT_ASSERT(sizeof(ICRSplineSegment) == 0x40, "ICRSplineSegment sizeof 0x40 (proven by operator= COMDAT fold with GunUseStruct)");
 
 // LAB_062d68b0 (item 1603) and LAB_062d7950 (item 1618) are FaceIdea::Update and
-// DodgeIdea::Update (common_faceidea.cpp / common_dodgeidea.cpp).
+// DodgeIdea::Update (Common/ai/faceidea.cpp / Common/ai/dodgeidea.cpp).
 
 // ----------------------------------------------------------------------------
 // TurnHelper::get_angular_throttle -- retail 0x062e28f0, decomp-tracker item
@@ -1411,7 +1411,7 @@ FL_LAYOUT_ASSERT(sizeof(ICRSplineSegment) == 0x40, "ICRSplineSegment sizeof 0x40
 // DAT_0639c9e8=2*pi(float, byte-exact 0x40C90FDB)) were independently
 // decoded from the raw bytes and the push-order convention was cross-checked
 // against 3 already-ready call sites elsewhere in this module
-// (common_cobject.cpp's MulMatrix/TransformMatrix uses, common_cequip.cpp's
+// (Common/object/cobject.cpp's MulMatrix/TransformMatrix uses, Common/equip/cequip.cpp's
 // MatrixToQuaternionViaMathEngine). Residual risk is limited to manual
 // ESP-relative offset bookkeeping across ~30 chained stack ops -- the
 // high-level data flow (which buffer feeds which call) was independently
@@ -1433,9 +1433,9 @@ namespace TurnHelper
 // picker below.
 int GenericWeightedPick(int* State);
 
-// LAB_062d68b0, item 1603, is FaceIdea::Update (common_idea.h), defined in
-// common_faceidea.cpp; the steering helpers it shares with DodgeIdea::Update are in
-// common_aisteer.cpp (common_aisteer_internal.h).
+// LAB_062d68b0, item 1603, is FaceIdea::Update (Common/ai/idea.h), defined in
+// Common/ai/faceidea.cpp; the steering helpers it shares with DodgeIdea::Update are in
+// Common/ai/aisteer.cpp (Common/ai/aisteer_internal.h).
 
-// LAB_062d7950, item 1618, is DodgeIdea::Update (common_idea.h), defined in
-// common_dodgeidea.cpp; the raw-offset free function SteeringTaskLarge_Update is gone.
+// LAB_062d7950, item 1618, is DodgeIdea::Update (Common/ai/idea.h), defined in
+// Common/ai/dodgeidea.cpp; the raw-offset free function SteeringTaskLarge_Update is gone.

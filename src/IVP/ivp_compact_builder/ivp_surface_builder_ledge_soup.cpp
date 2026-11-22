@@ -1410,7 +1410,7 @@ void IVP_SurfaceBuilder_Ledge_Soup::AccumulateAxisIntegral(const IVP_SurfaceMana
 // control-flow summary.
 // FUN_0628be10 (this = out; vec, scale) is out[i] = float(scale * vec[i]);
 // it is written inline below, like its other two file-local copies in this
-// port (common_physys.cpp PhySys_Vec3Scale, ivp_friction_solver.cpp).
+// port (Common/physics/physys.cpp PhySys_Vec3Scale, ivp_friction_solver.cpp).
 bool IVP_SurfaceBuilder_Ledge_Soup::ComputeMassProperties(const IVP_SurfaceManager_OutList& leaves,
                                                             float outCenterOfMass[3], float outRotationInertia[3])
 {

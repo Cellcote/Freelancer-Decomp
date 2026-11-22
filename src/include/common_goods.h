@@ -974,7 +974,7 @@ FL_LAYOUT_ASSERT(sizeof(EquipDesc) == 0x20, "EquipDesc sizeof 0x20");
 
 // Retail Common.dll exports every member of this STL instantiation (VC6 std::list, 55
 // members, imported by name by FreeLancer.exe, Server.dll and rpclocal.dll). The port
-// exports the modern MSVC instantiation instead: the definition is in common_equipdesc.cpp; other modules
+// exports the modern MSVC instantiation instead: the definition is in Common/archetype/equipdesc.cpp; other modules
 // import it through this declaration. It must precede the first use that would implicitly
 // instantiate the class, which is why it sits directly after the element type.
 #ifndef COMMON_EXPORTS
@@ -982,7 +982,7 @@ extern template class COMMON_API std::list<EquipDesc>;
 #endif
 // Retail Common.dll exports every member of this STL instantiation (VC6 std::vector, 47
 // members, imported by name by FreeLancer.exe, Server.dll and rpclocal.dll). The port
-// exports the modern MSVC instantiation instead: the definition is in common_equipdesc.cpp; other modules
+// exports the modern MSVC instantiation instead: the definition is in Common/archetype/equipdesc.cpp; other modules
 // import it through this declaration. It must precede the first use that would implicitly
 // instantiate the class, which is why it sits directly after the element type.
 #ifndef COMMON_EXPORTS
@@ -1178,7 +1178,7 @@ inline void OwnerListDeleteData<GoodDesc>(GoodDesc* Data)
 }
 
 // Importing modules take both instantiations from Common.dll; inside Common the explicit
-// instantiation definitions in common_goodinfo.cpp export them (dllexport + extern is C4910).
+// instantiation definitions in Common/archetype/goodinfo.cpp export them (dllexport + extern is C4910).
 #ifndef COMMON_EXPORTS
 extern template class COMMON_API MetaList<GoodDesc>;
 extern template class COMMON_API OwnerList<GoodDesc>;

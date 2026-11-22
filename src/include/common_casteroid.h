@@ -172,7 +172,7 @@ namespace CmnAsteroid
         Archetype::Asteroid* Arch;   // node+0x08
         // Per-axis placement offset of this rock within the cube: INI values 1/2/3, clamped
         // to [-1,1], then pre-scaled by half the field's cube size at load() time (see the
-        // "asteroid" key's handling in CAsteroidField::load, common_casteroidfield.cpp). Combined
+        // "asteroid" key's handling in CAsteroidField::load, Common/universe/casteroidfield.cpp). Combined
         // with the cube's own Orient via CAsteroidCube::init's TransformMatrix-equivalent call
         // to get the rock's final world-space offset from the cube center.
         Vector Extent;                // node+0x0c..0x14
@@ -512,7 +512,7 @@ namespace CmnAsteroid
     };
 
     // Global registry (CmnAsteroid::Load/Unload/Find/Update/CreateAsteroidField), keyed
-    // by universe SystemId: the file-scope std::map at DAT_063fc294 (common_casteroid.cpp,
+    // by universe SystemId: the file-scope std::map at DAT_063fc294 (Common/universe/casteroid.cpp,
     // GAsteroidSystems).
     COMMON_API int __cdecl Load(unsigned SystemId);
     COMMON_API int __cdecl Unload(unsigned SystemId);

@@ -1267,11 +1267,11 @@ FL_LAYOUT_ASSERT(sizeof(FPayloadServerRequestSpaceScript) == 0x1c, "REQUESTSPACE
 //
 // tag == 0x4e -> DL=1 -> EDX=0 -> 0 -> 0x17; anything else -> EDX=-1 -> 0xfffffff0 ->
 // 7; tag == 0x21 -> the recursive walk plus 3. That is byte for byte what
-// FmtStr::Val::get_flattened_size in src/Common/common_fmtstr.cpp computes. (The tracker note on item 202115 stated the
+// FmtStr::Val::get_flattened_size in src/Common/text/fmtstr.cpp computes. (The tracker note on item 202115 stated the
 // two constants the other way round -- 0x4e -> 7, else -> 0x17. It is wrong; corrected.)
 //
 // Per-FmtStr base is 6: the mad-lib id dword plus the ushort node count, the two fields
-// FmtStr::unflatten reads back first (src/Common/common_fmtstr.cpp).
+// FmtStr::unflatten reads back first (src/Common/text/fmtstr.cpp).
 
 // The 8-byte element the reputation types carry. Server.dll's caller allocates the whole
 // array as operator new(Reputation::group_count() * 8) (Server.dll.c:89953) and fills it
@@ -1474,7 +1474,7 @@ FL_LAYOUT_ASSERT(sizeof(FPayloadServerSetMissionObjectives) == 0x28,
 //
 // THE "BLOCKED ON CostumeHint" NOTE WAS STALE TOO. The port already has the whole class:
 // src/include/common_goods.h (BaseHint 0x08 with Kind at +0x04, CostumeHint 0x3c
-// with Data[13] at +0x08) and src/Common/common_baseproperties.cpp (Serialize,
+// with Data[13] at +0x08) and src/Common/universe/baseproperties.cpp (Serialize,
 // UnSerialize, CleanUp). The virtual ORDER matches retail exactly: rpclocal substitutes
 // its own four-slot vtable at .rdata:06db3740 and its three non-destructor slots are
 // import thunks -- +0x04 -> CostumeHint::Serialize, +0x08 -> CostumeHint::UnSerialize,
@@ -1517,7 +1517,7 @@ FL_LAYOUT_ASSERT(sizeof(FPayloadServerLoadHint) == 0x0c, "LOADHINT payload 0x0c"
 //
 // Six of the seven were already in the port; only EquipDesc::set_count(int) was absent.
 // It is retail RVA 0xdbad0, one instruction (`MOV [this+0x14],arg`), and is now declared
-// in src/include/common_goods.h and defined in src/Common/common_equipdesc.cpp.
+// in src/include/common_goods.h and defined in src/Common/archetype/equipdesc.cpp.
 //
 // Sender 0x06d8c0f0 (IClient+0x158, RET 0xc -> three dword args after this) reads its
 // EquipDesc argument field by field, and the offsets it reads are EXACTLY the port's

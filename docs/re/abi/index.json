@@ -124,7 +124,7 @@
    "base_resolved": true,
    "base_slots": 5,
    "bases": "public IVP_Listener_Object, public IVP_Listener_Collision, public IVP_Collision_Filter_Coll_Group_Ident",
-   "file": "src/Common/common_physys_internal.h",
+   "file": "src/Common/physics/physys_internal.h",
    "kind": "struct",
    "line": 36,
    "module": "Common",
@@ -13823,7 +13823,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/Common/common_behavior.h",
+   "file": "src/Common/ai/behavior.h",
    "kind": "class",
    "line": 538,
    "module": "Common",
@@ -13947,7 +13947,7 @@
      "method": "set_afterburner",
      "offset": 64,
      "slot_index": 16,
-     "text": "// 16 +0x40. FUN_062d2110, decomp-tracker item 1535, 54 instructions, // Common.dll.txt 210791-210860. NO LONGER `{}` -- 2026-09-17 (claude:w23-stubsweep2). // // Eighteen vtable slots DLL-wide hold this address, all of them behavior-family tables // inheriting Behavior's own entry, and IBehaviorManager::update_current_behavior_ // set_afterburner (common_behaviormanager.cpp) dispatches into it every time the manager is told // to toggle the afterburner. Until this pass every one of those calls landed on an // empty body. // // Item 1535's own note left it unported on the grounds that it \"dispatches through // this+0x24's unidentified pointee\". That is stale on both halves. The object at // this+0x24 is the NavHelper every subclass in this port already names, and the two // things retail does with it are both already-ported generic helpers: //   * `[this+0x24] + 0x8` -> list head -> `head - 8` -> vtable slot 0x5c, which //     common_iface.h and Behavior_UpdateCruiseGate both name //     IObjInspect::is_cruise_active(bool& OutCruise, bool& OutTradeLane); //   * `[this+0x24] + 0x18` is the module-wide \"ComponentThis\" convention (the same //     +0x18 slot 17 below forwards into, and the same one FormationMoveFx::SetMode and //     GotoBehavior already hand to Behavior_UpdateCruiseGate). // See common_behavior.cpp for the branch-by-branch derivation. virtual void set_afterburner(bool bOn);                                 // 16 +0x40"
+     "text": "// 16 +0x40. FUN_062d2110, decomp-tracker item 1535, 54 instructions, // Common.dll.txt 210791-210860. NO LONGER `{}` -- 2026-09-17 (claude:w23-stubsweep2). // // Eighteen vtable slots DLL-wide hold this address, all of them behavior-family tables // inheriting Behavior's own entry, and IBehaviorManager::update_current_behavior_ // set_afterburner (Common/ai/behaviormanager.cpp) dispatches into it every time the manager is told // to toggle the afterburner. Until this pass every one of those calls landed on an // empty body. // // Item 1535's own note left it unported on the grounds that it \"dispatches through // this+0x24's unidentified pointee\". That is stale on both halves. The object at // this+0x24 is the NavHelper every subclass in this port already names, and the two // things retail does with it are both already-ported generic helpers: //   * `[this+0x24] + 0x8` -> list head -> `head - 8` -> vtable slot 0x5c, which //     common_iface.h and Behavior_UpdateCruiseGate both name //     IObjInspect::is_cruise_active(bool& OutCruise, bool& OutTradeLane); //   * `[this+0x24] + 0x18` is the module-wide \"ComponentThis\" convention (the same //     +0x18 slot 17 below forwards into, and the same one FormationMoveFx::SetMode and //     GotoBehavior already hand to Behavior_UpdateCruiseGate). // See Common/ai/behavior.cpp for the branch-by-branch derivation. virtual void set_afterburner(bool bOn);                                 // 16 +0x40"
     },
     {
      "derived": false,
@@ -14010,7 +14010,7 @@
      "method": "Slot25",
      "offset": 100,
      "slot_index": 25,
-     "text": "// 25 +0x64. ADDED 2026-09-17 -- previously missing, which left every Behavior object // in this port carrying a 25-entry table while retail's is 27. Nothing in src/ indexes // a behavior vtable by number today (checked: the only raw // `*reinterpret_cast<void***>` dispatches in common_behavior.cpp are on NavPilotPtr / // EngineObj / NavHelper / GotoWatcherPtr / Field04Sub, none of them Behavior-family, // and all at indices below 25), so this was a latent hazard rather than a live // out-of-bounds call -- but it is the same hazard commit d178e12 found live in // common_stubs.cpp on FormationMoveFx, so it is fixed the same way. // Retail body 0629ba10, `XOR AL,AL; RET 4`: returns false, pops one dword. virtual bool Slot25(void* Arg) { (void)Arg; return false; }"
+     "text": "// 25 +0x64. ADDED 2026-09-17 -- previously missing, which left every Behavior object // in this port carrying a 25-entry table while retail's is 27. Nothing in src/ indexes // a behavior vtable by number today (checked: the only raw // `*reinterpret_cast<void***>` dispatches in Common/ai/behavior.cpp are on NavPilotPtr / // EngineObj / NavHelper / GotoWatcherPtr / Field04Sub, none of them Behavior-family, // and all at indices below 25), so this was a latent hazard rather than a live // out-of-bounds call -- but it is the same hazard commit d178e12 found live in // common_stubs.cpp on FormationMoveFx, so it is fixed the same way. // Retail body 0629ba10, `XOR AL,AL; RET 4`: returns false, pops one dword. virtual bool Slot25(void* Arg) { (void)Arg; return false; }"
     },
     {
      "derived": false,
@@ -14026,7 +14026,7 @@
    "base_resolved": true,
    "base_slots": 27,
    "bases": "public Behavior",
-   "file": "src/Common/common_behavior.h",
+   "file": "src/Common/ai/behavior.h",
    "kind": "class",
    "line": 876,
    "module": "Common",
@@ -14367,7 +14367,7 @@
      "method": "GetCenterOfMass",
      "offset": 112,
      "slot_index": 28,
-     "text": "// Common.dll.c 66567-66590 (raw 0629f030, listing 0x3f030). New virtual introduced at this // level (vtable+0x70, no CEquip base slot) -- overridden by CAttachedEquip below. Zeroes Out, // and when connected fetches this equip's own ConnectionIndex (GetParentConnector(false), // vtable+0x64) and queries DALib::Engine's vtable+0x90 (world-position getter, same slot as // common_misc.cpp's ComputeExplosiveImpulses / this file's own GetConnectionPosition +0xa0 // sibling) for the connector instance's world position. Like GetVelocity above, retail always // hardcodes the return to false regardless of outcome -- reproduced as-is. virtual bool GetCenterOfMass(Vector& Out) const;"
+     "text": "// Common.dll.c 66567-66590 (raw 0629f030, listing 0x3f030). New virtual introduced at this // level (vtable+0x70, no CEquip base slot) -- overridden by CAttachedEquip below. Zeroes Out, // and when connected fetches this equip's own ConnectionIndex (GetParentConnector(false), // vtable+0x64) and queries DALib::Engine's vtable+0x90 (world-position getter, same slot as // Common/core/misc.cpp's ComputeExplosiveImpulses / this file's own GetConnectionPosition +0xa0 // sibling) for the connector instance's world position. Like GetVelocity above, retail always // hardcodes the return to false regardless of outcome -- reproduced as-is. virtual bool GetCenterOfMass(Vector& Out) const;"
     },
     {
      "derived": true,
@@ -15739,7 +15739,7 @@
      "method": "update",
      "offset": 20,
      "slot_index": 5,
-     "text": "// Retail 0x62b0270, dispatched via this class's own IAction sub-vtable // (PTR_LAB_0639e5a4 slot 1). Only does anything when LaunchFlags & 0x20 (the // immediate-physical-launch path); the AI-directive path (Start() queued a // DirectiveLaunchOp instead) just reports \"not complete\" every tick with no // side effects. See common_launchaction.cpp for the full per-branch trace. virtual bool update(float Dt) override;"
+     "text": "// Retail 0x62b0270, dispatched via this class's own IAction sub-vtable // (PTR_LAB_0639e5a4 slot 1). Only does anything when LaunchFlags & 0x20 (the // immediate-physical-launch path); the AI-directive path (Start() queued a // DirectiveLaunchOp instead) just reports \"not complete\" every tick with no // side effects. See Common/object/launchaction.cpp for the full per-branch trace. virtual bool update(float Dt) override;"
     },
     {
      "derived": true,
@@ -16369,7 +16369,7 @@
      "method": "get_angular_velocity",
      "offset": 88,
      "slot_index": 22,
-     "text": "// Listing 0x1d150. Returns angular velocity from IVP body or zero. Retail vtable+0x58, // immediately after get_velocity (+0x54) -- confirmed via this port's own named vtable // dump (??_7CObject@@6B@, Common.dll.txt 557774+) and by common_iobjinspectimpl.cpp's // IObjInspectImpl::get_angular_velocity comment (\"vcall delegate vtable+0x58\"). Previously // mis-declared after get_mass/get_surface_extents below; moved here to match retail. virtual Vector get_angular_velocity() const;"
+     "text": "// Listing 0x1d150. Returns angular velocity from IVP body or zero. Retail vtable+0x58, // immediately after get_velocity (+0x54) -- confirmed via this port's own named vtable // dump (??_7CObject@@6B@, Common.dll.txt 557774+) and by Common/object/iobjinspectimpl.cpp's // IObjInspectImpl::get_angular_velocity comment (\"vcall delegate vtable+0x58\"). Previously // mis-declared after get_mass/get_surface_extents below; moved here to match retail. virtual Vector get_angular_velocity() const;"
     },
     {
      "derived": false,
@@ -17146,7 +17146,7 @@
      "method": "get_sub_obj_center_of_mass",
      "offset": 112,
      "slot_index": 28,
-     "text": "// Listing 0x4b3f0 (062ab3f0..062ab4b8). Now fully wired, both branches. The two reasons // this was previously left as a bare `return false` were both stale by the time they were // re-checked: the equip branch's +0x70 slot is CExternalEquip::GetCenterOfMass (declared // in common_cequip.h, overridden by CAttachedEquip), and CArchGroup::GetCenterOfMass now // exists (common_carchgroup.cpp, listing 0x40360). Retail leaves Out untouched on failure. virtual bool get_sub_obj_center_of_mass(unsigned short SubObjId, Vector& Out) const;"
+     "text": "// Listing 0x4b3f0 (062ab3f0..062ab4b8). Now fully wired, both branches. The two reasons // this was previously left as a bare `return false` were both stale by the time they were // re-checked: the equip branch's +0x70 slot is CExternalEquip::GetCenterOfMass (declared // in common_cequip.h, overridden by CAttachedEquip), and CArchGroup::GetCenterOfMass now // exists (Common/equip/carchgroup.cpp, listing 0x40360). Retail leaves Out untouched on failure. virtual bool get_sub_obj_center_of_mass(unsigned short SubObjId, Vector& Out) const;"
     },
     {
      "derived": true,
@@ -17666,7 +17666,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/Common/common_idea.h",
+   "file": "src/Common/ai/idea.h",
    "kind": "class",
    "line": 181,
    "module": "Common",
@@ -18616,7 +18616,7 @@
      "method": "Slot00",
      "offset": 0,
      "slot_index": 0,
-     "text": "// The one virtual of retail IBehaviorManager: vftable 063a037c holds a single entry, // LAB_062d3f90 (Common.dll.txt 213832-214170, `RET 4`), installed by both ctors // (.text:062d22bf / 062d2552). Retail name not recovered, hence Slot00. It is the ONLY // virtual of the class (no virtual dtor: the retail vftable has exactly one slot), so the // compiler's vptr sits at +0x00 exactly where retail's does, and Server.dll's // `MOV EDX,[ECX]; CALL [EDX]` sites are ordinary virtual calls through it. Like retail it // is NOT exported: Server reaches it only through the vptr of an object Common built // (GetBehaviorManager / CEqObj::create_behavior_interface). // Event->Type selects one of eight cases; Event->Data is a per-case payload block whose // offsets are listed on the definition in common_behaviormanager.cpp. Types above 7, and any event // while CurrentBehaviorIndex == -1, are ignored. virtual void Slot00(FBehaviorManagerEvent const* Event); // vftable 063a037c +0x00"
+     "text": "// The one virtual of retail IBehaviorManager: vftable 063a037c holds a single entry, // LAB_062d3f90 (Common.dll.txt 213832-214170, `RET 4`), installed by both ctors // (.text:062d22bf / 062d2552). Retail name not recovered, hence Slot00. It is the ONLY // virtual of the class (no virtual dtor: the retail vftable has exactly one slot), so the // compiler's vptr sits at +0x00 exactly where retail's does, and Server.dll's // `MOV EDX,[ECX]; CALL [EDX]` sites are ordinary virtual calls through it. Like retail it // is NOT exported: Server reaches it only through the vptr of an object Common built // (GetBehaviorManager / CEqObj::create_behavior_interface). // Event->Type selects one of eight cases; Event->Data is a per-case payload block whose // offsets are listed on the definition in Common/ai/behaviormanager.cpp. Types above 7, and any event // while CurrentBehaviorIndex == -1, are ignored. virtual void Slot00(FBehaviorManagerEvent const* Event); // vftable 063a037c +0x00"
     }
    ],
    "virtual_count": 1
@@ -18693,7 +18693,7 @@
      "method": "do_simulation_controller",
      "offset": 16,
      "slot_index": 4,
-     "text": "// Slot 4: .rdata:0639b61c, do_simulation_controller -- named by the six // retail exports that override it (CEEngine 06296430, CEThruster 0629d2d0, // CNudgeEngine 062ad340, CShip 0628f050, CSteering 062bb7c0, CStrafeEngine // 062bb960; all `...do_simulation_controller@...@@?AEXPAVIVP_Event_Sim@@ // PAV?$IVP_U_Vector@VIVP_Core@@@@@Z`, RET 0x8). _purecall in PhySys::Controller's // table, so every concrete controller overrides it; FLControllerGolem's force // integrator LAB_06343150 is its override (common_physys.cpp). // Retail's only dispatcher is the per-PSI controller loop FUN_063496a0 // (.text:063498fa-0634990d: `PUSH element+4; PUSH EBX(event); CALL [EDX+0x10]`), // which this port has not ported -- nothing in src/IVP calls this slot yet. virtual void do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<IVP_Core>* CoreList) = 0;"
+     "text": "// Slot 4: .rdata:0639b61c, do_simulation_controller -- named by the six // retail exports that override it (CEEngine 06296430, CEThruster 0629d2d0, // CNudgeEngine 062ad340, CShip 0628f050, CSteering 062bb7c0, CStrafeEngine // 062bb960; all `...do_simulation_controller@...@@?AEXPAVIVP_Event_Sim@@ // PAV?$IVP_U_Vector@VIVP_Core@@@@@Z`, RET 0x8). _purecall in PhySys::Controller's // table, so every concrete controller overrides it; FLControllerGolem's force // integrator LAB_06343150 is its override (Common/physics/physys.cpp). // Retail's only dispatcher is the per-PSI controller loop FUN_063496a0 // (.text:063498fa-0634990d: `PUSH element+4; PUSH EBX(event); CALL [EDX+0x10]`), // which this port has not ported -- nothing in src/IVP calls this slot yet. virtual void do_simulation_controller(IVP_Event_Sim* EventSim, IVP_U_Vector<IVP_Core>* CoreList) = 0;"
     },
     {
      "derived": false,
@@ -19505,7 +19505,7 @@
      "method": "OnDirectiveComplete",
      "offset": 0,
      "slot_index": 0,
-     "text": "// Slot 0, and the only virtual. Retail 0x62b01f0 is // LaunchAction::OnDirectiveComplete, still the only identified override // (see common_launchaction.cpp). Dispatched when a queued AI directive this // callback was registered for finishes. virtual void OnDirectiveComplete(int ResultWord11c, int ResultWord118) = 0;"
+     "text": "// Slot 0, and the only virtual. Retail 0x62b01f0 is // LaunchAction::OnDirectiveComplete, still the only identified override // (see Common/object/launchaction.cpp). Dispatched when a queued AI directive this // callback was registered for finishes. virtual void OnDirectiveComplete(int ResultWord11c, int ResultWord118) = 0;"
     }
    ],
    "virtual_count": 1
@@ -21262,14 +21262,14 @@
      "method": "read_buffer",
      "offset": 0,
      "slot_index": 0,
-     "text": "// Common.dll.c/.txt 0xcac30 (Common.dll.txt:362106-362299). Ported 2026-09-09 (D109, item // 73110): same CoCreateInstance/putContentHandler wiring as read_file below, but wraps // (Buffer, Size) in a BSTR and calls ISAXXMLReader::parse(VARIANT) instead of parseURL. Full // instruction-by-instruction trace and the one deliberately-simplified edge case (retail's // OOM path throws a real C++ exception this port doesn't reproduce; treated as an ordinary // parse failure instead) are documented on the definition in common_rdlio.cpp. virtual bool read_buffer(RenderDisplayList& Rdl, const char* Buffer, unsigned int Size);"
+     "text": "// Common.dll.c/.txt 0xcac30 (Common.dll.txt:362106-362299). Ported 2026-09-09 (D109, item // 73110): same CoCreateInstance/putContentHandler wiring as read_file below, but wraps // (Buffer, Size) in a BSTR and calls ISAXXMLReader::parse(VARIANT) instead of parseURL. Full // instruction-by-instruction trace and the one deliberately-simplified edge case (retail's // OOM path throws a real C++ exception this port doesn't reproduce; treated as an ordinary // parse failure instead) are documented on the definition in Common/text/rdlio.cpp. virtual bool read_buffer(RenderDisplayList& Rdl, const char* Buffer, unsigned int Size);"
     },
     {
      "derived": true,
      "method": "read_file",
      "offset": 4,
      "slot_index": 1,
-     "text": "// Common.dll.c/.txt 0xcbf80 (Common.dll.txt:364321-364417). Ported 2026-09-09 (D109, item // 13991): CoCreateInstance()s Microsoft's real MSXML2 SAXXMLReader COM object // (CLSID_SAXXMLReader), registers a genuine ISAXContentHandler-implementing sink (see // RdlxSaxContentHandler in common_rdlio.cpp) via putContentHandler, mbstowcs's Filename, and // calls parseURL. NOT a DOM/IPersistStreamInit load as previously assumed -- see the // detailed evidence trail on the definition in common_rdlio.cpp. virtual bool read_file(RenderDisplayList& Rdl, const char* Filename);"
+     "text": "// Common.dll.c/.txt 0xcbf80 (Common.dll.txt:364321-364417). Ported 2026-09-09 (D109, item // 13991): CoCreateInstance()s Microsoft's real MSXML2 SAXXMLReader COM object // (CLSID_SAXXMLReader), registers a genuine ISAXContentHandler-implementing sink (see // RdlxSaxContentHandler in Common/text/rdlio.cpp) via putContentHandler, mbstowcs's Filename, and // calls parseURL. NOT a DOM/IPersistStreamInit load as previously assumed -- see the // detailed evidence trail on the definition in Common/text/rdlio.cpp. virtual bool read_file(RenderDisplayList& Rdl, const char* Filename);"
     },
     {
      "derived": true,
@@ -33604,13 +33604,13 @@
  ],
  "forward_decls": [
   {
-   "file": "src/Common/common_cobject_internal.h",
+   "file": "src/Common/object/cobject_internal.h",
    "line": 10,
    "module": "Common",
    "name": "IObjDB"
   },
   {
-   "file": "src/Common/common_physys_internal.h",
+   "file": "src/Common/physics/physys_internal.h",
    "line": 27,
    "module": "Common",
    "name": "IVP_Material"
@@ -38818,19 +38818,19 @@
    "name": "IEngine"
   },
   {
-   "file": "src/Common/common_behavior.h",
+   "file": "src/Common/ai/behavior.h",
    "line": 12,
    "module": "Common",
    "name": "IObjDB"
   },
   {
-   "file": "src/Common/common_behavior.h",
+   "file": "src/Common/ai/behavior.h",
    "line": 399,
    "module": "Common",
    "name": "SystemManagerTimerTable"
   },
   {
-   "file": "src/Common/common_behavior.h",
+   "file": "src/Common/ai/behavior.h",
    "line": 874,
    "module": "Common",
    "name": "SystemManager"
@@ -39034,13 +39034,13 @@
    "name": "ICliObjFactory"
   },
   {
-   "file": "src/Common/common_evadebehavior.h",
+   "file": "src/Common/ai/evadebehavior.h",
    "line": 10,
    "module": "Common",
    "name": "IObjRW"
   },
   {
-   "file": "src/Common/common_facebehavior.h",
+   "file": "src/Common/ai/facebehavior.h",
    "line": 17,
    "module": "Common",
    "name": "SystemManager"
@@ -39094,13 +39094,13 @@
    "name": "FFlidCrcState"
   },
   {
-   "file": "src/Common/common_idea.h",
+   "file": "src/Common/ai/idea.h",
    "line": 15,
    "module": "Common",
    "name": "ICRSplineSegment"
   },
   {
-   "file": "src/Common/common_idea.h",
+   "file": "src/Common/ai/idea.h",
    "line": 16,
    "module": "Common",
    "name": "SystemManager"
@@ -39244,19 +39244,19 @@
    "name": "IVP_Anchor"
   },
   {
-   "file": "src/Common/common_lootbehavior.h",
+   "file": "src/Common/ai/lootbehavior.h",
    "line": 10,
    "module": "Common",
    "name": "IBehaviorManager"
   },
   {
-   "file": "src/Common/common_lootbehavior.h",
+   "file": "src/Common/ai/lootbehavior.h",
    "line": 11,
    "module": "Common",
    "name": "SystemManager"
   },
   {
-   "file": "src/Common/common_lootbehavior.h",
+   "file": "src/Common/ai/lootbehavior.h",
    "line": 12,
    "module": "Common",
    "name": "IObjRW"
@@ -39616,7 +39616,7 @@
    "name": "EquipDesc"
   },
   {
-   "file": "src/Common/common_strafebehavior.h",
+   "file": "src/Common/ai/strafebehavior.h",
    "line": 10,
    "module": "Common",
    "name": "IObjInspect"
@@ -39766,19 +39766,19 @@
    "name": "RDLRefNode"
   },
   {
-   "file": "src/Common/common_trailbehavior.h",
+   "file": "src/Common/ai/trailbehavior.h",
    "line": 10,
    "module": "Common",
    "name": "IBehaviorManager"
   },
   {
-   "file": "src/Common/common_trailbehavior.h",
+   "file": "src/Common/ai/trailbehavior.h",
    "line": 11,
    "module": "Common",
    "name": "SystemManager"
   },
   {
-   "file": "src/Common/common_trailbehavior.h",
+   "file": "src/Common/ai/trailbehavior.h",
    "line": 12,
    "module": "Common",
    "name": "IObjRW"
