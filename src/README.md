@@ -22,7 +22,7 @@ exception is retail's: `RemoteServer.dll` links `freelancer.exe`, whose exports 
 | Game | `qhull` (static, into `Common`), `Common` (shared game runtime), `Server` (the world), `Content` (missions, AI, populators) |
 | Network | `rpclocal` (single-player connection), `RemoteServer` (runs in the client), `RemoteClient` (runs in the server) |
 | Programs | `freelancer` (the client), `FLServer`, `FLDedicated`; `Resources/*` (resource-only DLLs) |
-| Tests and tools | `FLRegress`, `RpcCodecTest`, `TexConvertTest`, `DPNetCheck`, `MemoryDiagnostics`, `PortTests` |
+| Tests and tools | `FLRegress`, `RpcCodecTest`, `TexConvertTest`, `DPNetInteropTest`, `MemoryDiagnostics`, `PortTest` |
 
 ## Shared source folders
 

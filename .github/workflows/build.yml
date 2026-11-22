@@ -516,7 +516,7 @@ jobs:
           data-key: fl-data-${{ env.FL_ISO_MD5 }}-v1
           directplay: true
 
-      # Starts the server, joins it with Microsoft's DirectPlay 8 client (DPNetCheck, the client
+      # Starts the server, joins it with Microsoft's DirectPlay 8 client (DPNetInteropTest, the client
       # side of a retail Freelancer), lets it stop after 45 seconds and checks the log for the
       # startup and shutdown lines.
       - name: Start, join, run and stop
@@ -536,7 +536,7 @@ jobs:
           }
           $check = 1
           if (-not $proc.HasExited) {
-            & .\DPNetCheck.exe --host 127.0.0.1 --port 2302 --timeout 15000
+            & .\DPNetInteropTest.exe --host 127.0.0.1 --port 2302 --timeout 15000
             $check = $LASTEXITCODE
           }
           if (-not $proc.WaitForExit(300000)) {
@@ -550,7 +550,7 @@ jobs:
           foreach ($line in 'Server running, ready for log in.', 'Server stopped.') {
             if (-not $log.Contains($line)) { throw "missing from the log: $line" }
           }
-          if ($check -ne 0) { throw "DPNetCheck failed (exit code $check)" }
+          if ($check -ne 0) { throw "DPNetInteropTest failed (exit code $check)" }
 
   # The x64 .def files (dacom_x64.def, Content_x64.def) repeat their Win32 twins with the C++
   # names decorated for x64 (docs/x64.md). Their undecorated names, ordinals and flags must agree.
@@ -797,7 +797,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      # The x64 server hosts through DPNet (docs/dpnet.md); DPNetCheck joins it with Microsoft's
+      # The x64 server hosts through DPNet (docs/dpnet.md); DPNetInteropTest joins it with Microsoft's
       # DirectPlay 8 client, as a retail Freelancer client does.
       - name: FLDedicated x64 (DPNet), start, join with Microsoft's client, run and stop
         id: dedicated_x64
@@ -820,7 +820,7 @@ jobs:
           }
           $check = 1
           if (-not $proc.HasExited) {
-            & ..\bin\DPNetCheck.exe --host 127.0.0.1 --port 2302 --timeout 15000
+            & ..\bin\DPNetInteropTest.exe --host 127.0.0.1 --port 2302 --timeout 15000
             $check = $LASTEXITCODE
           }
           if (-not $proc.WaitForExit(300000)) {
@@ -833,7 +833,7 @@ jobs:
           # only: a clean shutdown (docs/x64.md: engine handles held in 32-bit fields).
           $log = Get-Content -Raw dedicated_out.txt
           if (-not $log.Contains('Server running, ready for log in.')) { throw 'the x64 server did not come up' }
-          if ($check -ne 0) { throw "DPNetCheck failed (exit code $check)" }
+          if ($check -ne 0) { throw "DPNetInteropTest failed (exit code $check)" }
           if ($proc.ExitCode -ne 0 -or -not $log.Contains('Server stopped.')) {
             Write-Host ("::warning::x64 FLDedicated did not shut down cleanly (exit code 0x{0:x8})" -f $proc.ExitCode)
           }

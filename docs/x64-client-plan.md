@@ -42,7 +42,7 @@ What is left, from a fresh survey of `master` (counts are from grep, then spot-c
 
 | Area | Size |
 |---|---|
-| Projects without an x64 build | movie (step 2.2); RP8 and RP9 (Win32-only renderers); FLServer (MFC), DPNetCheck, MemoryDiagnostics and the 8 resource-only DLLs, which are Win32-only by design |
+| Projects without an x64 build | movie (step 2.2); RP8 and RP9 (Win32-only renderers); FLServer (MFC), DPNetInteropTest, MemoryDiagnostics and the 8 resource-only DLLs, which are Win32-only by design |
 | Inline assembly | None left outside `#if defined(_M_IX86)`; every block has a portable version |
 | Layout `static_assert`s not yet `FL_LAYOUT_ASSERT` | None left in the client modules. The plain ones that remain hold on both platforms |
 | Hard-coded retail byte offsets | About 160 in the client modules (freelancer 92, of which `cli_nebula.cpp` 37; movie 48; alchemy 9; flmaterials 5; RemoteServer 2; Deformable2 1), and about 45 more in Common and Server |
@@ -151,7 +151,7 @@ option.
 
 **Gate:** `Release|x64` of every project that is not Win32-only is required in CI, with vcpkg
 required (a missing vcpkg is a build error, not a skipped RPGPU, since #60). The
-Win32-only projects are RP8, RP9, FLServer, DPNetCheck, MemoryDiagnostics and the resource-only
+Win32-only projects are RP8, RP9, FLServer, DPNetInteropTest, MemoryDiagnostics and the resource-only
 DLLs. Win32 FLRegress and RpcCodecTest output is unchanged.
 
 ## Phase 3: the x64 client runs and plays with retail
@@ -286,12 +286,12 @@ without the Windows API. Milestones:
 - **M2:** every client module compiles and links on macOS (the platform layer below; DACOM's
   components from `dlopen` or registered statically). `platform.h` has a POSIX backend
   (`platform_posix.h`): Win32's values and layouts, paths in either separator matched without
-  regard to case, WaitForSingle/MultipleObjects semantics; checked by `src/PortTests`. macOS then has x64 Windows' type model
+  regard to case, WaitForSingle/MultipleObjects semantics; checked by `src/PortTest`. macOS then has x64 Windows' type model
   (32-bit `long`, 64-bit pointers), so the `_WIN64` paths that keep pointers out of 32-bit fields
   (LowArena, HandleValue) become a 64-bit test (`FL_PTR64`, #118). Apple Silicon gives a 64-bit
   process no address below 4 GB, so there LowArena is one 2 GB reservation anywhere and the
   32-bit fields hold offsets into it: the handle sites go through `LowArena::Encode` / `Decode`,
-  plain casts on Windows (decided 2026-11-22; checked by `src/PortTests` on Linux and macOS).
+  plain casts on Windows (decided 2026-11-22; checked by `src/PortTest` on Linux and macOS).
   There is one arena per process, held by dacom (`FL_LOW_ARENA_DEFINE_SHARED`): a header's
   statics are per module on macOS and Linux, and an offset has to decode the same in every
   module. Clang reports the direct pointer-to-32-bit
@@ -306,7 +306,7 @@ without the Windows API. Milestones:
   `DllMain` as it loads. So far: dacom, zlib, DALib, x86math, system, ReadFile, luaprofile, Thorn,
   EngBase, ximage, Shading, flmaterials, RendComp, alchemy, Deformable2, Common, Server,
   rpclocal and RemoteClient,
-  loaded and checked by `src/PortTests/module_tests.cpp`. The POSIX handles are small numbers in a table, as Windows
+  loaded and checked by `src/PortTest/module_tests.cpp`. The POSIX handles are small numbers in a table, as Windows
   kernel handles are, so a file handle survives retail's 32-bit fields there too
   (`Platform::HandleToValue` / `HandleFromValue`, as HandleToULong / LongToHandle). The kernel32
   file, mapping and memory calls the retail code makes directly are in `posix/kernel32.h`. A

@@ -118,7 +118,7 @@ Code with no retail counterpart carries one tag, so that a single grep finds it:
 | `diag` | The owner's diagnostics: Beta label, tick profiler, FDUMP debugger echo |
 | `perf-index` | Side indexes that answer a retail walk without changing its result (docs/scaling.md) |
 | `x64` | The x64 build (`_WIN64` / not `_M_IX86`) |
-| `dpnet` | DPNet, the port's DirectPlay 8 (`FREELANCER_DPNET`), and DPNetCheck |
+| `dpnet` | DPNet, the port's DirectPlay 8 (`FREELANCER_DPNET`), and DPNetInteropTest |
 | `flregress` | FLRegress.exe and its hooks |
 | `dedicated` | FLDedicated.exe |
 | `tools` | Other port-only programs (RpcCodecTest, MemoryDiagnostics, TexConvertTest) |
