@@ -442,6 +442,24 @@ int main(int argc, char** argv)
     Check(PhantomDestroy != nullptr && PhantomDestroy(nullptr) == -2,
           "Server's pub::Phantom::Destroy");
 
+    // ModulePath resolves a loaded module's handle to its file (GetModuleFileNameA), as
+    // Content's StoryLauncher, rpclocal's Startup and DALib's DACOM.INI lookup ask of it.
+    {
+        Platform::Module const DALibHandle = Platform::ModuleLoad((Folder + "DALib.dll").c_str());
+        char DALibPath[0x400] = {};
+        FlULong const Length = Platform::ModulePath(DALibHandle, DALibPath, sizeof(DALibPath));
+        std::string const Found(DALibPath);
+        Check(
+            DALibHandle != nullptr && Length == Found.size() &&
+                (Found.size() > 12 && (Found.compare(Found.size() - 12, 12, "/DALib.dylib") == 0 ||
+                                       Found.compare(Found.size() - 9, 9, "/DALib.so") == 0)),
+            "ModulePath of a loaded module's handle");
+        char Small[4] = {};
+        Check(Platform::ModulePath(DALibHandle, Small, sizeof(Small)) == sizeof(Small) &&
+                  Small[3] == 0,
+              "ModulePath reports a truncated path with the buffer's size, as GetModuleFileNameA");
+    }
+
     // Content loads (on Server) and exports the controller entry points Server looks up. Its
     // random mission generator is a static that reads RandomMissions\*.ini through
     // pub::GetDataPath() (DALib::Data) as the module loads, as retail's does, so the data path

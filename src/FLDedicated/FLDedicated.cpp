@@ -324,7 +324,9 @@ namespace
     // The game resolves DATA, DACOM libraries and INI files relative to bin\.
     bool EnterModuleDirectory(char (&ModulePath)[MAX_PATH])
     {
-        if (GetModuleFileNameA(nullptr, ModulePath, MAX_PATH) == 0)
+        // 0 is a failure, MAX_PATH a truncated path (GetModuleFileNameA's contract).
+        const DWORD Length = GetModuleFileNameA(nullptr, ModulePath, MAX_PATH);
+        if (Length == 0 || Length >= MAX_PATH)
         {
             return false;
         }
@@ -379,7 +381,7 @@ namespace
 
     // FServerControl::SetIniPath (.text:004018e0): freelancer.ini and SrvLocal-freelancer.ini
     // in the directory of Path.
-    void MakeIniPaths(const char* Path, char (&IniPath)[0x104], char (&LocalIniPath)[0x104])
+    bool MakeIniPaths(const char* Path, char (&IniPath)[0x104], char (&LocalIniPath)[0x104])
     {
 #if defined(_WIN32)
         char Drive[3] = {};
@@ -387,15 +389,20 @@ namespace
         _splitpath(Path, Drive, Directory, nullptr, nullptr);
         _makepath(IniPath, Drive, Directory, "freelancer.ini", nullptr);
         _makepath(LocalIniPath, Drive, Directory, "SrvLocal-freelancer.ini", nullptr);
+        return true;
 #else
         // PORT(macOS): a native path: the directory runs to the last '/', as EnterModuleDirectory
         // takes it ('\\' is a filename character here, which _splitpath would split at).
         const char* const Slash = strrchr(Path, '/');
         const std::string Directory =
             Slash != nullptr ? std::string(Path, Slash + 1) : std::string();
-        snprintf(IniPath, sizeof(IniPath), "%sfreelancer.ini", Directory.c_str());
-        snprintf(LocalIniPath, sizeof(LocalIniPath), "%sSrvLocal-freelancer.ini",
-                 Directory.c_str());
+        // A path that does not fit is refused rather than cut to another file's name.
+        const int IniLength =
+            snprintf(IniPath, sizeof(IniPath), "%sfreelancer.ini", Directory.c_str());
+        const int LocalLength = snprintf(LocalIniPath, sizeof(LocalIniPath),
+                                         "%sSrvLocal-freelancer.ini", Directory.c_str());
+        return IniLength >= 0 && static_cast<size_t>(IniLength) < sizeof(IniPath) &&
+               LocalLength >= 0 && static_cast<size_t>(LocalLength) < sizeof(LocalIniPath);
 #endif
     }
 
@@ -741,7 +748,12 @@ namespace
 
         char IniPath[0x104];
         char LocalIniPath[0x104];
-        MakeIniPaths(ModulePath, IniPath, LocalIniPath);
+        if (!MakeIniPaths(ModulePath, IniPath, LocalIniPath))
+        {
+            fprintf(stderr, "FLDedicated: the path of freelancer.ini beside %s is too long\n",
+                    ModulePath);
+            return 1;
+        }
         strcpy(GStartupInfo.IniPath, IniPath);
         strcpy(GStartupInfo.ModulePath, "RemoteClient.dll");
 
