@@ -2536,18 +2536,19 @@ FL_LAYOUT_ASSERT(sizeof(FPacket_FLPACKET_SERVER_SCANNOTIFY) == 0x28u, "FLPACKET_
 // { 06d99930, 06d99990, 06d99b60, no-op dump (ICF'd onto IServerImpl::GetServerStats) }.
 class FPacket_FLPACKET_SERVER_PLAYERLIST : public FPacketBase {
 public:
+    // Typed, as the payload holds a pointer (Name): its fields move on 64-bit builds.
     FPacket_FLPACKET_SERVER_PLAYERLIST() : FPacketBase(0x20052u) {
-        RpcPacketStoreField(this, 0x20u, 4, 0x00000003u);   // 06d9ec81
-        RpcPacketStoreField(this, 0x24u, 4, 0u);   // 06d9ec88
-        RpcPacketStoreField(this, 0x28u, 4, 0u);   // 06d9ec8b
-        RpcPacketStoreField(this, 0x2cu, 1, 0u);   // 06d9ec8e
+        Wire.Kind = 0x00000003u; // 06d9ec81 (+0x20)
+        Wire.Name = nullptr; // 06d9ec88 (+0x24)
+        Wire.Field_0x08 = 0u; // 06d9ec8b (+0x28)
+        Wire.Field_0x0c = 0u; // 06d9ec8e (+0x2c)
     }
     // FUN_06d99900
     ~FPacket_FLPACKET_SERVER_PLAYERLIST() override {
-        RpcPacketField<unsigned int>(this, 0x28u) = 0;          // 06d9990e, before the test
-        if (RpcPacketField<void*>(this, 0x24u) != nullptr) {   // 06d99903..06d99915
-            ::free(RpcPacketField<void*>(this, 0x24u));          // 06d99918 MSVCRT free, not delete
-            RpcPacketField<void*>(this, 0x24u) = nullptr;        // 06d99921
+        Wire.Field_0x08 = 0u; // 06d9990e (+0x28), before the test
+        if (Wire.Name != nullptr) { // 06d99903..06d99915 (+0x24)
+            ::free(Wire.Name); // 06d99918 MSVCRT free, not delete
+            Wire.Name = nullptr; // 06d99921
         }
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
@@ -2558,7 +2559,7 @@ public:
                         unsigned int* OutLength) override {   // 06d99b60
         return RpcDecodeServerPlayerList(*this, Buffer, Size, OutLength);
     }
-    unsigned char Body[0x10];   // +0x20
+    FPayloadServerPlayerList Wire; // +0x20
 };
 FL_LAYOUT_ASSERT(sizeof(FPacket_FLPACKET_SERVER_PLAYERLIST) == 0x30u, "FLPACKET_SERVER_PLAYERLIST is operator new(0x30)");
 
