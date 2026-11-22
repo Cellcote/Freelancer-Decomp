@@ -112,8 +112,9 @@ removed. The ones that matter for fidelity:
 - **No `/sdl`**: it zero-fills new objects before their constructors run (hiding the
   uninitialised-member behaviour of retail) and gives every exported class an exported
   `__autoclassinit2` that retail does not export.
-- **C++20 with `/permissive`**: `/std:c++20` alone implies `/permissive-`; the decompiled sources
-  compile unchanged without it.
+- **C++23 with `/permissive`**: `/std:c++23preview` (MSVC has no plain `/std:c++23` yet) alone
+  implies `/permissive-`; the decompiled sources compile unchanged without it. Use only the C++23
+  that every compiler CI builds with supports (see [C++23 in this code](#c23-in-this-code)).
 - **Link order**: objects are linked in the order of the `SOURCES` list, which is also the order of
   static initialisation (see the note on `Client/cmn/vis_effect_arch.cpp` in `src/freelancer/CMakeLists.txt`);
   libraries in the order `fl_link()` names them. This is why the source lists are written out
@@ -145,7 +146,7 @@ cmake --preset portable && cmake --build --preset portable && ctest --preset por
 ```
 
 `portable-asan` builds the same in Debug with AddressSanitizer and UndefinedBehaviorSanitizer.
-Needs CMake 3.27 or later, Ninja and a C++20 compiler (GCC 11+, Clang 14+, Apple Clang 15+). CI
+Needs CMake 3.27 or later, Ninja and a C++23 compiler (GCC 13+, Clang 18+, Apple Clang 15+). CI
 builds both presets on Linux (GCC, Clang) and macOS.
 
 A module is portable when it uses no Windows API: `PORTABLE` in its `fl_add_module()`, and its
@@ -157,6 +158,32 @@ phase 6, M2): one that is in `FL_PROJECTS` without `PORTABLE` compiles against t
 `<windows.h>` of `src/include/posix` over the POSIX backend of `src/include/platform.h`
 ([platform.md](platform.md)). A DLL module is named as on Windows, without a `lib` prefix
 (`dacom.dylib`, `dacom.so`), so that `Platform::ModuleLoad("dacom.dll")` finds it.
+
+## C++23 in this code
+
+The code is C++23, but use only what every compiler CI builds with supports: MSVC 17.14
+(`/std:c++23preview`), GCC 13 with libstdc++ 13 and Clang 18 (Ubuntu 24.04), and Apple Clang
+15 with its libc++ (the oldest Xcode the macOS port builds with).
+
+- **Available**: `std::expected`, `std::to_underlying`, `std::byteswap`, `std::unreachable`,
+  `string::contains`, `if consteval`, and C++20's `std::bit_cast`, `<bit>`, `std::span`,
+  `std::numbers`, `contains()` on associative containers and `std::erase_if`.
+- **Not yet**: `std::print` and `std::ranges::to` (libstdc++ 14), `std::ranges::contains`,
+  `fold_left`, `views::zip` and `views::enumerate` (libc++ 19), `std::flat_map`, deducing `this`
+  and `static constexpr` locals in `constexpr` functions (Apple Clang 15), `[[assume]]` (MSVC).
+  A local build on Apple Clang 15 fails on these, so they are easy to catch.
+
+In retail code a standard replacement must give the same result for every input on x87, so
+some hand-written forms stay:
+
+- `if (a < b) a = b;` on floats is not `std::max`: `std::max` takes `const float&` and so rounds
+  an x87 extended-precision operand to float *before* the comparison, while retail compared first.
+- `_BitScanReverse` is not `std::countl_zero`: for 0 BSR leaves the index unchanged, while
+  `countl_zero(0)` is 32.
+- `push_back(T(...))` is not `emplace_back(...)`: the temporary's construction and destruction go
+  away.
+- A literal that is pi rounded to float but written as a `double` (`3.1415927410125732`) is not
+  `std::numbers::pi`.
 
 ## Warnings, formatting and static analysis
 

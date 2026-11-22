@@ -43,7 +43,7 @@ changes the behaviour of a retail module:
 
 | Module | What it is |
 |---|---|
-| [DPNet](docs/dpnet.md) (`src/DPNet`) | Our own implementation of the DirectPlay 8 network protocol, written from Microsoft's published specifications. It is portable C++20 with no OS headers. An adapter in DALib puts it behind `IDirectPlay8Server`, so the x64 server hosts without Microsoft's deprecated `dpnet.dll`. Its tests reproduce the specification's byte dumps exactly and run a simulated lossy network and 30,000 malformed datagrams, under sanitizers on Linux and Windows |
+| [DPNet](docs/dpnet.md) (`src/DPNet`) | Our own implementation of the DirectPlay 8 network protocol, written from Microsoft's published specifications. It is portable C++23 with no OS headers. An adapter in DALib puts it behind `IDirectPlay8Server`, so the x64 server hosts without Microsoft's deprecated `dpnet.dll`. Its tests reproduce the specification's byte dumps exactly and run a simulated lossy network and 30,000 malformed datagrams, under sanitizers on Linux and Windows |
 | DPNetInteropTest (`src/DPNetInteropTest`) | Joins a running server through Microsoft's DirectPlay 8 client, as a retail client does. CI runs it against the server on Microsoft's DirectPlay (Win32) and on DPNet (x64), and both must give the same result |
 | [RPGPU](docs/x64-client-plan.md#phase-5-rpgpu-the-sdl3--sdl_gpu-renderer) (`src/RPGPU`) | The SDL3 + SDL_GPU renderer. It implements RP8's interfaces and emulates Direct3D 8's fixed-function pipeline in HLSL, compiled offline to DXIL, SPIR-V and MSL |
 | TexConvert (`src/TexConvert`) | A texture loader that replaces D3DX 8.1 (DDS with DXT, TGA, BMP, cube maps). CI checks its output against D3DX byte for byte |
