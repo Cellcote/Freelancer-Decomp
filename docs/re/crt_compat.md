@@ -24,7 +24,7 @@ Consumers: `MsvcrtAtoi` — every direct decimal integer parse in the game sourc
 (project rule: `atoi`/`std::atoi` are forbidden); `MsvcrtAtof` — Common `ValueNum`,
 the decimal branch of `ParseNumber`, BINI string → float; `MsvcrtFormatLuaNumber` — `luaV_tostring`
 in Thorn and luaprofile (`lvm.c`); `MsvcrtNumericVsnprintf` — `NumberStringChild::Printf` /
-`FormatFloat` (`font_string.cpp`).
+`FormatFloat` (`Client/cmn/font_string.cpp`).
 
 ## Implemented contracts
 

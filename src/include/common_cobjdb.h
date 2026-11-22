@@ -13,7 +13,7 @@
 //
 // Client (freelancer.exe): static DAT_00678a2c via PTR_DAT_00613ed0
 //   (RTTI Object::IObjDBImpl, vtable .rdata:005df8ac). Port: GetClientObjDb()
-//   in freelancer Client/client_objdb.cpp.
+//   in freelancer Client/space/objdb.cpp.
 // Server: retail StarSystem (RTTI .?AVStarSystem@@, hierarchy StarSystem ->
 //   IObjDB, single inheritance) is the per-system IObjDB. Its constructor
 //   stores this base's vtable (.rdata:06d67cec) first and its own

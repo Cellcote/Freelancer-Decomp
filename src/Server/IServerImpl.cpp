@@ -51,7 +51,7 @@
 #pragma comment(lib, "winmm.lib")
 
 // PORT(deviation) SERVER-INPUT-GUARDS: whether Data[0..Size) is weapon-group text as the
-// client builds it (FWeaponGroups::SendToServer, hud_weapon_groups.cpp): lines of the form
+// client builds it (FWeaponGroups::SendToServer, Client/space/hud/hud_weapon_groups.cpp): lines of the form
 // "wg = <int>, <name>" ended by '\n', with a final empty line. No NUL or '\r' anywhere (the save
 // loader ends a line at either), and a name runs to the end of its line, so no line can start a
 // key or section of its own in the save.
@@ -360,7 +360,7 @@ void IServerImpl::ElapseTime(float dt) {
     //   06cf0e35  IObjAffect +0x34 (Hardpoints.Begin, count, &info.TargetPos, player_id)
     void IServerImpl::FireWeapon(unsigned int player_id, const XFireWeaponInfo& info)
     {
-        // PORT(deviation) SERVER-OWNERSHIP: the client fires its own ship (cli_projectile_fx.cpp).
+        // PORT(deviation) SERVER-OWNERSHIP: the client fires its own ship (Client/space/cli_projectile_fx.cpp).
         if (!Server_IsSessionShip(player_id, info.ObjectId))
             return;
         GameObject* const Obj = Server_LookupGameObject(info.ObjectId);
@@ -442,7 +442,7 @@ void IServerImpl::ElapseTime(float dt) {
         if (Obj == nullptr)
             return;
         // PORT(deviation) SERVER-OWNERSHIP: the client sets the target of its own ship, or of a
-        // missile it launched (client_gameobj.cpp); retail let it retarget anyone's missiles.
+        // missile it launched (Client/space/gameobj.cpp); retail let it retarget anyone's missiles.
         if (!Server_SessionOwnsObject(player_id, Obj))
             return;
         if (Obj->is_destroyed())
@@ -813,7 +813,7 @@ void IServerImpl::CharacterSkipAutosave(unsigned int session_id) {
 void IServerImpl::ReqShipArch(unsigned int arch_id, unsigned int session_id) {
         if (!SinglePlayer() && Players[session_id].entered_base_id == 0) return;
         // PORT(deviation) SERVER-INPUT-GUARDS: the dealer only sends a package's hull
-        // (nn_dealer.cpp, NnDealer::BuyShip); arch 0 left a ship that crashed the server at
+        // (Client/nn/nn_dealer.cpp, NnDealer::BuyShip); arch 0 left a ship that crashed the server at
         // launch and in trade (Archetype::GetShip(0) is null).
         if (arch_id == 0)
             return;
@@ -1664,7 +1664,7 @@ void IServerImpl::Hail(unsigned int object_id, unsigned int arg1, unsigned int a
         if (SinglePlayer())
             return; // .text:06cf062c
         // PORT(deviation) SERVER-OWNERSHIP: only the player's ship carries the remote-physics
-        // block that sends this (player_spawn.cpp); retail let a client move any object.
+        // block that sends this (Client/space/player_spawn.cpp); retail let a client move any object.
         if (!Server_IsSessionShip(session_id, info.ObjectId))
             return;
         GameObject* Obj = nullptr;
@@ -1718,7 +1718,7 @@ void IServerImpl::Hail(unsigned int object_id, unsigned int arg1, unsigned int a
             return;
         // PORT(deviation) SERVER-OWNERSHIP: a client reports its own gun shots, which carry its
         // ship as the shooter, and missiles hitting an object it owns, whoever fired them
-        // (client_gameobj.cpp, 0x0053f790 and 0x0053ee00). Anything else is refused.
+        // (Client/space/gameobj.cpp, 0x0053f790 and 0x0053ee00). Anything else is refused.
         if (!Server_IsSessionShip(session_id, info.Field_0x04) &&
             !Server_SessionOwnsObject(session_id, Obj))
             return;
@@ -1742,7 +1742,7 @@ void IServerImpl::Hail(unsigned int object_id, unsigned int arg1, unsigned int a
         if (Sys == nullptr)
             return;
         // PORT(deviation) SERVER-OWNERSHIP: the client reports its own ship or what it launched
-        // hitting a badlands asteroid (cli_asteroid_med.cpp); retail destroyed any object named.
+        // hitting a badlands asteroid (Client/space/cli_asteroid_med.cpp); retail destroyed any object named.
         if (!Server_SessionOwnsObject(session_id, Obj))
             return;
         Sys->badlands_collision(info);
@@ -1780,7 +1780,7 @@ void IServerImpl::Hail(unsigned int object_id, unsigned int arg1, unsigned int a
         if (Sys == nullptr)
             return;
         // PORT(deviation) SERVER-OWNERSHIP: the damaged object (+8) is the client's own side of
-        // the collision, its ship or what it launched (client_gameobj.cpp); retail applied the
+        // the collision, its ship or what it launched (Client/space/gameobj.cpp); retail applied the
         // reported damage to any object.
         if (!Server_SessionOwnsObject(session_id, Obj))
             return;
@@ -1798,7 +1798,7 @@ void IServerImpl::Hail(unsigned int object_id, unsigned int arg1, unsigned int a
     void IServerImpl::SPRequestUseItem(const SSPUseItem& info, unsigned int session_id)
     {
         // PORT(deviation) SERVER-OWNERSHIP: the client uses items on its own ship
-        // (hud_status_core.cpp).
+        // (Client/space/hud/hud_status_core.cpp).
         if (!Server_IsSessionShip(session_id, info.ObjectId))
             return;
         GameObject* const Obj = Server_LookupGameObject(info.ObjectId);
@@ -1923,7 +1923,7 @@ void IServerImpl::MissionSaveB(unsigned int session_id, FlULong mission_id) {
                                    unsigned int p3, FlULong p4, unsigned int p5)
     {
         // PORT(deviation) SERVER-OWNERSHIP: p1 is the requesting ship, the client's own
-        // (client_gameobj.cpp); p2 / p3 name the dock or formation target and stay unchecked.
+        // (Client/space/gameobj.cpp); p2 / p3 name the dock or formation target and stay unchecked.
         if (!Server_IsSessionShip(p5, p1))
             return;
         GameObject* const Obj = Server_LookupGameObject(p1);
@@ -1961,7 +1961,7 @@ void IServerImpl::MineAsteroid(unsigned int system_id, const Vector& position, u
         (void)session_id;
         StarSystem* const System = SysDB_LookupSystem(system_id);
         // PORT(deviation) SERVER-INPUT-GUARDS: retail has no null test; an unknown system id
-        // crashed the server. The client sends its active system (cli_asteroid_dynamic.cpp).
+        // crashed the server. The client sends its active system (Client/space/cli_asteroid_dynamic.cpp).
         if (System == nullptr)
             return;
         System->spawn_mined_loot(position, loot_id, secondary_loot, static_cast<int>(quantity));
@@ -2127,7 +2127,7 @@ void IServerImpl::SetWeaponGroup(unsigned int session_id, unsigned char* data, i
 void IServerImpl::SetVisitedState(unsigned int session_id, unsigned char* data, int data_len) {
     // PORT(deviation) SERVER-INPUT-GUARDS: retail reads `count` 5-byte records whatever the
     // buffer holds. The client sends {count, records} with its real size
-    // (character_select_equip.cpp), so a count the buffer cannot hold is refused.
+    // (Client/interface/character_select_equip.cpp), so a count the buffer cannot hold is refused.
     if (data == nullptr || data_len < 4 || *(int*)data > (data_len - 4) / 5)
         return;
     if (!Players.is_valid(session_id))
@@ -2169,7 +2169,7 @@ void IServerImpl::RequestBestPath(unsigned int session_id, unsigned char* data, 
         // is never read); both were port additions and are gone (w4-server-guards).
         PlayerSlot* p = GetPlayerBySession(session_id);
         if (!p) return;
-        // PORT(deviation) SERVER-INPUT-GUARDS: the request is 0x34 bytes (player_spawn.cpp);
+        // PORT(deviation) SERVER-INPUT-GUARDS: the request is 0x34 bytes (Client/space/player_spawn.cpp);
         // retail reads that much from any buffer.
         if (data == nullptr || data_len < 0x34)
             return;
@@ -2712,7 +2712,7 @@ void IServerImpl::AddTradeEquip(unsigned int session_id, const EquipDesc& equip)
             return;
         }
         // PORT(deviation) SERVER-INPUT-GUARDS: the trade window only offers a positive count, and
-        // never more in total than the stack it shows (nn_trade.cpp). A negative count took
+        // never more in total than the stack it shows (Client/nn/nn_trade.cpp). A negative count took
         // items from the partner at accept time, and repeated additions could wrap the offer's
         // int count negative. Refuse an offer whose total for this archetype exceeds what the
         // player holds of it.
@@ -2774,7 +2774,7 @@ void IServerImpl::DelTradeEquip(unsigned int session_id, const EquipDesc& equip)
         // PORT(deviation) SERVER-INPUT-GUARDS: find_matching_cargo ignores the count for items
         // that do not stack, and remove_equipment_item changes the first entry with Hit's id,
         // so retail could leave a negative count in the offer. The client only removes what
-        // it offered (nn_trade.cpp); refuse a count the entry being changed does not hold.
+        // it offered (Client/nn/nn_trade.cpp); refuse a count the entry being changed does not hold.
         if (Hit != nullptr)
         {
             std::list<EquipDesc>::const_iterator Target = List.Items.begin();

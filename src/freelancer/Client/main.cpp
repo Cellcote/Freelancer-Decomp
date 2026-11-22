@@ -4,11 +4,11 @@
 // developed by Digital Anvil.
 // Author: Giperion.
 
-#include "client_cliobj.h"     // FlushMaterialCache (FUN_0041b150)
+#include "cmn/cliobj.h"     // FlushMaterialCache (FUN_0041b150)
 #include "msvcrt_compat.h" // MsvcrtAtoi: retail MSVCRT.DLL wraps mod 2^32, the UCRT saturates
-#include "client_frame_tick.h"
-#include "client_ime_focus.h" // ReleaseClientIMEFocus (FUN_005641d0)
-#include "client_state.h"
+#include "frame_tick.h"
+#include "interface/ime_focus.h" // ReleaseClientIMEFocus (FUN_005641d0)
+#include "state.h"
 #include "intro_connect.h"
 
 #include "common_ini.h"
@@ -19,40 +19,40 @@
 #include "common_errorhandler.h" // ErrorHandler::activate / deactivate / new_log
 #include "common_misc.h"         // GetUserLocalDataPath
 #include "common_text.h"
-#include "character_info.h"   // ShutdownCharacterInfo (FUN_00435500)
-#include "chat_init.h"        // ChatShutdown (FUN_00469b30)
-#include "client_debris.h"    // ShutdownDebrisArchDb (FUN_00530fa0)
+#include "gf/character_info.h"   // ShutdownCharacterInfo (FUN_00435500)
+#include "nn/chat_init.h"        // ChatShutdown (FUN_00469b30)
+#include "space/debris.h"    // ShutdownDebrisArchDb (FUN_00530fa0)
 #include "connect_flow.h"
-#include "effect_base.h"      // EffectSystemShutdown (FUN_004f7140)
-#include "vis_effect_arch.h"  // EffectArchShutdown (FUN_0040ef30)
-#include "font_imp.h"         // FontShutdown (FUN_004174a0)
-#include "client_tick_profile.h" // PORT(diag): released before fonts
-#include "gameflow.h"
+#include "space/effect_base.h"      // EffectSystemShutdown (FUN_004f7140)
+#include "cmn/vis_effect_arch.h"  // EffectArchShutdown (FUN_0040ef30)
+#include "cmn/font_imp.h"         // FontShutdown (FUN_004174a0)
+#include "tick_profile.h" // PORT(diag): released before fonts
+#include "gf/gameflow.h"
 #include "globals.h"
-#include "graph_library.h"
+#include "cmn/graph_library.h"
 #include "dacom.h"
 #include "DALib.h"
 #include "dalib_net.h"
 #include "ids_strings.h"
-#include "loading_screen.h"   // LoadingScreenShutdown (FUN_005791c0)
-#include "menu_keymap_config.h"
-#include "menu_sound_arch.h"
-#include "menu_ui_init.h"
+#include "interface/loading_screen.h"   // LoadingScreenShutdown (FUN_005791c0)
+#include "interface/menu_keymap_config.h"
+#include "cmn/menu_sound_arch.h"
+#include "interface/menu_ui_init.h"
 #include "login_mgr.h"
-#include "mission_briefing.h"  // GetMissionBriefingState (FUN_0043d560)
-#include "nn_error.h"
-#include "nn_modal.h"         // NnSystemShutdown (FUN_0045a140)
-#include "nn_montage_draw.h"  // ClearButtonMontage (FUN_00559d20)
-#include "nn_rollover.h"      // NnRolloverDestroyGlobal (FUN_004b6580)
-#include "nn_tooltip.h"       // GetNnToolTipSingleton (DAT_0067244c)
-#include "space_state.h"      // GetSpaceState (FUN_0054bd30)
-#include "win3d.h"
+#include "nn/mission_briefing.h"  // GetMissionBriefingState (FUN_0043d560)
+#include "nn/nn_error.h"
+#include "nn/nn_modal.h"         // NnSystemShutdown (FUN_0045a140)
+#include "nn/nn_montage_draw.h"  // ClearButtonMontage (FUN_00559d20)
+#include "nn/nn_rollover.h"      // NnRolloverDestroyGlobal (FUN_004b6580)
+#include "nn/nn_tooltip.h"       // GetNnToolTipSingleton (DAT_0067244c)
+#include "space/space_state.h"      // GetSpaceState (FUN_0054bd30)
+#include "interface/win3d.h"
 #include "server_connect.h"
-#include "texture_shapes.h"   // ClearEffectShapesFiles (FUN_004f73b0)
-#include "ui_scroll.h"
-#include "voice_profiles.h"
+#include "cmn/texture_shapes.h"   // ClearEffectShapesFiles (FUN_004f73b0)
+#include "interface/ui_scroll.h"
+#include "cmn/voice_profiles.h"
 #ifdef FREELANCER_RP9
-#include "render_ex.h"        // PORT(rp9): RenderEx::Shutdown
+#include "cmn/render_ex.h"        // PORT(rp9): RenderEx::Shutdown
 #endif
 
 #include <ctype.h>

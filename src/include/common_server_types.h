@@ -353,7 +353,7 @@ enum class EFLConnection : int {
 // were not. Server.dll's SetManeuver (0x11540) resolves the CEqObj from +0x04, so
 // +0x04 is the object id and the other two dwords are still unidentified.
 // The only client sender, HUD_Maneuvers::RequestManeuver (freelancer.exe 0x004d935a..0x004d93ac,
-// hud_maneuvers.cpp), fills +0x00 = the id of the HUD's watched object (the player ship),
+// Client/space/hud/hud_maneuvers.cpp), fills +0x00 = the id of the HUD's watched object (the player ship),
 // +0x04 = the player ship's target id, +0x08 = the behaviour id it switched to.
 struct XSetManeuver {
     // TODO: semantics unproven (maneuver type?). rpclocal writes it to packet+0x20.

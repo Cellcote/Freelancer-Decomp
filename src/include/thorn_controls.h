@@ -15,9 +15,9 @@
 // thorn.dll QIs them by IID (Iids::GeoTransformControl and friends, all in dacom_iids.h) and
 // then calls slots on them. freelancer.exe implements them, as several facets of one attach
 // object -- Client/Gf/ScriptBase.cpp in retail; here Thorn_Component
-// (src/freelancer/Client/gf_thorn_component.cpp) and its per-entity-type subclasses in
+// (src/freelancer/Client/gf/gf_thorn_component.cpp) and its per-entity-type subclasses in
 // gf_thorn_*.cpp. A second, much smaller implementation of IGeoTransformControl alone lives in
-// space_camera_script.cpp.
+// Client/space/camera/space_camera_script.cpp.
 //
 // Until 2026-09-16 NONE of these were declared anywhere. Thorn reached them through generic
 // dispatchers that took the slot number as a runtime argument --
@@ -102,7 +102,7 @@ struct IScriptControl : IDAComponent
 
 // "1.11_ICompoundControl" -- compound and deformable entities: motions, hardpoints, floor
 // height. Ten slots (Thorn_Component 0x005cc6e0..0x005cc704); the identity table continues
-// with the Thorn object's own thiscall virtuals (gf_thorn_component.h), not with this interface.
+// with the Thorn object's own thiscall virtuals (Client/gf/gf_thorn_component.h), not with this interface.
 // Thorn_Compound 0x005ccf78.., Thorn_Deformable 0x005cd1f8.. implement it.
 struct ICompoundControl : IDAComponent
 {
@@ -195,7 +195,7 @@ struct ILightControl : IDAComponent
 // (a D3DLIGHT8) out of the engine light, 8 LAB_00453420 reads the direction back. ThornScene
 // passes the light props' +0x20 (On), +0x28 (the embedded D3DLIGHT8) and +0x0c (Direction) to
 // exactly these. The D3DLIGHT8 travels as void*: freelancer keeps its own FD3dLight8 layout
-// (engine_light.h) and Thorn only forwards the blob.
+// (Client/cmn/engine_light.h) and Thorn only forwards the blob.
 struct ID3DLightControl : IDAComponent
 {
     virtual GENRESULT DACOM_API SetOn(int On) = 0;                   // 3
@@ -211,7 +211,7 @@ struct ID3DLightControl : IDAComponent
 // a scene entity puts the fog table there instead of the D3D light table.
 // Ten slots; the widths are Thorn_Component's defaults (0x005cc5b4..0x005cc5d8): 3..6 and
 // 11..12 LAB_00454190 (one argument), 7..8 LAB_0044fcd0 (three), 9..10 LAB_0044fce0 (two).
-// Thorn_Scene's table 0x005cdec0 is the one implementation (FThorn_Scene, gf_thorn_scene.cpp).
+// Thorn_Scene's table 0x005cdec0 is the one implementation (FThorn_Scene, Client/gf/gf_thorn_scene.cpp).
 // Names and argument types read off that table (LAB_00454450..FUN_00454690): the colour is
 // three ints whose low bytes are kept (LAB_00454500), and slots 11 / 12 exchange the 0x20-byte
 // block {+0 on, +1 table, +4 int colour[3], +0x10 mode, +0x14 start, +0x18 end, +0x1c density}

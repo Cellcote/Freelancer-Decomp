@@ -6,18 +6,18 @@
 
 #include "connect_handshake.h"
 
-#include "client_frame_tick.h"    // BeginClientRenderFrame / EndClientRenderFrame
+#include "frame_tick.h"    // BeginClientRenderFrame / EndClientRenderFrame
 #include "server_pub.h"        // IServer
 #include "common_misc.h"          // SinglePlayer
 #include "common_timing.h"        // Timing::read
 #include "globals.h"              // PumpMessages, GetClientFrameTimeCapped
-#include "hud_command_dispatch.h" // HudPostCommand (FUN_005763b0)
+#include "space/hud/hud_command_dispatch.h" // HudPostCommand (FUN_005763b0)
 #include "login_mgr.h"
-#include "menu_enter_state.h"     // FUN_00564b10 / FUN_00564b20
+#include "interface/menu_enter_state.h"     // FUN_00564b10 / FUN_00564b20
 #include "server_connect.h"       // ShutdownServerConnection (FUN_005a8260)
-#include "nn_blocking_dialog.h"   // FUN_00474520 / FUN_00474590
-#include "nn_network_operation.h" // FUN_00473ad0 / FUN_00473b60 / FUN_00473be0
-#include "win3d.h"                // Win3DUpdateAll / Win3DDrawAll
+#include "nn/nn_blocking_dialog.h"   // FUN_00474520 / FUN_00474590
+#include "nn/nn_network_operation.h" // FUN_00473ad0 / FUN_00473b60 / FUN_00473be0
+#include "interface/win3d.h"                // Win3DUpdateAll / Win3DDrawAll
 
 // Retail .data:0067ea50 -- the DirectPlay connect HRESULT HandleConnectError records; zeroed
 // and polled by WaitForServerResponse.

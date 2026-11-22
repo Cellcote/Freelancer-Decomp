@@ -62,7 +62,7 @@ if the buffer has no DS3D), adds the archetype gain, the master gain and the cli
 as an error but not restored. Instance Play/Stop are slots 47/48; looping is taken from the client's
 source object.
 
-**Play key.** The manager does not create sources itself: the client (`src/freelancer/Client/menu_sound_arch.cpp`)
+**Play key.** The manager does not create sources itself: the client (`src/freelancer/Client/cmn/menu_sound_arch.cpp`)
 passes its own `ISoundSource` object (`AttachPlayKey`), and the mixer polls it every tick (position,
 volume, range, whether it is alive). Slot 33 (WAV) takes an `IFileSystem*`, not a path.
 
@@ -107,8 +107,8 @@ The object (`0x7C` bytes) exposes `IStreamer2` (15 slots; `IStreamer` is the sam
 ## Client layer and data
 
 The client part (in retail `Client/cmn/Sound.cpp`, `Gf/ScriptSound.cpp`, `Voice.cpp`) lives in
-`src/freelancer/Client/` (`menu_sound_arch.cpp`, `sound_config.cpp`, `voice_profiles.cpp`,
-`gf_thorn_sound.cpp`); it calls interface methods, not slot numbers. Thorn asks scene objects for
+`src/freelancer/Client/` (`Client/cmn/menu_sound_arch.cpp`, `Client/cmn/sound_config.cpp`, `Client/cmn/voice_profiles.cpp`,
+`Client/gf/gf_thorn_sound.cpp`); it calls interface methods, not slot numbers. Thorn asks scene objects for
 `ISoundControl` - it is implemented by the client, not by these DLLs. The catalogs of sounds and voice-over are listed in
 `freelancer.ini` (`[Startup] sounds = audio\*.ini`, `voices = audio\voices_*.ini`) and live in
 `DATA\AUDIO\`.
@@ -118,7 +118,7 @@ The client part (in retail `Client/cmn/Sound.cpp`, `Gf/ScriptSound.cpp`, `Voice.
 - The archetype storage in SoundManager is a linear array instead of retail's `std::map` (not visible through the
   interface).
 - The listener does not move: the client calls `MixerTick(nullptr)`, and `ISoundListenerPose` (camera pose,
-  velocity, coefficients) is not yet implemented by anyone in the port (`menu_sound_arch.cpp`, `soundmanager.h`).
+  velocity, coefficients) is not yet implemented by anyone in the port (`Client/cmn/menu_sound_arch.cpp`, `soundmanager.h`).
 - If the manager did not start, the Streamer creates its own DirectSound (as in retail), i.e. two DirectSound
   objects on one window.
 - The rest, per function, is in decomp-tracker and the SoundManager / SoundStreamer section of

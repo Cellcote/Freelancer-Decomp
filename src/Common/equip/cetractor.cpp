@@ -51,7 +51,7 @@ namespace
 // retail CEquip vtable is NOT this slot; this is I3DMathEngine's own vtable, cross-checked
 // against src/x86math/x86math.h's independently-recovered slot list and the "I3DMathEngine slot
 // 0x1c, MulTransform" comment already established at
-// src/freelancer/Client/space_camera_script.cpp). Retail (0629de50, 0629e730, 0629e660,
+// src/freelancer/Client/space/camera/space_camera_script.cpp). Retail (0629de50, 0629e730, 0629e660,
 // 0629df20) tests neither the owner nor the engine: [this+4]+8 is passed as is and the lazily
 // created engine is called directly; the 0x30-byte result is written whole by the engine.
 Transform ResolveTractorSourceXform(CEqObj const* Owner, Transform const& LocalXform)

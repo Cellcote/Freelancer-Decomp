@@ -78,8 +78,10 @@ documents that name the old path and the tracker's `ported_file`.
   so the old name stays easy to find. The prefix is only for the shared namespace of
   `src/include`.
 - **Subfolders by subsystem.** A module with more than about a hundred files groups them in
-  subfolders, one per subsystem (`Common/ai`, `freelancer/Client/hud`). A file's subsystem is what
-  it implements, not who calls it.
+  subfolders, one per subsystem (`Common/ai`, `freelancer/Client/space/hud`). A file's subsystem
+  is what it implements, not who calls it. Where retail's own source tree is known (the `__FILE__`
+  strings, `E:\FL\Scratch\Source\Client\Space\...`), the subfolders follow it, in lower case:
+  the client's `cmn`, `gf`, `interface`, `nn` and `space` are retail's.
 - **Headers.** `src/include` holds only the cross-module ABI: a header there is included by more
   than one module and is named after its module (`common_`, `server_`, `rpc_`), or is a platform
   header (`platform.h`, `posix/`). A header only its own module includes lives in that module.

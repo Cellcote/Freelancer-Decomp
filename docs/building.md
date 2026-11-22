@@ -115,7 +115,7 @@ removed. The ones that matter for fidelity:
 - **C++20 with `/permissive`**: `/std:c++20` alone implies `/permissive-`; the decompiled sources
   compile unchanged without it.
 - **Link order**: objects are linked in the order of the `SOURCES` list, which is also the order of
-  static initialisation (see the note on `vis_effect_arch.cpp` in `src/freelancer/CMakeLists.txt`);
+  static initialisation (see the note on `Client/cmn/vis_effect_arch.cpp` in `src/freelancer/CMakeLists.txt`);
   libraries in the order `fl_link()` names them. This is why the source lists are written out
   rather than globbed.
 - **DX8 headers after the Windows SDK**: `dx8\include` is appended to cl's `INCLUDE`, not passed
