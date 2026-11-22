@@ -7,9 +7,9 @@
 #pragma once
 
 #include "common_exports.h"
-#include "behavior.h" // Behavior
-#include "idea.h"     // MoveIdea, FaceIdea, AfterburnerIdea -- the three real embedded
-                             // sub-objects (their ctors FUN_062d4e60 / FUN_062d6750 / FUN_062da500)
+#include "behavior.h"        // Behavior
+#include "idea.h"            // MoveIdea, FaceIdea, AfterburnerIdea -- the three real embedded
+    // sub-objects (their ctors FUN_062d4e60 / FUN_062d6750 / FUN_062da500)
 
 #include <cstddef>
 

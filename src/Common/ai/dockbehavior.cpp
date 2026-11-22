@@ -8,7 +8,7 @@
 #include "common_iface.h" // FL_OBJRW_WATCHABLE_OFFSET
 #include "common_misc.h"   // SinglePlayer() -- UpdateApproachTail()'s case 0xb calls it
 #include "common_systemmanager.h"  // SystemManagerGunGroupManager::SetShieldActive -- FUN_062e9a60
-#include "gotobehavior.h"   // ComputeFormationFollowerEnvelope / ProxWatcherComputeSpeedCap
+#include "gotobehavior.h" // ComputeFormationFollowerEnvelope / ProxWatcherComputeSpeedCap
 #include "common_aisteer.h"        // FindObjectDockingAtBase (FUN_062e7400) -- CheckClearanceProgress
 #include "common_csys.h"           // Transform, Acquire3DMathEngine -- SetContext's hpmount offset
 #include "x86math.h"               // I3DMathEngine::TransposeTransform, FVector, FMatrix
@@ -1359,7 +1359,7 @@ int DockBehavior::UpdateApproachTail()
     UpdateResult10 = 1;
     AdvancePreamble();  // FUN_062c47f0, ECX == this
 
-    float const DeltaTime = GetTickDelta();   // Behavior's own +0x1c, see ai/behavior.h
+    float const DeltaTime = GetTickDelta();   // Behavior's own +0x1c, see common_behavior.h
 
     if (ModeState320 == 1)
     {

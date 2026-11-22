@@ -9,7 +9,7 @@
 
 #include "common_systemmanager.h"
 #include "common_aisteer.h"   // SustainedThresholdTimer, ConstructGunConvergenceState, RefreshWeaponFireControlConfig
-#include "behavior.h"  // Behavior_InvokeNodeSlotC (FUN_062e61f0)
+#include "behavior.h" // Behavior_InvokeNodeSlotC (FUN_062e61f0)
 #include "common_csys.h"      // Transform, Acquire3DMathEngine
 #include "x86math.h"          // I3DMathEngine::TransposeTransform / TransformMatrix, FVector, FMatrix
 #include "common_misc.h"      // SUBOBJ_ID_NONE

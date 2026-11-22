@@ -15,7 +15,7 @@
 #include "common_misc.h" // Geometry::Sphere / Frustum, SphereCull
 #include "common_net.h"  // CommReferrable (SYSTEM's second base)
 #include "common_reputation.h" // Reputation::Vibe static store (FreeStatic / Begin / EndStaticLoad)
-#include "zone.h"   // ZONE, the concrete IZone
+#include "zone.h" // ZONE, the concrete IZone
 
 #include "DALib.h"
 #include "dacom.h"

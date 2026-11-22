@@ -17,7 +17,7 @@
 #include "DALib.h"          // FEngineName (via engine/engbase.h; DALib.h must come first, it
                             // declares the distinct IEngine2 before engbase.h is seen)
 
-int CallDacomStricmp(const char* Left, const char* Right);  // core/dacom_stricmp.cpp
+int CallDacomStricmp(const char* Left, const char* Right);  // common_dacom_stricmp.cpp
 
 namespace Archetype
 {

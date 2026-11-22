@@ -54,7 +54,7 @@
 #include <utility>
 #include <vector>
 
-#include <mmsystem.h>  // timeGetTime (PhysicalSystem::Update, .text:0628ca84); winmm is linked by player/playeraccount.cpp
+#include <mmsystem.h> // timeGetTime (PhysicalSystem::Update, .text:0628ca84); winmm is linked by player/playeraccount.cpp
 
 
 // Win32 macro conflict: PhySys::GetCurrentTime vs windows.h GetCurrentTime()
@@ -515,8 +515,8 @@ float __cdecl PhySys::GetRadiusR(CObject const* Object, bool bIncludeChildren, V
 namespace
 {
     // The phantom pose helpers BeamR uses (PhySys_GetPhantomPosition / PhySys_SetPhantomPosition)
-    // are declared in physics/physys_internal.h and defined with PhySys::Phantom in
-    // physics/phantom.cpp.
+    // are declared in common_physys_internal.h and defined with PhySys::Phantom in
+    // common_phantom.cpp.
 
     // The object's Orientation (+0x08) and WorldPosition (+0x2c) as one 12-float transform --
     // retail copies it with REP MOVSD 0xc from / to +0x08 (06285175, 062851f8, 062852a3).

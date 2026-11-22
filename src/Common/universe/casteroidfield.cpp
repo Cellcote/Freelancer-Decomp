@@ -31,7 +31,7 @@ namespace
     // .data 063eb7fc / 063eb7fd: byte flags initialised to 1 and never written by any
     // instruction of the module; they gate populate_asteroids' grid and look-ahead
     // candidates (062a5801 / 062a5922). 063eb7f0 (GAsteroidObserverScan) stays in
-    // universe/casteroid.cpp with CAsteroidSystem::update.
+    // common_casteroid.cpp with CAsteroidSystem::update.
     bool GAsteroidGridSearch = true;
     bool GAsteroidAheadSearch = true;
 }

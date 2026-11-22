@@ -36,7 +36,7 @@
 // Math utilities
 // ============================================================================
 
-int CallDacomStricmp(const char* Left, const char* Right);  // core/dacom_stricmp.cpp
+int CallDacomStricmp(const char* Left, const char* Right);  // common_dacom_stricmp.cpp
 
 // .text:06303840..063038a0. strtok(String, ",;/ ") (DAT_063a2710) only cuts the first token in
 // place; every compare then uses String itself through the DACOM.DLL stricmp import

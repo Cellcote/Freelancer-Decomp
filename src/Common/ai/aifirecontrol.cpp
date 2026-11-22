@@ -25,7 +25,7 @@
 #include "common_systemmanager.h" // SystemManager, SystemManagerGunGroupManager
 #include "common_cobjdb.h"        // IObjDB::GetZoneDb
 #include "common_universe.h"      // Universe::ISystem
-#include "iustategraph.h"  // BuildAiTargetList (HasTargetInForwardArc)
+#include "iustategraph.h" // BuildAiTargetList (HasTargetInForwardArc)
 #include "x87_trig.h"             // X87Tan (062eabf0 FPTAN)
 
 #include <cmath>
