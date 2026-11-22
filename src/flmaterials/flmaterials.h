@@ -93,6 +93,23 @@ bool FlmLookupIdValue(int Id, void** Out);
 struct I3DMathEngine;
 I3DMathEngine* FlmCreateMathEngine();
 
+// One texture parameter's live state (retail 0x2C bytes). The name is pointer-sized, so on
+// 64-bit builds the fields after it move and the entry grows; every access goes through the
+// fields, never retail's byte offsets.
+struct FFlmTextureVerifyEntry
+{
+    char* Name;                  // +0x00 the texture-name parameter (malloc'd)
+    int PlaybackGroupId;         // +0x04 -1 while unresolved
+    FlULong Frame[5];            // +0x08 GetFrame: pipeline texture handle, then the UV rect
+    FlULong WrapMode;            // +0x1C texture-coordinate index parameter (type 8)
+    FlULong AddressU;            // +0x20 (type 9)
+    FlULong AddressV;            // +0x24 (type 9)
+    unsigned char bSingleFrame;  // +0x28
+};
+FL_LAYOUT_ASSERT(sizeof(FFlmTextureVerifyEntry) == 0x2C, "retail texture entry stride");
+FL_LAYOUT_ASSERT(offsetof(FFlmTextureVerifyEntry, WrapMode) == 0x1C, "wrap mode +0x1C");
+FL_LAYOUT_ASSERT(offsetof(FFlmTextureVerifyEntry, bSingleFrame) == 0x28, "single frame +0x28");
+
 class FMaterialImpl : public IMaterial
 {
 public:
@@ -167,8 +184,8 @@ private:
                                      FlULong IbStart, FlULong IndexSpan,
                                      FlULong Flags);
 
-    void ApplyTssFromTextureBlock(FlULong Stage, const FlULong* Block);
-    FlULong TextureHandleAt(const FlULong* Block) const;
+    void ApplyTssFromTextureBlock(FlULong Stage, const FFlmTextureVerifyEntry* Block);
+    FlULong TextureHandleAt(const FFlmTextureVerifyEntry* Block) const;
     bool ContextWantsColorVertex(void* Context) const;
     float CompareField2C() const;
 
@@ -193,7 +210,8 @@ private:
     IVertexBufferManager* VertexBufferManager_;
     IRPDraw* RpDraw_;
     IMaterialLibrary* MaterialLibrary_;
-    FlULong* TextureBlock_;
+    // TextureVerifyCount_ entries, allocated as retail's dword array.
+    FFlmTextureVerifyEntry* TextureBlock_;
     float MaterialBlock_[17];
     unsigned char Flag64_;
     unsigned char Flag65_;
@@ -213,7 +231,8 @@ private:
     // Stage texture handle resolved by BindEnvMap and reused by Submit.
     FlULong EnvMapResolvedHandle_;
     // EnvMap record remains separate from Shadow layer count / record / resolved texture.
-    FlULong ShadowHandle_; // EnvMap retained texture record (retail +0x68).
+    // EnvMap retained texture record (retail +0x68): FindTextureByCrc writes a pointer here.
+    void* ShadowHandle_;
     ITextureLibrary2* ShadowTextureLibrary_; // borrowed Shadow +0x6c
     void* ShadowTextureRecord_;              // retained Shadow +0x74
     FlULong ShadowResolvedHandle_;    // Shadow +0x70 pipeline texture

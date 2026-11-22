@@ -53,11 +53,27 @@ namespace
         return GetTickCount();
     }
 
+    // DPNet's strings are UTF-16, as WCHAR is on Windows. On macOS and Linux WCHAR is the 32-bit
+    // wchar_t: a character past U+FFFF becomes a surrogate pair.
     std::u16string ToU16(const WCHAR* Text)
     {
+        std::u16string Out;
         if (Text == nullptr)
-            return std::u16string();
-        return std::u16string(reinterpret_cast<const char16_t*>(Text));
+            return Out;
+        for (; *Text != 0; ++Text)
+        {
+            const uint32_t Char = (uint32_t)*Text;
+            if (Char > 0xFFFF && Char <= 0x10FFFF)
+            {
+                Out += (char16_t)(0xD800 + ((Char - 0x10000) >> 10));
+                Out += (char16_t)(0xDC00 + ((Char - 0x10000) & 0x3FF));
+            }
+            else
+            {
+                Out += (char16_t)Char;
+            }
+        }
+        return Out;
     }
 
     DPNet::FGuid ToGuid(const GUID& In)
@@ -356,10 +372,11 @@ namespace
         static std::string GuidText(const GUID& Guid)
         {
             char Text[64];
-            std::snprintf(Text, sizeof(Text), "%%7B%08lX-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X%%7D",
-                          (FlULong)Guid.Data1, Guid.Data2, Guid.Data3, Guid.Data4[0], Guid.Data4[1],
-                          Guid.Data4[2], Guid.Data4[3], Guid.Data4[4], Guid.Data4[5], Guid.Data4[6],
-                          Guid.Data4[7]);
+            std::snprintf(Text, sizeof(Text),
+                          "%%7B%08lX-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X%%7D",
+                          (unsigned long)Guid.Data1, Guid.Data2, Guid.Data3, Guid.Data4[0],
+                          Guid.Data4[1], Guid.Data4[2], Guid.Data4[3], Guid.Data4[4], Guid.Data4[5],
+                          Guid.Data4[6], Guid.Data4[7]);
             return Text;
         }
 
@@ -828,9 +845,20 @@ namespace
                 SOCKET Created = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
                 if (Created == INVALID_SOCKET)
                     return false;
+#if !defined(_WIN32)
+                // PORT(macOS): NetLoop waits with select, whose fd_set holds only descriptors below
+                // FD_SETSIZE on POSIX (a Windows fd_set is a list of handles, with no such limit).
+                if (Created >= FD_SETSIZE)
+                {
+                    closesocket(Created);
+                    return false;
+                }
+#endif
+#if defined(_WIN32)
                 BOOL Exclusive = TRUE;
                 setsockopt(Created, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char*>(&Exclusive),
                            sizeof(Exclusive));
+#endif // (macOS and Linux bind exclusively unless SO_REUSEADDR / SO_REUSEPORT is set)
                 sockaddr_in Local{};
                 Local.sin_family = AF_INET;
                 Local.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -891,7 +919,8 @@ namespace
                 FD_ZERO(&Readable);
                 FD_SET(Socket, &Readable);
                 timeval Timeout{0, (FlLong)(kTickMs * 1000)};
-                select(0, &Readable, nullptr, nullptr, &Timeout);
+                // The first argument is the highest descriptor + 1 (Windows ignores it).
+                select((int)Socket + 1, &Readable, nullptr, nullptr, &Timeout);
 
                 std::lock_guard<std::recursive_mutex> Guard(Lock);
                 if (Server == nullptr)
@@ -899,7 +928,7 @@ namespace
                 for (;;)
                 {
                     sockaddr_in From{};
-                    int FromSize = sizeof(From);
+                    socklen_t FromSize = sizeof(From);
                     const int Got = recvfrom(Socket, Buffer.data(), (int)Buffer.size(), 0,
                                              reinterpret_cast<sockaddr*>(&From), &FromSize);
                     if (Got < 0)

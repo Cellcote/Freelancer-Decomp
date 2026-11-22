@@ -9,6 +9,7 @@
 #include "engine/engbase.h" // IEngine
 #include "readfile.h"
 #include "render/shading.h" // ITextureLibrary2, IMaterialLibrary, IMatAnimLibrary, IImaInstance
+#include "x64_low_arena.h"   // pipeline texture handles and engine instances in 32-bit values
 #include "x86math.h"        // I3DMathEngine
 
 #include <cctype>
@@ -161,16 +162,25 @@ namespace
     }
 
 
-    // Size of one declared property descriptor.
-    const int kFlmParamDescSize = 0x4C;
+    // Size of one declared property descriptor (FShadingPropertyRecord, 0x4C on Win32).
+    const int kFlmParamDescSize = (int)sizeof(FShadingPropertyRecord);
 
     // Size of one per-instance texture verification record.
-    const FlULong kFlmTextureVerifyEntrySize = 0x2C;
+    const FlULong kFlmTextureVerifyEntrySize = (FlULong)sizeof(FFlmTextureVerifyEntry);
 
     // DAT_067013ec raw PE bits 0x34000000: 2^-23, kept unspilled in x87 bounds.
     const double kFlmVerifyEpsilon = 0x1p-23;
 
-    // Colorize declared property descriptor; some fields are type-dependent.
+    // A property payload's string in the static default tables below: the literal's address on
+    // Win32 (a constant), its shading payload id on 64-bit builds.
+#if defined(FL_PTR64)
+#define FLM_PAYLOAD_TEXT(Text) ShadingPayloadOf(Text)
+#else
+#define FLM_PAYLOAD_TEXT(Text) ((FlULong)(Text))
+#endif
+
+    // Colorize declared property descriptor; some fields are type-dependent. It mirrors
+    // FShadingPropertyRecord field for field, so a table of them is a table of records.
     struct FFlmMaterialParamDesc
     {
         FlULong Path; // see comment above -- EntryFlags for indices 8/9, else 0
@@ -185,26 +195,53 @@ namespace
         FlULong Value2[4];
     };
 
-    FL_LAYOUT_ASSERT(sizeof(FFlmMaterialParamDesc) == sizeof(FShadingPropertyRecord), "shared property descriptor size");
-    FL_LAYOUT_ASSERT(offsetof(FFlmMaterialParamDesc, Type0) == offsetof(FShadingPropertyRecord, Current), "current value boundary");
-    FL_LAYOUT_ASSERT(offsetof(FFlmMaterialParamDesc, Type1) == offsetof(FShadingPropertyRecord, Default), "default value boundary");
-    FL_LAYOUT_ASSERT(offsetof(FFlmMaterialParamDesc, Type2) == offsetof(FShadingPropertyRecord, Saved), "saved value boundary");
+    // These hold on every target (the pointer fields move together on 64-bit builds).
+    static_assert(sizeof(FFlmMaterialParamDesc) == sizeof(FShadingPropertyRecord),
+                  "shared property descriptor size");
+    static_assert(offsetof(FFlmMaterialParamDesc, ShortTag) ==
+                      offsetof(FShadingPropertyRecord, Name),
+                  "short tag is the record's name");
+    static_assert(offsetof(FFlmMaterialParamDesc, Type0) ==
+                      offsetof(FShadingPropertyRecord, Current),
+                  "current value boundary");
+    static_assert(offsetof(FFlmMaterialParamDesc, Type1) ==
+                      offsetof(FShadingPropertyRecord, Default),
+                  "default value boundary");
+    static_assert(offsetof(FFlmMaterialParamDesc, Type2) == offsetof(FShadingPropertyRecord, Saved),
+                  "saved value boundary");
+
+    // A descriptor table viewed as the records it mirrors.
+    FShadingPropertyRecord* FlmRecordOf(FFlmMaterialParamDesc* Entry)
+    {
+        return reinterpret_cast<FShadingPropertyRecord*>(Entry);
+    }
+
+    // A seed payload as the pointer argument FlmSetDescriptorEntry takes: a string through the
+    // shading payload helpers, any other value carried in the pointer.
+    const void* FlmSeedValue(FlULong Type, FlULong Payload)
+    {
+#if defined(FL_PTR64)
+        if (Type == 5 || Type == 6 || Type == 7)
+            return ShadingPayloadTo<const void>(Payload);
+        return (const void*)(std::uintptr_t)(Payload);
+#else
+        (void)Type;
+        return (const void*)(Payload);
+#endif
+    }
 
     void FlmSetDescriptorEntry(FFlmMaterialParamDesc* Entry, int Type,
                                 FlULong Flags, const char* Tag, const char* Name,
                                 const char* Metadata, const void* Value0,
                                 const void* Value1, const void* Value2);
-    void FlmResetDescriptorEntry(FlULong* Entry);
+    void FlmResetDescriptorEntry(FShadingPropertyRecord* Entry);
 
     // Native descriptor objects keep the three typed resources alive until
     // module teardown. An array gives reverse destruction and EH cleanup.
     struct FFlmOwnedDescriptor
     {
         FFlmMaterialParamDesc Entry = {};
-        ~FFlmOwnedDescriptor() noexcept(false)
-        {
-            FlmResetDescriptorEntry((FlULong*)(&Entry));
-        }
+        ~FFlmOwnedDescriptor() noexcept(false) { FlmResetDescriptorEntry(FlmRecordOf(&Entry)); }
     };
 
     template<FlULong Count>
@@ -221,16 +258,19 @@ namespace
             {
                 const FFlmMaterialParamDesc& Seed = Seeds[Index];
                 const bool bVector = Seed.Type0 >= 2 && Seed.Type0 <= 4;
-                const void* Value0 = bVector ? Seed.Value0 : (const void*)(Seed.Value0[0]);
-                const void* Value1 = bVector ? Seed.Value1 : (const void*)(Seed.Value1[0]);
-                const void* Value2 = bVector ? Seed.Value2 : (const void*)(Seed.Value2[0]);
+                const void* Value0 =
+                    bVector ? Seed.Value0 : FlmSeedValue(Seed.Type0, Seed.Value0[0]);
+                const void* Value1 =
+                    bVector ? Seed.Value1 : FlmSeedValue(Seed.Type1, Seed.Value1[0]);
+                const void* Value2 =
+                    bVector ? Seed.Value2 : FlmSeedValue(Seed.Type2, Seed.Value2[0]);
                 FlmSetDescriptorEntry(&Descriptors[Index].Entry, (int)(Seed.Type0),
                                       Seed.Path, Seed.ShortTag, Seed.Name, Seed.Field0C,
                                       Value0, Value1, Value2);
             }
         }
     };
-    FL_LAYOUT_ASSERT(sizeof(FFlmOwnedDescriptor) == kFlmParamDescSize, "Descriptor stride");
+    static_assert(sizeof(FFlmOwnedDescriptor) == kFlmParamDescSize, "Descriptor stride");
 
 
     void FlmReleaseTypedValue(FlULong* Slot);
@@ -263,12 +303,12 @@ namespace
     // FUN_066fba30 / FUN_066fc7f0: each callback owns its separate one-entry table.
     void FlmDestroyWireParameters()
     {
-        FlmResetDescriptorEntry((FlULong*)(&GFlmWireParameters.Entry));
+        FlmResetDescriptorEntry(FlmRecordOf(&GFlmWireParameters.Entry));
     }
 
     void FlmDestroyWire2Parameters()
     {
-        FlmResetDescriptorEntry((FlULong*)(&GFlmWire2Parameters.Entry));
+        FlmResetDescriptorEntry(FlmRecordOf(&GFlmWire2Parameters.Entry));
     }
 
     // LAB_066fb090 / LAB_066fbd20: construction guard precedes construction;
@@ -316,6 +356,7 @@ namespace
     {
         const FlULong kF0 = 0x00000000ul; // 0.0f
         const FlULong kF1 = 0x3f800000ul; // 1.0f
+        // clang-format off: one parameter per row
         static const FFlmMaterialParamDesc kParams[11] = {
             // 0: Ambient Color / Ac / type4
             {0, "Ac", "Ambient Color", "",
@@ -337,7 +378,7 @@ namespace
              2, {kF1, 0, 0, 0}, 2, {kF0, 0, 0, 0}, 2, {kF1, 0, 0, 0}},
             // 6: Texture Name / Dt_name / type7 (string) -- default "(None)"
             {0, "Dt_name", "Texture Name", "",
-             7, {(FlULong)("(None)"), 0, 0, 0},
+             7, {FLM_PAYLOAD_TEXT("(None)"), 0, 0, 0},
              7, {0, 0, 0, 0}, 7, {0, 0, 0, 0}},
             // 7: Texture Wrap Mode / Dt_flags / type8 (nibble), default nibble=4
             {0, "Dt_flags", "Texture Wrap Mode", "",
@@ -354,6 +395,7 @@ namespace
             {0, nullptr, "Colorize Options", "flcopt",
              1, {0, 0, 0, 0}, 1, {0, 0, 0, 0}, 1, {0, 0, 0, 0}},
         };
+        // clang-format on
         FL_LAYOUT_ASSERT(sizeof(FFlmMaterialParamDesc) == kFlmParamDescSize,
                       "FFlmMaterialParamDesc must match the confirmed 0x4C stride");
         if (bCloak)
@@ -372,6 +414,7 @@ namespace
     {
         const FlULong kZero = 0;
         const FlULong kOne = 0x3f800000ul;
+        // clang-format off: one parameter per row
         static const FFlmMaterialParamDesc kParams[10] = {
             {0, "Ac", "Ambient Color", "",
              3, {kOne, kOne, kOne, 0}, 3, {kZero, kZero, kZero, 0},
@@ -392,7 +435,7 @@ namespace
              2, {kOne, 0, 0, 0}, 2, {kZero, 0, 0, 0},
              2, {kOne, 0, 0, 0}},
             {0, "Dt_name", "Texture Name", "",
-             7, {(FlULong)("(None)"), 0, 0, 0},
+             7, {FLM_PAYLOAD_TEXT("(None)"), 0, 0, 0},
              7, {0, 0, 0, 0}, 7, {0, 0, 0, 0}},
             {0, "Dt_flags", "Texture Wrap Mode", "",
              8, {4, 0, 0, 0}, 8, {0, 0, 0, 0}, 8, {0, 0, 0, 0}},
@@ -401,6 +444,7 @@ namespace
             {0x40000ul, "Dt_flags", "Texture V Address Mode", "",
              9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}},
         };
+        // clang-format on
         switch (Kind)
         {
         case KindEngineGlow:
@@ -448,12 +492,13 @@ namespace
     {
         const FlULong kZero = 0;
         const FlULong kOne = 0x3f800000ul;
+        // clang-format off: one parameter per row
         static const FFlmMaterialParamDesc kParams[9] = {
             {0, "Dc", "Diffuse Color", "",
              3, {kOne, kOne, kOne, 0}, 3, {kZero, kZero, kZero, 0},
              3, {kOne, kOne, kOne, 0}},
             {0, "Dt_name", "Diffuse Name", "",
-             7, {(FlULong)("(None)"), 0, 0, 0},
+             7, {FLM_PAYLOAD_TEXT("(None)"), 0, 0, 0},
              7, {0, 0, 0, 0}, 7, {0, 0, 0, 0}},
             {0, "Dt_flags", "Diffuse Wrap Mode", "",
              8, {4, 0, 0, 0}, 8, {0, 0, 0, 0}, 8, {0, 0, 0, 0}},
@@ -462,7 +507,7 @@ namespace
             {0x40000ul, "Dt_flags", "Diffuse V Address Mode", "",
              9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}},
             {0, "nt_name", "NomadTexture Name", "",
-             7, {(FlULong)("NomadRGB1_NomadAlpha1"), 0, 0, 0},
+             7, {FLM_PAYLOAD_TEXT("NomadRGB1_NomadAlpha1"), 0, 0, 0},
              7, {0, 0, 0, 0}, 7, {0, 0, 0, 0}},
             {0, "nt_flags", "NomadTexture Wrap Mode", "",
              8, {5, 0, 0, 0}, 8, {0, 0, 0, 0}, 8, {0, 0, 0, 0}},
@@ -471,6 +516,7 @@ namespace
             {0x40000ul, "nt_flags", "NomadTexture V Address Mode", "",
              9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}, 9, {0, 0, 0, 0}},
         };
+        // clang-format on
         static FFlmOwnedParameterTable<9> Table;
         Table.InitializeDefaults(kParams);
         return &Table.Descriptors[0].Entry;
@@ -486,14 +532,14 @@ namespace
         {
             if (Slot[1] != 0)
             {
-                HeapFree(GetProcessHeap(), 0, (void*)(Slot[1]));
+                ShadingPayloadFreeString(Slot[1]);
                 Slot[1] = 0;
             }
             return;
         }
         if (OldType == 6)
         {
-            IDAComponent* Old = (IDAComponent*)(Slot[1]);
+            IDAComponent* Old = ShadingPayloadTo<IDAComponent>(Slot[1]);
             Slot[1] = 0;
             if (Old != nullptr)
                 Old->Release();
@@ -508,14 +554,14 @@ namespace
     {
         if (Slot[1] != 0)
         {
-            HeapFree(GetProcessHeap(), 0, (void*)(Slot[1]));
+            ShadingPayloadFreeString(Slot[1]);
             Slot[1] = 0;
         }
         if (NewStr != nullptr)
         {
             const size_t Len = std::strlen(NewStr) + 1;
             void* Copy = HeapAlloc(GetProcessHeap(), 0, Len);
-            Slot[1] = (FlULong)(Copy);
+            Slot[1] = ShadingPayloadOf(Copy);
             std::memcpy(Copy, NewStr, Len);
         }
     }
@@ -524,8 +570,8 @@ namespace
     // interface-pointer swap -- AddRef the new pointer before Release-ing the old one.
     void FlmAssignInterface(FlULong* Slot, IDAComponent* NewIface)
     {
-        IDAComponent* Old = (IDAComponent*)(Slot[1]);
-        Slot[1] = (FlULong)(NewIface);
+        IDAComponent* Old = ShadingPayloadTo<IDAComponent>(Slot[1]);
+        Slot[1] = ShadingPayloadOf(NewIface);
         if (NewIface != nullptr)
             NewIface->AddRef();
         if (Old != nullptr)
@@ -540,7 +586,7 @@ namespace
             std::free(*Slot);
             *Slot = nullptr;
         }
-        const char* Source = (const char*)(Value[1]);
+        const char* Source = ShadingPayloadTo<const char>(Value[1]);
         if (Source != nullptr)
         {
             const size_t Len = std::strlen(Source) + 1;
@@ -550,7 +596,7 @@ namespace
             *Slot = Copy;
             // All four retail bodies reload Value[1] after publishing the
             // allocation. Preserve that order even when Value aliases Slot.
-            Source = (const char*)(Value[1]);
+            Source = ShadingPayloadTo<const char>(Value[1]);
             char* Dest = (char*)(Copy);
             char Character;
             do
@@ -601,10 +647,10 @@ namespace
             break;
         case 5:
         case 7:
-            FlmAssignString((FlULong*)Dest, (const char*)Src->Payload0);
+            FlmAssignString((FlULong*)Dest, ShadingPayloadTo<const char>(Src->Payload0));
             break;
         case 6:
-            FlmAssignInterface((FlULong*)Dest, (IDAComponent*)Src->Payload0);
+            FlmAssignInterface((FlULong*)Dest, ShadingPayloadTo<IDAComponent>(Src->Payload0));
             break;
         default:
             break;
@@ -628,7 +674,7 @@ namespace
         case 8:
         case 9:
         case 10:
-            SubBlock[1] = (FlULong)(ValuePtr);
+            SubBlock[1] = (FlULong)(std::uintptr_t)(ValuePtr); // a value carried in the pointer
             break;
         case 2:
             SubBlock[1] = (FlULong)(Values[0]);
@@ -676,20 +722,20 @@ namespace
 
     // FUN_066f3cd0: borrowed header clear, then typed resource cleanup in
     // reverse order. RAII keeps earlier subblocks on the retail EH path.
-    void FlmResetDescriptorEntry(FlULong* Entry)
+    void FlmResetDescriptorEntry(FShadingPropertyRecord* Entry)
     {
-        Entry[0] = 0;
-        Entry[1] = 0;
-        Entry[2] = 0;
-        Entry[3] = 0;
+        Entry->Flags = 0;
+        Entry->Name = nullptr;
+        Entry->Description = nullptr;
+        Entry->Callback = nullptr;
         struct FReleaseSubBlock
         {
-            FlULong* Value;
-            ~FReleaseSubBlock() noexcept(false) { FlmReleaseTypedValue(Value); }
+            FShadingPropertyValue* Value;
+            ~FReleaseSubBlock() noexcept(false) { FlmReleaseTypedValue(&Value->Type); }
         };
-        FReleaseSubBlock First{Entry + 0x10 / 4};
-        FReleaseSubBlock Second{Entry + 0x24 / 4};
-        FReleaseSubBlock Third{Entry + 0x38 / 4};
+        FReleaseSubBlock First{&Entry->Current};
+        FReleaseSubBlock Second{&Entry->Default};
+        FReleaseSubBlock Third{&Entry->Saved};
     }
 
     // Slot numbers used to live here; the calls below go through ReadFile's published
@@ -899,18 +945,18 @@ namespace
     // FUN_066f1fc0: typed load result is committed through Slot26 only
     // after successful I/O. Type6/default cases still commit their zero value.
     bool FlmLoadDeclaredParameter(FMaterialImpl* Material, void* FileSystem,
-                                  unsigned char* Entry, FlULong Index)
+                                  FShadingPropertyRecord* Entry, FlULong Index)
     {
         FFlmScopedTypedValue Value;
-        const FlULong Type = *(const FlULong*)(Entry + 0x10);
+        const FlULong Type = Entry->Current.Type;
         Value.Words[0] = Type;
         if (Type == 9)
         {
-            const char* Path = *(const char* const*)(Entry + 4);
+            const char* Path = Entry->Name;
             FlULong RawValue;
             if (FlmReadPackedWord((IFileSystem*)FileSystem, Path, &RawValue) < 0)
                 return false;
-            const FlULong Flags = *(const FlULong*)Entry;
+            const FlULong Flags = Entry->Flags;
             const int FieldIndex = (Flags & 0x20000) == 0 && (Flags & 0x40000) != 0 ? 1 : 0;
             Value.Words[1] = FlmUnpackTwoBitField(RawValue, FieldIndex);
             Material->StoreParameterValue(Index, Entry, Value.Words);
@@ -918,7 +964,7 @@ namespace
         }
         if (Type >= 1 && Type <= 8 && Type != 6)
         {
-            const char* Path = *(const char* const*)(Entry + 4);
+            const char* Path = Entry->Name;
             FFileSystemDesc Desc;
             FlmBuildFileSystemDesc(&Desc, Path);
             IFileSystem* Fs = (IFileSystem*)FileSystem;
@@ -957,10 +1003,10 @@ namespace
     }
 
     bool FlmSaveParameterToFileSystem(FMaterialImpl* Material, void* FileSystem,
-                                      const unsigned char* Entry, FlULong Index)
+                                      const FShadingPropertyRecord* Entry, FlULong Index)
     {
         FFlmScopedTypedValue Value;
-        const FlULong Type = *(const FlULong*)(Entry + 0x10);
+        const FlULong Type = Entry->Current.Type;
         Value.Words[0] = Type;
         const FlULong* Raw = (const FlULong*)(Material->GetParameterAddress(Index));
         if (Raw == nullptr)
@@ -975,16 +1021,17 @@ namespace
         case 1: case 2: case 8: case 9: case 10:
             Value.Words[1] = Raw[0];
             break;
+        // The parameter holds the string or component pointer itself (pointer-sized).
         case 5: case 7:
-            FlmAssignString(Value.Words, (const char*)(Raw[0]));
+            FlmAssignString(Value.Words, *(const char* const*)(Raw));
             break;
         case 6:
-            FlmAssignInterface(Value.Words, (IDAComponent*)(Raw[0]));
+            FlmAssignInterface(Value.Words, *(IDAComponent* const*)(Raw));
             break;
         default:
             break;
         }
-        const char* Path = *(const char* const*)(Entry + 4);
+        const char* Path = Entry->Name;
         if (Type == 6 || Type == 0 || Type > 9)
             return true;
         if (Type == 8)
@@ -1000,18 +1047,18 @@ namespace
             }
             Packed ^= (Packed ^ (Value.Words[1] << 4)) & 0xf0ul;
             // 066f28cb / 066f2924 reread the path after filesystem callbacks.
-            const char* WritePath = *(const char* const*)(Entry + 4);
+            const char* WritePath = Entry->Name;
             return (FlLong)(FlmWriteSmallConfigValue(FileSystem, WritePath, &Packed)) >= 0;
         }
         if (Type == 9)
         {
             FlULong Packed = 0;
             FlmReadPackedWord((IFileSystem*)(FileSystem), Path, &Packed);
-            const FlULong Flags = *(const FlULong*)(Entry);
+            const FlULong Flags = Entry->Flags;
             const int FieldIndex = (Flags & 0x20000) == 0 && (Flags & 0x40000) != 0 ? 1 : 0;
             FlmPackTwoBitField(&Packed, Value.Words[1], FieldIndex);
             // 066f28cb / 066f2924 reread the path after filesystem callbacks.
-            const char* WritePath = *(const char* const*)(Entry + 4);
+            const char* WritePath = Entry->Name;
             return (FlLong)(FlmWriteSmallConfigValue(FileSystem, WritePath, &Packed)) >= 0;
         }
         const void* Buffer = Value.Words + 1;
@@ -1022,7 +1069,7 @@ namespace
             Size = 16;
         else if (Type == 5 || Type == 7)
         {
-            Buffer = (const char*)(Value.Words[1]);
+            Buffer = ShadingPayloadTo<const char>(Value.Words[1]);
             Size = (FlULong)(std::strlen((const char*)(Buffer))) + 1;
         }
         const FlULong Handle = FsOpenForWrite(FileSystem, Path);
@@ -1177,13 +1224,12 @@ namespace
         VbMgr->UnlockVertexMemory(Out);
     }
 
+    // StartIndex is the index buffer's bias plus the submit's first index, not an address.
     GENRESULT RpDrawIndexed(IRPDraw* RpDraw, FlULong Prim, FlULong Start, FlULong Count,
-                            const void* Indices, FlULong IndexSpan)
+                            FlULong StartIndex, FlULong IndexSpan)
     {
-        return RpDraw->DrawIndexedPrimitive(
-            Prim, (unsigned int)(Start), (unsigned int)(Count),
-            (unsigned int)((FlULong)(Indices)),
-            (unsigned int)(IndexSpan));
+        return RpDraw->DrawIndexedPrimitive(Prim, (unsigned int)(Start), (unsigned int)(Count),
+                                            (unsigned int)(StartIndex), (unsigned int)(IndexSpan));
     }
 
     // The manager copies mesh channels into the destination using the requested FVF.
@@ -1347,14 +1393,14 @@ namespace
         if (Context == nullptr)
             return Default;
 
-        const int InstanceId =
-            (int)((intptr_t)(*(void**)(Context)));
+        // The instance values are keyed by the instance's 32-bit value (engine/engbase.h).
+        const int InstanceId = (int)(LowArena::Encode(*(void**)(Context)));
         int RootId = InstanceId;
         if (G_FlmEngineOuter != nullptr)
         {
-            void* Root = ((IEngine*)(G_FlmEngineOuter))->GetInstanceRoot(
-                (void*)((intptr_t)(InstanceId)));
-            RootId = (int)((intptr_t)(Root));
+            void* Root =
+                ((IEngine*)(G_FlmEngineOuter))->GetInstanceRoot(LowArena::Decode<void>(InstanceId));
+            RootId = (int)(LowArena::Encode(Root));
         }
 
         void* Found = nullptr;
@@ -1362,7 +1408,8 @@ namespace
             return Default;
 
         float Value = Default;
-        const FlULong Bits = (FlULong)((intptr_t)(Found));
+        // The value is a float's bits carried in the pointer.
+        const FlULong Bits = (FlULong)((std::uintptr_t)(Found));
         std::memcpy(&Value, &Bits, sizeof(Value));
         return Value;
     }
@@ -1497,10 +1544,9 @@ namespace
         FNomadContext* Submit = (FNomadContext*)(Context);
         if ((Flags & 0x100) != 0)
         {
-            const uintptr_t IbBase = *(const uintptr_t*)(
-                (const unsigned char*)(Submit->IbWrapper) + 4);
-            const GENRESULT Result = RpDrawIndexed(RpDraw, Prim, Start, Count,
-                (const void*)(IbBase + IbStart), IndexSpan);
+            const FlULong IbBase = static_cast<const FIbScratch*>(Submit->IbWrapper)->Bias;
+            const GENRESULT Result =
+                RpDrawIndexed(RpDraw, Prim, Start, Count, IbBase + IbStart, IndexSpan);
             if (Result >= 0)
                 return Result;
         }
@@ -1852,7 +1898,8 @@ namespace
             {
                 PipelineApplyTssTable(Pipeline, Stage, kEnvMapTss0);
                 PipelineApplyTssTable(Pipeline, Stage + 1, kEnvMapTss1);
-                Pipeline->SetTextureStageTexture((int)(Stage), (void*)(EnvMapResolvedHandle));
+                Pipeline->SetTextureStageTexture(
+                    (int)(Stage), LowArena::Decode<void>((FlLong)(EnvMapResolvedHandle)));
                 Pipeline->SetTextureStageState((int)(Stage), D3DTSS_TEXCOORDINDEX, 0x30000);
                 Pipeline->SetRenderState(D3DRS_LOCALVIEWER, 1);
                 Pipeline->SetRenderState(D3DRS_NORMALIZENORMALS, 1);
@@ -2047,12 +2094,11 @@ FMaterialImpl::~FMaterialImpl() noexcept(false)
             void (FMaterialImpl::*Cleanup)();
             ~FEnvMapBaseCleanup() noexcept(false) { (Owner->*Cleanup)(); }
         } BaseCleanup{this, &FMaterialImpl::ReleaseMaterialResources};
-        if (TextureLibrary_ != nullptr && ShadowHandle_ != 0)
+        if (TextureLibrary_ != nullptr && ShadowHandle_ != nullptr)
         {
-            TextureLibrary_->ReleaseTextureRecord(
-                (void*)(ShadowHandle_));
+            TextureLibrary_->ReleaseTextureRecord(ShadowHandle_);
         }
-        ShadowHandle_ = 0;
+        ShadowHandle_ = nullptr;
         EnvMapTexNameCrc_ = 0;
         return;
     }
@@ -2085,9 +2131,8 @@ void FMaterialImpl::ReleaseMaterialResources()
 {
     for (FlULong Index = 0; Index < TextureVerifyCount_; ++Index)
     {
-        unsigned char* Entry = (unsigned char*)(TextureBlock_) +
-                               Index * kFlmTextureVerifyEntrySize;
-        int* PlaybackGroupId = (int*)(Entry + 4);
+        FFlmTextureVerifyEntry* Entry = TextureBlock_ + Index;
+        int* PlaybackGroupId = &Entry->PlaybackGroupId;
         if (*PlaybackGroupId != -1)
         {
             TextureLibrary_->DecRefById(*PlaybackGroupId);
@@ -2099,13 +2144,12 @@ void FMaterialImpl::ReleaseMaterialResources()
     {
         for (FlULong Remaining = TextureVerifyCount_; Remaining != 0; --Remaining)
         {
-            unsigned char* Entry = (unsigned char*)(TextureBlock_) +
-                                   (Remaining - 1) * kFlmTextureVerifyEntrySize;
-            std::free(*(void**)(Entry));
-            *(void**)(Entry) = nullptr;
+            FFlmTextureVerifyEntry* Entry = TextureBlock_ + (Remaining - 1);
+            std::free(Entry->Name);
+            Entry->Name = nullptr;
         }
     }
-    delete[] TextureBlock_;
+    delete[] (FlULong*)(TextureBlock_);
     TextureBlock_ = nullptr;
     TextureVerifyCount_ = 0;
     TextureLibrary_ = nullptr;
@@ -2239,37 +2283,35 @@ GENRESULT DACOM_API FMaterialImpl::Initialize(IDAComponent* Outer)
 
     void* ParamBase = nullptr;
     const FlULong ParamCount = GetParameterTable(&ParamBase);
-    unsigned char* Descriptors = (unsigned char*)(ParamBase);
+    FShadingPropertyRecord* Descriptors = (FShadingPropertyRecord*)(ParamBase);
     TextureVerifyCount_ = 0;
     for (FlULong Index = 0; Index < ParamCount; ++Index)
     {
-        const unsigned char* Entry = Descriptors + Index * kFlmParamDescSize;
-        if (*(const FlULong*)(Entry + 0x10) == 7)
+        const FShadingPropertyRecord* Entry = Descriptors + Index;
+        if (Entry->Current.Type == 7)
             ++TextureVerifyCount_;
     }
     if (TextureVerifyCount_ != 0)
     {
         const size_t WordCount = (size_t)(TextureVerifyCount_) *
                                  (kFlmTextureVerifyEntrySize / sizeof(FlULong));
-        TextureBlock_ = new FlULong[WordCount];
+        TextureBlock_ = (FFlmTextureVerifyEntry*)(new FlULong[WordCount]);
         for (FlULong Index = 0; Index < TextureVerifyCount_; ++Index)
         {
-            unsigned char* Entry = (unsigned char*)(TextureBlock_) +
-                                   Index * kFlmTextureVerifyEntrySize;
-            *(void**)(Entry) = nullptr;
-            *(int*)(Entry + 4) = -1;
-            *(FlULong*)(Entry + 8) = 0;
-            *(FlULong*)(Entry + 0x1C) = 4;
-            *(FlULong*)(Entry + 0x20) = 0;
-            *(FlULong*)(Entry + 0x24) = 0;
-            Entry[0x28] = 0;
+            FFlmTextureVerifyEntry* Entry = TextureBlock_ + Index;
+            Entry->Name = nullptr;
+            Entry->PlaybackGroupId = -1;
+            Entry->Frame[0] = 0;
+            Entry->WrapMode = 4;
+            Entry->AddressU = 0;
+            Entry->AddressV = 0;
+            Entry->bSingleFrame = 0;
         }
     }
     for (FlULong Index = 0; Index < ParamCount; ++Index)
     {
-        unsigned char* Entry = Descriptors +
-                               Index * kFlmParamDescSize;
-        StoreParameterValue(Index, Entry, Entry + 0x10);
+        FShadingPropertyRecord* Entry = Descriptors + Index;
+        StoreParameterValue(Index, Entry, &Entry->Current);
     }
 
     if (Kind_ == KindHudAnim)
@@ -2290,15 +2332,14 @@ GENRESULT DACOM_API FMaterialImpl::LoadFromFileSystem(void* FileSystem)
     const FlULong Count = GetParameterTable(&Base);
     for (FlULong Index = 0; Index < Count; ++Index)
     {
-        unsigned char* Entry = (unsigned char*)(Base) + Index * kFlmParamDescSize;
-        if ((*Entry & 1) != 0)
+        FShadingPropertyRecord* Entry = (FShadingPropertyRecord*)(Base) + Index;
+        if ((*(const unsigned char*)(&Entry->Flags) & 1) != 0)
             continue;
-        if (!FlmLoadDeclaredParameter(this, FileSystem, Entry, Index) &&
-            (*(const FlULong*)(Entry) & 4) != 0)
+        if (!FlmLoadDeclaredParameter(this, FileSystem, Entry, Index) && (Entry->Flags & 4) != 0)
         {
             const char* Instance = bInstanceNameSet_ ? InstanceName_ : "(Unnamed)";
             const char* Class = ClassName();
-            const char* Description = *(const char* const*)(Entry + 8);
+            const char* Description = Entry->Description;
             char Message[0x2000];
             FlmFormatMessage(Message, "Unable to load parameter '%s' for '%s' (%s)\n",
                       Description, Instance, Class);
@@ -2318,14 +2359,14 @@ GENRESULT DACOM_API FMaterialImpl::SaveProperties(void* FileSystem)
     GENRESULT Result = GR_OK;
     for (FlULong Index = 0; Index < Count; ++Index)
     {
-        unsigned char* Entry = (unsigned char*)(Base) + Index * kFlmParamDescSize;
-        if ((*Entry & 1) != 0)
+        const FShadingPropertyRecord* Entry = (const FShadingPropertyRecord*)(Base) + Index;
+        if ((*(const unsigned char*)(&Entry->Flags) & 1) != 0)
             continue;
         if (!FlmSaveParameterToFileSystem(this, FileSystem, Entry, Index))
         {
             const char* Instance = bInstanceNameSet_ ? InstanceName_ : "(Unnamed)";
             const char* Class = ClassName();
-            const char* Description = *(const char* const*)(Entry + 8);
+            const char* Description = Entry->Description;
             char Message[0x2000];
             FlmFormatMessage(Message, "Unable to save parameter '%s' for '%s' (%s)\n",
                       Description, Instance, Class);
@@ -2442,13 +2483,12 @@ GENRESULT DACOM_API FMaterialImpl::ResolveTextures(float Delta)
         // LAB_066fff20 resolves texture records before its HUD animation tail.
         for (FlULong Index = 0; Index < TextureVerifyCount_; ++Index)
         {
-            unsigned char* Entry = (unsigned char*)(TextureBlock_) +
-                                   Index * kFlmTextureVerifyEntrySize;
-            const int PlaybackGroupId = *(const int*)(Entry + 4);
-            FlULong* Handle = (FlULong*)(Entry + 8);
+            FFlmTextureVerifyEntry* Entry = TextureBlock_ + Index;
+            const int PlaybackGroupId = Entry->PlaybackGroupId;
+            FlULong* Handle = Entry->Frame;
             if (PlaybackGroupId == -1)
                 *Handle = 0;
-            else if (Entry[0x28] == 0)
+            else if (Entry->bSingleFrame == 0)
                 TextureLibrary_->GetFrame(PlaybackGroupId, -1, Handle);
         }
 
@@ -2497,13 +2537,12 @@ GENRESULT DACOM_API FMaterialImpl::ResolveTextures(float Delta)
     // LAB_066f1610: mandatory storage/library, unsigned count re-read each iteration.
     for (FlULong Index = 0; Index < TextureVerifyCount_; ++Index)
     {
-        unsigned char* Entry = (unsigned char*)(TextureBlock_) +
-                               Index * kFlmTextureVerifyEntrySize;
-        const int PlaybackGroupId = *(const int*)(Entry + 4);
-        FlULong* Handle = (FlULong*)(Entry + 8);
+        FFlmTextureVerifyEntry* Entry = TextureBlock_ + Index;
+        const int PlaybackGroupId = Entry->PlaybackGroupId;
+        FlULong* Handle = Entry->Frame;
         if (PlaybackGroupId == -1)
             *Handle = 0;
-        else if (Entry[0x28] == 0)
+        else if (Entry->bSingleFrame == 0)
             TextureLibrary_->GetFrame(PlaybackGroupId, -1, Handle);
     }
     return GR_OK;
@@ -2583,7 +2622,7 @@ GENRESULT DACOM_API FMaterialImpl::Teardown(void* Context)
     if (Kind_ == KindEnvMap)
     {
         // EnvMap restores its dynamic stage state using the retained texture handle.
-        if (ShadowHandle_ != 0)
+        if (ShadowHandle_ != nullptr)
         {
             PipelineSetRenderState(Pipeline_, D3DRS_NORMALIZENORMALS, 0);
             PipelineSetRenderState(Pipeline_, D3DRS_LOCALVIEWER, 0);
@@ -2861,12 +2900,13 @@ GENRESULT DACOM_API FMaterialImpl::GetParameterValue(FlULong Index, void* InOutD
     case 10:
         Result->Payload0 = RawWords[0];
         return GR_OK;
+    // The parameter holds the string or component pointer itself (pointer-sized).
     case 5:
     case 7:
-        FlmAssignString((FlULong*)Result, (const char*)RawWords[0]);
+        FlmAssignString((FlULong*)Result, *(const char* const*)Raw);
         return GR_OK;
     case 6:
-        FlmAssignInterface((FlULong*)Result, (IDAComponent*)RawWords[0]);
+        FlmAssignInterface((FlULong*)Result, *(IDAComponent* const*)Raw);
         return GR_OK;
     default:
         return GR_OK; // 066f1c2f -> 066f1d02 for unrecognized types.
@@ -2971,25 +3011,20 @@ GENRESULT __thiscall FMaterialImpl::Setup()
     void* ResolvedRecord; // Retail does not preclear the Slot12 output scratch.
     for (FlULong Index = 0; Index < TextureVerifyCount_; ++Index)
     {
-        unsigned char* Entry = (unsigned char*)(TextureBlock_) +
-                               Index * kFlmTextureVerifyEntrySize;
+        FFlmTextureVerifyEntry* Entry = TextureBlock_ + Index;
         ITextureLibrary2* Library = TextureLibrary_;
-        const int OldPlaybackGroupId = *(int*)(Entry + 4);
-        int* PlaybackGroupId = (int*)(Entry + 4);
-        FlULong* ResolvedHandle = (FlULong*)(Entry + 8);
-        const char* Name = *(const char* const*)(Entry);
-        unsigned char* SingleFrameFlag = Entry + 0x28;
+        const int OldPlaybackGroupId = Entry->PlaybackGroupId;
+        int* PlaybackGroupId = &Entry->PlaybackGroupId;
+        FlULong* ResolvedHandle = Entry->Frame;
+        const char* Name = Entry->Name;
+        unsigned char* SingleFrameFlag = &Entry->bSingleFrame;
         *ResolvedHandle = 0;
         *PlaybackGroupId = -1;
         *SingleFrameFlag = 1;
         bool bVerified = true;
         if (Name != nullptr)
         {
-            struct FTexLibQuery
-            {
-                const char* Name;
-                FlULong Crc;
-            } Query = {Name, DACOM_CRC::GetCRC32(Name)};
+            FMaterialCrcQuery Query = {Name, DACOM_CRC::GetCRC32(Name)};
             if (Library->FindTextureByCrc(&Query, &ResolvedRecord) >= 0)
             {
                 int FrameCount;
@@ -3002,7 +3037,7 @@ GENRESULT __thiscall FMaterialImpl::Setup()
             }
             else
             {
-                Name = *(const char* const*)(Entry);
+                Name = Entry->Name;
                 bVerified = std::strcmp(Name, "(None)") == 0;
             }
         }
@@ -3011,9 +3046,7 @@ GENRESULT __thiscall FMaterialImpl::Setup()
         if (!bVerified)
         {
             char Message[0x2000];
-            Name = *(const char* const*)(
-                (const unsigned char*)(TextureBlock_) +
-                Index * kFlmTextureVerifyEntrySize);
+            Name = TextureBlock_[Index].Name;
             FlmFormatMessage(Message, "texture verify failed: %s: %s",
                          bInstanceNameSet_ ? InstanceName_ : nullptr, Name);
             FlmFdump(kFdumpNotice, kImplFile, 0x23F, "NOTICE", Message);
@@ -3027,9 +3060,9 @@ GENRESULT __thiscall FMaterialImpl::Setup()
 bool __thiscall FMaterialImpl::ValueWithinDeclaredRange(FlULong Index, void* Entry, void* Value)
 {
     // Require the declared type, then check the type-specific range.
-    const unsigned char* EntryBytes = (const unsigned char*)(Entry);
+    const FShadingPropertyRecord* Record = (const FShadingPropertyRecord*)(Entry);
     const FlULong* ValueWords = (const FlULong*)(Value);
-    const FlULong EntryType = *(const FlULong*)(EntryBytes + 0x10);
+    const FlULong EntryType = Record->Current.Type;
     if (EntryType != ValueWords[0])
         return false;
 
@@ -3043,8 +3076,9 @@ bool __thiscall FMaterialImpl::ValueWithinDeclaredRange(FlULong Index, void* Ent
     else
         return true; // non-range types: retail always accepts
 
-    const float* Lo = (const float*)(EntryBytes + 0x28); // sub-block 2 ("default")
-    const float* Hi = (const float*)(EntryBytes + 0x3C); // sub-block 3 ("range")
+    // Sub-block 2 ("default", retail +0x28) and sub-block 3 ("range", +0x3C).
+    const float* Lo = (const float*)(&Record->Default.Payload0);
+    const float* Hi = (const float*)(&Record->Saved.Payload0);
     const float* Val = (const float*)(ValueWords + 1);  // Value+4
 
     for (FlULong Component = 0; Component < ComponentCount; ++Component)
@@ -3096,16 +3130,14 @@ GENRESULT __thiscall FMaterialImpl::StoreParameterValue(FlULong Index, void* Ent
                 FlmAssignStringRaw((void**)(Raw), SrcWords);
                 break;
             case 6:
-                FlmAssignInterfaceRaw((void**)(Raw),
-                                      (IDAComponent*)(SrcWords[1]));
+                FlmAssignInterfaceRaw((void**)(Raw), ShadingPayloadTo<IDAComponent>(SrcWords[1]));
                 break;
             default:
                 break;
             }
         }
 
-        const char* ShortTag = *(const char* const*)(
-            (const unsigned char*)(Entry) + 4);
+        const char* ShortTag = ((const FShadingPropertyRecord*)(Entry))->Name;
         if (ShortTag[0] == 'D' && ShortTag[1] == 'c' && ShortTag[2] == '\0')
         {
             MaterialBlock_[4] = MaterialBlock_[0];
@@ -3208,15 +3240,14 @@ GENRESULT __thiscall FMaterialImpl::StoreParameterValue(FlULong Index, void* Ent
                 FlmAssignStringRaw((void**)(Raw), SrcWords);
                 break;
             case 6:
-                FlmAssignInterfaceRaw((void**)(Raw), (IDAComponent*)(SrcWords[1]));
+                FlmAssignInterfaceRaw((void**)(Raw), ShadingPayloadTo<IDAComponent>(SrcWords[1]));
                 break;
             default:
                 break;
             }
         }
 
-        const char* ShortTag = *(const char* const*)(
-            (const unsigned char*)(Entry) + 4);
+        const char* ShortTag = ((const FShadingPropertyRecord*)(Entry))->Name;
         if (ShortTag[0] == 'D' && ShortTag[1] == 'c' && ShortTag[2] == '\0')
         {
             MaterialBlock_[4] = MaterialBlock_[0];
@@ -3260,8 +3291,7 @@ GENRESULT __thiscall FMaterialImpl::StoreParameterValue(FlULong Index, void* Ent
             FlmAssignStringRaw((void**)(Raw), SrcWords);
             break;
         case 6:
-            FlmAssignInterfaceRaw((void**)(Raw),
-                                  (IDAComponent*)(SrcWords[1]));
+            FlmAssignInterfaceRaw((void**)(Raw), ShadingPayloadTo<IDAComponent>(SrcWords[1]));
             break;
         default:
             break;
@@ -3269,8 +3299,7 @@ GENRESULT __thiscall FMaterialImpl::StoreParameterValue(FlULong Index, void* Ent
     }
 
     // 066f2b21..066f2c9d: the entry and its ShortTag are required by retail.
-    const char* ShortTag = *(const char* const*)(
-        (const unsigned char*)(Entry) + 4);
+    const char* ShortTag = ((const FShadingPropertyRecord*)(Entry))->Name;
     if (ShortTag[0] == 'D' && ShortTag[1] == 'c' && ShortTag[2] == '\0')
     {
         MaterialBlock_[4] = MaterialBlock_[0];
@@ -3293,10 +3322,10 @@ void FMaterialImpl::RecomputeOpacityFlags()
     if (Flag64_ != 0)
         return;
     int ActualFormat = FlmFindPixelFormatIndex(0);
-    const FlULong Handle = TextureBlock_[2];
+    const FlULong Handle = TextureBlock_->Frame[0];
     if (Handle == 0)
         return;
-    if (Pipeline_->GetTextureFormat((void*)(Handle), &ActualFormat) < 0)
+    if (Pipeline_->GetTextureFormat(LowArena::Decode<void>((FlLong)(Handle)), &ActualFormat) < 0)
         return;
     const FlULong* ActualDescriptor = FlmPixelFormatDescriptor(ActualFormat);
     Flag65_ = ActualDescriptor[0x38 / 4] == 1 ? 1 : 0;
@@ -3380,9 +3409,15 @@ void* __thiscall FMaterialImpl::GetParameterAddress(FlULong Index)
         case 4: Result = &MaterialBlock_[16]; break;  // this+0x60 (Specular Power)
         case 5: Result = &MaterialBlock_[3]; break;   // this+0x2C (Ambient alpha / Opacity)
         case 6: Result = TextureBlock_; break;        // *TextureBlock_ (this+0x18)
-        case 7: Result = (void*)((uintptr_t)(TextureBlock_) + 0x1c); break;
-        case 8: Result = (void*)((uintptr_t)(TextureBlock_) + 0x20); break;
-        case 9: Result = (void*)((uintptr_t)(TextureBlock_) + 0x24); break;
+        case 7:
+            Result = &TextureBlock_->WrapMode;
+            break;
+        case 8:
+            Result = &TextureBlock_->AddressU;
+            break;
+        case 9:
+            Result = &TextureBlock_->AddressV;
+            break;
         case 10: Result = &ColorizeOptionsFlags_; break; // this+0x6C
         default: Result = nullptr; break;
         }
@@ -3395,14 +3430,30 @@ void* __thiscall FMaterialImpl::GetParameterAddress(FlULong Index)
         switch (Index)
         {
         case 0: Result = &NomadDiffuseColor_[0]; break;
+        // Retail offsets 0, +0x1C, +0x20, +0x24 into TextureBlock_, then the second entry's
+        // +0x2C, +0x48, +0x4C, +0x50.
         case 1: Result = TextureBlock_; break;
-        case 2: Result = (void*)((uintptr_t)(TextureBlock_) + 0x1c); break;
-        case 3: Result = (void*)((uintptr_t)(TextureBlock_) + 0x20); break;
-        case 4: Result = (void*)((uintptr_t)(TextureBlock_) + 0x24); break;
-        case 5: Result = (void*)((uintptr_t)(TextureBlock_) + 0x2c); break;
-        case 6: Result = (void*)((uintptr_t)(TextureBlock_) + 0x48); break;
-        case 7: Result = (void*)((uintptr_t)(TextureBlock_) + 0x4c); break;
-        case 8: Result = (void*)((uintptr_t)(TextureBlock_) + 0x50); break;
+        case 2:
+            Result = &TextureBlock_[0].WrapMode;
+            break;
+        case 3:
+            Result = &TextureBlock_[0].AddressU;
+            break;
+        case 4:
+            Result = &TextureBlock_[0].AddressV;
+            break;
+        case 5:
+            Result = &TextureBlock_[1].Name;
+            break;
+        case 6:
+            Result = &TextureBlock_[1].WrapMode;
+            break;
+        case 7:
+            Result = &TextureBlock_[1].AddressU;
+            break;
+        case 8:
+            Result = &TextureBlock_[1].AddressV;
+            break;
         default: Result = nullptr; break;
         }
         return Result;
@@ -3422,9 +3473,15 @@ void* __thiscall FMaterialImpl::GetParameterAddress(FlULong Index)
         case 4: Result = &MaterialBlock_[16]; break;  // this+0x60
         case 5: Result = &MaterialBlock_[3]; break;   // this+0x2C
         case 6: Result = TextureBlock_; break;        // *TextureBlock_ (this+0x18)
-        case 7: Result = (void*)((uintptr_t)(TextureBlock_) + 0x1c); break;
-        case 8: Result = (void*)((uintptr_t)(TextureBlock_) + 0x20); break;
-        case 9: Result = (void*)((uintptr_t)(TextureBlock_) + 0x24); break;
+        case 7:
+            Result = &TextureBlock_->WrapMode;
+            break;
+        case 8:
+            Result = &TextureBlock_->AddressU;
+            break;
+        case 9:
+            Result = &TextureBlock_->AddressV;
+            break;
         default: Result = nullptr; break;
         }
         return Result;
@@ -3440,19 +3497,19 @@ void FMaterialImpl::BindUnknown(const char* Why)
 }
 
 // Apply this texture entry's coordinates and wrapping to the selected stage.
-void FMaterialImpl::ApplyTssFromTextureBlock(FlULong Stage, const FlULong* Block)
+void FMaterialImpl::ApplyTssFromTextureBlock(FlULong Stage, const FFlmTextureVerifyEntry* Block)
 {
-    FlULong const Coord = (Block[7] >= 4) ? (Block[7] - 4) : 0;
+    FlULong const Coord = (Block->WrapMode >= 4) ? (Block->WrapMode - 4) : 0;
     PipelineSetTextureStageState(Pipeline_, Stage, D3DTSS_TEXCOORDINDEX, Coord);
-    PipelineSetTextureStageState(Pipeline_, Stage, D3DTSS_ADDRESSU, Block[8] + 1);
-    PipelineSetTextureStageState(Pipeline_, Stage, D3DTSS_ADDRESSV, Block[9] + 1);
+    PipelineSetTextureStageState(Pipeline_, Stage, D3DTSS_ADDRESSU, Block->AddressU + 1);
+    PipelineSetTextureStageState(Pipeline_, Stage, D3DTSS_ADDRESSV, Block->AddressV + 1);
 }
 
 // Block+0x08, the texture handle handed to the pipeline's SetTexture (vt+0x108) right before
 // the stage setup above.
-FlULong FMaterialImpl::TextureHandleAt(const FlULong* Block) const
+FlULong FMaterialImpl::TextureHandleAt(const FFlmTextureVerifyEntry* Block) const
 {
-    return Block[2];
+    return Block->Frame[0];
 }
 
 bool FMaterialImpl::ContextWantsColorVertex(void* Context) const
@@ -3499,7 +3556,7 @@ void FMaterialImpl::BindNomad()
     if (bSecondTexture_ != 0)
     {
         // 066f8ab0..066f8ac1: the second of Nomad's two allocated texture records.
-        const FlULong* Second = TextureBlock_ + (0x2C / 4);
+        const FFlmTextureVerifyEntry* Second = TextureBlock_ + 1;
         PipelineSetTextureStageTexture(Pipeline_, StageCounter_, TextureHandleAt(Second));
         ApplyTssFromTextureBlock(StageCounter_, Second);
         PipelineSetTextureStageState(Pipeline_, StageCounter_, D3DTSS_COLOROP, 7);
@@ -3594,15 +3651,15 @@ GENRESULT FMaterialImpl::BindColorize(void* Context)
         // binding, then destroys range/default/current before releasing Batched.
         struct FScopedParameterDescriptor
         {
-            FlULong Words[kFlmParamDescSize / sizeof(FlULong)] = {};
-            ~FScopedParameterDescriptor() noexcept(false) { FlmResetDescriptorEntry(Words); }
+            FShadingPropertyRecord Record = {};
+            ~FScopedParameterDescriptor() noexcept(false) { FlmResetDescriptorEntry(&Record); }
         } Descriptor;
 
-        const GENRESULT DescriptorResult = ((IMaterial*)(
-            Submit->Candidate))->GetParameterDescriptor(5, Descriptor.Words);
+        const GENRESULT DescriptorResult =
+            ((IMaterial*)(Submit->Candidate))->GetParameterDescriptor(5, &Descriptor.Record);
         if (DescriptorResult == GR_OK)
         {
-            const char* ShortTag = (const char*)(Descriptor.Words[1]);
+            const char* ShortTag = Descriptor.Record.Name;
             // 066f4def..066f4dfc: compare two characters, no length/null test.
             if (ShortTag[0] == 'O' && ShortTag[1] == 'c')
             {
@@ -3750,7 +3807,7 @@ void FMaterialImpl::BindEnvMap(void* Context)
             if (G_FlmEngineOuter != nullptr)
                 Root = ((IEngine*)(G_FlmEngineOuter))->GetInstanceRoot(Root);
             void* Found = nullptr;
-            if (FlmLookupIdValue((int)((intptr_t)(Root)), &Found))
+            if (FlmLookupIdValue((int)(LowArena::Encode(Root)), &Found))
                 Name = (const char*)(Found);
         }
     }
@@ -3758,10 +3815,9 @@ void FMaterialImpl::BindEnvMap(void* Context)
     EnvMapResolvedHandle_ = 0;
     if (Name == nullptr)
     {
-        if (TextureLibrary_ != nullptr && ShadowHandle_ != 0)
-            TextureLibrary_->ReleaseTextureRecord(
-                (void*)(ShadowHandle_));
-        ShadowHandle_ = 0;
+        if (TextureLibrary_ != nullptr && ShadowHandle_ != nullptr)
+            TextureLibrary_->ReleaseTextureRecord(ShadowHandle_);
+        ShadowHandle_ = nullptr;
         EnvMapTexNameCrc_ = 0;
     }
     else
@@ -3769,28 +3825,21 @@ void FMaterialImpl::BindEnvMap(void* Context)
         const FlULong NameCrc = DACOM_CRC::GetCRC32(Name);
         if (NameCrc != EnvMapTexNameCrc_)
         {
-            if (TextureLibrary_ != nullptr && ShadowHandle_ != 0)
-                TextureLibrary_->ReleaseTextureRecord(
-                    (void*)(ShadowHandle_));
-            ShadowHandle_ = 0;
+            if (TextureLibrary_ != nullptr && ShadowHandle_ != nullptr)
+                TextureLibrary_->ReleaseTextureRecord(ShadowHandle_);
+            ShadowHandle_ = nullptr;
             EnvMapTexNameCrc_ = NameCrc;
             if (NameCrc != 0)
             {
-                struct FTextureNameQuery
-                {
-                    const char* Name;
-                    FlULong Crc;
-                } Query = {Name, DACOM_CRC::GetCRC32(Name)};
-                TextureLibrary_->FindTextureByCrc(&Query,
-                    (void**)(&ShadowHandle_));
+                FMaterialCrcQuery Query = {Name, DACOM_CRC::GetCRC32(Name)};
+                TextureLibrary_->FindTextureByCrc(&Query, &ShadowHandle_);
             }
         }
     }
-    if (ShadowHandle_ != 0)
+    if (ShadowHandle_ != nullptr)
     {
         FlULong Out[5];
-        if (TextureLibrary_->GetTextureFrame(
-                (void*)(ShadowHandle_), 0, Out) >= 0)
+        if (TextureLibrary_->GetTextureFrame(ShadowHandle_, 0, Out) >= 0)
             EnvMapResolvedHandle_ = Out[0];
     }
     if (EnvMapFlag_ == 0 && EnvMapResolvedHandle_ != 0)
@@ -3839,8 +3888,7 @@ GENRESULT FMaterialImpl::BindShadow(void* Context)
         bShadowTextureInitialized_ = true;
         if (ShadowTextureRecord_ == nullptr)
         {
-            struct FTextureQuery { const char* Name; FlULong Crc; };
-            FTextureQuery Query = {"efxshadow", DACOM_CRC::GetCRC32("efxshadow")};
+            FMaterialCrcQuery Query = {"efxshadow", DACOM_CRC::GetCRC32("efxshadow")};
             if (ShadowTextureLibrary_->FindTextureByCrc(&Query, &ShadowTextureRecord_) < 0)
                 FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
                     "E:\\FL\\Scratch\\Source\\FLMaterials\\shadows_inl.h", 0x24,
@@ -3880,7 +3928,8 @@ GENRESULT FMaterialImpl::DrawShadow(void* Context, FlULong Prim, FlULong Start,
     int SavedCull;
     Pipeline_->GetRenderState(D3DRS_ZFUNC, &SavedCull);
     const FlULong Stage = ShadowLayerCount_ < 2 ? 1 : 0;
-    Pipeline_->SetTextureStageTexture((int)(Stage), (void*)(ShadowResolvedHandle_));
+    Pipeline_->SetTextureStageTexture((int)(Stage),
+                                      LowArena::Decode<void>((FlLong)(ShadowResolvedHandle_)));
     if (Stage == 1)
     {
         IRenderPipeline* TablePipeline = Pipeline_;
@@ -3910,8 +3959,7 @@ GENRESULT FMaterialImpl::DrawShadow(void* Context, FlULong Prim, FlULong Start,
         bool bDrawn = false;
         if ((Flags & 0x100) != 0)
         {
-            const FlULong IbBase = *(const FlULong*)(
-                (unsigned char*)(Submit->IbWrapper) + 4);
+            const FlULong IbBase = static_cast<const FIbScratch*>(Submit->IbWrapper)->Bias;
             Result = RpDraw_->DrawIndexedPrimitive(Prim, Start, Count,
                 IbBase + IbStart, IndexSpan);
             bDrawn = Result >= 0;

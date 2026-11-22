@@ -8,6 +8,7 @@
 
 #include "dacom.h"
 #include "render/IRenderPipeline.h"
+#include "x64_low_arena.h"
 
 // Thin wrappers over IRenderPipeline's typed methods, kept for their callers' int / unsigned long
 // bridging and the table-walk helpers. Slot numbers live only in the typed vtable
@@ -70,11 +71,12 @@ inline GENRESULT PipelineGetTextureStageState(IRenderPipeline* Pipeline, FlULong
     return Result;
 }
 
+// Handle is a pipeline texture handle's 32-bit value (a LowArena block, x64_low_arena.h).
 inline GENRESULT PipelineSetTextureStageTexture(IRenderPipeline* Pipeline, FlULong Stage,
                                                  FlULong Handle)
 {
     return Pipeline->SetTextureStageTexture(static_cast<int>(Stage),
-                                           reinterpret_cast<void*>(Handle));
+                                            LowArena::Decode<void>(static_cast<FlLong>(Handle)));
 }
 
 // Slot 64's second argument is the 4x4 UV matrix, not a flags dword: flmaterials.dll

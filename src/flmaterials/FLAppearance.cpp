@@ -9,6 +9,7 @@
 #include "engine/engbase.h" // IEngine
 #include "render/rendcomp.h" // IRenderer2
 #include "render/shading.h"  // IMaterialLibrary, ITextureLibrary2
+#include "x64_low_arena.h"   // engine instances as 32-bit keys
 #include "x86math.h"         // I3DMathEngine
 
 #include <cmath>
@@ -529,9 +530,9 @@ namespace
 
     int DACOM_API FFLAppearanceBase::FEngineFace::DestroyInstance(void* Instance)
     {
-        // LAB_066fda20: adjust the receiver and forward to IFLAppearance slot 5.
-        return OwnerFromEngineFace(this)->RemoveInstanceValue(
-            (int)((FlULong)(Instance)));
+        // LAB_066fda20: adjust the receiver and forward to IFLAppearance slot 5, keyed by the
+        // instance's 32-bit value (engine/engbase.h).
+        return OwnerFromEngineFace(this)->RemoveInstanceValue((int)(LowArena::Encode(Instance)));
     }
 
     GENRESULT DACOM_API FFLAppearanceBase::FInner::QueryInterface(const char* Iid, void** Out)
@@ -954,14 +955,15 @@ namespace
         Appearance->Pipeline_->QueryDeviceAbility(Render::DepthBias, &Ability);
         if (Ability == 0)
             return (GENRESULT)-1;
-        const int InstanceCount = (int)((FlULong)(C));
+        const int InstanceCount =
+            (int)((FlULong)((std::uintptr_t)(C))); // a count carried in the pointer
         if (InstanceCount == 0)
             return GR_OK;
 
         FShadowTextureScope Texture((ITextureLibrary2*)Appearance->TextureLibrary_);
         FlULong Handle = 0;
-        FlULong Crc[2] = {(FlULong)("efxshadow"), DACOM_CRC::GetCRC32("efxshadow")};
-        const GENRESULT Found = Texture.Library->FindTextureByCrc(Crc, &Texture.Record);
+        FMaterialCrcQuery Query = {"efxshadow", DACOM_CRC::GetCRC32("efxshadow")};
+        const GENRESULT Found = Texture.Library->FindTextureByCrc(&Query, &Texture.Record);
         if (Found < 0)
         {
             FDUMP(0x100002, "%s(%d) : WARNING:General:%s",
@@ -1011,7 +1013,7 @@ namespace
                     Engine->ReleaseHandle(Archetype);
                     float Extents[6];
                     bool bUsedFallback = true;
-                    if (FlagD != 0 && Archetype != (void*)((FlULong)-1))
+                    if (FlagD != 0 && Archetype != (void*)((std::intptr_t)-1))
                         bUsedFallback = Appearance->Renderer_->GetBounds(Archetype, 1.0f, Extents) < 0;
                     if (bUsedFallback)
                     {

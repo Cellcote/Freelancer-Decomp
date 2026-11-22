@@ -17,6 +17,9 @@
 // - Small Win32 calls with an obvious meaning here (OutputDebugStringA writes to stderr,
 //   SearchPathA looks along the path without regard to case), and the kernel32 file, mapping
 //   and memory calls the retail code makes directly (posix/kernel32.h), over the platform layer.
+// - COM's basics (posix/unknwn.h), as the SDK's <windows.h> brings them in through <ole2.h>:
+//   GUID, IUnknown, the common HRESULTs, and CoCreateInstance, which finds no class (there is no
+//   COM here).
 // - FL_POSIX_DLLMAIN(DllMain): runs a module's DllMain as it loads and unloads (see below).
 
 #pragma once
@@ -98,6 +101,16 @@ typedef char* LPSTR;
 typedef char const* LPCSTR;
 typedef char* PSTR;
 typedef char const* PCSTR;
+typedef void* PVOID;
+typedef BYTE* PBYTE;
+typedef DWORD* PDWORD;
+// Wide characters are the C library's wchar_t (32-bit here, 16-bit on Windows): the retail code
+// passes L"" literals and wchar_t arrays where the Windows API takes WCHAR.
+typedef wchar_t WCHAR;
+typedef WCHAR* LPWSTR;
+typedef WCHAR const* LPCWSTR;
+typedef WCHAR* PWSTR;
+typedef WCHAR const* PCWSTR;
 
 typedef void* HANDLE;
 typedef HANDLE* LPHANDLE;
@@ -204,11 +217,14 @@ typedef POINT* LPPOINT;
 #define HIWORD(Value) ((WORD)((((DWORD_PTR)(Value)) >> 16) & 0xFFFF))
 #define LOBYTE(Value) ((BYTE)(((DWORD_PTR)(Value)) & 0xFF))
 #define HIBYTE(Value) ((BYTE)((((DWORD_PTR)(Value)) >> 8) & 0xFF))
+#define MAKEWORD(Low, High)                                                                        \
+    ((WORD)(((BYTE)((DWORD_PTR)(Low) & 0xFF)) | ((WORD)((BYTE)((DWORD_PTR)(High) & 0xFF))) << 8))
 #define MAKELONG(Low, High)                                                                        \
     ((LONG)(((WORD)((DWORD_PTR)(Low) & 0xFFFF)) | ((DWORD)((WORD)((DWORD_PTR)(High) & 0xFFFF)))    \
                                                       << 16))
 
 #include "posix/kernel32.h" // the file, mapping and memory calls (uses the types above)
+#include "posix/unknwn.h"   // COM's basics: GUID, IUnknown, the HRESULTs, CoCreateInstance
 
 // ---------------------------------------------------------------------------------------------
 // Small Win32 calls

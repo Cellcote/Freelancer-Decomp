@@ -24,8 +24,10 @@ namespace
     // the stack held (0x0042ce9e / 0x0042d5ae / 0x0042d5ea); it is zero here.
     struct FTextureQuery
     {
-        FlULong Field_0x00; // TODO: never written by these callers
-        FlULong Crc;        // +0x04
+        // FMaterialCrcQuery's layout (render/shading.h), which the reader casts to: on 64-bit
+        // builds the CRC follows a pointer-sized first field.
+        char const* Field_0x00; // TODO: never written by these callers
+        FlULong Crc; // +0x04
     };
 
     // Slot 12 writes straight into the member (retail passes its address), so a miss leaves the

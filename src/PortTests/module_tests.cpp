@@ -7,20 +7,26 @@
 // code is the number of failures.
 
 #include "dacom.h"
+#include "dalib_net.h"
 #include "engine/engbase.h"
 #include "platform.h"
 #include "readfile.h"
+#include "render/shading.h"
 
 #include <intrin.h>
 #include <xmmintrin.h>
 
 #include <climits>
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include <string>
 
+#include <netinet/in.h>
 #include <stdlib.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 namespace
 {
@@ -118,6 +124,66 @@ void TestReadFile(ICOManager* Manager)
     std::system(("rm -rf '" + Root + "'").c_str());
 }
 
+// The string a shading payload names: an id in the process's HandleValue table, held by dacom
+// (render/shading.h). The test reads the table through dacom's export, as the modules do.
+// bForget drops the id, as ShadingPayloadForget does when the string is freed.
+const char* PayloadText(Platform::Module Dacom, FlULong Payload, bool bForget = false)
+{
+    auto const Shared = reinterpret_cast<HandleValue::Detail::FTable* (*)()>(
+        Platform::ModuleSymbol(Dacom, "FlHandleValueShared"));
+    if (Shared == nullptr || Payload == 0)
+        return nullptr;
+    HandleValue::Detail::FTable& Table = *Shared();
+    std::lock_guard<std::mutex> Guard(Table.Lock);
+    auto const Found = Table.Objects.find(Payload);
+    if (Found == Table.Objects.end())
+        return nullptr;
+    const char* const Text = static_cast<const char*>(Found->second);
+    if (bForget)
+    {
+        Table.Ids.erase(Found->second);
+        Table.Objects.erase(Found);
+    }
+    return Text;
+}
+
+// flmaterials' Glass material: its declared parameters are FShadingPropertyRecords whose names
+// are pointers and whose texture-name default is a string payload ("(None)").
+void TestFlMaterials(ICOManager* Manager, Platform::Module Dacom)
+{
+    FAGGDESC14 Desc = {sizeof(FAGGDESC14), "GlassMaterial", nullptr, nullptr, nullptr};
+    IMaterial* Material = nullptr;
+    Check(Manager->CreateInstance((AGGDESC*)(&Desc), (void**)(&Material)) == GR_OK &&
+              Material != nullptr,
+          "flmaterials makes a GlassMaterial");
+    if (Material == nullptr)
+        return;
+    FlULong Count = 0;
+    Check(Material->GetParameterCount(&Count) == GR_OK && Count == 10,
+          "GlassMaterial declares ten parameters");
+    FShadingPropertyRecord Record = {};
+    Check(Material->GetParameterDescriptor(6, &Record) == GR_OK, "GetParameterDescriptor(6)");
+    Check(Record.Name != nullptr && std::strcmp(Record.Name, "Dt_name") == 0 &&
+              Record.Description != nullptr && std::strcmp(Record.Description, "Texture Name") == 0,
+          "the texture-name descriptor's tag and name");
+    Check(Record.Current.Type == 7 && Record.Default.Type == 7 && Record.Saved.Type == 7,
+          "the texture-name descriptor's values are strings");
+    const char* const Text = PayloadText(Dacom, Record.Current.Payload0);
+    Check(Text != nullptr && std::strcmp(Text, "(None)") == 0,
+          "the texture-name default is \"(None)\", a string payload");
+    // The descriptor copy owns its strings (ProcessHeap copies; HeapFree is free here).
+    for (FShadingPropertyValue* Value : {&Record.Current, &Record.Default, &Record.Saved})
+    {
+        std::free(const_cast<char*>(PayloadText(Dacom, Value->Payload0, true)));
+        Value->Payload0 = 0;
+    }
+    Check(Material->GetParameterDescriptor(0, &Record) == GR_OK && Record.Current.Type == 3,
+          "the ambient colour descriptor is a three-float value");
+    Check(Material->GetParameterDescriptor(10, &Record) != GR_OK,
+          "there is no eleventh Glass parameter");
+    Material->Release();
+}
+
 // EngBase's engine: a compound archetype and an instance of it, which are LowArena blocks
 // whose encoded values key the engine's maps (the root-instance map walked here).
 void TestEngine(ICOManager* Manager)
@@ -158,6 +224,71 @@ void TestEngine(ICOManager* Manager)
     Engine->Release();
 }
 
+// Whether a UDP socket can bind Port on every interface (DirectPlay's server binds so).
+bool CanBindUdp(unsigned short Port)
+{
+    int const Socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (Socket < 0)
+        return false;
+    sockaddr_in Local{};
+    Local.sin_family = AF_INET;
+    Local.sin_addr.s_addr = htonl(INADDR_ANY);
+    Local.sin_port = htons(Port);
+    bool const bBound = bind(Socket, reinterpret_cast<const sockaddr*>(&Local), sizeof(Local)) == 0;
+    close(Socket);
+    return bBound;
+}
+
+// A UDP port that is free now: the one the system picks for port 0.
+unsigned short FreeUdpPort()
+{
+    int const Socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (Socket < 0)
+        return 0;
+    sockaddr_in Local{};
+    Local.sin_family = AF_INET;
+    Local.sin_addr.s_addr = htonl(INADDR_ANY);
+    socklen_t Size = sizeof(Local);
+    unsigned short Port = 0;
+    if (bind(Socket, reinterpret_cast<const sockaddr*>(&Local), sizeof(Local)) == 0 &&
+        getsockname(Socket, reinterpret_cast<sockaddr*>(&Local), &Size) == 0)
+        Port = ntohs(Local.sin_port);
+    close(Socket);
+    return Port;
+}
+
+// DALib's server, CDPServer, hosts through DPNet (DPNetAdapter.cpp): it holds its UDP port while
+// hosting and lets it go when it stops. Its members are reached by their (Itanium) names, as this
+// test links no module.
+void TestDALibServer(Platform::Module DALib)
+{
+    auto const Construct =
+        reinterpret_cast<void (*)(void*)>(Platform::ModuleSymbol(DALib, "_ZN9CDPServerC1Ev"));
+    auto const Destroy =
+        reinterpret_cast<void (*)(void*)>(Platform::ModuleSymbol(DALib, "_ZN9CDPServerD1Ev"));
+    auto const BeginHosting = reinterpret_cast<bool (*)(void*, unsigned int)>(
+        Platform::ModuleSymbol(DALib, "_ZN9CDPServer12BeginHostingEj"));
+    auto const StopHosting = reinterpret_cast<void (*)(void*)>(
+        Platform::ModuleSymbol(DALib, "_ZN9CDPServer11StopHostingEv"));
+    Check(Construct != nullptr && Destroy != nullptr && BeginHosting != nullptr &&
+              StopHosting != nullptr,
+          "DALib exports CDPServer");
+    if (Construct == nullptr || Destroy == nullptr || BeginHosting == nullptr ||
+        StopHosting == nullptr)
+        return;
+    unsigned short const Port = FreeUdpPort();
+    Check(Port != 0, "a free UDP port");
+    if (Port == 0)
+        return;
+    alignas(alignof(std::max_align_t)) static unsigned char Storage[sizeof(CDPServer)];
+    Construct(Storage);
+    Check(BeginHosting(Storage, Port), "CDPServer::BeginHosting hosts through DPNet");
+    Check(!CanBindUdp(Port), "the hosting server holds its UDP port");
+    StopHosting(Storage);
+    Check(CanBindUdp(Port), "StopHosting lets the port go");
+    Destroy(Storage);
+}
+
 int __cdecl CountComponent(IDAComponent* Factory, const char* Name, void*, void* Context)
 {
     if (Factory != nullptr && Name != nullptr)
@@ -188,6 +319,11 @@ int main(int argc, char** argv)
     Platform::Module const EngBase = Platform::ModuleLoad((Folder + "EngBase.dll").c_str());
     Check(EngBase != nullptr, "EngBase.dll loads");
     Check(Platform::ModuleLoad((Folder + "ximage.dll").c_str()) != nullptr, "ximage.dll loads");
+    Platform::Module const DALib = Platform::ModuleLoad((Folder + "DALib.dll").c_str());
+    Check(DALib != nullptr && Platform::ModuleSymbol(DALib, "CriticalWarningFn") != nullptr,
+          "DALib.dll loads and exports its error hooks");
+    if (DALib != nullptr)
+        TestDALibServer(DALib);
 
     Platform::Module const Dacom = Platform::ModuleFind((Folder + "dacom.dylib").c_str()) != nullptr
                                        ? Platform::ModuleFind((Folder + "dacom.dylib").c_str())
@@ -224,7 +360,7 @@ int main(int argc, char** argv)
         int After = 0;
         Manager->EnumerateComponents(nullptr, &CountComponent, &After);
         Check(After > Before, "Shading's DllMain registered its components");
-        for (const char* Module : {"RendComp.dll", "alchemy.dll"})
+        for (const char* Module : {"RendComp.dll", "alchemy.dll", "flmaterials.dll"})
         {
             Before = After;
             Check(Platform::ModuleLoad((Folder + Module).c_str()) != nullptr,
@@ -233,6 +369,19 @@ int main(int argc, char** argv)
             Manager->EnumerateComponents(nullptr, &CountComponent, &After);
             Check(After > Before, "the render module's DllMain registered its components");
         }
+        for (const char* Component : {"GlassMaterial", "NomadMaterial", "FLAppearance"})
+        {
+            Count = 0;
+            Manager->EnumerateComponents(Component, &CountComponent, &Count);
+            Check(Count == 1, "flmaterials' DllMain registered its materials and FLAppearance");
+        }
+        TestFlMaterials(Manager, Dacom);
+        // Deformable2 registers its one component, "Deformable", as it loads.
+        Check(Platform::ModuleLoad((Folder + "Deformable2.dll").c_str()) != nullptr,
+              "Deformable2.dll loads");
+        Count = 0;
+        Manager->EnumerateComponents("Deformable", &CountComponent, &Count);
+        Check(Count == 1, "Deformable2's DllMain registered Deformable");
         if (EngBase != nullptr)
             TestEngine(Manager);
         if (Files != nullptr)

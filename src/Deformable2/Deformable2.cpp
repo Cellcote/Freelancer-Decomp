@@ -1542,7 +1542,9 @@ static bool LoadGeometry(FMeshArchetype* Arch, IFileSystem* Fs)
     }
 
     FSkinPair* Cursor = Arch->SkinPairs;
-    Arch->SkinTable = (FSkinVertex*)new unsigned char[(size_t)(unsigned int)Arch->VertexCount * 8];
+    // sizeof(FSkinVertex) is 8 on Win32 (an int and a pointer), 16 on 64-bit builds.
+    Arch->SkinTable = (FSkinVertex*)new unsigned char[(size_t)(unsigned int)Arch->VertexCount *
+                                                      sizeof(FSkinVertex)];
     for (unsigned int Index = 0; Index < (unsigned int)Arch->VertexCount; ++Index)
     {
         const FlULong Influence = BoneCounts[Index];
@@ -1750,7 +1752,7 @@ static FDeformMesh* LoadDeformMesh(FLodHolder* Holder, IFileSystem* MeshFs, cons
         void* Handle = G_Engine->CreateArchetypeHandle(&ArchName, MeshFs);
         IVMeshPart* Library = nullptr;
         // This query ABI accepts the const IID as an opaque mutable token.
-        if (G_Engine->QueryEngineComponent((int)((intptr_t)Handle),
+        if (G_Engine->QueryEngineComponent((int)LowArena::Encode(Handle),
                                            const_cast<char*>(Iids::VMeshLibrary),
                                            (void**)(&Library)) < 0)
         {
@@ -1811,8 +1813,7 @@ static void DestroySkeletonHandles(FSkeleton* Skel)
     int Index = 0;
     while (Index < Skel->BoneCount)
     {
-        G_Engine->ReleaseHandle(
-            (void*)((ptrdiff_t)(Skel->Bones[Index].Parent)));
+        G_Engine->ReleaseHandle(LowArena::Decode<void>(Skel->Bones[Index].Parent));
         Index += 1;
     }
     G_Engine->ReleaseHandle(Skel->EngineHandle);
@@ -1924,8 +1925,8 @@ static bool LoadSkeleton(FSkeleton* Skel, const char* Name, IFileSystem* Fs)
                     FEngineName BoneName;
                     BoneName.Text = FindData.cFileName;
                     BoneName.Crc = DACOM_CRC::GetCRC32(FindData.cFileName);
-                    Bone->Parent = (int)((ptrdiff_t)(
-                        G_Engine->CreateArchetypeHandle(&BoneName, Child)));
+                    Bone->Parent =
+                        (int)LowArena::Encode(G_Engine->CreateArchetypeHandle(&BoneName, Child));
                     Skel->BoneCount += 1;
                 }
             }
@@ -2072,7 +2073,7 @@ GENRESULT DACOM_API FBoneRuntime::SetExtra(void* /*InInstance*/, float /*Extra*/
 // LAB_065f1790 (RET 0xC), slot 11.
 GENRESULT DACOM_API FBoneRuntime::SetUser(void* InInstance, FlULong User)
 {
-    BoneRuntimeRetC(this, InInstance, (void*)((ptrdiff_t)User));
+    BoneRuntimeRetC(this, InInstance, (void*)(std::uintptr_t)User);
     return GR_OK;
 }
 
@@ -2777,10 +2778,22 @@ void MathTransformVec3(float* Dest, const float* A, const float* B)
     Dest[2] = Tmp[2];
 }
 
-// An IK joint id (JointIds[i], StartJoint) is an IEngine instance handle.
+// An IK joint id (JointIds[i], StartJoint, a gate's JointAt0C) is an IEngine instance in its
+// 32-bit form (LowArena, engine/engbase.h).
 static void* IkJointInstance(int JointId)
 {
-    return (void*)((ptrdiff_t)JointId);
+    return LowArena::Decode<void>(JointId);
+}
+
+static int IkJointId(void* Instance)
+{
+    return (int)LowArena::Encode(Instance);
+}
+
+// Event->Channels[i] carries the 32-bit IChannel key CreateTyped returned.
+static FlULong IkChannelKey(const FIkEvent* Event, int Index)
+{
+    return (FlULong)(std::uintptr_t)(Event->Channels[Index]);
 }
 
 static void IkCopy3(float* Dest, const float* Src)
@@ -2983,8 +2996,7 @@ static int FirstBoneInstance(FDeformInstance* Instance)
 {
     if (Instance->PartArray == nullptr)
         return -1;
-    return (int)(
-        (ptrdiff_t)(Instance->PartArray[0].Lod->BoneSlots[0].Instance));
+    return IkJointId(Instance->PartArray[0].Lod->BoneSlots[0].Instance);
 }
 
 // FUN_065f5950, thiscall (the instance in ECX, never read) RET 0x4 (Node), 065f5950..a5:
@@ -2999,8 +3011,7 @@ static void StopAimNode(FIkListNode* Node)
     while (Cursor != Node->Event->StartJoint)
     {
         G_Animation->HasAnyHandle((FlULong)Cursor);
-        Cursor = (int)((ptrdiff_t)(
-            G_Engine->GetInstanceParent((void*)((ptrdiff_t)Cursor))));
+        Cursor = IkJointId(G_Engine->GetInstanceParent(IkJointInstance(Cursor)));
     }
 }
 
@@ -3376,11 +3387,11 @@ int DACOM_API FIkEvent::Apply(float* Sampled, FlULong ChannelKey, void* BindDesc
 // FUN_065fbf40 (thiscall, RET 0), 065fbf40..bfb5: vtable = 06601340 (the compiler's own reset
 FIkEvent::~FIkEvent()
 {
+    HandleValue::Forget(this);
     int Index = 0;
     while (Index < JointCount)
     {
-        G_Channel->Destroy(
-            (FlULong)((ptrdiff_t)Channels[Index]));
+        G_Channel->Destroy(IkChannelKey(this, Index));
         Index += 1;
     }
     JointCount = 0;
@@ -3421,6 +3432,36 @@ static void UnlinkListNode(FDeformInstance* Instance, FIkListNode* Node)
     else
         Node->Next->Prev = Node->Prev;
     Instance->ListCount -= 1;
+}
+
+// A node's +4 is an IAnimation2 playback id when Active == 0, carried in the pointer.
+static FlULong NodePlaybackId(const FIkListNode* Node)
+{
+    return (FlULong)(std::uintptr_t)(Node->Event);
+}
+
+// The 32-bit value CopyList hands out for a node and DestroyHandle matches: its +4. An IK node's
+// is its event's address on Win32. On 64-bit builds it is the event's HandleValue id (dropped
+// when the event is deleted) with bit 30 set, and a playback id is itself: both must stay below
+// 2^30, so the two ranges are disjoint. Neither gets there in practice (a billion live ids, a
+// billion playbacks); if one did, the process stops rather than hand out a handle that could
+// name two nodes.
+static int ListNodeHandle(const FIkListNode* Node)
+{
+#if defined(FL_PTR64)
+    constexpr FlULong kIkTag = 0x40000000u;
+    const FlULong Value =
+        Node->Active != 0 ? HandleValue::Of(Node->Event) : (FlULong)(std::uintptr_t)(Node->Event);
+    if (Value >= kIkTag && Value != 0xFFFFFFFFu)
+    {
+        std::fprintf(stderr, "Deformable2: a list handle reached 2^30 (%s)\n",
+                     Node->Active != 0 ? "IK event id" : "playback id");
+        std::abort();
+    }
+    if (Node->Active != 0)
+        return (int)(Value | kIkTag);
+#endif
+    return (int)(std::uintptr_t)(Node->Event);
 }
 
 // The payload teardown every list walker inlines (065f4c9d, 065f4d60, 065f4e2d): Active != 0
@@ -3469,8 +3510,7 @@ static void DestroyListByHandle(FDeformInstance* Instance, int Handle)
     while (Node != nullptr)
     {
         FIkListNode* Next = Node->Next;
-        const int Stored = (int)((ptrdiff_t)Node->Event);
-        if (Stored == Handle)
+        if (ListNodeHandle(Node) == Handle)
         {
             DeleteListNode(Instance, Node);
             return;
@@ -3491,8 +3531,7 @@ static void SweepExpiredList(FDeformInstance* Instance)
         {
             FIkEvent* Event = Node->Event;
             if ((Event->Flags34 & 1) != 0 &&
-                (unsigned char)(G_Channel->InMixer((FlULong)(
-                    (ptrdiff_t)Event->Channels[0]))) == 0)
+                (unsigned char)(G_Channel->InMixer(IkChannelKey(Event, 0))) == 0)
                 bDrop = true;
         }
         else if (G_Animation->FilterObjects(Node->Event) != 0)
@@ -3594,16 +3633,14 @@ static int PlayInstanceAnim(FDeformInstance* Instance, void* Name, void* Extra, 
                             void* ArgE, void* ArgF, void* ArgG, void* ArgH, void* ScriptOrNull)
 {
     SweepExpiredList(Instance);
-    int BoneHandle = -1;
+    void* BoneHandle = G_InvalidEngineHandle;
     if (Instance->PartArray != nullptr)
-        BoneHandle = (int)(
-            (ptrdiff_t)(Instance->PartArray[0].Lod->BoneSlots[0].Instance));
+        BoneHandle = Instance->PartArray[0].Lod->BoneSlots[0].Instance;
     void* Script = ScriptOrNull;
     if (Script == nullptr)
         Script = Instance->UserAt1C;
-    const int Handle = (int)(G_Animation->PlayScript(
-        Name, AsOpaqueDword(BoneHandle), (const char*)Extra,
-        (IChannelSink*)Instance, Script));
+    const int Handle = (int)(G_Animation->PlayScript(Name, BoneHandle, (const char*)Extra,
+                                                     (IChannelSink*)Instance, Script));
     if (Handle == -1)
         return -1;
 
@@ -3622,10 +3659,9 @@ static int PlayInstanceAnim(FDeformInstance* Instance, void* Name, void* Extra, 
         {
             // 065f42af..42dc: the pushes, last first, are 1.0f, ArgF, ArgD, ArgE, ArgC, ArgG,
             // &Vec, Handle.
-            const unsigned char bTouched = Root->Eval(
-                (FlULong)Handle, Vec,
-                (FlULong)((ptrdiff_t)ArgG), ArgCFloat,
-                FloatFromOpaqueDword(ArgE), ArgD, ArgF, 1.0f);
+            const unsigned char bTouched =
+                Root->Eval((FlULong)Handle, Vec, (FlULong)(std::uintptr_t)ArgG, ArgCFloat,
+                           FloatFromOpaqueDword(ArgE), ArgD, ArgF, 1.0f);
             if (bTouched != 0)
             {
                 Vec[2] = 0.0f;
@@ -3675,19 +3711,18 @@ static int PlayInstanceAnim(FDeformInstance* Instance, void* Name, void* Extra, 
     Xform[10] = Pos[1];
     Xform[11] = Pos[2];
     const FlLong Applied = (FlLong)(G_Animation->EvalPlayback(
-        (FlULong)Handle,
-        (FlULong)((ptrdiff_t)ArgG), ArgCFloat,
-        FloatFromOpaqueDword(ArgE), ArgD, ArgF, AsOpaqueDword(1.0f), (void*)Xform));
+        (FlULong)Handle, (FlULong)(std::uintptr_t)ArgG, ArgCFloat, FloatFromOpaqueDword(ArgE), ArgD,
+        ArgF, AsOpaqueDword(1.0f), (void*)Xform));
     if (Applied < 0)
     {
-        G_Animation->DestroyScript((void*)((ptrdiff_t)Handle));
+        G_Animation->DestroyScript(AsOpaqueDword((FlULong)Handle));
         return -1;
     }
 
     FIkListNode* Node = new FIkListNode;
     Node->Active = 0;
     LinkListNode(Instance, Node);
-    Node->Event = (FIkEvent*)((ptrdiff_t)Handle);
+    Node->Event = (FIkEvent*)(AsOpaqueDword((FlULong)Handle)); // a playback id (Active == 0)
     std::memcpy(&Node->Extra8, &Y, sizeof(float));
     return Handle;
 }
@@ -3732,7 +3767,7 @@ static int PlayInstanceAnimChain(FDeformInstance* Instance, void* Name, void* Ex
     const FlULong Play = (FlULong)PlayHandle;
     const float Time = FloatFromOpaqueDword(ArgC);
 
-    void* const Stop = (void*)((ptrdiff_t)(FirstBoneInstance(Instance)));
+    void* const Stop = IkJointInstance(FirstBoneInstance(Instance));
 
     // EngBase FAnimBindOut {Kind, Extra, Typed, Instance}; +0x10 of the frame is outside it.
     FlULong Query[4];
@@ -3749,7 +3784,7 @@ static int PlayInstanceAnimChain(FDeformInstance* Instance, void* Name, void* Ex
         void* const Parent = G_Engine->GetInstanceParent(Cursor);
         Relatives.push_back(
             (const unsigned char*)(G_Engine->GetInstanceRelative(Cursor)));
-        Query[3] = (FlULong)((ptrdiff_t)Cursor);
+        Query[3] = (FlULong)IkJointId(Cursor);
         const FlULong Channel = G_Animation->FindObject(Play, Query);
         IChannelArchetype* Archetype = nullptr;
         G_Channel->GetObject(Channel, (void**)(&Archetype));
@@ -3768,7 +3803,7 @@ static int PlayInstanceAnimChain(FDeformInstance* Instance, void* Name, void* Ex
     }
     const int ChainCount = (int)(ChainQuats.size());
 
-    Query[3] = (FlULong)((ptrdiff_t)Stop);
+    Query[3] = (FlULong)IkJointId(Stop);
     Query[0] = 1;
     const FlULong RootChannel = G_Animation->FindObject(Play, Query);
     IChannelArchetype* RootArchetype = nullptr;
@@ -4210,7 +4245,7 @@ static void IkSolveDlsAlt(FIkEvent* Event)
 // The single-joint body LAB_065fb540 inlines (065fb5f3..b879; Bone = the IEngine +0xC4 result
 static void IkSolveSingleJoint(FIkEvent* Event, FIkApplyGate* Gate, const float* Bone)
 {
-    void* const Joint = (void*)((ptrdiff_t)Gate->JointAt0C);
+    void* const Joint = IkJointInstance(Gate->JointAt0C);
     const float* ParentRot = G_Engine->GetInstanceOrientation(G_Engine->GetInstanceParent(Joint));
     float Local[9];
     IkCopy9(Local, ParentRot);
@@ -4292,11 +4327,9 @@ static int DACOM_API IkApply(FIkEvent* Event, float* OutQuat, int MatchId, FIkAp
     {
         for (int Index = 0; Index < Event->JointCount; ++Index)
         {
-            if ((int)Event->Channels[Index] == MatchId)
+            if (IkChannelKey(Event, Index) == (FlULong)MatchId)
             {
-                G_Engine->GetJointParams(
-                    (void*)((ptrdiff_t)Event->JointIds[Index]), 0,
-                    OutQuat);
+                G_Engine->GetJointParams(IkJointInstance(Event->JointIds[Index]), 0, OutQuat);
                 return 1;
             }
         }
@@ -4307,8 +4340,8 @@ static int DACOM_API IkApply(FIkEvent* Event, float* OutQuat, int MatchId, FIkAp
     Event->Tick3C = OldTick + 1;
     if (OldTick == 0 && Gate->SkipFlag == 0)
     {
-        const float* Bone = (const float*)(G_Engine->GetInstanceRelative(
-            (void*)((ptrdiff_t)Gate->JointAt0C)));
+        const float* Bone =
+            (const float*)(G_Engine->GetInstanceRelative(IkJointInstance(Gate->JointAt0C)));
         if (Event->JointCount == 1)
             IkSolveSingleJoint(Event, Gate, Bone);
         else if ((Event->Flags34 & 2) != 0)
@@ -4322,7 +4355,7 @@ static int DACOM_API IkApply(FIkEvent* Event, float* OutQuat, int MatchId, FIkAp
 
     for (int Index = 0; Index < Event->JointCount; ++Index)
     {
-        if ((int)Event->Channels[Index] == MatchId)
+        if (IkChannelKey(Event, Index) == (FlULong)MatchId)
         {
             IkCopy4(OutQuat, Event->Quats + Index * 4);
             return 0;
@@ -4332,17 +4365,22 @@ static int DACOM_API IkApply(FIkEvent* Event, float* OutQuat, int MatchId, FIkAp
 }
 
 // FUN_065f5400, thiscall (Instance) RET 0x8 (Desc, PlayExtra), 065f5400..065f5943; called
-static FIkListNode* AllocAimEvent(FDeformInstance* Instance, const unsigned char* Desc,
+FL_LAYOUT_ASSERT(sizeof(FDeformAimDesc) == 0x20, "the aim desc's joint ids start at +0x20");
+
+static FIkListNode* AllocAimEvent(FDeformInstance* Instance, const unsigned char* AimDesc,
                                   void* PlayExtra)
 {
-    int BindB = -1;
+    // The descriptor is an FDeformAimDesc (read at +4..+0x1C on Win32), its RootPart / EndPart
+    // instances in their 32-bit form; Field1C joint ids follow it (+0x20 on Win32).
+    const FDeformAimDesc* const Desc = (const FDeformAimDesc*)(AimDesc);
+    void* BindB = G_InvalidEngineHandle; // the root instance
     if (Instance->PartArray != nullptr)
-        BindB = (int)((ptrdiff_t)(Instance->PartArray[0].Lod->BoneSlots[0].Instance));
+        BindB = Instance->PartArray[0].Lod->BoneSlots[0].Instance;
 
     std::vector<int> Chain;
     unsigned char bSphereAxis = 0;
-    int Cursor = *(const int*)(Desc + 8);
-    if (Cursor != *(const int*)(Desc + 4))
+    int Cursor = Desc->EndPart;
+    if (Cursor != Desc->RootPart)
     {
         int Parent = 0;
         do
@@ -4353,12 +4391,12 @@ static FIkListNode* AllocAimEvent(FDeformInstance* Instance, const unsigned char
                 G_Animation->HasHandle((FlULong)Cursor, &bBlocked);
                 if (bBlocked != 0)
                 {
-                    int WalkBack = *(const int*)(Desc + 8);
+                    int WalkBack = Desc->EndPart;
                     while (WalkBack != Cursor)
                     {
                         G_Animation->HasAnyHandle((FlULong)WalkBack);
-                        WalkBack = (int)((ptrdiff_t)(
-                            G_Engine->GetInstanceParent((void*)((ptrdiff_t)WalkBack))));
+                        WalkBack =
+                            IkJointId(G_Engine->GetInstanceParent(IkJointInstance(WalkBack)));
                     }
                     FDUMP(0x100002, "%s(%d) : WARNING:General:%s", G_FdumpFileDeformableObject, 0x44D,
                           G_StartAimBlocked);
@@ -4367,8 +4405,8 @@ static FIkListNode* AllocAimEvent(FDeformInstance* Instance, const unsigned char
                 G_Animation->RegisterHandle((FlULong)Cursor);
             }
             Chain.push_back(Cursor);
-            void* const CursorInstance = (void*)((ptrdiff_t)Cursor);
-            Parent = (int)((ptrdiff_t)(G_Engine->GetInstanceParent(CursorInstance)));
+            void* const CursorInstance = IkJointInstance(Cursor);
+            Parent = IkJointId(G_Engine->GetInstanceParent(CursorInstance));
             const FlULong* Relative = G_Engine->GetInstanceRelative(CursorInstance);
             if (Relative[0] == 4)
             {
@@ -4382,7 +4420,7 @@ static FIkListNode* AllocAimEvent(FDeformInstance* Instance, const unsigned char
                     bSphereAxis = 0;
             }
             Cursor = Parent;
-        } while (Parent != *(const int*)(Desc + 4));
+        } while (Parent != Desc->RootPart);
     }
     const int Count = (int)(Chain.size());
     std::vector<int> JointIds(Chain.size());
@@ -4399,9 +4437,9 @@ static FIkListNode* AllocAimEvent(FDeformInstance* Instance, const unsigned char
     // 065f55c6..0601: operator new 0x44 (not cleared), then the inlined constructor -- +0x24,
     // +0x34 &= ~1, +0x20, the table 06601340 (installed by `new FIkEvent`), +0x3C = 0.
     FIkEvent* Event = new FIkEvent;
-    Event->TargetB = *(void* const*)(Desc + 0x14);
+    Event->TargetB = Desc->TargetOrient;
     Event->Flags34 = (unsigned char)(Event->Flags34 & 0xFE);
-    Event->TargetA = *(void* const*)(Desc + 0x10);
+    Event->TargetA = Desc->TargetPos;
     Event->Tick3C = 0;
     Node->Event = Event;
     Event->Owner = Node;
@@ -4410,16 +4448,17 @@ static FIkListNode* AllocAimEvent(FDeformInstance* Instance, const unsigned char
     Event->JointIds = (int*)new unsigned char[Count4];
     if (Count > 0)
         std::memcpy(Event->JointIds, &JointIds[0], Count4);
-    Event->Channels = (void**)new unsigned char[Count4];
+    // Pointer-sized elements: Count4 on Win32, twice that on 64-bit builds.
+    Event->Channels = (void**)new unsigned char[(size_t)Count * sizeof(*Event->Channels)];
     Event->Quats = (float*)new unsigned char[(size_t)Count * 0x10];
-    Event->Flags28 = *(const FlULong*)(Desc + 0x0C);
-    Event->StartJoint = *(const int*)(Desc + 4);
-    Event->EndJoint = *(const int*)(Desc + 8);
+    Event->Flags28 = Desc->Flags;
+    Event->StartJoint = Desc->RootPart;
+    Event->EndJoint = Desc->EndPart;
     Event->BindMats = (float*)new unsigned char[(size_t)Count * 0x24];
     Event->LockBytes = new unsigned char[(size_t)Count];
     std::memset(Event->LockBytes, 0, (size_t)Count);
-    Event->Damp38 = *(const float*)(Desc + 0x18);
-    Event->Extra30 = *(const int*)(Desc + 0x1C);
+    Event->Damp38 = Desc->Damping;
+    Event->Extra30 = Desc->Field1C;
 
     if (!SetIkJointCount(Event, (unsigned int)Count))
     {
@@ -4429,10 +4468,10 @@ static FIkListNode* AllocAimEvent(FDeformInstance* Instance, const unsigned char
 
     FlULong PlayBlob[7];
     PlayBlob[0] = 0;
-    PlayBlob[1] = (*(const FlULong*)(Desc + 0x0C) >> 1) & 0x80u;
+    PlayBlob[1] = (Desc->Flags >> 1) & 0x80u;
     const float One = 1.0f;
     std::memcpy(&PlayBlob[2], &One, sizeof(One));
-    PlayBlob[3] = (FlULong)((ptrdiff_t)PlayExtra);
+    PlayBlob[3] = (FlULong)(std::uintptr_t)PlayExtra; // a float's bits (ChannelPlay's Time[3])
     std::memcpy(&PlayBlob[4], &One, sizeof(One));
     std::memcpy(&PlayBlob[5], &One, sizeof(One));
     PlayBlob[6] = 0;
@@ -4444,11 +4483,10 @@ static FIkListNode* AllocAimEvent(FDeformInstance* Instance, const unsigned char
     for (int Index = 0; Index < Count; ++Index)
     {
         const int JointId = JointIds[Index];
-        void* const JointInstance = (void*)((ptrdiff_t)JointId);
+        void* const JointInstance = IkJointInstance(JointId);
         CreateCookie[3] = (FlULong)JointId;
-        const FlULong Key = G_Channel->CreateTyped(
-            (IChannelOwner*)Event, 4, CreateCookie, (void*)((ptrdiff_t)BindB));
-        Event->Channels[Index] = (void*)((ptrdiff_t)Key);
+        const FlULong Key = G_Channel->CreateTyped((IChannelOwner*)Event, 4, CreateCookie, BindB);
+        Event->Channels[Index] = (void*)(std::uintptr_t)Key;
         G_Channel->Play(Key, (float*)PlayBlob);
 
         const float* Relative = (const float*)(G_Engine->GetInstanceRelative(JointInstance));
@@ -4472,8 +4510,8 @@ static FIkListNode* AllocAimEvent(FDeformInstance* Instance, const unsigned char
         IkMathQuatToMatrix(LiveMat, JointQuat);
         std::memcpy(Event->BindMats + Index * 9, LiveMat, sizeof(LiveMat));
 
-        const int LockCount = *(const int*)(Desc + 0x1C);
-        const int* LockIds = (const int*)(Desc + 0x20);
+        const int LockCount = Desc->Field1C;
+        const int* LockIds = (const int*)(Desc + 1);
         for (int Lock = 0; Lock < LockCount; ++Lock)
         {
             if (LockIds[Lock] == JointId)
@@ -4562,8 +4600,7 @@ unsigned char FLodHolder::AttachSkeleton(FSkeleton* Skel) // formerly AttachLodS
     {
         if (BoneSlots[BoneIndex].Instance == G_InvalidEngineHandle)
         {
-            void* ArchHandle = (void*)(
-                (ptrdiff_t)(Skeleton->Bones[BoneIndex].Parent));
+            void* ArchHandle = LowArena::Decode<void>(Skeleton->Bones[BoneIndex].Parent);
             void* BoneInst = G_Engine->CreateInstance(ArchHandle, nullptr);
             FBoneRuntime* Slot = BindOneBoneRuntime(this, BoneIndex, BoneInst);
             Slot->Flags = (unsigned char)(Slot->Flags | 1u);
@@ -4716,7 +4753,7 @@ static GENRESULT ApplyCreateInstanceInit(FDeformableObject* Object, FAGGDESC18* 
         if (Parser == nullptr &&
             Dacom->QueryInterface(Iids::ProfileParser, (void**)(&Parser)) != 0)
         {
-            Rate = (FlULong)((ptrdiff_t)Parser); // 065f1b23
+            Rate = (FlULong)(std::uintptr_t)Parser; // 065f1b23
             bParse = false;
         }
         if (bParse)
@@ -4787,9 +4824,8 @@ void DACOM_API FDeformInstance::OnKeys(FlULong ChannelKey, void* Context,
     {
         if (Node->Active == 0)
         {
-            const FlULong Handle =
-                (FlULong)((ptrdiff_t)Node->Event);
-            if (G_Animation->HasObject(Handle, AsOpaqueDword(ChannelKey)) != 0)
+            const FlULong Handle = NodePlaybackId(Node);
+            if (G_Animation->HasObject(Handle, LowArena::Decode<void>((FlLong)ChannelKey)) != 0)
             {
                 G_Animation->GetFirstInstanceField(Handle, &Cookie);
                 break;
@@ -4821,9 +4857,8 @@ void DACOM_API FDeformInstance::OnLoop(FlULong ChannelKey, float* Transform, voi
     {
         if (Node->Active == 0)
         {
-            const FlULong Stored =
-                (FlULong)((ptrdiff_t)Node->Event);
-            if (G_Animation->HasObject(Stored, AsOpaqueDword(ChannelKey)) != 0)
+            const FlULong Stored = NodePlaybackId(Node);
+            if (G_Animation->HasObject(Stored, LowArena::Decode<void>((FlLong)ChannelKey)) != 0)
             {
                 Handle = (int)Stored;
                 break;
@@ -4963,8 +4998,7 @@ static unsigned char WalkInstanceHardpoints(FDeformInstance* Instance, void* Use
             Ctx.UserData = UserData;
             Ctx.BoneInst = Lod->BoneSlots[Bone].Instance;
             Hardpoint->EnumerateHardpoints(
-                &HardpointWalkThunk,
-                (void*)((ptrdiff_t)(Lod->Skeleton->Bones[Bone].Parent)),
+                &HardpointWalkThunk, LowArena::Decode<void>(Lod->Skeleton->Bones[Bone].Parent),
                 &Ctx);
             Bone += 1;
         }
@@ -4992,7 +5026,9 @@ static bool ConnectInstanceParts(FDeformInstance* Instance, int* Parts, void* Ar
     }
     Instance->PartArray = Array;
 
-    FDeformPartDesc* Descs = *(FDeformPartDesc**)(Parts + 1);
+    // Parts + 1 holds the FDeformPartDesc pointer (two ints of it on 64-bit builds, unaligned).
+    FDeformPartDesc* Descs = nullptr;
+    std::memcpy(&Descs, Parts + 1, sizeof(Descs));
     int PartIndex = 0;
     while (PartIndex < Instance->PartCount)
     {
@@ -5466,7 +5502,7 @@ static void DrawInstanceParts(FDeformInstance* Instance, void* /*Unused*/, ICame
 
     if (*OutLod < 3)
         return;
-    void* const Bone = (void*)((ptrdiff_t)(FirstBoneInstance(Instance)));
+    void* const Bone = IkJointInstance(FirstBoneInstance(Instance));
     // Submit the root instance and merge its renderer rank into the LOD result.
     const int Rank = G_Renderer->RenderInstance(
         Camera, Bone, 1.0f, Flags | 0x108ul, nullptr, RenderArg);
@@ -5574,8 +5610,7 @@ static GENRESULT DACOM_API EngineCallbackTrampoline(void* /*This*/, void* Arg1, 
 {
     if (G_BoneLinkFn == nullptr)
         return GR_OK;
-    return (GENRESULT)(
-        G_BoneLinkFn(Arg1, (int)((ptrdiff_t)Arg2), G_BoneLinkHolder));
+    return (GENRESULT)(G_BoneLinkFn(Arg1, (int)LowArena::Encode(Arg2), G_BoneLinkHolder));
 }
 
 
@@ -5789,8 +5824,7 @@ GENRESULT DACOM_API FDeformable::GetFirstBone(void* Instance, int* Out) // forme
         *Out = -1;
         return GR_OK;
     }
-    *Out = (int)(
-        (ptrdiff_t)(DeformInstance->PartArray[0].Lod->BoneSlots[0].Instance));
+    *Out = IkJointId(DeformInstance->PartArray[0].Lod->BoneSlots[0].Instance);
     return GR_OK;
 }
 
@@ -5811,8 +5845,7 @@ GENRESULT DACOM_API FDeformable::SetPosePos(void* Instance, float* Pos3) // form
     {
         if (Node->Active == 0)
         {
-            const FlULong Handle =
-                (FlULong)((ptrdiff_t)Node->Event);
+            const FlULong Handle = NodePlaybackId(Node);
             float Duration;
             float MappedA[3];
             float MappedB[3];
@@ -5843,9 +5876,7 @@ GENRESULT DACOM_API FDeformable::SetPosePos(void* Instance, float* Pos3) // form
     }
     if (bHit == 0)
         Vec[1] = DeformInstance->Offset24 + DeformInstance->Offset20;
-    G_Engine->SetInstancePosition((void*)((ptrdiff_t)(
-                                      FirstBoneInstance(DeformInstance))),
-                                  Vec);
+    G_Engine->SetInstancePosition(IkJointInstance(FirstBoneInstance(DeformInstance)), Vec);
     return GR_OK;
 }
 
@@ -5859,13 +5890,10 @@ GENRESULT DACOM_API FDeformable::SetPoseOri(void* Instance, void* Ori) // former
     while (Node != nullptr)
     {
         if (Node->Active == 0)
-            G_Animation->SetOverlayExtra(
-                (FlULong)((ptrdiff_t)Node->Event),
-                (float*)Ori);
+            G_Animation->SetOverlayExtra(NodePlaybackId(Node), (float*)Ori);
         Node = Node->Next;
     }
-    G_Engine->SetInstanceOrientation(
-        (void*)((ptrdiff_t)(FirstBoneInstance(DeformInstance))), Ori);
+    G_Engine->SetInstanceOrientation(IkJointInstance(FirstBoneInstance(DeformInstance)), Ori);
     return GR_OK;
 }
 
@@ -5897,8 +5925,7 @@ GENRESULT DACOM_API FDeformable::SetHeight(void* Instance, float Height) // form
     {
         if (Node->Active == 0)
         {
-            const FlULong Handle =
-                (FlULong)((ptrdiff_t)Node->Event);
+            const FlULong Handle = NodePlaybackId(Node);
             float Duration = 0.0f;
             float Base = 0.0f;
             float Add = 0.0f;
@@ -5972,7 +5999,7 @@ GENRESULT DACOM_API FDeformable::CopyList(void* Instance, int* Out) // formerly 
     int* Cursor = Out;
     while (Node != nullptr)
     {
-        *Cursor = (int)((ptrdiff_t)Node->Event);
+        *Cursor = ListNodeHandle(Node);
         Cursor += 1;
         Node = Node->Next;
     }
@@ -6361,3 +6388,7 @@ BOOL WINAPI DllMain(HINSTANCE Instance, DWORD Reason, LPVOID /*Reserved*/)
     }
     return TRUE;
 }
+
+#if !defined(_WIN32)
+FL_POSIX_DLLMAIN(DllMain) // PORT(macOS): run as the module loads (posix/windows.h)
+#endif

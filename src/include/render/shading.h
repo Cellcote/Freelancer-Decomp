@@ -198,7 +198,8 @@ struct ITextureLibrary2 : IDAComponent
     virtual GENRESULT DACOM_API GetGroupName(int Id, char* Buf, FlULong Size) = 0;
     // 11 +0x2C LAB_06ec2760: find-or-create by name, returns via slot-12 style handle (§15.1).
     virtual GENRESULT DACOM_API FindOrCreateByName(const char* Name, void** OutTex) = 0;
-    // 12 +0x30 LAB_06ec2810 RET 0xC: Query+4 = CRC, *OutTex = texture object (node+0x10).
+    // 12 +0x30 LAB_06ec2810 RET 0xC: Query is an FMaterialCrcQuery (retail reads the CRC at
+    // Query+4), *OutTex = texture object (node+0x10).
     virtual GENRESULT DACOM_API FindTextureByCrc(void* Query, void** OutTex) = 0;
     // 13 +0x34 LAB_06ec3050: AddRef SourceRecord, hand back an id for slots 29–43.
     virtual GENRESULT DACOM_API CreatePlaybackGroup(void* SourceRecord, int* OutId) = 0;

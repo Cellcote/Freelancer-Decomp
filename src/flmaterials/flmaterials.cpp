@@ -124,7 +124,7 @@ namespace
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
             // LAB_066f5220: validate size/name, construct controller, then Slot22.
-            if (Desc->size != 0x14)
+            if (Desc->size != sizeof(FAGGDESC14)) // 0x14 on Win32
             {
                 *Instance = nullptr;
                 return GR_INTERFACE_UNSUPPORTED;
@@ -203,7 +203,7 @@ namespace
         GENRESULT DACOM_API CreateInstance(AGGDESC* Desc, void** Instance) override
         {
             // LAB_066fd830: descriptor and result pointer are mandatory.
-            if (Desc->size != 0x18)
+            if (Desc->size != sizeof(FAGGDESC18)) // 0x18 on Win32
             {
                 *Instance = nullptr;
                 return GR_INTERFACE_UNSUPPORTED;
@@ -280,3 +280,7 @@ BOOL WINAPI DllMain(HINSTANCE Instance, DWORD Reason, LPVOID /*Reserved*/)
     }
     return TRUE;
 }
+
+#if !defined(_WIN32)
+FL_POSIX_DLLMAIN(DllMain) // PORT(macOS): run as the module loads (posix/windows.h)
+#endif

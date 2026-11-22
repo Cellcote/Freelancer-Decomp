@@ -10,6 +10,8 @@
 #include "engine/engbase.h"
 
 // Instance values, lighting, override materials and appearance drawing.
+// PORT(x64): an instance value's Id is the engine instance's 32-bit value, LowArena::Encode of
+// the instance (engine/engbase.h); the value itself is pointer-sized.
 struct IFLAppearance : IDAComponent
 {
     virtual GENRESULT DACOM_API SetInstanceValue(int Id, void* Value) = 0;

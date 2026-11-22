@@ -29,14 +29,17 @@ static constexpr float G_ParamRangeSlack = 1.1920928955078125e-07f;
 // .rdata:06601580 (a double): FUN_066001c0's dead zone.
 static constexpr double G_EyeUvDeadZone = 1.0e-4;
 
+// A cell's Value[0] for types 5/6/7 (and a parameter default's pointer argument) is a shading
+// payload: the pointer itself on Win32, a HandleValue id on 64-bit builds (render/shading.h),
+// since other modules read material property cells.
 static void* DwordToPointer(FlULong Value)
 {
-    return (void*)((uintptr_t)(Value));
+    return ShadingPayloadTo<void>(Value);
 }
 
 static FlULong PointerToDword(const void* Pointer)
 {
-    return (FlULong)((uintptr_t)(Pointer));
+    return ShadingPayloadOf(Pointer);
 }
 
 
@@ -334,7 +337,7 @@ void FMaterialParamValue::Clear()
     {
         if (Value[0] != 0)
         {
-            HeapFree(GetProcessHeap(), 0, DwordToPointer(Value[0]));
+            ShadingPayloadFreeString(Value[0]);
             Value[0] = 0;
         }
         Value[0] = 0;
@@ -359,7 +362,7 @@ void FMaterialParamValue::DupString(const char* Src)
     // FUN_065fe620, 065fe620..e67d.
     if (Value[0] != 0)
     {
-        HeapFree(GetProcessHeap(), 0, DwordToPointer(Value[0]));
+        ShadingPayloadFreeString(Value[0]);
         Value[0] = 0;
     }
     if (Src == nullptr)
@@ -424,6 +427,7 @@ void FMaterialParamValue::Set(int InType, FlULong Arg)
     if (InType != Type)
         Clear();
     Type = InType;
+    // For 2/3/4, Arg names the values (on 64-bit builds a payload id, read only there).
     const FlULong* const Source = (const FlULong*)(DwordToPointer(Arg));
     switch (InType)
     {
@@ -718,10 +722,10 @@ GENRESULT DACOM_API FEyeMaterialImpl::SaveProperties(void* FileSystem)
                     break;
                 case 5:
                 case 7:
-                    Cell.DupString((const char*)(DwordToPointer(Address[0])));
+                    Cell.DupString(*(const char* const*)(Address));
                     break;
                 case 6:
-                    Cell.SwapCom((IDAComponent*)(DwordToPointer(Address[0])));
+                    Cell.SwapCom(*(IDAComponent* const*)(Address));
                     break;
                 default:
                     break;
@@ -1025,10 +1029,10 @@ GENRESULT DACOM_API FEyeMaterialImpl::GetParameterValue(FlULong Index, void* InO
         break;
     case 5:
     case 7:
-        Out->DupString((const char*)(DwordToPointer(Address[0])));
+        Out->DupString(*(const char* const*)(Address));
         break;
     case 6:
-        Out->SwapCom((IDAComponent*)(DwordToPointer(Address[0])));
+        Out->SwapCom(*(IDAComponent* const*)(Address));
         break;
     default:
         break;
@@ -1071,7 +1075,9 @@ GENRESULT FEyeMaterialImpl::UpdateTranslucency()
     if (TextureRows[0].Frame == 0)
         return Result;
     int Format;
-    Result = Pipeline->GetTextureFormat(DwordToPointer(TextureRows[0].Frame), &Format); // +0xC8
+    // +0xC8; a frame is a texture handle, a LowArena block.
+    Result =
+        Pipeline->GetTextureFormat(LowArena::Decode<void>((FlLong)(TextureRows[0].Frame)), &Format);
     if (Result < 0)
         return Result;
     bOneBitAlpha = PixelFormatGetDesc(Format)->Alpha.Bits == 1 ? 1 : 0;
@@ -1405,7 +1411,8 @@ GENRESULT DACOM_API FEyeMaterial::Bind(void* Context)
     // state 0xB, the address modes plus 1 as 0xD / 0xE.
     IRenderPipeline* const StagePipeline = Pipeline;
     const FMaterialTextureRow* const Row = TextureRows;
-    StagePipeline->SetTextureStageTexture(0, DwordToPointer(Row->Frame)); // +0x108
+    // +0x108
+    StagePipeline->SetTextureStageTexture(0, LowArena::Decode<void>((FlLong)(Row->Frame)));
     StagePipeline->SetTextureStageState(0, D3DTSS_TEXCOORDINDEX, (int)(Row->WrapMode >= 4 ? Row->WrapMode - 4 : 0));
     StagePipeline->SetTextureStageState(0, D3DTSS_ADDRESSU, (int)(Row->AddressU + 1));
     StagePipeline->SetTextureStageState(0, D3DTSS_ADDRESSV, (int)(Row->AddressV + 1));

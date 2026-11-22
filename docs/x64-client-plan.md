@@ -303,8 +303,8 @@ without the Windows API. Milestones:
   Windows sizes, the platform layer's structures under their Windows names, the MSVC CRT names
   with MSVC's behaviour (`posix/msvc_crt.h`), and small Win32 calls with an obvious meaning here.
   Larger APIs go through `Platform::` at the call site. `FL_POSIX_DLLMAIN` runs a module's
-  `DllMain` as it loads. So far: dacom, zlib, x86math, system, ReadFile, luaprofile, Thorn, EngBase, ximage,
-  Shading, RendComp and alchemy,
+  `DllMain` as it loads. So far: dacom, zlib, DALib, x86math, system, ReadFile, luaprofile, Thorn,
+  EngBase, ximage, Shading, flmaterials, RendComp, alchemy and Deformable2,
   loaded and checked by `src/PortTests/module_tests.cpp`. The POSIX handles are small numbers in a table, as Windows
   kernel handles are, so a file handle survives retail's 32-bit fields there too
   (`Platform::HandleToValue` / `HandleFromValue`, as HandleToULong / LongToHandle). The kernel32
@@ -316,16 +316,29 @@ without the Windows API. Milestones:
   `engine/engbase.h`). Its stack frame in a bind header, the name cookie and the event keys are
   HandleValue ids, which only EngBase reads back. The modules that call EngBase (Common,
   Deformable2, the client) follow the same contract as they are ported: their casts of
-  instances to 32 bits become `Encode`.
+  instances to 32 bits become `Encode`. Deformable2 does so: its bone archetype handles and IK joint ids
+  (an aim descriptor's parts, a bind header's instance) are `Encode`d instances, the channel
+  keys and playback ids it keeps in pointer fields are values carried there, and an IK node's
+  value in `CopyList` is a HandleValue id on 64-bit builds.
   HandleValue's table is one per process on macOS and Linux too (held by dacom, as the arena),
   for ids that cross modules: a material property's string or component sits in a 32-bit
   payload (`ShadingPayloadOf` / `ShadingPayloadTo`, render/shading.h). The render modules
   compile against a stand-in `<d3d8.h>` (`src/include/posix`): the Direct3D 8 names with the
   SDK's values and layouts, the render states generated from `render/rp_types.h`; there is no
   Direct3D, the names reach RPGPU. The pipeline's texture handles are LowArena blocks.
+  A material's declared parameters are `FShadingPropertyRecord`s (pointer-sized names), never
+  arrays of dwords, and FLAppearance's instance values are keyed by the instance's `Encode`.
   MSVC's x86 intrinsics come from stand-ins too (`posix/intrin.h`, `posix/xmmintrin.h`): the
   compiler's own on x86, and on Apple Silicon an emulation of the scalar SSE operations with
   SSE's results (alchemy's retail-exact math).
+  DALib hosts through DPNet (docs/dpnet.md), as the x64 build does: module_tests makes its
+  `CDPServer` host on a UDP port. Its other Windows APIs are stand-ins in `src/include/posix`
+  too: COM's basics (`posix/unknwn.h`: GUID, IUnknown, the HRESULTs; `CoCreateInstance` finds no
+  class, as there is no COM), DirectPlay 8 (`posix/dplay8.h`, `posix/dpaddr.h`: the SDK's
+  values and vtable order, for DALib and DPNet's adapter, which are compiled from the same
+  header), Winsock over BSD sockets (`posix/winsock2.h`, `ws2tcpip.h`, `mstcpip.h`) and the
+  DirectSound interfaces the sound headers name (`posix/dsound.h`, declared only until M4).
+  `CDPClient`, the client's DirectPlay, has no DirectPlay class here yet.
 - **M3:** an SDL window to the main menu, drawn by RPGPU through Metal, without sound.
 - **M4:** audio, input and gameplay.
 

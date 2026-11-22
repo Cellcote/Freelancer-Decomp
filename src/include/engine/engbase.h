@@ -374,7 +374,10 @@ struct IChannelArchetype : IDAComponent
                                              FlULong* Count) = 0;                // 10
 };
 
-// Aim event parameters; target pointers are borrowed.
+// Aim event parameters; target pointers are borrowed. Field1C joint ids (ints) follow the struct,
+// at sizeof(FDeformAimDesc) (+0x20 on Win32). PORT(x64): RootPart, EndPart and those joint ids
+// name engine instances, LowArena-encoded on 64-bit builds as the rest of this file's 32-bit
+// fields (see the top).
 struct FDeformAimDesc
 {
     char const* Name;    // +0x00
@@ -384,12 +387,13 @@ struct FDeformAimDesc
     float* TargetPos;    // +0x10 three floats the aim follows
     float* TargetOrient; // +0x14 nine floats
     float Damping;       // +0x18
-    int Field1C;         // +0x1c TODO: meaning not recovered; freelancer passes 0
+    int Field1C; // +0x1c the count of joint ids after the struct; freelancer passes 0
 };
 
 // The part table IDeformable::Create / CreateAlias read (Deformable2 FUN_065f36c0):
 // Parts[0] = entry count, Parts[1] = FDeformPartDesc* (stride 0x18). Read and written by
-// 065f3749..065f3bf3.
+// 065f3749..065f3bf3. PORT(x64): the table is ints, so on 64-bit builds the pointer spans
+// Parts[1] and Parts[2], unaligned (Deformable2 reads it with memcpy).
 struct FDeformLodDesc
 {
     // 065f3773..3779: used only when the entry's Path is null -- the part file is then
