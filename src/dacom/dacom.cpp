@@ -2689,6 +2689,10 @@ BOOL APIENTRY DllMain(HMODULE Module, DWORD Reason, LPVOID /*Reserved*/)
     return TRUE;
 }
 
+#if !defined(_WIN32)
+FL_POSIX_DLLMAIN(DllMain) // PORT(macOS): run as the module loads (posix/windows.h)
+#endif
+
 FlULong __cdecl DACOM_CRC::GetCRC32(const char* Str)
 {
     // Retail FUN_065b60f0 (export thunk 065b4380).
@@ -2750,6 +2754,12 @@ extern "C" int __cdecl DacomStricmp(const char* A, const char* B)
         ++Right;
     }
 }
+
+#if !defined(_WIN32)
+// PORT(macOS): dacom.def exports DacomStricmp as "stricmp"; a .dylib/.so has no export list to
+// rename it, so the name is a function of its own here.
+extern "C" int stricmp(const char* A, const char* B) { return DacomStricmp(A, B); }
+#endif
 
 namespace LogStream
 {

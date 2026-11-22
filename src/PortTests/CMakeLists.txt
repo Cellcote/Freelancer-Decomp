@@ -8,3 +8,15 @@ target_include_directories(port_tests PRIVATE ${CMAKE_SOURCE_DIR}/src/include)
 target_compile_options(port_tests PRIVATE -include ${CMAKE_SOURCE_DIR}/src/include/fl_layout.h
                        -Wall -Wextra)
 add_test(NAME port_tests COMMAND port_tests)
+
+# module_tests: loads the client modules this build makes (dacom, system, x86math) and checks
+# that their DllMains ran. Built against the stand-in <windows.h> (src/include/posix), as they are.
+add_executable(module_tests module_tests.cpp)
+target_compile_features(module_tests PRIVATE cxx_std_20)
+target_include_directories(module_tests PRIVATE ${CMAKE_SOURCE_DIR}/src/include/posix
+                           ${CMAKE_SOURCE_DIR}/src/include)
+target_compile_options(module_tests PRIVATE -include ${CMAKE_SOURCE_DIR}/src/include/fl_layout.h
+                       "-D__declspec(x)=" -Wall -Wextra -Wno-unknown-pragmas)
+# Loaded at run time, by name, as the game loads them: built first, not linked.
+add_dependencies(module_tests dacom system x86math)
+add_test(NAME module_tests COMMAND module_tests $<TARGET_FILE_DIR:dacom>)

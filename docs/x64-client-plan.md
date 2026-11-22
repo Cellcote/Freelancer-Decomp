@@ -295,6 +295,13 @@ without the Windows API. Milestones:
   casts as errors, but not the ones that narrow on purpose through `uintptr_t` / `intptr_t`
   (`PointerToDword`, `PhySys_InstanceId` and the like), so those get an audit of their own. The
   sites CodeRabbit listed on #108, #109 and #111 are the starting list.
+  The modules join the non-Windows build one at a time (`FL_PROJECTS` in `CMakeLists.txt`),
+  compiling against a stand-in `<windows.h>` in `src/include/posix`: the Windows types at their
+  Windows sizes, the platform layer's structures under their Windows names, the MSVC CRT names
+  with MSVC's behaviour (`posix/msvc_crt.h`), and small Win32 calls with an obvious meaning here.
+  Larger APIs go through `Platform::` at the call site. `FL_POSIX_DLLMAIN` runs a module's
+  `DllMain` as it loads. So far: dacom, x86math and system, loaded and checked by
+  `src/PortTests/module_tests.cpp`. Next: ReadFile, the first one with handle sites.
 - **M3:** an SDL window to the main menu, drawn by RPGPU through Metal, without sound.
 - **M4:** audio, input and gameplay.
 

@@ -12,9 +12,10 @@
 #   .github/scripts/build_parity.py compares the two builds command line by command line and
 #   binary by binary.
 #
-#   Anything else (GCC or Clang on Linux and macOS): the portable modules only, the ones that
-#   use no Windows API (fl_add_module's PORTABLE). Every other module is Windows-only until the
-#   non-Windows port (on hold) gives it a platform backend. See docs/building.md.
+#   Anything else (GCC or Clang on Linux and macOS): the modules in the non-Windows FL_PROJECTS
+#   of the root CMakeLists.txt. PORTABLE ones use no Windows API; the others are being ported
+#   (docs/x64-client-plan.md, M2) and compile against the stand-in <windows.h> and MSVC CRT
+#   names of src/include/posix, over the POSIX platform layer. See docs/building.md.
 
 include_guard(GLOBAL)
 
@@ -27,7 +28,7 @@ else()
 endif()
 
 # ---------------------------------------------------------------------------------------------
-# Portable build (GCC / Clang): plain CMake targets for the PORTABLE modules.
+# Portable build (GCC / Clang): plain CMake targets for the modules listed for it.
 # ---------------------------------------------------------------------------------------------
 if(NOT FL_WINDOWS)
   if(WIN32)
@@ -50,17 +51,14 @@ if(NOT FL_WINDOWS)
     add_link_options(-fsanitize=address,undefined)
   endif()
 
-  # fl_add_module(<name> <DLL|EXE|LIB> <RETAIL|PORT|TOOL> PORTABLE ... SOURCES <files...>)
+  # fl_add_module(<name> <DLL|EXE|LIB> <RETAIL|PORT|TOOL> [PORTABLE] ... SOURCES <files...>)
   # The Windows-only arguments (.rc and .def files, linker and character-set flags) are accepted
-  # and ignored, so that a module's CMakeLists.txt has one form for every platform.
+  # and ignored, so that a module's CMakeLists.txt has one form for every platform. A module
+  # without PORTABLE uses the Windows API through src/include/posix (its <windows.h>).
   function(fl_add_module name kind)
     cmake_parse_arguments(PARSE_ARGV 2 A
       "RETAIL;PORT;TOOL;PORTABLE;NO_WPO;UNICODE;MFC;CONSOLE;NO_SAFESEH;NO_INCREMENTAL;EXPORTS;PCH"
       "OUTPUT_NAME;WARNING_LEVEL;DEF" "SOURCES;ITEM_DEFAULTS")
-    if(NOT A_PORTABLE)
-      message(FATAL_ERROR "fl_add_module(${name}): not PORTABLE, so Windows-only; leave it out "
-                          "of FL_PORTABLE_PROJECTS (CMakeLists.txt).")
-    endif()
     set(_sources ${A_SOURCES})
     list(FILTER _sources EXCLUDE REGEX "\\.(rc|def)$")
     if(kind STREQUAL "EXE")
@@ -75,15 +73,31 @@ if(NOT FL_WINDOWS)
     if(A_OUTPUT_NAME)
       set_property(TARGET ${name} PROPERTY OUTPUT_NAME "${A_OUTPUT_NAME}")
     endif()
+    if(kind STREQUAL "DLL")
+      # dacom.dylib, not libdacom.dylib: Platform::ModuleLoad finds "dacom.dll" under that name.
+      set_property(TARGET ${name} PROPERTY PREFIX "")
+    endif()
     set_target_properties(${name} PROPERTIES
       RUNTIME_OUTPUT_DIRECTORY "${FL_BIN_DIR}"
       LIBRARY_OUTPUT_DIRECTORY "${FL_BIN_DIR}"
       ARCHIVE_OUTPUT_DIRECTORY "${FL_BIN_DIR}")
-    target_include_directories(${name} PRIVATE "${FL_SRC_DIR}/include" "${FL_SRC_DIR}/IVP")
+    if(A_PORTABLE)
+      target_include_directories(${name} PRIVATE "${FL_SRC_DIR}/include" "${FL_SRC_DIR}/IVP")
+    else()
+      # The stand-in <windows.h> first. __declspec(dllimport / dllexport) means nothing here:
+      # a shared library exports its functions by default
+      target_include_directories(${name} PRIVATE
+        "${FL_SRC_DIR}/include/posix" "${FL_SRC_DIR}/include" "${FL_SRC_DIR}/IVP")
+      # (A flag: CMake drops function-like macros from its compile definitions.) #pragma
+      # comment(lib, ...) and the like are MSVC's, with nothing to do here, and the retail code's
+      # sprintf / vsprintf stay as they are (macOS's SDK marks them deprecated). Both after
+      # -Wall, which turns the warnings on.
+      set(_posix_options "-D__declspec(x)=" -Wno-unknown-pragmas -Wno-deprecated-declarations)
+    endif()
     target_compile_definitions(${name} PRIVATE FREELANCER_ENABLE_TICK_PROFILE=0)
     target_compile_options(${name} PRIVATE
       "SHELL:-include \"${FL_SRC_DIR}/include/fl_layout.h\""
-      $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra>)
+      $<$<COMPILE_LANGUAGE:CXX>:-Wall -Wextra> ${_posix_options})
   endfunction()
 
   function(fl_includes name)

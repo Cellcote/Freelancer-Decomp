@@ -152,6 +152,8 @@ A module is portable when it uses no Windows API: `PORTABLE` in its `fl_add_modu
 folder in the non-Windows `FL_PROJECTS` of the root `CMakeLists.txt`. On these compilers
 `fl_add_module()` makes a plain CMake target: the MSVC-only settings (`.rc` and `.def` files,
 `fl_item()`, `fl_cl_options()`, linker flags) are ignored, and `fl_layout.h` is forced in as on
-Windows. Making more modules portable is the non-Windows port (on hold; see
-[x64-client-plan.md](x64-client-plan.md)), which needs a non-Windows backend for
-`src/include/platform.h` ([platform.md](platform.md)) first.
+Windows. The other modules are being ported to macOS ([x64-client-plan.md](x64-client-plan.md),
+phase 6, M2): one that is in `FL_PROJECTS` without `PORTABLE` compiles against the stand-in
+`<windows.h>` of `src/include/posix` over the POSIX backend of `src/include/platform.h`
+([platform.md](platform.md)). A DLL module is named as on Windows, without a `lib` prefix
+(`dacom.dylib`, `dacom.so`), so that `Platform::ModuleLoad("dacom.dll")` finds it.
