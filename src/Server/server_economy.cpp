@@ -265,6 +265,7 @@ void NotePricePaid(FLedger& Ledger, unsigned int GoodId, long long Unit)
 void SettleAll(PlayerSlot& Slot, FLedger& Ledger)
 {
     Ledger.bRefusedBuy = false;
+    Ledger.RefusedAmmoGood = 0;
     // A purchase settled before its payment arrived is charged the least it could cost, and
     // that is the price it may resell for this dock.
     if (Ledger.PricedCount > 0)
@@ -420,12 +421,15 @@ bool Ledger_OnGoodSell(PlayerSlot& Slot, unsigned int SessionId, SGFGoodSellInfo
     unsigned int const BaseId = Info.Field_0x00;
     FLedger& Ledger = LedgerOf(SessionId);
     Ledger.bRefusedBuy = false;
+    Ledger.RefusedAmmoGood = 0;
     if (!Docked(Slot) || BaseId != Slot.current_base || static_cast<int>(Info.Field_0x08) < 1)
     {
         DropCredit(Slot, Ledger);
         return false;
     }
-    if (Ledger.bCredit && !Ledger.bSaleNamed)
+    // Named with or without a credit: a used item can sell for 0 (ReqChangeCash(0) is then a
+    // no-op), and the removal that follows still counts toward buying it back.
+    if (!Ledger.bSaleNamed)
     {
         Ledger.bSaleNamed = true;
         Ledger.SaleGood = Info.Field_0x04;
@@ -625,8 +629,8 @@ void Ledger_RemoveItem(PlayerSlot& Slot, unsigned int SessionId, unsigned short 
         return;
 
     FLedger& Ledger = LedgerOf(SessionId);
-    if (!Ledger.bCredit)
-        return;
+    if (!Ledger.bCredit && !Ledger.bSaleNamed)
+        return; // a removal that is not a sale
     if (!Ledger.bSaleNamed || ArchId == 0 || Count < 1 || Arch2Good(ArchId) != Ledger.SaleGood)
     {
         DropCredit(Slot, Ledger);
