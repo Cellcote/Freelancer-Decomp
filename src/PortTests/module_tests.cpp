@@ -447,6 +447,8 @@ int main(int argc, char** argv)
         reinterpret_cast<FThreadId>(Platform::ModuleSymbol(ProbeA, "Probe_a_ThreadId"));
     auto const ThreadIdB =
         reinterpret_cast<FThreadId>(Platform::ModuleSymbol(ProbeB, "Probe_b_ThreadId"));
+    Check(EventCreateA != nullptr && EventSetB != nullptr && EventWaitA != nullptr,
+          "the probes export the event functions");
     if (EventCreateA != nullptr && EventSetB != nullptr && EventWaitA != nullptr)
     {
         Platform::Handle const Event = EventCreateA();

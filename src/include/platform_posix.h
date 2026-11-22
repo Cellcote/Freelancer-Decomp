@@ -1261,10 +1261,17 @@ namespace Platform
 
     // LoadLibraryA: dlopen. A name ending in .dll is also tried as .dylib (macOS) or .so.
     // nullptr on failure.
+    //
+    // A loaded module stays mapped until the process ends (RTLD_NODELETE), even after
+    // ModuleFree drops the last reference. Objects it made outlive it: handles in the shared
+    // table (their vtables are the module's) and the factories and callbacks it registered with
+    // dacom. FreeLibrary returns as on Windows, but the module's static destructors and
+    // DLL_PROCESS_DETACH run at process exit.
+    inline constexpr int kModuleLoadFlags = RTLD_NOW | RTLD_LOCAL | RTLD_NODELETE;
     inline Module ModuleLoad(char const* Path)
     {
         std::string Resolved = Detail::ResolvePath(Path);
-        if (Module const Loaded = dlopen(Resolved.c_str(), RTLD_NOW | RTLD_LOCAL))
+        if (Module const Loaded = dlopen(Resolved.c_str(), kModuleLoadFlags))
             return Loaded;
         std::size_t const Length = std::strlen(Path);
         if (Length > 4 && strcasecmp(Path + Length - 4, ".dll") == 0)
@@ -1277,7 +1284,7 @@ namespace Platform
             Native.replace(Native.size() - 4, 4, ".so");
 #endif
             // Resolved again: the .dylib/.so may be spelled with another case than the .dll.
-            return dlopen(Detail::ResolvePath(Native.c_str()).c_str(), RTLD_NOW | RTLD_LOCAL);
+            return dlopen(Detail::ResolvePath(Native.c_str()).c_str(), kModuleLoadFlags);
         }
         return nullptr;
     }
@@ -1289,7 +1296,7 @@ namespace Platform
         return nullptr;
     }
 
-    // FreeLibrary.
+    // FreeLibrary: drops a reference; the module stays mapped (see ModuleLoad).
     inline bool ModuleFree(Module Library) { return Library != nullptr && dlclose(Library) == 0; }
 
     // GetModuleHandleA: an already loaded module, nullptr naming the executable. Borrowed, as
