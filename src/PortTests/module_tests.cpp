@@ -7,6 +7,7 @@
 // code is the number of failures.
 
 #include "dacom.h"
+#include "dalib_net.h"
 #include "engine/engbase.h"
 #include "platform.h"
 #include "readfile.h"
@@ -16,12 +17,16 @@
 #include <xmmintrin.h>
 
 #include <climits>
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include <string>
 
+#include <netinet/in.h>
 #include <stdlib.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 namespace
 {
@@ -219,6 +224,71 @@ void TestEngine(ICOManager* Manager)
     Engine->Release();
 }
 
+// Whether a UDP socket can bind Port on every interface (DirectPlay's server binds so).
+bool CanBindUdp(unsigned short Port)
+{
+    int const Socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (Socket < 0)
+        return false;
+    sockaddr_in Local{};
+    Local.sin_family = AF_INET;
+    Local.sin_addr.s_addr = htonl(INADDR_ANY);
+    Local.sin_port = htons(Port);
+    bool const bBound = bind(Socket, reinterpret_cast<const sockaddr*>(&Local), sizeof(Local)) == 0;
+    close(Socket);
+    return bBound;
+}
+
+// A UDP port that is free now: the one the system picks for port 0.
+unsigned short FreeUdpPort()
+{
+    int const Socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (Socket < 0)
+        return 0;
+    sockaddr_in Local{};
+    Local.sin_family = AF_INET;
+    Local.sin_addr.s_addr = htonl(INADDR_ANY);
+    socklen_t Size = sizeof(Local);
+    unsigned short Port = 0;
+    if (bind(Socket, reinterpret_cast<const sockaddr*>(&Local), sizeof(Local)) == 0 &&
+        getsockname(Socket, reinterpret_cast<sockaddr*>(&Local), &Size) == 0)
+        Port = ntohs(Local.sin_port);
+    close(Socket);
+    return Port;
+}
+
+// DALib's server, CDPServer, hosts through DPNet (DPNetAdapter.cpp): it holds its UDP port while
+// hosting and lets it go when it stops. Its members are reached by their (Itanium) names, as this
+// test links no module.
+void TestDALibServer(Platform::Module DALib)
+{
+    auto const Construct =
+        reinterpret_cast<void (*)(void*)>(Platform::ModuleSymbol(DALib, "_ZN9CDPServerC1Ev"));
+    auto const Destroy =
+        reinterpret_cast<void (*)(void*)>(Platform::ModuleSymbol(DALib, "_ZN9CDPServerD1Ev"));
+    auto const BeginHosting = reinterpret_cast<bool (*)(void*, unsigned int)>(
+        Platform::ModuleSymbol(DALib, "_ZN9CDPServer12BeginHostingEj"));
+    auto const StopHosting = reinterpret_cast<void (*)(void*)>(
+        Platform::ModuleSymbol(DALib, "_ZN9CDPServer11StopHostingEv"));
+    Check(Construct != nullptr && Destroy != nullptr && BeginHosting != nullptr &&
+              StopHosting != nullptr,
+          "DALib exports CDPServer");
+    if (Construct == nullptr || Destroy == nullptr || BeginHosting == nullptr ||
+        StopHosting == nullptr)
+        return;
+    unsigned short const Port = FreeUdpPort();
+    Check(Port != 0, "a free UDP port");
+    if (Port == 0)
+        return;
+    alignas(alignof(std::max_align_t)) static unsigned char Storage[sizeof(CDPServer)];
+    Construct(Storage);
+    Check(BeginHosting(Storage, Port), "CDPServer::BeginHosting hosts through DPNet");
+    Check(!CanBindUdp(Port), "the hosting server holds its UDP port");
+    StopHosting(Storage);
+    Check(CanBindUdp(Port), "StopHosting lets the port go");
+    Destroy(Storage);
+}
+
 int __cdecl CountComponent(IDAComponent* Factory, const char* Name, void*, void* Context)
 {
     if (Factory != nullptr && Name != nullptr)
@@ -249,6 +319,11 @@ int main(int argc, char** argv)
     Platform::Module const EngBase = Platform::ModuleLoad((Folder + "EngBase.dll").c_str());
     Check(EngBase != nullptr, "EngBase.dll loads");
     Check(Platform::ModuleLoad((Folder + "ximage.dll").c_str()) != nullptr, "ximage.dll loads");
+    Platform::Module const DALib = Platform::ModuleLoad((Folder + "DALib.dll").c_str());
+    Check(DALib != nullptr && Platform::ModuleSymbol(DALib, "CriticalWarningFn") != nullptr,
+          "DALib.dll loads and exports its error hooks");
+    if (DALib != nullptr)
+        TestDALibServer(DALib);
 
     Platform::Module const Dacom = Platform::ModuleFind((Folder + "dacom.dylib").c_str()) != nullptr
                                        ? Platform::ModuleFind((Folder + "dacom.dylib").c_str())

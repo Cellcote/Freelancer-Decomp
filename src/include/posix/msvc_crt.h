@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <cwchar>
 #include <string>
 #include <vector>
 
@@ -39,6 +40,22 @@ inline int _stricmp(char const* Left, char const* Right)
 inline int _strnicmp(char const* Left, char const* Right, std::size_t Count)
 {
     return strncasecmp(Left, Right, Count);
+}
+// _wcsicmp: as MSVC's in the C locale, which lowers A-Z only; the difference of the first
+// characters that differ.
+inline int _wcsicmp(wchar_t const* Left, wchar_t const* Right)
+{
+    auto Lower = [](wchar_t Char) -> long
+    {
+        return (Char >= L'A' && Char <= L'Z') ? static_cast<long>(Char - L'A' + L'a')
+                                              : static_cast<long>(Char);
+    };
+    for (;; ++Left, ++Right)
+    {
+        long const Difference = Lower(*Left) - Lower(*Right);
+        if (Difference != 0 || *Left == 0)
+            return static_cast<int>(Difference);
+    }
 }
 inline int _memicmp(void const* Left, void const* Right, std::size_t Count)
 {
@@ -80,6 +97,67 @@ inline int _snprintf(char* Buffer, std::size_t Count, char const* Format, ...)
     va_list Args;
     va_start(Args, Format);
     int const Result = _vsnprintf(Buffer, Count, Format, Args);
+    va_end(Args);
+    return Result;
+}
+
+namespace PosixMsvcCrt
+{
+// A wide printf format in MSVC's legacy meaning made C's: in MSVC's wide functions %s and %c
+// take wide characters (C's %ls / %lc), and %S / %C, %hs / %hc take narrow ones (C's %s / %c).
+inline std::wstring WideFormat(wchar_t const* Format)
+{
+    std::wstring Out;
+    while (*Format != 0)
+    {
+        if (*Format != L'%')
+        {
+            Out += *Format++;
+            continue;
+        }
+        Out += *Format++;
+        if (*Format == L'%')
+        {
+            Out += *Format++;
+            continue;
+        }
+        // Flags, width, precision.
+        while (*Format != 0 && std::wcschr(L"-+ #0123456789.*", *Format) != nullptr)
+            Out += *Format++;
+        if ((*Format == L'h' || *Format == L'w' || *Format == L'l') &&
+            (Format[1] == L's' || Format[1] == L'c'))
+        {
+            if (*Format != L'h')
+                Out += L'l';
+            ++Format;
+            Out += *Format++;
+            continue;
+        }
+        if (*Format == L's' || *Format == L'c')
+        {
+            Out += L'l';
+            Out += *Format++;
+            continue;
+        }
+        if (*Format == L'S' || *Format == L'C')
+        {
+            Out += static_cast<wchar_t>(*Format == L'S' ? L's' : L'c');
+            ++Format;
+            continue;
+        }
+    }
+    return Out;
+}
+}
+
+// _swprintf: MSVC's legacy swprintf, with no buffer size (the caller's buffer is large enough,
+// as on Windows) and %s for a wide string. The length written, or -1.
+inline int _swprintf(wchar_t* Buffer, wchar_t const* Format, ...)
+{
+    std::wstring const CFormat = PosixMsvcCrt::WideFormat(Format);
+    va_list Args;
+    va_start(Args, Format);
+    int const Result = std::vswprintf(Buffer, 0x7FFFFFFF / sizeof(wchar_t), CFormat.c_str(), Args);
     va_end(Args);
     return Result;
 }

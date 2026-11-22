@@ -303,8 +303,8 @@ without the Windows API. Milestones:
   Windows sizes, the platform layer's structures under their Windows names, the MSVC CRT names
   with MSVC's behaviour (`posix/msvc_crt.h`), and small Win32 calls with an obvious meaning here.
   Larger APIs go through `Platform::` at the call site. `FL_POSIX_DLLMAIN` runs a module's
-  `DllMain` as it loads. So far: dacom, zlib, x86math, system, ReadFile, luaprofile, Thorn, EngBase, ximage,
-  Shading, flmaterials, RendComp, alchemy and Deformable2,
+  `DllMain` as it loads. So far: dacom, zlib, DALib, x86math, system, ReadFile, luaprofile, Thorn,
+  EngBase, ximage, Shading, flmaterials, RendComp, alchemy and Deformable2,
   loaded and checked by `src/PortTests/module_tests.cpp`. The POSIX handles are small numbers in a table, as Windows
   kernel handles are, so a file handle survives retail's 32-bit fields there too
   (`Platform::HandleToValue` / `HandleFromValue`, as HandleToULong / LongToHandle). The kernel32
@@ -331,6 +331,14 @@ without the Windows API. Milestones:
   MSVC's x86 intrinsics come from stand-ins too (`posix/intrin.h`, `posix/xmmintrin.h`): the
   compiler's own on x86, and on Apple Silicon an emulation of the scalar SSE operations with
   SSE's results (alchemy's retail-exact math).
+  DALib hosts through DPNet (docs/dpnet.md), as the x64 build does: module_tests makes its
+  `CDPServer` host on a UDP port. Its other Windows APIs are stand-ins in `src/include/posix`
+  too: COM's basics (`posix/unknwn.h`: GUID, IUnknown, the HRESULTs; `CoCreateInstance` finds no
+  class, as there is no COM), DirectPlay 8 (`posix/dplay8.h`, `posix/dpaddr.h`: the SDK's
+  values and vtable order, for DALib and DPNet's adapter, which are compiled from the same
+  header), Winsock over BSD sockets (`posix/winsock2.h`, `ws2tcpip.h`, `mstcpip.h`) and the
+  DirectSound interfaces the sound headers name (`posix/dsound.h`, declared only until M4).
+  `CDPClient`, the client's DirectPlay, has no DirectPlay class here yet.
 - **M3:** an SDL window to the main menu, drawn by RPGPU through Metal, without sound.
 - **M4:** audio, input and gameplay.
 

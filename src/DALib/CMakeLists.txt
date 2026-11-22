@@ -1,11 +1,15 @@
 # See cmake/Freelancer.cmake. The source list is the link order, and with it the order of
 # static initialisation.
 
-# PORT(dpnet) (docs/dpnet.md): the x64 build hosts through DPNet, the port's own DirectPlay 8,
-# instead of Microsoft's dpnet.dll. Win32 keeps Microsoft's, as retail. On x64 these sources
-# link first.
+# PORT(dpnet) (docs/dpnet.md): the x64 build and the macOS and Linux builds host through DPNet,
+# the port's own DirectPlay 8, instead of Microsoft's dpnet.dll. Win32 keeps Microsoft's, as
+# retail. There these sources link first.
+set(_fl_dpnet FALSE)
+if(FL_X64 OR NOT FL_WINDOWS)
+  set(_fl_dpnet TRUE)
+endif()
 set(_dpnet_sources)
-if(FL_X64)
+if(_fl_dpnet)
   set(_dpnet_sources
     DPNetAdapter.cpp
     ../DPNet/dpnet_wire.cpp
@@ -30,7 +34,7 @@ fl_add_module(DALib DLL RETAIL
 fl_includes(DALib AFTER_COMMON ../zlib/vendor)
 fl_defines(DALib DALIB_EXPORTS ZLIB_WINAPI)
 set(_dpnet_libs)
-if(FL_X64)
+if(_fl_dpnet)
   fl_includes(DALib AFTER_COMMON ../DPNet)
   fl_defines(DALib FREELANCER_DPNET)
   # Ahead of the others: the x64 link order since DPNet came in.

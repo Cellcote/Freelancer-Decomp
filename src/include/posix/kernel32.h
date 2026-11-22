@@ -575,3 +575,44 @@ inline void DeleteCriticalSection(LPCRITICAL_SECTION Lock)
 {
     Platform::LockDelete(Lock);
 }
+
+// ---------------------------------------------------------------------------------------------
+// Time, sleep, interlocked counters and the process id, over the platform layer
+// ---------------------------------------------------------------------------------------------
+
+inline DWORD GetTickCount()
+{
+    return Platform::TickCountMs();
+}
+inline void Sleep(DWORD Milliseconds)
+{
+    Platform::SleepMs(Milliseconds);
+}
+inline LONG InterlockedIncrement(LONG volatile* Value)
+{
+    return Platform::AtomicIncrement(Value);
+}
+inline LONG InterlockedDecrement(LONG volatile* Value)
+{
+    return Platform::AtomicDecrement(Value);
+}
+inline BOOL QueryPerformanceCounter(LARGE_INTEGER* Counter)
+{
+    std::int64_t Ticks = 0;
+    if (Counter == nullptr || !Platform::PerfCounter(&Ticks))
+        return FALSE;
+    Counter->QuadPart = Ticks;
+    return TRUE;
+}
+inline BOOL QueryPerformanceFrequency(LARGE_INTEGER* Frequency)
+{
+    std::int64_t TicksPerSecond = 0;
+    if (Frequency == nullptr || !Platform::PerfFrequency(&TicksPerSecond))
+        return FALSE;
+    Frequency->QuadPart = TicksPerSecond;
+    return TRUE;
+}
+inline DWORD GetCurrentProcessId()
+{
+    return static_cast<DWORD>(getpid());
+}

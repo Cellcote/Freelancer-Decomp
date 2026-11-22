@@ -361,3 +361,7 @@ BOOL WINAPI DllMain(HMODULE Module, DWORD Reason, LPVOID)
     }
     return TRUE;
 }
+
+#if !defined(_WIN32)
+FL_POSIX_DLLMAIN(DllMain) // PORT(macOS): run as the module loads (posix/windows.h)
+#endif

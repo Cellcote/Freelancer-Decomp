@@ -46,8 +46,11 @@ That keeps the protocol deterministic and testable.
 `IDirectPlay8Server` and `IDirectPlay8Address`. `CDPServer` takes its objects from
 `DPNetAdapter::CreateServer` / `CreateAddress` instead of `CoCreateInstance` when
 `FREELANCER_DPNET` is defined, and calls them exactly as it calls Microsoft's. The x64 build
-defines it (only x64 DALib compiles the DPNet sources); the Win32 build keeps Microsoft's
-`dpnet.dll`, as retail.
+and the macOS and Linux builds define it (only their DALib compiles the DPNet sources); the Win32
+build keeps Microsoft's `dpnet.dll`, as retail. On macOS and Linux the DirectPlay names come from a
+stand-in `<dplay8.h>` and the sockets from a stand-in `<winsock2.h>` over BSD sockets
+(`src/include/posix`); `CoCreateInstance` finds no DirectPlay class there, so the client
+(`CDPClient`) has no DirectPlay yet.
 
 - **Socket and thread:** one UDP socket bound like DirectPlay's TCP/IP service provider (all
   interfaces; the given port, else the first free one of 2302–2400), and a network thread that
