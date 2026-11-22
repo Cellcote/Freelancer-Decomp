@@ -212,7 +212,8 @@ namespace
 
         Platform::Handle const NamedA = Platform::EventCreate(true, false, "PortTestsEvent");
         Platform::Handle const NamedB = Platform::EventCreate(false, true, "PortTestsEvent");
-        Check(NamedA != nullptr && NamedA == NamedB, "a named event opens the existing one");
+        Check(NamedA != nullptr && NamedB != nullptr && NamedA != NamedB,
+              "a named event opens the existing one, with a handle of its own");
         Check(Platform::MutexCreate("PortTestsEvent") == nullptr, "a name taken by an event is no mutex");
         Platform::EventSet(NamedB);
         Platform::CloseHandle(NamedB);
@@ -235,6 +236,19 @@ namespace
               "an abandoned mutex is owned afterwards, and abandoned only once");
         Platform::MutexRelease(Mutex);
         Platform::CloseHandle(Mutex);
+
+        // Handles are small numbers, as Windows kernel handles: they survive a 32-bit field.
+        Platform::Handle const Small = Platform::EventCreate(true, true);
+        std::uint32_t const Stored = static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(Small));
+        Platform::Handle const Restored = reinterpret_cast<Platform::Handle>(static_cast<std::uintptr_t>(Stored));
+        Check(reinterpret_cast<std::uintptr_t>(Small) % 4 == 0 && Restored == Small &&
+                  Platform::WaitOne(Restored, 0) == Platform::kWaitSignaled,
+              "a handle round-trips through 32 bits");
+        Platform::CloseHandle(Small);
+        Check(Platform::WaitOne(Small, 0) == Platform::kWaitFailed && !Platform::CloseHandle(Small),
+              "a closed handle names nothing");
+        Check(Platform::WaitOne(reinterpret_cast<Platform::Handle>(std::uintptr_t{0x7FFF0}), 0) == Platform::kWaitFailed,
+              "a made-up handle names nothing");
 
         // A thread whose handle closes first still runs to its end.
         Platform::Handle const Done = Platform::EventCreate(true, false);
