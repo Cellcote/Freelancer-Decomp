@@ -3,7 +3,8 @@
 # Windows (from an x86 or x64 Developer Command Prompt, or Visual Studio's Open Folder):
 #   cmake --preset release            && cmake --build --preset release            (Win32, bin\)
 #   cmake --preset release-x64        && cmake --build --preset release-x64        (x64, bin_x64\)
-# Linux and macOS (the portable modules only, see cmake/Freelancer.cmake):
+# Linux and macOS (the portable modules and the client modules ported so far, see
+# cmake/Freelancer.cmake):
 #   cmake --preset portable && cmake --build --preset portable && ctest --preset portable
 
 # 3.27: `cmake -E env --modify` (the DX8 include order, cmake/Freelancer.cmake).
@@ -92,9 +93,11 @@ if(FL_WINDOWS)
     FLServer FLDedicated
     FLRegress RpcCodecTest TexConvertTest DPNetCheck MemoryDiagnostics)
 else()
-  # The modules that use no Windows API (fl_add_module's PORTABLE), DPNet with its tests, and
-  # PortTests, the checks of the port's platform headers (LowArena, HandleValue).
-  set(FL_PROJECTS qhull TexConvert DPNet PortTests)
+  # The modules that use no Windows API (fl_add_module's PORTABLE), DPNet with its tests, the
+  # client modules ported so far (M2: the stand-in <windows.h> of src/include/posix), and
+  # PortTests, the checks of the port's platform headers and of those modules (last: its
+  # module_tests depend on them).
+  set(FL_PROJECTS qhull TexConvert DPNet dacom zlib x86math system ReadFile luaprofile Thorn PortTests)
   enable_testing()
 endif()
 foreach(_project IN LISTS FL_PROJECTS)

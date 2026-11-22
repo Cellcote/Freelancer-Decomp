@@ -34,7 +34,7 @@ namespace
     // 0x400 entries via FSQRT + FDIVR qword 1.0, then (bits + 0x2000) >> 15. Match that x87 path.
     void BuildInvSqrtTable()
     {
-        const double One = 1.0;
+        [[maybe_unused]] const double One = 1.0;
         for (unsigned int Index = 0; Index < 0x400; ++Index)
         {
             unsigned int Bits = (Index | 0xFC00u) << 14;
@@ -259,7 +259,7 @@ namespace
 
     // Retail FSQRT + FDIVR dword 1.0 (DAT_06f730f8). quat_slerp (LAB_06f724d0)
     // uses this path, not table InvSqrt (FUN_06f72830).
-    float RecipSqrtFsqrt(float LenSq)
+    [[maybe_unused]] float RecipSqrtFsqrt(float LenSq)
     {
         const float One = 1.0f;
 #if defined(_M_IX86)
@@ -1944,3 +1944,7 @@ BOOL WINAPI DllMain(HINSTANCE Module, DWORD Reason, LPVOID /*Reserved*/)
     }
     return TRUE;
 }
+
+#if !defined(_WIN32)
+FL_POSIX_DLLMAIN(DllMain) // PORT(macOS): run as the module loads (posix/windows.h)
+#endif

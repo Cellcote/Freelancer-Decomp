@@ -291,10 +291,28 @@ without the Windows API. Milestones:
   (LowArena, HandleValue) become a 64-bit test (`FL_PTR64`, #118). Apple Silicon gives a 64-bit
   process no address below 4 GB, so there LowArena is one 2 GB reservation anywhere and the
   32-bit fields hold offsets into it: the handle sites go through `LowArena::Encode` / `Decode`,
-  plain casts on Windows (decided 2026-11-22; checked by `src/PortTests` on Linux and macOS). Clang reports the direct pointer-to-32-bit
+  plain casts on Windows (decided 2026-11-22; checked by `src/PortTests` on Linux and macOS).
+  There is one arena per process, held by dacom (`FL_LOW_ARENA_DEFINE_SHARED`): a header's
+  statics are per module on macOS and Linux, and an offset has to decode the same in every
+  module. Clang reports the direct pointer-to-32-bit
   casts as errors, but not the ones that narrow on purpose through `uintptr_t` / `intptr_t`
   (`PointerToDword`, `PhySys_InstanceId` and the like), so those get an audit of their own. The
   sites CodeRabbit listed on #108, #109 and #111 are the starting list.
+  The modules join the non-Windows build one at a time (`FL_PROJECTS` in `CMakeLists.txt`),
+  compiling against a stand-in `<windows.h>` in `src/include/posix`: the Windows types at their
+  Windows sizes, the platform layer's structures under their Windows names, the MSVC CRT names
+  with MSVC's behaviour (`posix/msvc_crt.h`), and small Win32 calls with an obvious meaning here.
+  Larger APIs go through `Platform::` at the call site. `FL_POSIX_DLLMAIN` runs a module's
+  `DllMain` as it loads. So far: dacom, zlib, x86math, system, ReadFile, luaprofile and Thorn,
+  loaded and checked by `src/PortTests/module_tests.cpp`. The POSIX handles are small numbers in a table, as Windows
+  kernel handles are, so a file handle survives retail's 32-bit fields there too
+  (`Platform::HandleToValue` / `HandleFromValue`, as HandleToULong / LongToHandle). The kernel32
+  file, mapping and memory calls the retail code makes directly are in `posix/kernel32.h`. A
+  retail 32-bit parameter that carries a pointer no caller passes (ReadFile's locked callback,
+  its `OVERLAPPED` in `Read`) is refused on 64-bit builds rather than cut.
+  EngBase is next, with an audit of its own: besides the instance handles (LowArena, so
+  `Encode` / `Decode`), its animation channels pass stack frames, channel data and sinks through
+  retail's 32-bit fields, which need a decision each.
 - **M3:** an SDL window to the main menu, drawn by RPGPU through Metal, without sound.
 - **M4:** audio, input and gameplay.
 

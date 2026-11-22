@@ -7,8 +7,10 @@
 // outside Windows. The same functions as the Win32 backend, with Win32's values, results and
 // structure layouts (x64-client-plan.md, phase 6, M2):
 //
-// - Handles are pointers to small objects (files, searches, threads, events, mutexes);
-//   InvalidHandle() is the all-ones value, as INVALID_HANDLE_VALUE.
+// - Handles are small numbers, as Windows kernel handles are (multiples of 4 from 4 up), naming
+//   objects in a table: files, searches, threads, events, mutexes. Retail keeps file handles in
+//   32-bit fields, which Windows' handles survive on x64, and so do these. InvalidHandle() is
+//   the all-ones value, as INVALID_HANDLE_VALUE; a value the table does not hold names nothing.
 // - Paths take '\' as well as '/', and each component is matched without regard to case: retail
 //   DATA\ spells names in mixed case that its ini files spell differently.
 // - Waits (WaitOne, WaitMany) follow WaitForSingleObject / WaitForMultipleObjects: an auto-reset
@@ -69,6 +71,13 @@ namespace Platform
 
     inline Handle InvalidHandle() { return reinterpret_cast<Handle>(static_cast<std::intptr_t>(-1)); }
 
+    // A handle in a 32-bit field and back, as HandleToULong / LongToHandle: retail keeps file
+    // handles in DWORDs. Handle values fit in 32 bits (Windows keeps kernel handles there on
+    // x64, and so does the POSIX backend); the way back sign-extends, so 0xFFFFFFFF is
+    // InvalidHandle() again.
+    inline FlULong HandleToValue(Handle Object) { return (FlULong)((std::uintptr_t)(Object)); }
+    inline Handle HandleFromValue(FlULong Value) { return (Handle)((std::intptr_t)((FlLong)(Value))); }
+
     namespace Detail
     {
         // Every handle points at one of these. References counts the open handles (and, for a
@@ -109,7 +118,82 @@ namespace Platform
             virtual bool Acquire() { return false; }
         };
 
-        inline bool Valid(Handle Object) { return Object != nullptr && Object != InvalidHandle(); }
+        // The handle table: slot N is handle (N + 1) * 4. Free slots are reused, as Windows
+        // reuses handle values. Lock order: WaitLock, then this one.
+        struct FHandles
+        {
+            std::mutex Lock;
+            std::vector<FObject*> Slots;
+            std::vector<std::size_t> Free;
+        };
+        inline FHandles& Handles()
+        {
+            static FHandles Table;
+            return Table;
+        }
+
+        // A new handle for Object (which it now holds a reference of), or nullptr when the table
+        // cannot grow.
+        inline Handle NewHandle(FObject* Object)
+        {
+            if (Object == nullptr)
+                return nullptr;
+            FHandles& Table = Handles();
+            std::lock_guard<std::mutex> Lock(Table.Lock);
+            try
+            {
+                std::size_t Slot;
+                if (!Table.Free.empty())
+                {
+                    Slot = Table.Free.back();
+                    Table.Free.pop_back();
+                    Table.Slots[Slot] = Object;
+                }
+                else
+                {
+                    if (Table.Slots.size() >= 0x3FFFFFFEu)
+                        return nullptr; // (Slot + 1) * 4 must stay below 0xFFFFFFFF
+                    Slot = Table.Slots.size();
+                    Table.Slots.push_back(Object);
+                }
+                return reinterpret_cast<Handle>(static_cast<std::uintptr_t>((Slot + 1) * 4));
+            }
+            catch (std::bad_alloc const&)
+            {
+                return nullptr;
+            }
+        }
+
+        // The table slot a handle value names, or -1.
+        inline std::ptrdiff_t SlotOf(Handle Value)
+        {
+            std::uintptr_t const Number = reinterpret_cast<std::uintptr_t>(Value);
+            if (Number < 4 || Number % 4 != 0)
+                return -1;
+            return static_cast<std::ptrdiff_t>(Number / 4 - 1);
+        }
+
+        // The object a handle names, or nullptr (a closed or made-up value, nullptr,
+        // InvalidHandle()). Not a reference: closing the handle on another thread meanwhile is
+        // the caller's race, as on Windows.
+        inline FObject* Lookup(Handle Value)
+        {
+            std::ptrdiff_t const Slot = SlotOf(Value);
+            if (Slot < 0)
+                return nullptr;
+            FHandles& Table = Handles();
+            std::lock_guard<std::mutex> Lock(Table.Lock);
+            return static_cast<std::size_t>(Slot) < Table.Slots.size() ? Table.Slots[Slot] : nullptr;
+        }
+
+        inline bool Valid(Handle Value) { return Lookup(Value) != nullptr; }
+
+        // The object behind a handle as a T, or nullptr when it names nothing or something else.
+        template <class T>
+        T* As(Handle Value)
+        {
+            return dynamic_cast<T*>(Lookup(Value));
+        }
 
         // The named events and mutexes of this process, under WaitLock.
         inline std::map<std::string, FObject*>& Names()
@@ -133,12 +217,30 @@ namespace Platform
         }
     }
 
-    // CloseHandle: releases the handle's reference.
-    inline bool CloseHandle(Handle Object)
+    // CloseHandle: frees the handle value and releases its reference.
+    inline bool CloseHandle(Handle Value)
     {
-        if (!Detail::Valid(Object))
+        std::ptrdiff_t const Slot = Detail::SlotOf(Value);
+        if (Slot < 0)
             return false;
-        Detail::Release(static_cast<Detail::FObject*>(Object));
+        Detail::FObject* Object = nullptr;
+        {
+            Detail::FHandles& Table = Detail::Handles();
+            std::lock_guard<std::mutex> Lock(Table.Lock);
+            if (static_cast<std::size_t>(Slot) >= Table.Slots.size() || Table.Slots[Slot] == nullptr)
+                return false;
+            Object = Table.Slots[Slot];
+            Table.Slots[Slot] = nullptr;
+            try
+            {
+                Table.Free.push_back(static_cast<std::size_t>(Slot));
+            }
+            catch (std::bad_alloc const&)
+            {
+                // The value is not reused; nothing else is lost.
+            }
+        }
+        Detail::Release(Object);
         return true;
     }
 
@@ -278,7 +380,13 @@ namespace Platform
             return InvalidHandle();
         }
         File->Descriptor = Descriptor;
-        return File;
+        Handle const Value = Detail::NewHandle(File);
+        if (Value == nullptr)
+        {
+            delete File; // closes Descriptor
+            return InvalidHandle();
+        }
+        return Value;
     }
 
     // ReadFile, synchronous: reads until Size bytes or the end of the file.
@@ -286,9 +394,10 @@ namespace Platform
     {
         if (BytesRead != nullptr)
             *BytesRead = 0;
-        if (!Detail::Valid(File))
+        Detail::FFile* const Object = Detail::As<Detail::FFile>(File);
+        if (Object == nullptr)
             return false;
-        int const Descriptor = static_cast<Detail::FFile*>(File)->Descriptor;
+        int const Descriptor = Object->Descriptor;
         FlULong Done = 0;
         while (Done < Size)
         {
@@ -311,9 +420,10 @@ namespace Platform
     {
         if (BytesWritten != nullptr)
             *BytesWritten = 0;
-        if (!Detail::Valid(File))
+        Detail::FFile* const Object = Detail::As<Detail::FFile>(File);
+        if (Object == nullptr)
             return false;
-        int const Descriptor = static_cast<Detail::FFile*>(File)->Descriptor;
+        int const Descriptor = Object->Descriptor;
         FlULong Done = 0;
         while (Done < Size)
         {
@@ -333,7 +443,8 @@ namespace Platform
     inline FlULong FileGetSize(Handle File)
     {
         struct stat Info;
-        if (!Detail::Valid(File) || fstat(static_cast<Detail::FFile*>(File)->Descriptor, &Info) != 0)
+        Detail::FFile* const Object = Detail::As<Detail::FFile>(File);
+        if (Object == nullptr || fstat(Object->Descriptor, &Info) != 0)
             return 0xFFFFFFFFu;
         return static_cast<FlULong>(static_cast<std::uint64_t>(Info.st_size) & 0xFFFFFFFFu);
     }
@@ -533,18 +644,21 @@ namespace Platform
         Search->Directory = Detail::ResolvePath(Slash == std::string::npos ? "." : Text.substr(0, Slash).c_str());
         Search->Pattern = Slash == std::string::npos ? Text : Text.substr(Slash + 1);
         Search->Entries = opendir(Search->Directory.c_str());
-        if (Search->Entries == nullptr || !Detail::NextMatch(Search, Data))
+        Handle Value = nullptr;
+        if (Search->Entries == nullptr || !Detail::NextMatch(Search, Data) ||
+            (Value = Detail::NewHandle(Search)) == nullptr)
         {
             delete Search;
             return InvalidHandle();
         }
-        return Search;
+        return Value;
     }
 
     // FindNextFileA.
     inline bool FindNext(Handle Search, FindData* Data)
     {
-        return Detail::Valid(Search) && Detail::NextMatch(static_cast<Detail::FFind*>(Search), Data);
+        Detail::FFind* const Object = Detail::As<Detail::FFind>(Search);
+        return Object != nullptr && Detail::NextMatch(Object, Data);
     }
 
     // FindClose.
@@ -641,16 +755,7 @@ namespace Platform
         }
 
         // The waitable object behind a handle, or nullptr (a file, a search, a closed value).
-        inline FWaitable* Waitable(Handle Object)
-        {
-            return Valid(Object) ? dynamic_cast<FWaitable*>(static_cast<FObject*>(Object)) : nullptr;
-        }
-
-        template <class T>
-        T* As(Handle Object)
-        {
-            return Valid(Object) ? dynamic_cast<T*>(static_cast<FObject*>(Object)) : nullptr;
-        }
+        inline FWaitable* Waitable(Handle Object) { return As<FWaitable>(Object); }
 
         // Waits for one object (WaitAll false: any, true: all), as WaitForMultipleObjects. An
         // abandoned mutex returns kWaitAbandoned (+ its index when WaitAll is false).
@@ -705,28 +810,37 @@ namespace Platform
         template <class T, class FMake>
         Handle OpenOrCreate(char const* Name, FMake Make)
         {
-            if (Name == nullptr || *Name == 0)
+            T* Object = nullptr;
             {
                 std::lock_guard<std::mutex> Lock(WaitLock());
-                return Make();
+                if (Name == nullptr || *Name == 0)
+                {
+                    Object = Make();
+                }
+                else
+                {
+                    auto const Found = Names().find(Name);
+                    if (Found != Names().end())
+                    {
+                        Object = dynamic_cast<T*>(Found->second);
+                        if (Object == nullptr)
+                            return nullptr;
+                        ++Object->References;
+                    }
+                    else if ((Object = Make()) != nullptr)
+                    {
+                        Object->Name = Name;
+                        Names().emplace(Name, Object);
+                    }
+                }
             }
-            std::lock_guard<std::mutex> Lock(WaitLock());
-            auto const Found = Names().find(Name);
-            if (Found != Names().end())
-            {
-                T* const Existing = dynamic_cast<T*>(Found->second);
-                if (Existing == nullptr)
-                    return nullptr;
-                ++Existing->References;
-                return Existing;
-            }
-            T* const Created = Make();
-            if (Created != nullptr)
-            {
-                Created->Name = Name;
-                Names().emplace(Name, Created);
-            }
-            return Created;
+            if (Object == nullptr)
+                return nullptr;
+            // A handle of its own, also for an object that already existed (as on Windows).
+            Handle const Value = NewHandle(Object);
+            if (Value == nullptr)
+                Release(Object);
+            return Value;
         }
     }
 
@@ -905,11 +1019,22 @@ namespace Platform
             delete Thread;
             return nullptr;
         }
-        std::unique_lock<std::mutex> Lock(Detail::WaitLock());
-        Detail::WaitSignal().wait(Lock, [Thread] { return Thread->Id != 0; });
+        FlULong Id = 0;
+        {
+            std::unique_lock<std::mutex> Lock(Detail::WaitLock());
+            Detail::WaitSignal().wait(Lock, [Thread] { return Thread->Id != 0; });
+            Id = Thread->Id;
+        }
+        Handle const Value = Detail::NewHandle(Thread);
+        if (Value == nullptr)
+        {
+            // No handle: the thread runs on, unseen, as one whose handle was closed.
+            Detail::Release(Thread);
+            return nullptr;
+        }
         if (ThreadId != nullptr)
-            *ThreadId = Thread->Id;
-        return Thread;
+            *ThreadId = Id;
+        return Value;
     }
 
     // ResumeThread: the previous suspend count, or 0xffffffff on failure.
@@ -933,7 +1058,7 @@ namespace Platform
     inline bool ThreadSetPriority(Handle Thread, int Priority)
     {
         (void)Priority;
-        return Detail::Valid(Thread);
+        return Detail::As<Detail::FThread>(Thread) != nullptr;
     }
 
     // TerminateThread: POSIX has no safe equivalent, so it fails.

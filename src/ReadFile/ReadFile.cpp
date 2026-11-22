@@ -39,11 +39,20 @@ namespace
     {
         // FUN_06b76410: lock DAT_06b7a224+0x154, stdcall Callback(Arg0, Arg1)
         // unconditionally, unlock, return its result.
+#if defined(FL_PTR64)
+        // PORT(x64): a code address does not fit the retail 32-bit Callback, and no caller in the
+        // game passes one (IFileSystem slot A0 has no users), so 64-bit builds refuse the call.
+        (void)Arg0;
+        (void)Callback;
+        (void)Arg1;
+        return 0;
+#else
         typedef int(__stdcall* FLockedCall)(FlULong, FlULong);
         Platform::LockEnter(G_DosRootLock);
         const int Result = ((FLockedCall)(Callback))(Arg0, Arg1);
         Platform::LockLeave(G_DosRootLock);
         return Result;
+#endif
     }
 
     void CopyPath(char* Dest, FlULong DestChars, const char* Source)
@@ -739,10 +748,10 @@ namespace
             return 1;
         }
 
-        bool GetFileTimes(FlULong HandleValue, FILETIME* Creation, FILETIME* Access,
+        bool GetFileTimes(FlULong Value, FILETIME* Creation, FILETIME* Access,
                           FILETIME* Write) const
         {
-            if (HandleValue == 0)
+            if (Value == 0)
                 return false;
             if (!bNode2C)
             {
@@ -754,9 +763,10 @@ namespace
                     *Write = ArchiveTimes[2];
                 return true;
             }
-            if (HandleValue == 0xFFFFFFFFu)
+            if (Value == 0xFFFFFFFFu)
                 return false;
-            const unsigned char* Node = ((const FUtfHandle*)(HandleValue))->Node;
+            // PORT(x64): Value is a HandleValue id (callers pass HandleValue::Of(handle)).
+            const unsigned char* Node = HandleValue::To<const FUtfHandle>(Value)->Node;
             if (Node == nullptr)
                 return false;
             if (Creation != nullptr)
@@ -1009,7 +1019,7 @@ namespace
         {
             if (Handle != 0)
                 return Handle;
-            return (FlULong)(FileHandle);
+            return Platform::HandleToValue(FileHandle);
         }
 
         void CopyNestedLastError()
@@ -1057,7 +1067,7 @@ namespace
 
         int DACOM_API CloseFile(FlULong Handle) override
         {
-            const FlULong Current = (FlULong)(FileHandle);
+            const FlULong Current = Platform::HandleToValue(FileHandle);
             if (Handle == 0 || Handle == Current)
             {
                 LastError = 6;
@@ -1205,7 +1215,7 @@ namespace
             if (NestedChild != nullptr)
                 Result = NestedChild->GetSize(NestedHandle(Handle), HighOut);
             else
-                Result = GetFileSize((HANDLE)(NestedHandle(Handle)),
+                Result = GetFileSize(Platform::HandleFromValue(NestedHandle(Handle)),
                                      HighOut);
             if (Result == 0xFFFFFFFFu)
                 CopyNestedLastError();
@@ -1234,7 +1244,7 @@ namespace
             if (NestedChild != nullptr)
                 Result = NestedChild->GetFileTimes(NestedHandle(Handle), CreationOut, AccessOut, WriteOut);
             else
-                Result = GetFileTime((HANDLE)(NestedHandle(Handle)),
+                Result = GetFileTime(Platform::HandleFromValue(NestedHandle(Handle)),
                                      CreationOut,
                                      AccessOut,
                                      WriteOut);
@@ -1470,7 +1480,7 @@ namespace
         int DACOM_API OpenByDesc(FFileSystemDesc* Desc) override
         {
             if (Desc == nullptr)
-                return (int)((FlULong)(FileHandle));
+                return (int)(Platform::HandleToValue(FileHandle));
             if (bFileInstance != 0 || Desc->Path == nullptr)
             {
                 LastError = 2;
@@ -1495,7 +1505,7 @@ namespace
                 LastError = 2;
                 return -1;
             }
-            return (int)((FlULong)(Opened));
+            return (int)(Platform::HandleToValue(Opened));
         }
         // formerly Slot80
         int DACOM_API GetFilePosition(FlULong Handle, FlULong* HighOut) override
@@ -1574,11 +1584,16 @@ namespace
         {
             if (NestedChild != nullptr)
                 return NestedChild->InvokeLockedCallback(Arg0, Callback, Arg1);
+#if defined(FL_PTR64)
+            // PORT(x64): refused on 64-bit builds, as InvokeDosRootLockedCall.
+            return 0;
+#else
             typedef int(__stdcall* FLockedCall)(FlULong, FlULong);
             Platform::LockEnter(&Lock);
             const int Result = ((FLockedCall)(Callback))(Arg0, Arg1);
             Platform::LockLeave(&Lock);
             return Result;
+#endif
         }
         // formerly SlotA4
         int DACOM_API ResolvePath(char* Dest, const char* Src, FlULong DestChars) override
@@ -1621,7 +1636,7 @@ namespace
             if (File == INVALID_HANDLE_VALUE)
                 return INVALID_HANDLE_VALUE;
 
-            const FlULong Key = (FlULong)(File);
+            const FlULong Key = Platform::HandleToValue(File);
             if (OpenFiles.contains(Key))
                 return INVALID_HANDLE_VALUE;
             FDosOpenFile* Open = new FDosOpenFile();
@@ -1657,7 +1672,7 @@ namespace
         {
             FlULong Key = Handle;
             if (Key == 0)
-                Key = (FlULong)(FileHandle);
+                Key = Platform::HandleToValue(FileHandle);
             if (Key == 0 || Key == 0xFFFFFFFFu)
                 return nullptr;
             std::map<FlULong, FDosOpenFile*>::iterator It = OpenFiles.find(Key);
@@ -1669,7 +1684,7 @@ namespace
         void AdoptCurrentFile(HANDLE Opened)
         {
             FileHandle = Opened;
-            FDosOpenFile* Open = FindOpenFile((FlULong)(Opened));
+            FDosOpenFile* Open = FindOpenFile(Platform::HandleToValue(Opened));
             if (Open == nullptr)
             {
                 MappingHandle = nullptr;
@@ -1848,7 +1863,7 @@ namespace
             if (FsDesc->Parent != nullptr)
             {
                 Child->AttachNestedChild((IFileSystem*)(FsDesc->Parent));
-                Child->FileHandle = (HANDLE)(FsDesc->Extra);
+                Child->FileHandle = Platform::HandleFromValue(FsDesc->Extra);
                 Child->bFileInstance = 1;
                 Child->AccessFlags = FsDesc->Access;
                 std::strncpy(RootPath, FsDesc->Path, 0x108);
@@ -1955,13 +1970,13 @@ namespace
                 CopyNestedLastError();
                 return 0;
             }
-            return (int)((FlULong)(Found));
+            return (int)(Platform::HandleToValue(Found));
         }
 
         // formerly Slot4C
         int DACOM_API FindNext(FlULong Handle, WIN32_FIND_DATAA* FindData) override
         {
-            const BOOL Result = Platform::FindNext((HANDLE)(Handle),
+            const BOOL Result = Platform::FindNext(Platform::HandleFromValue(Handle),
                                                    FindData) ? TRUE : FALSE;
             if (Result == 0)
                 CopyNestedLastError();
@@ -1971,7 +1986,7 @@ namespace
         // formerly Slot50
         int DACOM_API FindClose(FlULong Handle) override
         {
-            const BOOL Result = Platform::FindClose((HANDLE)(Handle)) ? TRUE : FALSE;
+            const BOOL Result = Platform::FindClose(Platform::HandleFromValue(Handle)) ? TRUE : FALSE;
             if (Result == 0)
                 CopyNestedLastError();
             return Result;
@@ -3158,7 +3173,16 @@ namespace
             if (Handle != 0)
                 return 0;
             if (Extra != 0)
+            {
+#if defined(FL_PTR64)
+                // PORT(x64): Extra is an OVERLAPPED* in retail (Offset at +8), which the 32-bit
+                // parameter cannot carry on 64-bit builds. No caller in the game passes one (they
+                // pass 0), so 64-bit builds refuse the read instead of reading a cut pointer.
+                return 0;
+#else
                 MappedPos = *(FlULong*)(Extra + 8);
+#endif
+            }
             if (MappedPos > LogicalSize)
                 MappedPos = LogicalSize;
             FlULong Remain = 0;
@@ -3546,3 +3570,7 @@ BOOL WINAPI DllMain(HINSTANCE Instance, DWORD Reason, LPVOID /*Reserved*/)
     }
     return TRUE;
 }
+
+#if !defined(_WIN32)
+FL_POSIX_DLLMAIN(DllMain) // PORT(macOS): run as the module loads (posix/windows.h)
+#endif
