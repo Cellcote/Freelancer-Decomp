@@ -110,7 +110,7 @@ static bool MarshalCh3DwordByRefAt(FPacketBase* Packet, const RpcArg* Args, unsi
 
 // Nothing is serialized at all. ch3 0x05, 0x10, 0x38, 0x42 -- the whole call is the
 // opcode plus the implicit session.
-static bool MarshalCh3Empty(FPacketBase*, const unsigned int*, unsigned int) {
+static bool MarshalCh3Empty(FPacketBase*, const RpcArg*, unsigned int) {
     return true;
 }
 

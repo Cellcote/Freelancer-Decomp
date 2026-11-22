@@ -386,7 +386,7 @@ public:
             // 06d8efeb MOV ECX,[ESI+0x8] / TEST / JZ 06d8f01d -- no serializer (Startup
             // has not run), no CONNECTRESPONSE; the drain below still runs.
             if (Serializer != nullptr) {
-                const unsigned int NoArgs[1] = { 0 };
+                const RpcArg NoArgs[1] = { 0 };
                 SendPacketEx(2, 0x01, 1u, NoArgs, 0);   // FLPACKET_SERVER_CONNECTRESPONSE
             }
         }

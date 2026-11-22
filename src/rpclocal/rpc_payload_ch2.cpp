@@ -143,7 +143,7 @@ static bool MarshalCh2BlobReversed(FPacketBase* Packet, const RpcArg* Args, unsi
 // Types whose payload is empty: the sender allocates the packet and pushes it straight at
 // slot 9 (FLPACKET_SERVER_REVERT_CAMERA 0x06d8af20, FLPACKET_SERVER_CANCEL_MUSIC
 // 0x06d8c6e0). Registry size 0x20, i.e. the bare CDAPacket base.
-static bool MarshalCh2Empty(FPacketBase*, const unsigned int*, unsigned int) {
+static bool MarshalCh2Empty(FPacketBase*, const RpcArg*, unsigned int) {
     return true;
 }
 
@@ -1104,7 +1104,7 @@ static bool DeliverSetCollisionGroups(const FPacketBase* Packet, IClient* Client
 // ch2 0x01 FLPACKET_SERVER_CONNECTRESPONSE. Retail's sender lives inside the pump
 // FUN_06d8efc0, not in an IClient slot, and the payload is a literal.
 // ===========================================================================
-static bool MarshalConnectResponse(FPacketBase* Packet, const unsigned int*, unsigned int) {
+static bool MarshalConnectResponse(FPacketBase* Packet, const RpcArg*, unsigned int) {
     FPayloadServerConnectResponse Wire;
     Wire.Field_0x00 = 1u;   // retail: `MOV dword ptr [ECX + 0x20],0x1`
     return RpcPayloadWrite(Packet, 0, Wire);
