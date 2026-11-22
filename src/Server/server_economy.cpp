@@ -359,6 +359,8 @@ bool Ledger_OnGoodBuy(PlayerSlot& Slot, unsigned int SessionId, SGFGoodBuyInfo c
             return false;
         Ledger.FreeAmmoLeft -= static_cast<int>(Count);
         Ledger.Allowance[Good->ArchId] += Count;
+        if (bSoldBack && !Sells(Base, GoodId))
+            Sold->second -= Count;
         return true;
     }
     if (bOk)
