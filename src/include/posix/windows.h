@@ -36,6 +36,7 @@
 #include <string>
 
 #include <dlfcn.h>
+#include <strings.h>
 
 // ---------------------------------------------------------------------------------------------
 // Calling conventions and declaration attributes
@@ -249,9 +250,11 @@ inline void PostQuitMessage(int) {}
 inline BOOL DisableThreadLibraryCalls(HMODULE) { return TRUE; }
 
 // SearchPathA with a Path list (';'-separated folders): the first folder that holds FileName,
-// without regard to case. FilePart may be nullptr. The length written, or the size needed when
-// Buffer is too small, or 0 when it is not found. A null Path (the system's search order) looks
-// in the current folder only. Extension is not supported (callers pass nullptr).
+// without regard to case. A module's Windows name (system.dll) also finds the module this
+// platform builds (system.dylib / system.so), whose path is then the answer, for LoadLibraryA
+// (Platform::ModuleLoad) to load. FilePart may be nullptr. The length written, or the size
+// needed when Buffer is too small, or 0 when it is not found. A null Path (the system's search
+// order) looks in the current folder only. Extension is not supported (callers pass nullptr).
 inline DWORD SearchPathA(LPCSTR Path, LPCSTR FileName, LPCSTR Extension, DWORD BufferLength, LPSTR Buffer,
                          LPSTR* FilePart)
 {
@@ -272,9 +275,23 @@ inline DWORD SearchPathA(LPCSTR Path, LPCSTR FileName, LPCSTR Extension, DWORD B
         if (Candidate.back() != '\\' && Candidate.back() != '/')
             Candidate += '\\';
         Candidate += FileName;
-        DWORD const Attributes = Platform::PathAttributes(Candidate.c_str());
-        if (Attributes == Platform::kInvalidAttributes || (Attributes & Platform::kAttributeDirectory) != 0)
-            continue;
+        auto IsFile = [](std::string const& Name) {
+            DWORD const Attributes = Platform::PathAttributes(Name.c_str());
+            return Attributes != Platform::kInvalidAttributes && (Attributes & Platform::kAttributeDirectory) == 0;
+        };
+        if (!IsFile(Candidate))
+        {
+            std::size_t const Length = Candidate.size();
+            if (Length <= 4 || strcasecmp(Candidate.c_str() + Length - 4, ".dll") != 0)
+                continue;
+#if defined(__APPLE__)
+            Candidate.replace(Length - 4, 4, ".dylib");
+#else
+            Candidate.replace(Length - 4, 4, ".so");
+#endif
+            if (!IsFile(Candidate))
+                continue;
+        }
         char Full[4096];
         char* Name = nullptr;
         DWORD const Length = Platform::FullPath(Candidate.c_str(), Full, sizeof(Full), &Name);
