@@ -24,11 +24,16 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <memory>
+#include <new>
 #include <string>
+#include <utility>
 #include <vector>
 
 // d3dx9.h after RP9.h (render/d3d8_min.h already pulled the Windows SDK d3d9.h).
 #include <d3dx9.h>
+
+using Microsoft::WRL::ComPtr;
 
 namespace
 {
@@ -145,7 +150,10 @@ namespace
                        FileName);
                 return E_FAIL;
             }
-            char* Copy = new char[Data.size() + 1];
+            // No throwing new in a COM_DECLSPEC_NOTHROW callback.
+            char* Copy = new (std::nothrow) char[Data.size() + 1];
+            if (Copy == nullptr)
+                return E_OUTOFMEMORY;
             if (!Data.empty())
                 memcpy(Copy, &Data[0], Data.size());
             Copy[Data.size()] = '\0';
@@ -171,11 +179,11 @@ namespace
                       const std::string& Entry, const char* Profile,
                       std::vector<unsigned char>* OutCode)
     {
-        LPD3DXBUFFER Code = nullptr;
-        LPD3DXBUFFER Errors = nullptr;
+        ComPtr<ID3DXBuffer> Code;
+        ComPtr<ID3DXBuffer> Errors;
         const HRESULT Hr = D3DXCompileShader(Source.c_str(), (UINT)(Source.size()), nullptr,
-                                             Include, Entry.c_str(), Profile, 0, &Code,
-                                             &Errors, nullptr);
+                                             Include, Entry.c_str(), Profile, 0,
+                                             Code.GetAddressOf(), Errors.GetAddressOf(), nullptr);
         const bool bOk = SUCCEEDED(Hr) && Code != nullptr;
         if (!bOk)
             ExLogf(kExFdumpError, "ERROR", __LINE__, "%s: %s %s failed to compile (hr 0x%08x)",
@@ -186,17 +194,11 @@ namespace
             if (Text != nullptr)
                 ExLog(bOk ? kExFdumpWarning : kExFdumpError, bOk ? "WARNING" : "ERROR",
                       __LINE__, Text);
-            Errors->Release();
         }
         if (!bOk)
-        {
-            if (Code != nullptr)
-                Code->Release();
             return false;
-        }
         const unsigned char* Bytes = (const unsigned char*)(Code->GetBufferPointer());
         OutCode->assign(Bytes, Bytes + Code->GetBufferSize());
-        Code->Release();
         return true;
     }
 
@@ -207,9 +209,11 @@ namespace
             return S_OK;
         HRESULT Hr = S_OK;
         if (Program->Vs == nullptr)
-            Hr = Device->CreateVertexShader((const DWORD*)(&Program->VsBytecode[0]), &Program->Vs);
+            Hr = Device->CreateVertexShader((const DWORD*)(&Program->VsBytecode[0]),
+                                            Program->Vs.GetAddressOf());
         if (SUCCEEDED(Hr) && Program->Ps == nullptr)
-            Hr = Device->CreatePixelShader((const DWORD*)(&Program->PsBytecode[0]), &Program->Ps);
+            Hr = Device->CreatePixelShader((const DWORD*)(&Program->PsBytecode[0]),
+                                           Program->Ps.GetAddressOf());
         if (FAILED(Hr))
             ExLogf(kExFdumpError, "ERROR", __LINE__, "%s: creating the shaders failed (hr 0x%08x)",
                    Program->Path.c_str(), (unsigned int)(Hr));
@@ -218,16 +222,8 @@ namespace
 
     void ReleaseProgramShaders(FRPExProgram* Program)
     {
-        if (Program->Vs != nullptr)
-        {
-            Program->Vs->Release();
-            Program->Vs = nullptr;
-        }
-        if (Program->Ps != nullptr)
-        {
-            Program->Ps->Release();
-            Program->Ps = nullptr;
-        }
+        Program->Vs.Reset();
+        Program->Ps.Reset();
     }
 
     // Read + compile both stages; only when both compiled (and, with a device, both shader
@@ -236,7 +232,7 @@ namespace
     bool CompileProgram(IDirect3DDevice9* Device, FRPExProgram* Program)
     {
         std::vector<char> File;
-        if (!ReadFsFile(Program->FileSystem, Program->Path.c_str(), &File))
+        if (!ReadFsFile(Program->FileSystem.Get(), Program->Path.c_str(), &File))
         {
             ExLogf(kExFdumpError, "ERROR", __LINE__, "%s: cannot read the shader file",
                    Program->Path.c_str());
@@ -250,7 +246,7 @@ namespace
         if (!File.empty())
             Source.append(&File[0], File.size());
 
-        FRp9ExShaderInclude Include(Program->FileSystem, DirectoryOf(Program->Path));
+        FRp9ExShaderInclude Include(Program->FileSystem.Get(), DirectoryOf(Program->Path));
         std::vector<unsigned char> VsCode;
         std::vector<unsigned char> PsCode;
         const bool bVs = CompileStage(Source, Program->Path, &Include, Program->VsEntry, "vs_3_0",
@@ -266,19 +262,12 @@ namespace
         }
 
         FRPExProgram Fresh;
-        Fresh.FileSystem = nullptr;
-        Fresh.Vs = nullptr;
-        Fresh.Ps = nullptr;
         Fresh.VsBytecode.swap(VsCode);
         Fresh.PsBytecode.swap(PsCode);
         if (FAILED(CreateProgramShaders(Device, &Fresh)))
-        {
-            ReleaseProgramShaders(&Fresh);
             return false;
-        }
-        ReleaseProgramShaders(Program);
-        Program->Vs = Fresh.Vs;
-        Program->Ps = Fresh.Ps;
+        Program->Vs = std::move(Fresh.Vs);
+        Program->Ps = std::move(Fresh.Ps);
         Program->VsBytecode.swap(Fresh.VsBytecode);
         Program->PsBytecode.swap(Fresh.PsBytecode);
         ExLogf(kExFdumpNotice, "NOTICE", __LINE__, "%s: compiled (%s, %s)", Program->Path.c_str(),
@@ -303,16 +292,8 @@ namespace
 
     void ReleaseExTextureGpu(FRPExTexture* Texture)
     {
-        if (Texture->Surface != nullptr)
-        {
-            Texture->Surface->Release();
-            Texture->Surface = nullptr;
-        }
-        if (Texture->Texture != nullptr)
-        {
-            Texture->Texture->Release();
-            Texture->Texture = nullptr;
-        }
+        Texture->Surface.Reset();
+        Texture->Texture.Reset();
     }
 
     // A D3DPOOL_DEFAULT render target at its requested size (absolute, or a fraction of the
@@ -333,23 +314,22 @@ namespace
             Height = 1;
         unsigned long Bytes = 0;
         const D3DFORMAT Format = ExFormatToD3d(Target->Format, &Bytes);
-        IDirect3DTexture9* Texture = nullptr;
+        ComPtr<IDirect3DTexture9> Texture;
         HRESULT Hr = Device->CreateTexture((UINT)(Width), (UINT)(Height), 1, D3DUSAGE_RENDERTARGET,
-                                           Format, D3DPOOL_DEFAULT, &Texture, nullptr);
-        IDirect3DSurface9* Surface = nullptr;
+                                           Format, D3DPOOL_DEFAULT, Texture.GetAddressOf(),
+                                           nullptr);
+        ComPtr<IDirect3DSurface9> Surface;
         if (SUCCEEDED(Hr))
-            Hr = Texture->GetSurfaceLevel(0, &Surface);
+            Hr = Texture->GetSurfaceLevel(0, Surface.GetAddressOf());
         if (FAILED(Hr))
         {
-            if (Texture != nullptr)
-                Texture->Release();
             ExLogf(kExFdumpWarning, "WARNING", __LINE__,
                    "render target %lux%lu (format %u) could not be created (hr 0x%08x)", Width,
                    Height, (unsigned int)(Target->Format), (unsigned int)(Hr));
             return Hr;
         }
-        Target->Texture = Texture;
-        Target->Surface = Surface;
+        Target->Texture = std::move(Texture);
+        Target->Surface = std::move(Surface);
         Target->Width = Width;
         Target->Height = Height;
         return S_OK;
@@ -360,10 +340,10 @@ namespace
     {
         unsigned long Bytes = 0;
         const D3DFORMAT Format = ExFormatToD3d(Volume->Format, &Bytes);
-        IDirect3DVolumeTexture9* Texture = nullptr;
+        ComPtr<IDirect3DVolumeTexture9> Texture;
         HRESULT Hr = Device->CreateVolumeTexture((UINT)(Volume->Width), (UINT)(Volume->Height),
                                                  (UINT)(Volume->Depth), 1, 0, Format,
-                                                 D3DPOOL_MANAGED, &Texture, nullptr);
+                                                 D3DPOOL_MANAGED, Texture.GetAddressOf(), nullptr);
         if (SUCCEEDED(Hr))
         {
             D3DLOCKED_BOX Box;
@@ -391,15 +371,13 @@ namespace
         }
         if (FAILED(Hr))
         {
-            if (Texture != nullptr)
-                Texture->Release();
             ExLogf(kExFdumpWarning, "WARNING", __LINE__,
                    "volume texture %lux%lux%lu (format %u) could not be created (hr 0x%08x)",
                    Volume->Width, Volume->Height, Volume->Depth, (unsigned int)(Volume->Format),
                    (unsigned int)(Hr));
             return Hr;
         }
-        Volume->Texture = Texture;
+        Volume->Texture = std::move(Texture);
         return S_OK;
     }
 
@@ -449,13 +427,15 @@ namespace
     {
         FRp9ExState* Ex = Self->Ex_;
         IDirect3DDevice9* Device = Self->Device_;
-        IDirect3DSurface9* Surface = Target != nullptr ? Target->Surface : Ex->SavedColor;
+        IDirect3DSurface9* Surface =
+            Target != nullptr ? Target->Surface.Get() : Ex->SavedColor.Get();
         if (Surface == nullptr)
             return E_FAIL;
         // A texture cannot be sampled while it is the render target.
         for (unsigned long Sampler = 0; Target != nullptr && Sampler < kExSamplerCount; ++Sampler)
         {
-            if (Ex->BoundTextures[Sampler] != nullptr && Ex->BoundTextures[Sampler] == Target->Texture)
+            if (Ex->BoundTextures[Sampler] != nullptr &&
+                Ex->BoundTextures[Sampler] == Target->Texture.Get())
             {
                 Device->SetTexture(Sampler, nullptr);
                 Ex->BoundTextures[Sampler] = nullptr;
@@ -487,7 +467,7 @@ namespace
                 }
             }
             Ex->SceneDepthSamplers = 0;
-            Hr = Device->SetDepthStencilSurface(Ex->SavedDepth);
+            Hr = Device->SetDepthStencilSurface(Ex->SavedDepth.Get());
             Ex->bDepthBound = SUCCEEDED(Hr);
         }
         else
@@ -558,8 +538,8 @@ namespace
                     Device->SetTexture(Sampler, nullptr);
             }
             if (Ex->SavedColor != nullptr)
-                Device->SetRenderTarget(0, Ex->SavedColor);
-            Device->SetDepthStencilSurface(Ex->SavedDepth);
+                Device->SetRenderTarget(0, Ex->SavedColor.Get());
+            Device->SetDepthStencilSurface(Ex->SavedDepth.Get());
             // SetRenderTarget reset the device viewport; put back the cached one RP9's
             // SetViewportRect / SetDepthRange last sent, with its validity bytes.
             Self->ViewportCache_ = Ex->SavedViewport;
@@ -568,16 +548,8 @@ namespace
             Device->SetViewport(&Self->ViewportCache_);
         }
         Self->RenderStates_.RestorePending(Ex->SavedPending);
-        if (Ex->SavedColor != nullptr)
-        {
-            Ex->SavedColor->Release();
-            Ex->SavedColor = nullptr;
-        }
-        if (Ex->SavedDepth != nullptr)
-        {
-            Ex->SavedDepth->Release();
-            Ex->SavedDepth = nullptr;
-        }
+        Ex->SavedColor.Reset();
+        Ex->SavedDepth.Reset();
         Ex->TouchedSamplers = 0;
         Ex->SceneDepthSamplers = 0;
         memset(Ex->BoundTextures, 0, sizeof(Ex->BoundTextures));
@@ -617,8 +589,7 @@ namespace
 }
 
 FRp9ExState::FRp9ExState()
-    : SceneDepth(), FallbackDepth(nullptr), BackBufferWidth(0), BackBufferHeight(0),
-      bInPass(false), bDepthBound(false), SavedColor(nullptr), SavedDepth(nullptr),
+    : SceneDepth(), BackBufferWidth(0), BackBufferHeight(0), bInPass(false), bDepthBound(false),
       bSavedViewportRectValid(0), bSavedDepthRangeValid(0), TouchedSamplers(0),
       SceneDepthSamplers(0), BoundProgram(nullptr), CurrentTarget(nullptr), TargetWidth(0),
       TargetHeight(0)
@@ -650,68 +621,69 @@ bool FDirectX9::ExWantsIntzDepth(D3DFORMAT AdapterFormat, D3DFORMAT DepthFormat)
 HRESULT FDirectX9::ExCreateDeviceResources(bool bIntzDepth, D3DFORMAT DepthFormat)
 {
     FRp9ExState* Ex = Ex_;
-    IDirect3DSurface9* BackBuffer = nullptr;
-    if (SUCCEEDED(Device_->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &BackBuffer)))
     {
+        ComPtr<IDirect3DSurface9> BackBuffer;
         D3DSURFACE_DESC Desc;
-        if (SUCCEEDED(BackBuffer->GetDesc(&Desc)))
+        if (SUCCEEDED(Device_->GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO,
+                                             BackBuffer.GetAddressOf())) &&
+            SUCCEEDED(BackBuffer->GetDesc(&Desc)))
         {
             Ex->BackBufferWidth = Desc.Width;
             Ex->BackBufferHeight = Desc.Height;
         }
-        BackBuffer->Release();
     }
 
     if (bIntzDepth)
     {
         // The device was made with EnableAutoDepthStencil = FALSE: the INTZ texture's level 0
         // is the depth surface from now on (same size as the back buffer, no multisampling).
-        IDirect3DTexture9* Texture = nullptr;
-        IDirect3DSurface9* Surface = nullptr;
+        ComPtr<IDirect3DTexture9> Texture;
+        ComPtr<IDirect3DSurface9> Surface;
         HRESULT Hr = Device_->CreateTexture((UINT)(Ex->BackBufferWidth),
                                             (UINT)(Ex->BackBufferHeight), 1, D3DUSAGE_DEPTHSTENCIL,
-                                            kIntzFormat, D3DPOOL_DEFAULT, &Texture, nullptr);
+                                            kIntzFormat, D3DPOOL_DEFAULT, Texture.GetAddressOf(),
+                                            nullptr);
         if (SUCCEEDED(Hr))
-            Hr = Texture->GetSurfaceLevel(0, &Surface);
+            Hr = Texture->GetSurfaceLevel(0, Surface.GetAddressOf());
         if (SUCCEEDED(Hr))
         {
-            Ex->SceneDepth.Texture = Texture;
-            Ex->SceneDepth.Surface = Surface;
+            Ex->SceneDepth.Texture = std::move(Texture);
+            Ex->SceneDepth.Surface = std::move(Surface);
             Ex->SceneDepth.Width = Ex->BackBufferWidth;
             Ex->SceneDepth.Height = Ex->BackBufferHeight;
-            Hr = Device_->SetDepthStencilSurface(Surface);
+            Hr = Device_->SetDepthStencilSurface(Ex->SceneDepth.Surface.Get());
             ExLogf(kExFdumpNotice, "NOTICE", __LINE__, "scene depth: INTZ %lux%lu",
                    Ex->BackBufferWidth, Ex->BackBufferHeight);
         }
         else
         {
-            if (Texture != nullptr)
-                Texture->Release();
+            Texture.Reset();
             ExLogf(kExFdumpWarning, "WARNING", __LINE__,
                    "INTZ depth texture failed (hr 0x%08x); plain depth surface instead, no scene "
                    "depth", (unsigned int)(Hr));
             Hr = Device_->CreateDepthStencilSurface((UINT)(Ex->BackBufferWidth),
                                                     (UINT)(Ex->BackBufferHeight), DepthFormat,
                                                     D3DMULTISAMPLE_NONE, 0, FALSE,
-                                                    &Ex->FallbackDepth, nullptr);
+                                                    Ex->FallbackDepth.ReleaseAndGetAddressOf(),
+                                                    nullptr);
             if (SUCCEEDED(Hr))
-                Hr = Device_->SetDepthStencilSurface(Ex->FallbackDepth);
+                Hr = Device_->SetDepthStencilSurface(Ex->FallbackDepth.Get());
         }
         if (FAILED(Hr))
             return Hr;
     }
 
-    for (size_t Index = 0; Index < Ex->Programs.size(); ++Index)
-        CreateProgramShaders(Device_, Ex->Programs[Index]);
-    for (size_t Index = 0; Index < Ex->Textures.size(); ++Index)
+    for (const std::unique_ptr<FRPExProgram>& Program : Ex->Programs)
+        CreateProgramShaders(Device_, Program.get());
+    for (const std::unique_ptr<FRPExTexture>& Texture : Ex->Textures)
     {
-        FRPExTexture* Texture = Ex->Textures[Index];
         if (Texture->Texture != nullptr)
             continue;
         if (Texture->Kind == Rp9ExTextureRenderTarget)
-            CreateRenderTargetGpu(Device_, Texture, Ex->BackBufferWidth, Ex->BackBufferHeight);
+            CreateRenderTargetGpu(Device_, Texture.get(), Ex->BackBufferWidth,
+                                  Ex->BackBufferHeight);
         else if (Texture->Kind == Rp9ExTextureVolume)
-            CreateVolumeGpu(Device_, Texture);
+            CreateVolumeGpu(Device_, Texture.get());
     }
     return S_OK;
 }
@@ -728,15 +700,11 @@ void FDirectX9::ExReleaseDeviceResources()
     if (Device_ != nullptr && (Ex->SceneDepth.Surface != nullptr || Ex->FallbackDepth != nullptr))
         Device_->SetDepthStencilSurface(nullptr);
     ReleaseExTextureGpu(&Ex->SceneDepth);
-    if (Ex->FallbackDepth != nullptr)
+    Ex->FallbackDepth.Reset();
+    for (const std::unique_ptr<FRPExTexture>& Texture : Ex->Textures)
     {
-        Ex->FallbackDepth->Release();
-        Ex->FallbackDepth = nullptr;
-    }
-    for (size_t Index = 0; Index < Ex->Textures.size(); ++Index)
-    {
-        if (Ex->Textures[Index]->Kind == Rp9ExTextureRenderTarget)
-            ReleaseExTextureGpu(Ex->Textures[Index]);
+        if (Texture->Kind == Rp9ExTextureRenderTarget)
+            ReleaseExTextureGpu(Texture.get());
     }
 }
 
@@ -746,10 +714,10 @@ void FDirectX9::ExReleaseAllGpu()
     if (Ex == nullptr)
         return;
     ExReleaseDeviceResources();
-    for (size_t Index = 0; Index < Ex->Programs.size(); ++Index)
-        ReleaseProgramShaders(Ex->Programs[Index]);
-    for (size_t Index = 0; Index < Ex->Textures.size(); ++Index)
-        ReleaseExTextureGpu(Ex->Textures[Index]);
+    for (const std::unique_ptr<FRPExProgram>& Program : Ex->Programs)
+        ReleaseProgramShaders(Program.get());
+    for (const std::unique_ptr<FRPExTexture>& Texture : Ex->Textures)
+        ReleaseExTextureGpu(Texture.get());
 }
 
 void FDirectX9::ExDestroyAll()
@@ -758,16 +726,7 @@ void FDirectX9::ExDestroyAll()
     if (Ex == nullptr)
         return;
     ExReleaseAllGpu();
-    for (size_t Index = 0; Index < Ex->Programs.size(); ++Index)
-    {
-        FRPExProgram* Program = Ex->Programs[Index];
-        if (Program->FileSystem != nullptr)
-            Program->FileSystem->Release();
-        delete Program;
-    }
     Ex->Programs.clear();
-    for (size_t Index = 0; Index < Ex->Textures.size(); ++Index)
-        delete Ex->Textures[Index];
     Ex->Textures.clear();
 }
 
@@ -843,15 +802,13 @@ GENRESULT DACOM_API FDirectX9::CreateExProgram(IFileSystem* FileSystem, const ch
     *Out = nullptr;
     if (FileSystem == nullptr || Path == nullptr || VsEntry == nullptr || PsEntry == nullptr)
         return GR_INVALID_PARMS;
-    FRPExProgram* Program = new FRPExProgram();
-    Program->FileSystem = FileSystem;
-    FileSystem->AddRef();
-    Program->Path = Path;
-    Program->VsEntry = VsEntry;
-    Program->PsEntry = PsEntry;
-    Program->Vs = nullptr;
-    Program->Ps = nullptr;
-    Ex_->Programs.push_back(Program);
+    std::unique_ptr<FRPExProgram> Owned = std::make_unique<FRPExProgram>();
+    Owned->FileSystem = FileSystem; // AddRef
+    Owned->Path = Path;
+    Owned->VsEntry = VsEntry;
+    Owned->PsEntry = PsEntry;
+    Ex_->Programs.push_back(std::move(Owned));
+    FRPExProgram* Program = Ex_->Programs.back().get();
     *Out = Program;
     // Without a device only the bytecode is made; ExCreateDeviceResources makes the shaders.
     return CompileProgram(Device_, Program) ? GR_OK : GR_GENERIC;
@@ -862,7 +819,7 @@ GENRESULT DACOM_API FDirectX9::DestroyExProgram(FRPExProgram* Program)
     FRp9ExState* Ex = Ex_;
     for (size_t Index = 0; Index < Ex->Programs.size(); ++Index)
     {
-        if (Ex->Programs[Index] != Program)
+        if (Ex->Programs[Index].get() != Program)
             continue;
         if (Ex->bInPass && Ex->BoundProgram == Program && Device_ != nullptr)
         {
@@ -870,11 +827,7 @@ GENRESULT DACOM_API FDirectX9::DestroyExProgram(FRPExProgram* Program)
             Device_->SetPixelShader(nullptr);
             Ex->BoundProgram = nullptr;
         }
-        ReleaseProgramShaders(Program);
-        if (Program->FileSystem != nullptr)
-            Program->FileSystem->Release();
         Ex->Programs.erase(Ex->Programs.begin() + (std::ptrdiff_t)(Index));
-        delete Program;
         return GR_OK;
     }
     return GR_INVALID_PARMS;
@@ -886,14 +839,14 @@ GENRESULT DACOM_API FDirectX9::ReloadExPrograms()
     bool bAllOk = true;
     for (size_t Index = 0; Index < Ex->Programs.size(); ++Index)
     {
-        FRPExProgram* Program = Ex->Programs[Index];
+        FRPExProgram* Program = Ex->Programs[Index].get();
         if (!CompileProgram(Device_, Program))
             bAllOk = false;
         // A reload inside a pass rebinds the (possibly new) shaders of the bound program.
         if (Ex->bInPass && Ex->BoundProgram == Program && Device_ != nullptr)
         {
-            Device_->SetVertexShader(Program->Vs);
-            Device_->SetPixelShader(Program->Ps);
+            Device_->SetVertexShader(Program->Vs.Get());
+            Device_->SetPixelShader(Program->Ps.Get());
         }
     }
     return bAllOk ? GR_OK : GR_GENERIC;
@@ -910,22 +863,20 @@ GENRESULT DACOM_API FDirectX9::CreateExRenderTarget(const FRPExRenderTargetDesc*
         return GR_INVALID_PARMS;
     if ((Desc->Width == 0 || Desc->Height == 0) && !(Desc->BackBufferScale > 0.0f))
         return GR_INVALID_PARMS;
-    FRPExTexture* Target = new FRPExTexture();
+    std::unique_ptr<FRPExTexture> Target = std::make_unique<FRPExTexture>();
     Target->Kind = Rp9ExTextureRenderTarget;
     Target->Format = Desc->Format;
     Target->TargetDesc = *Desc;
     if (Device_ != nullptr && (DeviceReady_ & 1) != 0)
     {
         const HRESULT Hr =
-            CreateRenderTargetGpu(Device_, Target, Ex_->BackBufferWidth, Ex_->BackBufferHeight);
+            CreateRenderTargetGpu(Device_, Target.get(), Ex_->BackBufferWidth,
+                                  Ex_->BackBufferHeight);
         if (FAILED(Hr))
-        {
-            delete Target;
             return (GENRESULT)(Hr);
-        }
     }
-    Ex_->Textures.push_back(Target);
-    *Out = Target;
+    Ex_->Textures.push_back(std::move(Target));
+    *Out = Ex_->Textures.back().get();
     return GR_OK;
 }
 
@@ -939,7 +890,7 @@ GENRESULT DACOM_API FDirectX9::CreateExVolumeTexture(unsigned long Width, unsign
     unsigned long Bytes = 0;
     if (ExFormatToD3d(Format, &Bytes) == D3DFMT_UNKNOWN || Width == 0 || Height == 0 || Depth == 0)
         return GR_INVALID_PARMS;
-    FRPExTexture* Volume = new FRPExTexture();
+    std::unique_ptr<FRPExTexture> Volume = std::make_unique<FRPExTexture>();
     Volume->Kind = Rp9ExTextureVolume;
     Volume->Format = Format;
     Volume->Width = Width;
@@ -952,15 +903,12 @@ GENRESULT DACOM_API FDirectX9::CreateExVolumeTexture(unsigned long Width, unsign
     }
     if (Device_ != nullptr)
     {
-        const HRESULT Hr = CreateVolumeGpu(Device_, Volume);
+        const HRESULT Hr = CreateVolumeGpu(Device_, Volume.get());
         if (FAILED(Hr))
-        {
-            delete Volume;
             return (GENRESULT)(Hr);
-        }
     }
-    Ex_->Textures.push_back(Volume);
-    *Out = Volume;
+    Ex_->Textures.push_back(std::move(Volume));
+    *Out = Ex_->Textures.back().get();
     return GR_OK;
 }
 
@@ -974,11 +922,9 @@ GENRESULT DACOM_API FDirectX9::DestroyExTexture(FRPExTexture* Texture)
     }
     for (size_t Index = 0; Index < Ex->Textures.size(); ++Index)
     {
-        if (Ex->Textures[Index] != Texture)
+        if (Ex->Textures[Index].get() != Texture)
             continue;
-        ReleaseExTextureGpu(Texture);
         Ex->Textures.erase(Ex->Textures.begin() + (std::ptrdiff_t)(Index));
-        delete Texture;
         return GR_OK;
     }
     return GR_INVALID_PARMS;
@@ -1025,19 +971,21 @@ GENRESULT DACOM_API FDirectX9::BeginExPass(const FRPExPassDesc* Desc)
     if (Target != nullptr && (Target->Kind != Rp9ExTextureRenderTarget || Target->Surface == nullptr))
         return GR_INVALID_PARMS;
 
-    IDirect3DSurface9* Color = nullptr;
-    const HRESULT ColorHr = Device_->GetRenderTarget(0, &Color);
+    ComPtr<IDirect3DSurface9> Color;
+    const HRESULT ColorHr = Device_->GetRenderTarget(0, Color.GetAddressOf());
     if (FAILED(ColorHr))
     {
         ExLogf(kExFdumpWarning, "WARNING", __LINE__, "GetRenderTarget failed (hr 0x%08x)",
                (unsigned int)(ColorHr));
         return (GENRESULT)(ColorHr);
     }
-    IDirect3DSurface9* Depth = nullptr;
-    if (FAILED(Device_->GetDepthStencilSurface(&Depth))) // D3DERR_NOTFOUND: none bound
-        Depth = nullptr;
-    Ex->SavedColor = Color;
-    Ex->SavedDepth = Depth;
+    ComPtr<IDirect3DSurface9> Depth;
+    // D3DERR_NOTFOUND: none bound.
+    if (FAILED(Device_->GetDepthStencilSurface(Depth.GetAddressOf())))
+        Depth.Reset();
+    Ex->bDepthBound = Depth != nullptr;
+    Ex->SavedColor = std::move(Color);
+    Ex->SavedDepth = std::move(Depth);
     Ex->SavedViewport = ViewportCache_;
     Ex->bSavedViewportRectValid = bViewportRectValid_;
     Ex->bSavedDepthRangeValid = bDepthRangeValid_;
@@ -1048,7 +996,6 @@ GENRESULT DACOM_API FDirectX9::BeginExPass(const FRPExPassDesc* Desc)
     memset(Ex->BoundTextures, 0, sizeof(Ex->BoundTextures));
     Ex->BoundProgram = nullptr;
     Ex->CurrentTarget = nullptr;
-    Ex->bDepthBound = Depth != nullptr;
     Ex->bInPass = true;
 
     // The pass's starting render states (through the cache; EndExPass re-queues the old ones).
@@ -1114,8 +1061,8 @@ GENRESULT DACOM_API FDirectX9::BindExProgram(FRPExProgram* Program)
     // A program that never compiled has no shaders; its compile errors are already logged.
     if (Program->Vs == nullptr || Program->Ps == nullptr)
         return GR_GENERIC;
-    Device_->SetVertexShader(Program->Vs);
-    Device_->SetPixelShader(Program->Ps);
+    Device_->SetVertexShader(Program->Vs.Get());
+    Device_->SetPixelShader(Program->Ps.Get());
     Ex_->BoundProgram = Program;
     return GR_OK;
 }
@@ -1158,8 +1105,8 @@ GENRESULT DACOM_API FDirectX9::BindExTexture(unsigned long Sampler, FRPExTexture
         }
     }
     const bool bSceneDepth = Texture != nullptr && Texture == &Ex_->SceneDepth;
-    return ExBindSampler(this, Sampler, Texture != nullptr ? Texture->Texture : nullptr, State,
-                         bSceneDepth);
+    return ExBindSampler(this, Sampler, Texture != nullptr ? Texture->Texture.Get() : nullptr,
+                         State, bSceneDepth);
 }
 
 GENRESULT DACOM_API FDirectX9::BindExPipelineTexture(unsigned long Sampler, void* Handle,
