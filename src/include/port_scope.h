@@ -3,8 +3,8 @@
 
 #pragma once
 
-// PORT(tools): scope guards for the port's own programs (FLRegress, FLDedicated, DPNetInteropTest,
-// MemoryDiagnostics). Retail modules keep retail's hand-written cleanup.
+// PORT(tools): scope guards for the port's own programs (FLRegress, FLDedicated, DPNetInteropTest).
+// Retail modules keep retail's hand-written cleanup.
 //
 // Each guard undoes one step when its scope ends, however it ends. Written right after the step
 // succeeds, it keeps the step next to its teardown, and an early return undoes exactly what was
