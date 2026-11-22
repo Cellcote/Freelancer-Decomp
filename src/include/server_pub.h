@@ -1293,7 +1293,7 @@ FL_LAYOUT_ASSERT(sizeof(CRemotePhysicsController) == 0x3C0,
 // 697, 962, 2562), Server.dll (1, 2, 18, 23, 34, 483) AND freelancer.exe (1, 2,
 // 14, 15, 25, 58), with identical bodies, so each of the three modules expands
 // OWNERLIST_CARGODESC_EXPORTS once (src/Common/archetype/goodinfo.cpp,
-// src/Server/server_classes.cpp, src/freelancer/Client/client_objdb.cpp).
+// src/Server/server_classes.cpp, src/freelancer/Client/space/objdb.cpp).
 // ============================================================================
 namespace pub {
 namespace SpaceObj {

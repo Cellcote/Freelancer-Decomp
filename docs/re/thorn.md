@@ -35,7 +35,7 @@ dacom.h's `FAGGDESC14`: `+8` is the controlling outer, `+0xC` the inner out-slot
 
 Who uses it: `Common` creates `IScriptEngine` through DACOM and hands it the file system; `RoomData`
 (`src/Common/universe/roomdata.cpp`) pulls out descriptors and properties to build a room and releases the
-engine. The client script object (`src/freelancer/Client/gf_script_object.cpp`, `gf_script_spawn.cpp`)
+engine. The client script object (`src/freelancer/Client/gf/gf_script_object.cpp`, `Client/gf/gf_script_spawn.cpp`)
 holds the engine, creates external objects from descriptors, binds them to entities and passes the time.
 
 ## Lua 3.2 and loading

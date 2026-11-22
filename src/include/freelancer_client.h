@@ -14,12 +14,12 @@
 // .text:005b0840 stores the IClient vptr (.rdata:005e6674) at .data:Client+0, the IChatClient
 // vptr (.rdata:005e6668, one slot) at +4 and zero at +8, and GetChatClientInterface returns
 // Client+4 -- the IChatClient sub-object of the same instance, not a second object. The
-// object (`Client`, ordinal 66) and the two getters live in client_exports.cpp.
+// object (`Client`, ordinal 66) and the two getters live in Client/exports.cpp.
 //
 // The slot bodies are split along retail's translation units:
-//   client_iclient_space.cpp -- IClientS.cpp (.text:0053aaa0..0053e4a0, the FDUMP path string
+//   Client/space/iclient_space.cpp -- IClientS.cpp (.text:0053aaa0..0053e4a0, the FDUMP path string
 //                               .rdata:005dec60), the space side;
-//   client_iclient.cpp       -- everything else: the GF mirror forwards (.text:00437510..
+//   Client/iclient.cpp       -- everything else: the GF mirror forwards (.text:00437510..
 //                               00437b30), the player-state / chat / trade block (.text:
 //                               005a5a60..005a64f0), the login forwards (.text:005a81f0..
 //                               005a8240) and the three shared stubs (0052fba0, 00401e90,

@@ -148,7 +148,7 @@ struct FServerRepairObjectInfo;             // slot 84
 // everywhere else (Common.dll reaches this header through server_sysdb.h /
 // server_basedb.h and exports no IClient). Never dllimport: each of the three defines its
 // own copies of the three special members (src/rpclocal/rpc_client_proxy.cpp,
-// src/Server/IServerImpl.cpp, src/freelancer/Client/client_exports.cpp) and none links
+// src/Server/IServerImpl.cpp, src/freelancer/Client/exports.cpp) and none links
 // another's import library, so a dllimport would be C2491 on those definitions. The
 // vftable is exported from the TU whose constructor stamps it.
 //
@@ -178,7 +178,7 @@ public:
     // ??0IClient@@QAE@ABV0@@Z and ??4IClient@@QAEAAV0@ABV0@@Z next to ??_7IClient@@6B@.
     // They are user-declared (so no move members are generated and exported) and DEFINED
     // once per module that links IClient: src/rpclocal/rpc_client_proxy.cpp,
-    // src/Server/IServerImpl.cpp, src/freelancer/Client/client_exports.cpp. The class is
+    // src/Server/IServerImpl.cpp, src/freelancer/Client/exports.cpp. The class is
     // abstract and carries no data, so all three are trivial.
     IClient();
     IClient(const IClient& Other);

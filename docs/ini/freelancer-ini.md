@@ -33,7 +33,7 @@ Sections not listed here (for example the commented-out `[;Display]` block of th
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `movie_file` | path (repeated) | none | Intro movies, played in order at engine start. Only the **first three** occurrences are kept (counted over the whole file); the rest are ignored. The path is joined as `<data path>\<value>`. | [startup_config.cpp](../../src/freelancer/Client/startup_config.cpp), [engine_init.cpp](../../src/freelancer/Client/engine_init.cpp) |
+| `movie_file` | path (repeated) | none | Intro movies, played in order at engine start. Only the **first three** occurrences are kept (counted over the whole file); the rest are ignored. The path is joined as `<data path>\<value>`. | [startup_config.cpp](../../src/freelancer/Client/startup_config.cpp), [Client/cmn/engine_init.cpp](../../src/freelancer/Client/cmn/engine_init.cpp) |
 
 ## `[ListServer]`
 

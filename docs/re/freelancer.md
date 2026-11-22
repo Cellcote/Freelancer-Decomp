@@ -10,6 +10,22 @@ decomp-tracker (module `freelancer.exe`, listing `EXE/Disasm/freelancer.exe.{txt
 Thorn, EngBase, alchemy, Common) — the client gives them data and calls their interfaces rather than
 duplicating them.
 
+## Source layout
+
+`src/freelancer/Client/` follows retail's own source tree (`E:\FL\Scratch\Source\Client\...`, known
+from the `__FILE__` strings), in lower case:
+
+| Folder | Retail | What |
+|--------|--------|------|
+| `Client/` | `Client\` | `main`, startup config, client states, timing, the `IClient` side of the connection, login, server lists |
+| `cmn/` | `Client\cmn\` | shared client services: client archetypes (`cliobj`), effect archetypes, fonts, sound and voices, lights, materials, the render manager, input |
+| `gf/` | `Client\Gf\` | the base game flow: rooms, hotspots, Thorn scene scripts, the nav bar, walk mode |
+| `interface/` | `Client\Interface\` | the window and control framework (`Win3D`, `WinControl`, `UI*`), the front-end menus and pages, the key map |
+| `nn/` | `Client\nn\` | the NeuroNet screens and dialogs, chat |
+| `space/` | `Client\Space\` | the client objects in space (`gameobj`, `cli_*`), effects, the space scene; `space/hud/` the HUD and `space/camera/` the cameras (retail keeps both in `Space\` too) |
+
+`cli_` is retail's own prefix (`CliAsteroid.cpp`); the client's files carry no other module prefix.
+
 Related documents: [freelancer_cliobj.md](freelancer_cliobj.md) (client companions of archetypes),
 [equip_fx_factory.md](equip_fx_factory.md) (equipment FX), [options_screen.md](options_screen.md),
 [dealer_equip_stats.md](dealer_equip_stats.md), [winmain.md](winmain.md), [deviations.md](deviations.md).
@@ -17,18 +33,18 @@ Related documents: [freelancer_cliobj.md](freelancer_cliobj.md) (client companio
 ## Startup and the main loop
 
 - `WinMain` (`main.cpp`): instance mutex, DATA check, `LoadStartupConfig`
-  (`startup_config.cpp`), window creation, `InitializeEngine` (`engine_init.cpp`), the loop
+  (`startup_config.cpp`), window creation, `InitializeEngine` (`Client/cmn/engine_init.cpp`), the loop
   (`message_pump.cpp`). `InitializeEngine` brings up `DALib`, the render pipeline and buffers, calls
   `DataConfig::startup` with an `ICliObjFactory` and `ProgressCB` (`dataconfig_progress.cpp`: the `[Data]`
   keys that Common does not know — fonts, sounds, voices, effects, HUD, `intro` — are handled by the client
   as they are read), shows the splash screen, and loads `movie.dll` through `GetProcAddress`.
-- **Client states** are objects `IEnvironment : IInputEvent` (15 slots, `client_environment.h`):
-  `GF` (the base game flow, `gameflow.cpp`), `SpaceApp` (`space_app.h`), `IntroFocus`
-  (`client_state.cpp`), `MissionBriefing` (`mission_briefing.cpp`). `EnterClientState(id, prev)`
-  (`client_state.cpp`): 1 — exit, 2 — space, 3 — base (GF), 4/5 — slot 10 of GF/SpaceApp (empty),
+- **Client states** are objects `IEnvironment : IInputEvent` (15 slots, `Client/space/environment.h`):
+  `GF` (the base game flow, `gameflow.cpp`), `SpaceApp` (`Client/space/space_app.h`), `IntroFocus`
+  (`Client/state.cpp`), `MissionBriefing` (`Client/nn/mission_briefing.cpp`). `EnterClientState(id, prev)`
+  (`Client/state.cpp`): 1 — exit, 2 — space, 3 — base (GF), 4/5 — slot 10 of GF/SpaceApp (empty),
   6 — menu, 7 — game load, 8 — mission briefing; other ids return the previous state.
   The next transition is set by `G_PendingClientStateId`.
-- **Frame**: `TickClientFrame` updates the timer (`client_timing.cpp`), the current state, lighting, the HUD
+- **Frame**: `TickClientFrame` updates the timer (`Client/timing.cpp`), the current state, lighting, the HUD
   and rendering; in the menu the state itself presents the frame (3D → clear Z → UI).
 - **The order of static initializers is an input contract.** KeyMap event handlers of one id are called in
   reverse order of registration, and the first one to return `true` "eats" the event; some handlers are
@@ -44,10 +60,10 @@ Base scenes are Thorn scripts (`.thn`) executed by `Thorn.dll`; for their entiti
 `FAttachObject`/`Gf\Script` objects (`gf_script*.cpp`, `gf_thorn_*.cpp`): types 1–9 and 13 (compound,
 deformable, camera, light, scene, psys, marker, sound, hardpoint wrapper). `RoomControl`
 (`room_control*.cpp`) draws the room: layers, object traversal, the Alchemy pass (`DAT_00679a10` is the
-`FRoomObject` registry), room cameras (`room_camera.cpp`, `find_camera` after `RoomData::load`),
+`FRoomObject` registry), room cameras (`Client/gf/room_camera.cpp`, `find_camera` after `RoomData::load`),
 hotspots. The camera, `SetView` and `GeoSetPos/Orient` come from Thorn/EngBase: if the frame is empty after
 slot 22 `SET_CAMERA`, they are to blame, not the exe. The base's location and state are
-`menu_universe_base.cpp` (`LocationController`: entry/exit, room music and ambience from `RoomData`).
+`Client/gf/menu_universe_base.cpp` (`LocationController`: entry/exit, room music and ambience from `RoomData`).
 The character/server/account selection screens are `page_*.cpp`, the connection is `connect_*.cpp`,
 `server_connect.cpp`, `login_mgr.cpp`, `intro_connect.cpp`.
 
@@ -62,7 +78,7 @@ The character/server/account selection screens are `page_*.cpp`, the connection 
   `nn_button_control`, `nn_group_control`. Button captions are drawn by `font_atlas`/`font_imp`
   (`FontAtlasRasterize` uses `ETO_OPAQUE`, otherwise the letters of previous buttons remain in the shared
   bitmap).
-- **KeyMap**: `interface/KeyMap.ini` + the user's `UserKeyMap.ini` (`menu_keymap.cpp`); the controls
+- **KeyMap**: `interface/KeyMap.ini` + the user's `UserKeyMap.ini` (`Client/interface/menu_keymap.cpp`); the controls
   settings page is part of `NN_Preferences` (`nn_preferences.*`, see
   [options_screen.md](options_screen.md)); `perf_options.cpp` is the performance options registry
   (`PerfOptions.ini` in the user directory; sections `[PerfVersion]`, `[PerfCount]`, `[PerfOptions]`,
@@ -74,62 +90,62 @@ The character/server/account selection screens are `page_*.cpp`, the connection 
 - **Transition scene setting**: the PerfOptions registry and the `GfScriptSequence` player share one state
   `skip_transition_scripts` (a value below 0.5 enables auto-skip of landing and take-off; 1.0 shows the
   scenes).
-- **Sound**: `menu_sound_arch.cpp` is the client mixer, sources (`Sound::Source`, streaming, spatial),
-  ducking, bgm; `sound_config.cpp` is `audio\SoundCFG.ini` (`[CFG]`) and the Gf fader;
-  `voice_profiles.cpp` is the voice registry (`[Data] voices=`, `[Voice]`, `[VoiceSound]`).
+- **Sound**: `Client/cmn/menu_sound_arch.cpp` is the client mixer, sources (`Sound::Source`, streaming, spatial),
+  ducking, bgm; `Client/cmn/sound_config.cpp` is `audio\SoundCFG.ini` (`[CFG]`) and the Gf fader;
+  `Client/cmn/voice_profiles.cpp` is the voice registry (`[Data] voices=`, `[Voice]`, `[VoiceSound]`).
 
 ## HUD
 
 `HUD=` in `[Data]` gives the path to `interface\hud.ini`; when the cockpit is initialised,
-`LoadHudElementsFromIni` (`hud_element_list.cpp`) reads it and creates elements from the section headers
+`LoadHudElementsFromIni` (`Client/space/hud/hud_element_list.cpp`) reads it and creates elements from the section headers
 through a chain of factories; active elements receive the Notify/Event/Render/Shutdown broadcast, and the
 frame is drawn by `RenderHudElements`. Sections/classes: `[Steer]` (the mouse-flight arrow), `[Core]` and
-`[Status]` (ship gauges, `hud_status_core.cpp`, weapon groups — `hud_weapon_groups.cpp`), `[Target]`
-(`hud_target*.cpp`), `[Targetable_Objects]` (brackets and lead markers, `hud_targetable_objects.cpp`),
-`[DamageIndicator]`, `[Receiver]` (`HUD_Comm`, radio queue and portrait, `hud_comm.cpp`),
+`[Status]` (ship gauges, `Client/space/hud/hud_status_core.cpp`, weapon groups — `Client/space/hud/hud_weapon_groups.cpp`), `[Target]`
+(`hud_target*.cpp`), `[Targetable_Objects]` (brackets and lead markers, `Client/space/hud/hud_targetable_objects.cpp`),
+`[DamageIndicator]`, `[Receiver]` (`HUD_Comm`, radio queue and portrait, `Client/space/hud/hud_comm.cpp`),
 `[ContactList]`, `[Maneuvers]`, `[Waypoint]`, `[CruiseProgress]`. The `HUD=` path is remembered separately
 from the registry load itself. In widescreen mode the corner HUD windows are moved apart toward the edges
 (`hud_widescreen.*`).
 
 ## Space
 
-- **Entering a system**: `space_scene_load.cpp` reads the system INI (`[Object]`, `[Archetype]`,
+- **Entering a system**: `Client/space/space_scene_load.cpp` reads the system INI (`[Object]`, `[Archetype]`,
   `[Nebula]`, stars, `star_sys`) and builds the furniture scene; in single player Server's
   `StarSystem::add_player` itself sends `CREATESHIP`/`CREATELOOT` (`IClient` slots 47/48), while
   `CREATESOLAR` is sent only in multiplayer. Poses of foreign objects from the `UPDATEOBJECT` packet arrive
   only in MP (in SP `SystemPlayerView_Update` returns at once, the objects share a process with the
   server). Client game objects are `client_gameobj.*` (`FClientGameobj`, ~0x208 bytes), the `IObjDB`
-  registry is `client_objdb.cpp`, player spawn is `player_spawn.cpp`.
+  registry is `Client/space/objdb.cpp`, player spawn is `Client/space/player_spawn.cpp`.
 - **Cameras**: the base class and derived ones (`space_camera_*`): first/third/rear/turret/script/static/
   docking/death; parameters from `shiparch.ini` and the `CliShip` companion (`camera_offset`, angles,
-  `camera_turn_look_ahead_slerp_amount`), cockpit ini loaders (`cockpit_load.cpp`).
-- **Draw pass** (`space_scene_obj_draw.cpp`, `space_scene_draw.cpp`): the object queue is sorted by
+  `camera_turn_look_ahead_slerp_amount`), cockpit ini loaders (`Client/space/cockpit_load.cpp`).
+- **Draw pass** (`Client/space/space_scene_obj_draw.cpp`, `Client/space/space_scene_draw.cpp`): the object queue is sorted by
   descending squared distance (far ones first) — as in retail, this is the MSVC6 `_Sort`: insertion sort
   for `< 17` elements, otherwise median-of-three + Hoare partitioning (strict comparisons, unstable) + a
   final insertion pass; it must not be replaced with a simple sort. Every queue "flush" begins with
   re-setting the camera perspective (`Win3DSetPerspective`). Flush order: meshes, asteroids
   (`cli_asteroid*.cpp` — field cubes, fading, immersion in the exclusion zone), nebulae, effects;
   `FUN_0051f950` is the mesh flush and the walk of the asteroid registry.
-- **Nebulae** (`cli_nebula.cpp`, retail `JumpEffect.cpp`): the `[Nebula]` section of the system INI
+- **Nebulae** (`Client/space/cli_nebula.cpp`, retail `JumpEffect.cpp`): the `[Nebula]` section of the system INI
   creates a 0x2d0 object; it loads the nebula file (`vtable[0](file, zone)`), holds two trees (`+0x04`
   nodes of 0x5c, `+0x38` nodes of 0x18 with meshes), the zone shell (`Exclusion::NebulaExclusionZone`)
-  and lightning (billboard segments); jump gates are `gate_tunnel.cpp`. Planet rings
-  (`texture_panels.cpp`) and the star glow (`star_sphere.cpp`) are separate classes, not parts of a
+  and lightning (billboard segments); jump gates are `Client/space/gate_tunnel.cpp`. Planet rings
+  (`Client/space/texture_panels.cpp`) and the star glow (`Client/space/star_sphere.cpp`) are separate classes, not parts of a
   nebula.
 - **Lights and fog**: equipment lights go through a shared batch queue of screen quads (vertices
   `XYZRHW | DIFFUSE | SPECULAR | TEX1`), the fog for additive effects is black; the choice between vertex
   and table fog (`FogApplyColorAndRange`) depends on `QueryDeviceAbility(13)` (the device's W-fog), not on
   `GetPipelineState(13)`. With vertex fog the alpha is taken from `SPECULAR`, which the batch zeroes — the
   wrong mode hides glints even on nearby objects.
-- **Effects** (`effect_type_*.cpp`, `effect_base`, `particle_effect.cpp`, `beam_effect.cpp`,
-  `effect_vertex_batch.cpp`): effects lie in "buckets" by type (`G_EffectTypeBuckets`, type `0x2c` is a
+- **Effects** (`effect_type_*.cpp`, `effect_base`, `Client/space/particle_effect.cpp`, `Client/space/beam_effect.cpp`,
+  `Client/cmn/effect_vertex_batch.cpp`): effects lie in "buckets" by type (`G_EffectTypeBuckets`, type `0x2c` is a
   beam) that `SpaceEffectsDrawFrame` walks at three points of the frame; a beam (`BeamEffect`) is drawn as
   a cross of two perpendicular billboards (texture `code_beam`, FVF `0x142`, additive blending) in a shared
   growing CPU vertex/index buffer that is flushed once per frame (`DrawIndexedPrimitiveUP`). The firing
   chain: `CliShipFireWeapons` → the `FCliLauncherFx`/`FCliGunFx` sockets
   → `CliLauncherFireProjectiles` → `FClientBeamGameobj` → `CliBeamActivateEffects` → `BeamEffectStart`
   → flush of bucket `0x2c` (see [equip_fx_factory.md](equip_fx_factory.md)).
-- **Alchemy FX and particles** (`vis_effect_arch.cpp`, `.ale` files): `LoadAlePath` opens an `.ale` as a
+- **Alchemy FX and particles** (`Client/cmn/vis_effect_arch.cpp`, `.ale` files): `LoadAlePath` opens an `.ale` as a
   UTF `IFileSystem`; inside are two directory nodes `ALEffectLib\ALEffectLib` and
   `AlchemyNodeLibrary\AlchemyNodeLibrary` — the data is read "inside" the directory (`OpenNode` followed by
   `OpenByDesc` of the same name), and `..` is called only at the end. `LoadNodeLibrary` and
@@ -146,8 +162,8 @@ The SP server runs in the client process (`Server.dll` + `rpclocal`), the client
 `client_iclient*.cpp` (`IClient`, ~90 slots; packets `CREATE*`, `UPDATEOBJECT`, `DESTROY*`,
 `LAND`/`LAUNCH`, `SYSTEM_SWITCH_*`, `SETREPUTATION` …). The server sends the answer to `RequestCreateShip`
 by a direct call of `REQUESTCREATESHIPRESP` (slot 61), not by a controller message. `connect_flow.cpp`
-builds the connection, `character_select_equip.cpp` builds equipment from `Loadout`/`EquipDescList`,
-`player_spawn.cpp` handles the first space.
+builds the connection, `Client/interface/character_select_equip.cpp` builds equipment from `Loadout`/`EquipDescList`,
+`Client/space/player_spawn.cpp` handles the first space.
 
 ## Widescreen mode
 

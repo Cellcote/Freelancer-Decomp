@@ -15,7 +15,7 @@
 // full surface width widens its frustum by the factor below. The vertical angle, and with it
 // the whole Win3D interface, stays what a 4:3 screen of the same height shows; the extra width
 // is added at the sides; the HUD's corner windows are drawn out at the edges
-// (hud_widescreen.h). See docs/re/deviations.md (WIDESCREEN).
+// (space/hud/hud_widescreen.h). See docs/re/deviations.md (WIDESCREEN).
 
 #ifdef FREELANCER_WIDESCREEN_SUPPORT
 

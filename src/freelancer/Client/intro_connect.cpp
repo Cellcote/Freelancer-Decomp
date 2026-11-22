@@ -6,11 +6,11 @@
 
 #include "intro_connect.h"
 
-#include "character_select_equip.h" // GetPlayerBaseIdRetail (FUN_004c4810's DAT_00673358)
+#include "interface/character_select_equip.h" // GetPlayerBaseIdRetail (FUN_004c4810's DAT_00673358)
 #include "connect_flow.h"
 #include "globals.h"
 #include "login_mgr.h"
-#include "menu_mp_session.h"
+#include "interface/menu_mp_session.h"
 
 #include "common_misc.h" // SinglePlayer
 #include "dacom.h" // FDUMP

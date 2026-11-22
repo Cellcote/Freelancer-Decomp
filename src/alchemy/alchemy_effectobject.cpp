@@ -194,7 +194,7 @@ namespace AlchemyImpl
         // are only forwarded to the nodes' vt+0x3c, which on an appearance
         // is the this+0xc thunk (e.g. FUN_06226f80) into FUN_062400f0: A is the slot index
         // (0 composed +0x4c, 1 raw +0x1c, else -2) and B the 12-float source. Callers:
-        // gf_thorn_psys.cpp (1, Xform), particle_effect.cpp (0, &World). A port-only copy of A
+        // Client/gf/gf_thorn_psys.cpp (1, Xform), Client/space/particle_effect.cpp (0, &World). A port-only copy of A
         // as 16 floats into a Transform_ cache was removed 2026-09-26 -- A is an index.
 
         // 0621f611..0621f625: the override node's vt+0x3c takes the call alone (tail JMP),

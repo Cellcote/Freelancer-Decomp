@@ -8,7 +8,7 @@
 
 // Retail Event::Handler (RTTI .?AVHandler@Event@@, Client\Interface\KeyMap.cpp) -- the face a
 // class inherits to receive KeyMap command ids through the DAT_0067c3a4 registry
-// (hud_command_dispatch.h). Base vftable 0x005cbed8 has a single slot (_purecall): the event
+// (space/hud/hud_command_dispatch.h). Base vftable 0x005cbed8 has a single slot (_purecall): the event
 // callback, thiscall RET 4, which FUN_00576410 calls as vt[0](MsgId) and stops at the first
 // true. The destructor is not virtual: FUN_00576010 is called directly by every derived dtor
 // (e.g. TypeSelect 0x0056624f, UIPage::MasterWin, the main command handler atexit 005b2550).
@@ -16,7 +16,7 @@
 // The face sits wherever the derived class puts it (TypeSelect +0x7c, MasterWin +0x80); the
 // registry stores the face's address, so AsHudCmdHandler() is `this` of the face.
 
-#include "hud_command_dispatch.h"
+#include "space/hud/hud_command_dispatch.h"
 
 class EventHandler
 {

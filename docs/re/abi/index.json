@@ -8412,7 +8412,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/button_mover.h",
+   "file": "src/freelancer/Client/interface/button_mover.h",
    "kind": "class",
    "line": 48,
    "module": "freelancer",
@@ -8440,7 +8440,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/button_mover.h",
+   "file": "src/freelancer/Client/interface/button_mover.h",
    "kind": "class",
    "line": 82,
    "module": "freelancer",
@@ -8468,7 +8468,7 @@
    "base_resolved": true,
    "base_slots": 27,
    "bases": "public FClientGameobj",
-   "file": "src/freelancer/Client/cli_asteroid_dynamic.h",
+   "file": "src/freelancer/Client/space/cli_asteroid_dynamic.h",
    "kind": "class",
    "line": 19,
    "module": "freelancer",
@@ -8489,7 +8489,7 @@
    "base_resolved": true,
    "base_slots": 27,
    "bases": "public FClientGameobj",
-   "file": "src/freelancer/Client/cli_asteroid_med.h",
+   "file": "src/freelancer/Client/space/cli_asteroid_med.h",
    "kind": "class",
    "line": 23,
    "module": "freelancer",
@@ -8510,7 +8510,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/cli_nebula.h",
+   "file": "src/freelancer/Client/space/cli_nebula.h",
    "kind": "struct",
    "line": 76,
    "module": "freelancer",
@@ -8685,7 +8685,7 @@
    "base_resolved": true,
    "base_slots": 3,
    "bases": "FClientEquip",
-   "file": "src/freelancer/Client/cli_projectile_fx.h",
+   "file": "src/freelancer/Client/space/cli_projectile_fx.h",
    "kind": "struct",
    "line": 60,
    "module": "freelancer",
@@ -8720,7 +8720,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/client_environment.h",
+   "file": "src/freelancer/Client/space/environment.h",
    "kind": "struct",
    "line": 40,
    "module": "freelancer",
@@ -8769,7 +8769,7 @@
    "base_resolved": true,
    "base_slots": 5,
    "bases": "public IInputEvent",
-   "file": "src/freelancer/Client/client_environment.h",
+   "file": "src/freelancer/Client/space/environment.h",
    "kind": "struct",
    "line": 59,
    "module": "freelancer",
@@ -8853,7 +8853,7 @@
    "base_resolved": true,
    "base_slots": 1,
    "bases": "INotify",
-   "file": "src/freelancer/Client/client_equip_fx.h",
+   "file": "src/freelancer/Client/space/equip_fx.h",
    "kind": "struct",
    "line": 15,
    "module": "freelancer",
@@ -8881,7 +8881,7 @@
    "base_resolved": false,
    "base_slots": 0,
    "bases": "public ClientFuseAction",
-   "file": "src/freelancer/Client/client_fuse.h",
+   "file": "src/freelancer/Client/space/fuse.h",
    "kind": "class",
    "line": 81,
    "module": "freelancer",
@@ -8902,7 +8902,7 @@
    "base_resolved": false,
    "base_slots": 0,
    "bases": "public ClientFuseAction",
-   "file": "src/freelancer/Client/client_fuse.h",
+   "file": "src/freelancer/Client/space/fuse.h",
    "kind": "class",
    "line": 112,
    "module": "freelancer",
@@ -8923,7 +8923,7 @@
    "base_resolved": false,
    "base_slots": 0,
    "bases": "public ClientFuseAction",
-   "file": "src/freelancer/Client/client_fuse.h",
+   "file": "src/freelancer/Client/space/fuse.h",
    "kind": "class",
    "line": 150,
    "module": "freelancer",
@@ -8944,7 +8944,7 @@
    "base_resolved": false,
    "base_slots": 0,
    "bases": "public ClientFuseAction",
-   "file": "src/freelancer/Client/client_fuse.h",
+   "file": "src/freelancer/Client/space/fuse.h",
    "kind": "class",
    "line": 190,
    "module": "freelancer",
@@ -8965,7 +8965,7 @@
    "base_resolved": false,
    "base_slots": 0,
    "bases": "public ClientFuseAction",
-   "file": "src/freelancer/Client/client_fuse.h",
+   "file": "src/freelancer/Client/space/fuse.h",
    "kind": "class",
    "line": 215,
    "module": "freelancer",
@@ -8986,7 +8986,7 @@
    "base_resolved": true,
    "base_slots": 1,
    "bases": "public IObjInspectImpl",
-   "file": "src/freelancer/Client/client_gameobj.h",
+   "file": "src/freelancer/Client/space/gameobj.h",
    "kind": "class",
    "line": 169,
    "module": "freelancer",
@@ -9068,7 +9068,7 @@
      "method": "Slot17c",
      "offset": 380,
      "slot_index": 95,
-     "text": "// 95 +0x17c FUN_00539820 (RET 0xc): the LOD pick. Returns its first argument: a non-zero // low word in *CachedLod is copied straight to *OutLod (0x0053982c..0x0053983a), otherwise // the pick runs (Slot178 radius, camera vt+0x40, ...). The pick's port is the free function // GameobjPickLod in space_scene_obj_draw.cpp -- see client_gameobj.cpp. virtual unsigned* Slot17c(unsigned* OutLod, void* Camera, unsigned const* CachedLod);"
+     "text": "// 95 +0x17c FUN_00539820 (RET 0xc): the LOD pick. Returns its first argument: a non-zero // low word in *CachedLod is copied straight to *OutLod (0x0053982c..0x0053983a), otherwise // the pick runs (Slot178 radius, camera vt+0x40, ...). The pick's port is the free function // GameobjPickLod in Client/space/space_scene_obj_draw.cpp -- see Client/space/gameobj.cpp. virtual unsigned* Slot17c(unsigned* OutLod, void* Camera, unsigned const* CachedLod);"
     },
     {
      "derived": false,
@@ -9082,14 +9082,14 @@
      "method": "Slot184",
      "offset": 388,
      "slot_index": 97,
-     "text": "// 97 +0x184 FUN_00539b40 (RET 4): per-object lighting (FUN_005554d0). Body: the free // function GameobjUpdateDrawLightingRetail in space_scene_obj_draw.cpp. virtual void Slot184(void* Camera);"
+     "text": "// 97 +0x184 FUN_00539b40 (RET 4): per-object lighting (FUN_005554d0). Body: the free // function GameobjUpdateDrawLightingRetail in Client/space/space_scene_obj_draw.cpp. virtual void Slot184(void* Camera);"
     },
     {
      "derived": false,
      "method": "Slot188",
      "offset": 392,
      "slot_index": 98,
-     "text": "// 98 +0x188 FUN_00539980 (RET 0x14): draw submit -- Slot180, Slot17c(&Lod, Camera, // &CachedLod), the LOD gate (a failed gate writes the LOD to *OutLod and returns), // the effect-list sweep, Slot184(Camera), the player flags, get_index, the envmap arm, // IRenderer2::Slot7(Camera, Inst, 1.0f, Flags, Matrix, Extra). Matrix = retail arg 4 // (flags |= 0x120 when non-null), Extra = retail arg 5 (the IFLAppearance Slot8 out-param // when it was null). Body: GameobjSubmitDrawRetail in space_scene_obj_draw.cpp; the draw // drain calls this slot through the node LAB_0051f7a0. virtual unsigned* Slot188(unsigned* OutLod, void* Camera, unsigned CachedLod, void* Matrix, void* Extra);"
+     "text": "// 98 +0x188 FUN_00539980 (RET 0x14): draw submit -- Slot180, Slot17c(&Lod, Camera, // &CachedLod), the LOD gate (a failed gate writes the LOD to *OutLod and returns), // the effect-list sweep, Slot184(Camera), the player flags, get_index, the envmap arm, // IRenderer2::Slot7(Camera, Inst, 1.0f, Flags, Matrix, Extra). Matrix = retail arg 4 // (flags |= 0x120 when non-null), Extra = retail arg 5 (the IFLAppearance Slot8 out-param // when it was null). Body: GameobjSubmitDrawRetail in Client/space/space_scene_obj_draw.cpp; the draw // drain calls this slot through the node LAB_0051f7a0. virtual unsigned* Slot188(unsigned* OutLod, void* Camera, unsigned CachedLod, void* Matrix, void* Extra);"
     },
     {
      "derived": false,
@@ -9182,7 +9182,7 @@
    "base_resolved": true,
    "base_slots": 27,
    "bases": "public FClientGameobj",
-   "file": "src/freelancer/Client/client_gameobj.h",
+   "file": "src/freelancer/Client/space/gameobj.h",
    "kind": "class",
    "line": 401,
    "module": "freelancer",
@@ -9203,7 +9203,7 @@
    "base_resolved": true,
    "base_slots": 28,
    "bases": "public FClientSimpleGameobj, public INotify",
-   "file": "src/freelancer/Client/client_gameobj.h",
+   "file": "src/freelancer/Client/space/gameobj.h",
    "kind": "class",
    "line": 427,
    "module": "freelancer",
@@ -9215,7 +9215,7 @@
      "method": "Slot1c0",
      "offset": 448,
      "slot_index": 112,
-     "text": "// 112 +0x1c0 FUN_00534240 (RET 0x14): ignite the fuse FuseId on this object -- the first // burning fuse of that name on the +0xc4 list gets Fuse::IgniteAt(SourceId, SubObjId, // AtT); otherwise a copy of the ClientFuseDB prototype is appended, bound to this object, // randomised, given Lifetime unless it is -1, and ignited. False only when the fuse is // not in the database (FDUMP). Callers: the equip-FX rebuild FUN_00533e10 (0x00533ee7, // 0x00533f92), BURNFUSE FUN_0053e090, the ship override FUN_00545a90. Body: // EquippedObjIgniteFuse (client_equip_fx.cpp). virtual bool Slot1c0(unsigned SourceId, ID_String const* FuseId, unsigned short SubObjId, float AtT, float Lifetime);"
+     "text": "// 112 +0x1c0 FUN_00534240 (RET 0x14): ignite the fuse FuseId on this object -- the first // burning fuse of that name on the +0xc4 list gets Fuse::IgniteAt(SourceId, SubObjId, // AtT); otherwise a copy of the ClientFuseDB prototype is appended, bound to this object, // randomised, given Lifetime unless it is -1, and ignited. False only when the fuse is // not in the database (FDUMP). Callers: the equip-FX rebuild FUN_00533e10 (0x00533ee7, // 0x00533f92), BURNFUSE FUN_0053e090, the ship override FUN_00545a90. Body: // EquippedObjIgniteFuse (Client/space/equip_fx.cpp). virtual bool Slot1c0(unsigned SourceId, ID_String const* FuseId, unsigned short SubObjId, float AtT, float Lifetime);"
     },
     {
      "derived": false,
@@ -9236,7 +9236,7 @@
      "method": "Slot1cc",
      "offset": 460,
      "slot_index": 115,
-     "text": "// 115 +0x1cc FUN_00534460 (RET 4): the equipment message -- 0x18 fire, 0x19 activate. // Port: EquippedObjHandleEquipMsg (cli_projectile_fx.cpp). virtual unsigned char Slot1cc(FCliEquipFirePacket const* Packet);"
+     "text": "// 115 +0x1cc FUN_00534460 (RET 4): the equipment message -- 0x18 fire, 0x19 activate. // Port: EquippedObjHandleEquipMsg (Client/space/cli_projectile_fx.cpp). virtual unsigned char Slot1cc(FCliEquipFirePacket const* Packet);"
     }
    ],
    "virtual_count": 4
@@ -9245,7 +9245,7 @@
    "base_resolved": true,
    "base_slots": 32,
    "bases": "public FClientEquippedObj",
-   "file": "src/freelancer/Client/client_gameobj.h",
+   "file": "src/freelancer/Client/space/gameobj.h",
    "kind": "class",
    "line": 598,
    "module": "freelancer",
@@ -9266,7 +9266,7 @@
    "base_resolved": true,
    "base_slots": 28,
    "bases": "public FClientSimpleGameobj",
-   "file": "src/freelancer/Client/client_gameobj.h",
+   "file": "src/freelancer/Client/space/gameobj.h",
    "kind": "class",
    "line": 824,
    "module": "freelancer",
@@ -9287,7 +9287,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/client_mesh_load.h",
+   "file": "src/freelancer/Client/space/mesh_load.h",
    "kind": "struct",
    "line": 53,
    "module": "freelancer",
@@ -9308,7 +9308,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/effect_base.h",
+   "file": "src/freelancer/Client/space/effect_base.h",
    "kind": "struct",
    "line": 15,
    "module": "freelancer",
@@ -9385,7 +9385,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/engine_light.h",
+   "file": "src/freelancer/Client/cmn/engine_light.h",
    "kind": "struct",
    "line": 40,
    "module": "freelancer",
@@ -9420,7 +9420,7 @@
    "base_resolved": true,
    "base_slots": 2,
    "bases": "public OwnerList<AnimFrame>",
-   "file": "src/freelancer/Client/engine_light.h",
+   "file": "src/freelancer/Client/cmn/engine_light.h",
    "kind": "struct",
    "line": 299,
    "module": "freelancer",
@@ -9441,7 +9441,7 @@
    "base_resolved": true,
    "base_slots": 3,
    "bases": "FEngineLight",
-   "file": "src/freelancer/Client/engine_light.h",
+   "file": "src/freelancer/Client/cmn/engine_light.h",
    "kind": "struct",
    "line": 347,
    "module": "freelancer",
@@ -9483,7 +9483,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/font_string.h",
+   "file": "src/freelancer/Client/cmn/font_string.h",
    "kind": "class",
    "line": 45,
    "module": "freelancer",
@@ -9567,7 +9567,7 @@
    "base_resolved": true,
    "base_slots": 10,
    "bases": "public FontStringElement",
-   "file": "src/freelancer/Client/font_string.h",
+   "file": "src/freelancer/Client/cmn/font_string.h",
    "kind": "class",
    "line": 138,
    "module": "freelancer",
@@ -9602,7 +9602,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/gate_tunnel.h",
+   "file": "src/freelancer/Client/space/gate_tunnel.h",
    "kind": "struct",
    "line": 102,
    "module": "freelancer",
@@ -9651,7 +9651,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/gf_hotspot.h",
+   "file": "src/freelancer/Client/gf/gf_hotspot.h",
    "kind": "class",
    "line": 25,
    "module": "freelancer",
@@ -9672,7 +9672,7 @@
    "base_resolved": false,
    "base_slots": 0,
    "bases": "FThornComponent",
-   "file": "src/freelancer/Client/gf_thorn_scene.h",
+   "file": "src/freelancer/Client/gf/gf_thorn_scene.h",
    "kind": "struct",
    "line": 22,
    "module": "freelancer",
@@ -9700,7 +9700,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/graph_library.h",
+   "file": "src/freelancer/Client/cmn/graph_library.h",
    "kind": "class",
    "line": 61,
    "module": "freelancer",
@@ -9784,7 +9784,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/hud_element_list.h",
+   "file": "src/freelancer/Client/space/hud/hud_element_list.h",
    "kind": "class",
    "line": 51,
    "module": "freelancer",
@@ -9875,7 +9875,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/hud_element_list.h",
+   "file": "src/freelancer/Client/space/hud/hud_element_list.h",
    "kind": "class",
    "line": 109,
    "module": "freelancer",
@@ -9903,7 +9903,7 @@
    "base_resolved": true,
    "base_slots": 11,
    "bases": "public HUDItem, public WinControl, public ButtonMover, public EventHandler",
-   "file": "src/freelancer/Client/hud_target.h",
+   "file": "src/freelancer/Client/space/hud/hud_target.h",
    "kind": "class",
    "line": 259,
    "module": "freelancer",
@@ -9929,7 +9929,7 @@
      "method": "Slot13",
      "offset": 52,
      "slot_index": 13,
-     "text": "// slot 13 (+0x34) FUN_0053e4a0 -- RET 4. OnMoveFinished passes 0; HUD_Target FUN_004e1930 // hands the byte to SetProperty(1, bHide, 0) of its panel controls -- WinControl property 1 // hides on A == 1 (wincontrol_base.cpp), so the byte is \"hide\". virtual void Slot13(bool bHide);"
+     "text": "// slot 13 (+0x34) FUN_0053e4a0 -- RET 4. OnMoveFinished passes 0; HUD_Target FUN_004e1930 // hands the byte to SetProperty(1, bHide, 0) of its panel controls -- WinControl property 1 // hides on A == 1 (Client/interface/wincontrol_base.cpp), so the byte is \"hide\". virtual void Slot13(bool bHide);"
     },
     {
      "derived": false,
@@ -9959,7 +9959,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/image.h",
+   "file": "src/freelancer/Client/interface/image.h",
    "kind": "struct",
    "line": 14,
    "module": "freelancer",
@@ -10022,7 +10022,7 @@
    "base_resolved": true,
    "base_slots": 45,
    "bases": "public WinControl, public ButtonMover, public ButtonScaler",
-   "file": "src/freelancer/Client/nav_bar.h",
+   "file": "src/freelancer/Client/gf/nav_bar.h",
    "kind": "class",
    "line": 61,
    "module": "freelancer",
@@ -10050,7 +10050,7 @@
    "base_resolved": true,
    "base_slots": 45,
    "bases": "public WinControl",
-   "file": "src/freelancer/Client/nn_button_control.h",
+   "file": "src/freelancer/Client/nn/nn_button_control.h",
    "kind": "class",
    "line": 55,
    "module": "freelancer",
@@ -10071,7 +10071,7 @@
    "base_resolved": true,
    "base_slots": 45,
    "bases": "public WinControl",
-   "file": "src/freelancer/Client/nn_inventory.h",
+   "file": "src/freelancer/Client/nn/nn_inventory.h",
    "kind": "class",
    "line": 110,
    "module": "freelancer",
@@ -10099,7 +10099,7 @@
    "base_resolved": true,
    "base_slots": 45,
    "bases": "public WinControl",
-   "file": "src/freelancer/Client/nn_text_control.h",
+   "file": "src/freelancer/Client/nn/nn_text_control.h",
    "kind": "class",
    "line": 21,
    "module": "freelancer",
@@ -10120,7 +10120,7 @@
    "base_resolved": true,
    "base_slots": 9,
    "bases": "FEffectBase",
-   "file": "src/freelancer/Client/particle_effect.h",
+   "file": "src/freelancer/Client/space/particle_effect.h",
    "kind": "struct",
    "line": 19,
    "module": "freelancer",
@@ -10141,7 +10141,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/particle_effect.h",
+   "file": "src/freelancer/Client/space/particle_effect.h",
    "kind": "struct",
    "line": 233,
    "module": "freelancer",
@@ -10176,7 +10176,7 @@
    "base_resolved": true,
    "base_slots": 45,
    "bases": "public WinControl",
-   "file": "src/freelancer/Client/rich_text_win.h",
+   "file": "src/freelancer/Client/interface/rich_text_win.h",
    "kind": "class",
    "line": 83,
    "module": "freelancer",
@@ -10204,7 +10204,7 @@
    "base_resolved": true,
    "base_slots": 47,
    "bases": "public BaseRichTextWin",
-   "file": "src/freelancer/Client/rich_text_win.h",
+   "file": "src/freelancer/Client/interface/rich_text_win.h",
    "kind": "class",
    "line": 220,
    "module": "freelancer",
@@ -10225,7 +10225,7 @@
    "base_resolved": true,
    "base_slots": 48,
    "bases": "public RichTextWin, public EventHandler",
-   "file": "src/freelancer/Client/rich_text_win.h",
+   "file": "src/freelancer/Client/interface/rich_text_win.h",
    "kind": "class",
    "line": 298,
    "module": "freelancer",
@@ -10274,7 +10274,7 @@
    "base_resolved": true,
    "base_slots": 20,
    "bases": "public ICamera",
-   "file": "src/freelancer/Client/room_camera.h",
+   "file": "src/freelancer/Client/gf/room_camera.h",
    "kind": "class",
    "line": 21,
    "module": "freelancer",
@@ -10309,7 +10309,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/room_control.h",
+   "file": "src/freelancer/Client/gf/room_control.h",
    "kind": "struct",
    "line": 34,
    "module": "freelancer",
@@ -10391,7 +10391,7 @@
      "method": "Slot10",
      "offset": 40,
      "slot_index": 10,
-     "text": "// 10..12: the hotspot events FUN_00555f00 sends to a hotspot's owner (gf_hotspot.h) with // the hotspot's cookie (+0x08) and the cursor point: 1 enter, 2 leave, 3 click. Only // Character (0x005cb930: 0x00445a90 / 0x00445be0 / 0x00445c10) overrides them. virtual void Slot10(unsigned long Cookie, int const* Point); // 10 +0x28 no-op (RET 8)"
+     "text": "// 10..12: the hotspot events FUN_00555f00 sends to a hotspot's owner (Client/gf/gf_hotspot.h) with // the hotspot's cookie (+0x08) and the cursor point: 1 enter, 2 leave, 3 click. Only // Character (0x005cb930: 0x00445a90 / 0x00445be0 / 0x00445c10) overrides them. virtual void Slot10(unsigned long Cookie, int const* Point); // 10 +0x28 no-op (RET 8)"
     },
     {
      "derived": false,
@@ -10414,7 +10414,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/room_control_hotspot.h",
+   "file": "src/freelancer/Client/gf/room_control_hotspot.h",
    "kind": "class",
    "line": 30,
    "module": "freelancer",
@@ -10470,7 +10470,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/sound_archetype.h",
+   "file": "src/freelancer/Client/cmn/sound_archetype.h",
    "kind": "struct",
    "line": 22,
    "module": "freelancer",
@@ -10589,7 +10589,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/sound_archetype.h",
+   "file": "src/freelancer/Client/cmn/sound_archetype.h",
    "kind": "struct",
    "line": 69,
    "module": "freelancer",
@@ -10659,7 +10659,7 @@
    "base_resolved": false,
    "base_slots": 0,
    "bases": "FSpaceCamera",
-   "file": "src/freelancer/Client/space_camera_game.h",
+   "file": "src/freelancer/Client/space/camera/space_camera_game.h",
    "kind": "struct",
    "line": 75,
    "module": "freelancer",
@@ -10757,7 +10757,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/star_sphere.h",
+   "file": "src/freelancer/Client/space/star_sphere.h",
    "kind": "struct",
    "line": 55,
    "module": "freelancer",
@@ -10820,7 +10820,7 @@
    "base_resolved": true,
    "base_slots": 28,
    "bases": "public Win3D",
-   "file": "src/freelancer/Client/text_win.h",
+   "file": "src/freelancer/Client/interface/text_win.h",
    "kind": "class",
    "line": 33,
    "module": "freelancer",
@@ -10841,7 +10841,7 @@
    "base_resolved": true,
    "base_slots": 1,
    "bases": "public Universe::IZoneImmersion",
-   "file": "src/freelancer/Client/texture_panels.h",
+   "file": "src/freelancer/Client/space/texture_panels.h",
    "kind": "class",
    "line": 35,
    "module": "freelancer",
@@ -10946,7 +10946,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/trade_equip_list.h",
+   "file": "src/freelancer/Client/nn/trade_equip_list.h",
    "kind": "class",
    "line": 58,
    "module": "freelancer",
@@ -10967,7 +10967,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/trade_equip_list.h",
+   "file": "src/freelancer/Client/nn/trade_equip_list.h",
    "kind": "class",
    "line": 93,
    "module": "freelancer",
@@ -10988,7 +10988,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/ui_fast_table.h",
+   "file": "src/freelancer/Client/interface/ui_fast_table.h",
    "kind": "class",
    "line": 65,
    "module": "freelancer",
@@ -11009,7 +11009,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/ui_page.h",
+   "file": "src/freelancer/Client/interface/ui_page.h",
    "kind": "class",
    "line": 39,
    "module": "freelancer",
@@ -11051,7 +11051,7 @@
    "base_resolved": false,
    "base_slots": 0,
    "bases": "public LinkTree<Win3D>",
-   "file": "src/freelancer/Client/win3d.h",
+   "file": "src/freelancer/Client/interface/win3d.h",
    "kind": "struct",
    "line": 47,
    "module": "freelancer",
@@ -11261,7 +11261,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/win_factory.h",
+   "file": "src/freelancer/Client/interface/win_factory.h",
    "kind": "class",
    "line": 24,
    "module": "freelancer",
@@ -11282,7 +11282,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/wincontrol_base.h",
+   "file": "src/freelancer/Client/interface/wincontrol_base.h",
    "kind": "struct",
    "line": 46,
    "module": "freelancer",
@@ -11310,7 +11310,7 @@
    "base_resolved": true,
    "base_slots": 28,
    "bases": "public Win3D, public IDataViewOwner",
-   "file": "src/freelancer/Client/wincontrol_base.h",
+   "file": "src/freelancer/Client/interface/wincontrol_base.h",
    "kind": "class",
    "line": 52,
    "module": "freelancer",
@@ -11420,7 +11420,7 @@
      "method": "SetProperty",
      "offset": 168,
      "slot_index": 42,
-     "text": "// slot 42 (+0xa8) FUN_005a13c0 -- property switch 1..11 (see wincontrol_base.cpp). A and B // are dwords that are an int, a flag or a pointer depending on Msg. virtual intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B);"
+     "text": "// slot 42 (+0xa8) FUN_005a13c0 -- property switch 1..11 (see Client/interface/wincontrol_base.cpp). A and B // are dwords that are an int, a flag or a pointer depending on Msg. virtual intptr_t SetProperty(int Msg, uintptr_t A, uintptr_t B);"
     },
     {
      "derived": false,
@@ -11443,7 +11443,7 @@
    "base_resolved": false,
    "base_slots": 0,
    "bases": "public WireStaticControl",
-   "file": "src/freelancer/Client/wire_controls.h",
+   "file": "src/freelancer/Client/interface/wire_controls.h",
    "kind": "class",
    "line": 121,
    "module": "freelancer",
@@ -13954,7 +13954,7 @@
      "method": "slide_strafe_burst",
      "offset": 68,
      "slot_index": 17,
-     "text": "// 17 +0x44. FUN_062d21b0, decomp-tracker item 1536, THREE instructions: //     MOV ECX,[ECX+0x24]   ; the NavHelper pointer field //     ADD ECX,0x18         ; the ComponentThis sub-object //     JMP FUN_062e9030     ; == Behavior_RefreshCachedValueIfChanged, already ported // NO LONGER `{}` -- 2026-09-17 (claude:w23-stubsweep2). The whole body is a forward // into a function this port has had at `ready_unverified` for days, and the empty stub // meant the twenty vtable slots that hold this address -- plus the PLAYER's own strafe // burst, which reaches here through IBehaviorManager::update_current_behavior_slide_ // strafe_burst from src/freelancer/Client/player_behavior.cpp -- all did nothing. virtual void slide_strafe_burst(StrafeDir Dir);                         // 17 +0x44"
+     "text": "// 17 +0x44. FUN_062d21b0, decomp-tracker item 1536, THREE instructions: //     MOV ECX,[ECX+0x24]   ; the NavHelper pointer field //     ADD ECX,0x18         ; the ComponentThis sub-object //     JMP FUN_062e9030     ; == Behavior_RefreshCachedValueIfChanged, already ported // NO LONGER `{}` -- 2026-09-17 (claude:w23-stubsweep2). The whole body is a forward // into a function this port has had at `ready_unverified` for days, and the empty stub // meant the twenty vtable slots that hold this address -- plus the PLAYER's own strafe // burst, which reaches here through IBehaviorManager::update_current_behavior_slide_ // strafe_burst from src/freelancer/Client/space/player_behavior.cpp -- all did nothing. virtual void slide_strafe_burst(StrafeDir Dir);                         // 17 +0x44"
     },
     {
      "derived": false,
@@ -24036,7 +24036,7 @@
    "base_resolved": true,
    "base_slots": 0,
    "bases": "",
-   "file": "src/freelancer/Client/font.h",
+   "file": "src/freelancer/Client/cmn/font.h",
    "kind": "class",
    "line": 17,
    "module": "freelancer",
@@ -36064,811 +36064,811 @@
    "name": "I3DMathEngine"
   },
   {
-   "file": "src/freelancer/Client/asteroid_billboard.h",
+   "file": "src/freelancer/Client/space/asteroid_billboard.h",
    "line": 19,
    "module": "freelancer",
    "name": "FSpaceCamera"
   },
   {
-   "file": "src/freelancer/Client/asteroid_billboard.h",
+   "file": "src/freelancer/Client/space/asteroid_billboard.h",
    "line": 20,
    "module": "freelancer",
    "name": "IVertexBufferManager"
   },
   {
-   "file": "src/freelancer/Client/asteroid_billboard.h",
+   "file": "src/freelancer/Client/space/asteroid_billboard.h",
    "line": 24,
    "module": "freelancer",
    "name": "AsteroidExclusionZoneMgr"
   },
   {
-   "file": "src/freelancer/Client/beam_effect.h",
+   "file": "src/freelancer/Client/space/beam_effect.h",
    "line": 85,
    "module": "freelancer",
    "name": "FEffectArch"
   },
   {
-   "file": "src/freelancer/Client/beam_effect.h",
+   "file": "src/freelancer/Client/space/beam_effect.h",
    "line": 86,
    "module": "freelancer",
    "name": "FSpaceCamera"
   },
   {
-   "file": "src/freelancer/Client/best_path.h",
+   "file": "src/freelancer/Client/nn/best_path.h",
    "line": 23,
    "module": "freelancer",
    "name": "IObjRW"
   },
   {
-   "file": "src/freelancer/Client/best_path.h",
+   "file": "src/freelancer/Client/nn/best_path.h",
    "line": 24,
    "module": "freelancer",
    "name": "Vector"
   },
   {
-   "file": "src/freelancer/Client/best_path.h",
+   "file": "src/freelancer/Client/nn/best_path.h",
    "line": 102,
    "module": "freelancer",
    "name": "FServerReplaceMissionObjectiveInfo"
   },
   {
-   "file": "src/freelancer/Client/best_path.h",
+   "file": "src/freelancer/Client/nn/best_path.h",
    "line": 103,
    "module": "freelancer",
    "name": "FServerSetMissionObjectivesInfo"
   },
   {
-   "file": "src/freelancer/Client/best_path.h",
+   "file": "src/freelancer/Client/nn/best_path.h",
    "line": 104,
    "module": "freelancer",
    "name": "FServerMissionObjectiveStateInfo"
   },
   {
-   "file": "src/freelancer/Client/button_mover.h",
+   "file": "src/freelancer/Client/interface/button_mover.h",
    "line": 30,
    "module": "freelancer",
    "name": "WinControl"
   },
   {
-   "file": "src/freelancer/Client/cargo_bar_control.h",
+   "file": "src/freelancer/Client/interface/cargo_bar_control.h",
    "line": 90,
    "module": "freelancer",
    "name": "FToolTipHoverInfo"
   },
   {
-   "file": "src/freelancer/Client/character_info.h",
+   "file": "src/freelancer/Client/gf/character_info.h",
    "line": 18,
    "module": "freelancer",
    "name": "CostumeDescriptions"
   },
   {
-   "file": "src/freelancer/Client/chat_control.h",
+   "file": "src/freelancer/Client/nn/chat_control.h",
    "line": 35,
    "module": "freelancer",
    "name": "MsgWin"
   },
   {
-   "file": "src/freelancer/Client/chat_control.h",
+   "file": "src/freelancer/Client/nn/chat_control.h",
    "line": 36,
    "module": "freelancer",
    "name": "RichTextWin"
   },
   {
-   "file": "src/freelancer/Client/chat_init.h",
+   "file": "src/freelancer/Client/nn/chat_init.h",
    "line": 29,
    "module": "freelancer",
    "name": "MsgWin"
   },
   {
-   "file": "src/freelancer/Client/chat_init.h",
+   "file": "src/freelancer/Client/nn/chat_init.h",
    "line": 30,
    "module": "freelancer",
    "name": "NnGroupControl"
   },
   {
-   "file": "src/freelancer/Client/chat_init.h",
+   "file": "src/freelancer/Client/nn/chat_init.h",
    "line": 31,
    "module": "freelancer",
    "name": "RichTextWin"
   },
   {
-   "file": "src/freelancer/Client/chat_text_input.h",
+   "file": "src/freelancer/Client/nn/chat_text_input.h",
    "line": 30,
    "module": "freelancer",
    "name": "FChatChannelTable"
   },
   {
-   "file": "src/freelancer/Client/cli_asteroid.h",
+   "file": "src/freelancer/Client/space/cli_asteroid.h",
    "line": 22,
    "module": "freelancer",
    "name": "IMaterial"
   },
   {
-   "file": "src/freelancer/Client/cli_asteroid.h",
+   "file": "src/freelancer/Client/space/cli_asteroid.h",
    "line": 189,
    "module": "freelancer",
    "name": "FCliDynamicAsteroidGameobj"
   },
   {
-   "file": "src/freelancer/Client/cli_asteroid.h",
+   "file": "src/freelancer/Client/space/cli_asteroid.h",
    "line": 190,
    "module": "freelancer",
    "name": "IMaterial"
   },
   {
-   "file": "src/freelancer/Client/cli_asteroid.h",
+   "file": "src/freelancer/Client/space/cli_asteroid.h",
    "line": 287,
    "module": "freelancer",
    "name": "I3DMathEngine"
   },
   {
-   "file": "src/freelancer/Client/cli_asteroid.h",
+   "file": "src/freelancer/Client/space/cli_asteroid.h",
    "line": 307,
    "module": "freelancer",
    "name": "FSpaceCamera"
   },
   {
-   "file": "src/freelancer/Client/cli_asteroid_dynamic.h",
+   "file": "src/freelancer/Client/space/cli_asteroid_dynamic.h",
    "line": 17,
    "module": "freelancer",
    "name": "FSpaceCamera"
   },
   {
-   "file": "src/freelancer/Client/cli_asteroid_med.h",
+   "file": "src/freelancer/Client/space/cli_asteroid_med.h",
    "line": 21,
    "module": "freelancer",
    "name": "FCliAsteroid"
   },
   {
-   "file": "src/freelancer/Client/cli_nebula.h",
+   "file": "src/freelancer/Client/space/cli_nebula.h",
    "line": 30,
    "module": "freelancer",
    "name": "I3DMathEngine"
   },
   {
-   "file": "src/freelancer/Client/cli_nebula.h",
+   "file": "src/freelancer/Client/space/cli_nebula.h",
    "line": 53,
    "module": "freelancer",
    "name": "FNebulaZoneShell"
   },
   {
-   "file": "src/freelancer/Client/cli_projectile_fx.h",
+   "file": "src/freelancer/Client/space/cli_projectile_fx.h",
    "line": 16,
    "module": "freelancer",
    "name": "FClientGameobj"
   },
   {
-   "file": "src/freelancer/Client/cli_projectile_fx.h",
+   "file": "src/freelancer/Client/space/cli_projectile_fx.h",
    "line": 17,
    "module": "freelancer",
    "name": "FClientBeamGameobj"
   },
   {
-   "file": "src/freelancer/Client/cli_projectile_fx.h",
+   "file": "src/freelancer/Client/space/cli_projectile_fx.h",
    "line": 18,
    "module": "freelancer",
    "name": "FParticleEffect"
   },
   {
-   "file": "src/freelancer/Client/cli_projectile_fx.h",
+   "file": "src/freelancer/Client/space/cli_projectile_fx.h",
    "line": 19,
    "module": "freelancer",
    "name": "ISoundSource"
   },
   {
-   "file": "src/freelancer/Client/cli_projectile_fx.h",
+   "file": "src/freelancer/Client/space/cli_projectile_fx.h",
    "line": 179,
    "module": "freelancer",
    "name": "FClientEquippedObj"
   },
   {
-   "file": "src/freelancer/Client/cli_tractor_beam.h",
+   "file": "src/freelancer/Client/space/cli_tractor_beam.h",
    "line": 17,
    "module": "freelancer",
    "name": "FClientEquip"
   },
   {
-   "file": "src/freelancer/Client/cli_tractor_beam.h",
+   "file": "src/freelancer/Client/space/cli_tractor_beam.h",
    "line": 18,
    "module": "freelancer",
    "name": "FTexShape"
   },
   {
-   "file": "src/freelancer/Client/client_base_market.h",
+   "file": "src/freelancer/Client/gf/base_market.h",
    "line": 19,
    "module": "freelancer",
    "name": "BaseData"
   },
   {
-   "file": "src/freelancer/Client/client_cliobj.h",
+   "file": "src/freelancer/Client/cmn/cliobj.h",
    "line": 16,
    "module": "freelancer",
    "name": "IFileSystem"
   },
   {
-   "file": "src/freelancer/Client/client_cliobj.h",
+   "file": "src/freelancer/Client/cmn/cliobj.h",
    "line": 17,
    "module": "freelancer",
    "name": "FEffectArch"
   },
   {
-   "file": "src/freelancer/Client/client_cliobj.h",
+   "file": "src/freelancer/Client/cmn/cliobj.h",
    "line": 18,
    "module": "freelancer",
    "name": "EquipDescVector"
   },
   {
-   "file": "src/freelancer/Client/client_cliobj.h",
+   "file": "src/freelancer/Client/cmn/cliobj.h",
    "line": 23,
    "module": "freelancer",
    "name": "FCliMaterialEntry"
   },
   {
-   "file": "src/freelancer/Client/client_debris.h",
+   "file": "src/freelancer/Client/space/debris.h",
    "line": 19,
    "module": "freelancer",
    "name": "INI_Reader"
   },
   {
-   "file": "src/freelancer/Client/client_equip_fx.h",
+   "file": "src/freelancer/Client/space/equip_fx.h",
    "line": 8,
    "module": "freelancer",
    "name": "FClientGameobj"
   },
   {
-   "file": "src/freelancer/Client/client_explosion.h",
+   "file": "src/freelancer/Client/space/explosion.h",
    "line": 21,
    "module": "freelancer",
    "name": "FClientGameobj"
   },
   {
-   "file": "src/freelancer/Client/client_explosion.h",
+   "file": "src/freelancer/Client/space/explosion.h",
    "line": 22,
    "module": "freelancer",
    "name": "CObject"
   },
   {
-   "file": "src/freelancer/Client/client_explosion.h",
+   "file": "src/freelancer/Client/space/explosion.h",
    "line": 23,
    "module": "freelancer",
    "name": "FDebrisArch"
   },
   {
-   "file": "src/freelancer/Client/client_fuse.h",
+   "file": "src/freelancer/Client/space/fuse.h",
    "line": 24,
    "module": "freelancer",
    "name": "FClientGameobj"
   },
   {
-   "file": "src/freelancer/Client/client_fuse.h",
+   "file": "src/freelancer/Client/space/fuse.h",
    "line": 25,
    "module": "freelancer",
    "name": "INI_Reader"
   },
   {
-   "file": "src/freelancer/Client/client_fuse.h",
+   "file": "src/freelancer/Client/space/fuse.h",
    "line": 26,
    "module": "freelancer",
    "name": "FEffectArch"
   },
   {
-   "file": "src/freelancer/Client/client_gameobj.h",
+   "file": "src/freelancer/Client/space/gameobj.h",
    "line": 18,
    "module": "freelancer",
    "name": "FCliEquipFirePacket"
   },
   {
-   "file": "src/freelancer/Client/client_gameobj.h",
+   "file": "src/freelancer/Client/space/gameobj.h",
    "line": 19,
    "module": "freelancer",
    "name": "FEffectArch"
   },
   {
-   "file": "src/freelancer/Client/client_gameobj.h",
+   "file": "src/freelancer/Client/space/gameobj.h",
    "line": 20,
    "module": "freelancer",
    "name": "FParticleEffect"
   },
   {
-   "file": "src/freelancer/Client/client_gameobj.h",
+   "file": "src/freelancer/Client/space/gameobj.h",
    "line": 21,
    "module": "freelancer",
    "name": "FStarSphere"
   },
   {
-   "file": "src/freelancer/Client/client_gameobj.h",
+   "file": "src/freelancer/Client/space/gameobj.h",
    "line": 22,
    "module": "freelancer",
    "name": "ISoundSource"
   },
   {
-   "file": "src/freelancer/Client/client_gameobj.h",
+   "file": "src/freelancer/Client/space/gameobj.h",
    "line": 870,
    "module": "freelancer",
    "name": "FBeamEffect"
   },
   {
-   "file": "src/freelancer/Client/client_ime_focus.h",
+   "file": "src/freelancer/Client/interface/ime_focus.h",
    "line": 11,
    "module": "freelancer",
    "name": "FontStringChild"
   },
   {
-   "file": "src/freelancer/Client/client_ime_focus.h",
+   "file": "src/freelancer/Client/interface/ime_focus.h",
    "line": 38,
    "module": "freelancer",
    "name": "IFont"
   },
   {
-   "file": "src/freelancer/Client/client_land_action.h",
+   "file": "src/freelancer/Client/space/land_action.h",
    "line": 22,
    "module": "freelancer",
    "name": "FClientGameobj"
   },
   {
-   "file": "src/freelancer/Client/client_land_action.h",
+   "file": "src/freelancer/Client/space/land_action.h",
    "line": 23,
    "module": "freelancer",
    "name": "FClientShipGameobj"
   },
   {
-   "file": "src/freelancer/Client/client_land_action.h",
+   "file": "src/freelancer/Client/space/land_action.h",
    "line": 24,
    "module": "freelancer",
    "name": "CEqObj"
   },
   {
-   "file": "src/freelancer/Client/client_mesh_load.h",
+   "file": "src/freelancer/Client/space/mesh_load.h",
    "line": 6,
    "module": "freelancer",
    "name": "IEngine"
   },
   {
-   "file": "src/freelancer/Client/client_mesh_load.h",
+   "file": "src/freelancer/Client/space/mesh_load.h",
    "line": 44,
    "module": "freelancer",
    "name": "IEngine"
   },
   {
-   "file": "src/freelancer/Client/client_objdb.h",
+   "file": "src/freelancer/Client/space/objdb.h",
    "line": 10,
    "module": "freelancer",
    "name": "FClientGameobj"
   },
   {
-   "file": "src/freelancer/Client/client_objdb.h",
+   "file": "src/freelancer/Client/space/objdb.h",
    "line": 14,
    "module": "freelancer",
    "name": "ISystem"
   },
   {
-   "file": "src/freelancer/Client/client_state.h",
+   "file": "src/freelancer/Client/state.h",
    "line": 16,
    "module": "freelancer",
    "name": "CHARACTER_ID"
   },
   {
-   "file": "src/freelancer/Client/commodity_by_base.h",
+   "file": "src/freelancer/Client/nn/commodity_by_base.h",
    "line": 31,
    "module": "freelancer",
    "name": "UiScroll"
   },
   {
-   "file": "src/freelancer/Client/effect_base.h",
+   "file": "src/freelancer/Client/space/effect_base.h",
    "line": 11,
    "module": "freelancer",
    "name": "FEffectArch"
   },
   {
-   "file": "src/freelancer/Client/effect_base.h",
+   "file": "src/freelancer/Client/space/effect_base.h",
    "line": 12,
    "module": "freelancer",
    "name": "FVisEffectArch"
   },
   {
-   "file": "src/freelancer/Client/effect_base.h",
+   "file": "src/freelancer/Client/space/effect_base.h",
    "line": 13,
    "module": "freelancer",
    "name": "FSpaceCamera"
   },
   {
-   "file": "src/freelancer/Client/effect_base.h",
+   "file": "src/freelancer/Client/space/effect_base.h",
    "line": 113,
    "module": "freelancer",
    "name": "FSpaceCamera"
   },
   {
-   "file": "src/freelancer/Client/effect_type_info.h",
+   "file": "src/freelancer/Client/space/effect_type_info.h",
    "line": 57,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/effect_vertex_batch.h",
+   "file": "src/freelancer/Client/cmn/effect_vertex_batch.h",
    "line": 10,
    "module": "freelancer",
    "name": "IRenderPipeline"
   },
   {
-   "file": "src/freelancer/Client/effect_vertex_batch.h",
+   "file": "src/freelancer/Client/cmn/effect_vertex_batch.h",
    "line": 64,
    "module": "freelancer",
    "name": "I3DMathEngine"
   },
   {
-   "file": "src/freelancer/Client/effect_vertex_batch.h",
+   "file": "src/freelancer/Client/cmn/effect_vertex_batch.h",
    "line": 105,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/engine_character.h",
+   "file": "src/freelancer/Client/cmn/engine_character.h",
    "line": 33,
    "module": "freelancer",
    "name": "IFileSystem"
   },
   {
-   "file": "src/freelancer/Client/engine_light.h",
+   "file": "src/freelancer/Client/cmn/engine_light.h",
    "line": 20,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/engine_light.h",
+   "file": "src/freelancer/Client/cmn/engine_light.h",
    "line": 382,
    "module": "freelancer",
    "name": "I3DMathEngine"
   },
   {
-   "file": "src/freelancer/Client/engine_light.h",
+   "file": "src/freelancer/Client/cmn/engine_light.h",
    "line": 445,
    "module": "freelancer",
    "name": "INI_Reader"
   },
   {
-   "file": "src/freelancer/Client/equip_visual_set.h",
+   "file": "src/freelancer/Client/space/equip_visual_set.h",
    "line": 25,
    "module": "freelancer",
    "name": "EquipDescList"
   },
   {
-   "file": "src/freelancer/Client/equip_visual_set.h",
+   "file": "src/freelancer/Client/space/equip_visual_set.h",
    "line": 26,
    "module": "freelancer",
    "name": "HardpointSummary"
   },
   {
-   "file": "src/freelancer/Client/equip_visual_set.h",
+   "file": "src/freelancer/Client/space/equip_visual_set.h",
    "line": 27,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/equip_visual_set.h",
+   "file": "src/freelancer/Client/space/equip_visual_set.h",
    "line": 31,
    "module": "freelancer",
    "name": "Equipment"
   },
   {
-   "file": "src/freelancer/Client/fade_to_black.h",
+   "file": "src/freelancer/Client/cmn/fade_to_black.h",
    "line": 83,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/fl_fx_mesh.h",
+   "file": "src/freelancer/Client/cmn/fl_fx_mesh.h",
    "line": 16,
    "module": "freelancer",
    "name": "IFxMeshFactory"
   },
   {
-   "file": "src/freelancer/Client/fl_ime_input_box.h",
+   "file": "src/freelancer/Client/interface/fl_ime_input_box.h",
    "line": 20,
    "module": "freelancer",
    "name": "FontStringChild"
   },
   {
-   "file": "src/freelancer/Client/fl_ime_input_box.h",
+   "file": "src/freelancer/Client/interface/fl_ime_input_box.h",
    "line": 21,
    "module": "freelancer",
    "name": "RichTextEditWin"
   },
   {
-   "file": "src/freelancer/Client/flash_light.h",
+   "file": "src/freelancer/Client/space/flash_light.h",
    "line": 11,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/flash_light.h",
+   "file": "src/freelancer/Client/space/flash_light.h",
    "line": 12,
    "module": "freelancer",
    "name": "HardpointSummary"
   },
   {
-   "file": "src/freelancer/Client/flash_light.h",
+   "file": "src/freelancer/Client/space/flash_light.h",
    "line": 16,
    "module": "freelancer",
    "name": "ICliObj"
   },
   {
-   "file": "src/freelancer/Client/font_atlas.h",
+   "file": "src/freelancer/Client/cmn/font_atlas.h",
    "line": 9,
    "module": "freelancer",
    "name": "IFont"
   },
   {
-   "file": "src/freelancer/Client/font_atlas.h",
+   "file": "src/freelancer/Client/cmn/font_atlas.h",
    "line": 56,
    "module": "freelancer",
    "name": "FontStringChild"
   },
   {
-   "file": "src/freelancer/Client/font_imp.h",
+   "file": "src/freelancer/Client/cmn/font_imp.h",
    "line": 16,
    "module": "freelancer",
    "name": "IFileSystem"
   },
   {
-   "file": "src/freelancer/Client/font_string.h",
+   "file": "src/freelancer/Client/cmn/font_string.h",
    "line": 229,
    "module": "freelancer",
    "name": "FFontString"
   },
   {
-   "file": "src/freelancer/Client/gameflow.h",
+   "file": "src/freelancer/Client/gf/gameflow.h",
    "line": 22,
    "module": "freelancer",
    "name": "FHotspot"
   },
   {
-   "file": "src/freelancer/Client/gate_tunnel.h",
+   "file": "src/freelancer/Client/space/gate_tunnel.h",
    "line": 31,
    "module": "freelancer",
    "name": "FClientShipGameobj"
   },
   {
-   "file": "src/freelancer/Client/gate_tunnel.h",
+   "file": "src/freelancer/Client/space/gate_tunnel.h",
    "line": 32,
    "module": "freelancer",
    "name": "FGameLight"
   },
   {
-   "file": "src/freelancer/Client/gate_tunnel.h",
+   "file": "src/freelancer/Client/space/gate_tunnel.h",
    "line": 33,
    "module": "freelancer",
    "name": "FSpaceCamera"
   },
   {
-   "file": "src/freelancer/Client/gf_character_object.h",
+   "file": "src/freelancer/Client/gf/gf_character_object.h",
    "line": 26,
    "module": "freelancer",
    "name": "DetailSwitchTable"
   },
   {
-   "file": "src/freelancer/Client/gf_character_object.h",
+   "file": "src/freelancer/Client/gf/gf_character_object.h",
    "line": 27,
    "module": "freelancer",
    "name": "FGfScriptSequence"
   },
   {
-   "file": "src/freelancer/Client/gf_character_object.h",
+   "file": "src/freelancer/Client/gf/gf_character_object.h",
    "line": 28,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/gf_character_object.h",
+   "file": "src/freelancer/Client/gf/gf_character_object.h",
    "line": 66,
    "module": "freelancer",
    "name": "FCharacterObject"
   },
   {
-   "file": "src/freelancer/Client/gf_hotspot.h",
+   "file": "src/freelancer/Client/gf/gf_hotspot.h",
    "line": 23,
    "module": "freelancer",
    "name": "FRoomObject"
   },
   {
-   "file": "src/freelancer/Client/gf_object_ship.h",
+   "file": "src/freelancer/Client/gf/gf_object_ship.h",
    "line": 20,
    "module": "freelancer",
    "name": "EquipDescList"
   },
   {
-   "file": "src/freelancer/Client/gf_object_ship.h",
+   "file": "src/freelancer/Client/gf/gf_object_ship.h",
    "line": 21,
    "module": "freelancer",
    "name": "HardpointSummary"
   },
   {
-   "file": "src/freelancer/Client/gf_object_ship.h",
+   "file": "src/freelancer/Client/gf/gf_object_ship.h",
    "line": 22,
    "module": "freelancer",
    "name": "CacheString"
   },
   {
-   "file": "src/freelancer/Client/gf_object_ship.h",
+   "file": "src/freelancer/Client/gf/gf_object_ship.h",
    "line": 23,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/gf_object_ship.h",
+   "file": "src/freelancer/Client/gf/gf_object_ship.h",
    "line": 24,
    "module": "freelancer",
    "name": "ISoundSource"
   },
   {
-   "file": "src/freelancer/Client/gf_object_ship.h",
+   "file": "src/freelancer/Client/gf/gf_object_ship.h",
    "line": 28,
    "module": "freelancer",
    "name": "Ship"
   },
   {
-   "file": "src/freelancer/Client/gf_object_ship.h",
+   "file": "src/freelancer/Client/gf/gf_object_ship.h",
    "line": 279,
    "module": "freelancer",
    "name": "FVector"
   },
   {
-   "file": "src/freelancer/Client/gf_object_ship.h",
+   "file": "src/freelancer/Client/gf/gf_object_ship.h",
    "line": 280,
    "module": "freelancer",
    "name": "FMatrix"
   },
   {
-   "file": "src/freelancer/Client/gf_script.h",
+   "file": "src/freelancer/Client/gf/gf_script.h",
    "line": 15,
    "module": "freelancer",
    "name": "FRoomCamera"
   },
   {
-   "file": "src/freelancer/Client/gf_script.h",
+   "file": "src/freelancer/Client/gf/gf_script.h",
    "line": 16,
    "module": "freelancer",
    "name": "FGfLightWrapper"
   },
   {
-   "file": "src/freelancer/Client/gf_script.h",
+   "file": "src/freelancer/Client/gf/gf_script.h",
    "line": 77,
    "module": "freelancer",
    "name": "FEngineLight"
   },
   {
-   "file": "src/freelancer/Client/gf_script.h",
+   "file": "src/freelancer/Client/gf/gf_script.h",
    "line": 78,
    "module": "freelancer",
    "name": "FD3dLight8"
   },
   {
-   "file": "src/freelancer/Client/gf_script.h",
+   "file": "src/freelancer/Client/gf/gf_script.h",
    "line": 122,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/gf_script.h",
+   "file": "src/freelancer/Client/gf/gf_script.h",
    "line": 160,
    "module": "freelancer",
    "name": "IScriptEngine"
   },
   {
-   "file": "src/freelancer/Client/gf_script_object.h",
+   "file": "src/freelancer/Client/gf/gf_script_object.h",
    "line": 32,
    "module": "freelancer",
    "name": "FObjectProp"
   },
   {
-   "file": "src/freelancer/Client/gf_script_object.h",
+   "file": "src/freelancer/Client/gf/gf_script_object.h",
    "line": 33,
    "module": "freelancer",
    "name": "NnOfferDialog"
   },
   {
-   "file": "src/freelancer/Client/gf_script_object.h",
+   "file": "src/freelancer/Client/gf/gf_script_object.h",
    "line": 34,
    "module": "freelancer",
    "name": "FCharacterObject"
   },
   {
-   "file": "src/freelancer/Client/gf_script_object.h",
+   "file": "src/freelancer/Client/gf/gf_script_object.h",
    "line": 35,
    "module": "freelancer",
    "name": "FRoomObject"
   },
   {
-   "file": "src/freelancer/Client/gf_script_object.h",
+   "file": "src/freelancer/Client/gf/gf_script_object.h",
    "line": 36,
    "module": "freelancer",
    "name": "FRoomRuntime"
   },
   {
-   "file": "src/freelancer/Client/gf_script_object.h",
+   "file": "src/freelancer/Client/gf/gf_script_object.h",
    "line": 37,
    "module": "freelancer",
    "name": "FThornComponent"
   },
   {
-   "file": "src/freelancer/Client/gf_script_object.h",
+   "file": "src/freelancer/Client/gf/gf_script_object.h",
    "line": 38,
    "module": "freelancer",
    "name": "FThornEntitySnap"
   },
   {
-   "file": "src/freelancer/Client/gf_script_object.h",
+   "file": "src/freelancer/Client/gf/gf_script_object.h",
    "line": 39,
    "module": "freelancer",
    "name": "FThornSound"
   },
   {
-   "file": "src/freelancer/Client/gf_script_object.h",
+   "file": "src/freelancer/Client/gf/gf_script_object.h",
    "line": 40,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/gf_script_object.h",
+   "file": "src/freelancer/Client/gf/gf_script_object.h",
    "line": 41,
    "module": "freelancer",
    "name": "IScriptEngine"
   },
   {
-   "file": "src/freelancer/Client/gf_script_object.h",
+   "file": "src/freelancer/Client/gf/gf_script_object.h",
    "line": 42,
    "module": "freelancer",
    "name": "FGfScriptSequence"
   },
   {
-   "file": "src/freelancer/Client/gf_script_object.h",
+   "file": "src/freelancer/Client/gf/gf_script_object.h",
    "line": 43,
    "module": "freelancer",
    "name": "FGfMirrorDatabase"
   },
   {
-   "file": "src/freelancer/Client/gf_thorn_camera.h",
+   "file": "src/freelancer/Client/gf/gf_thorn_camera.h",
    "line": 15,
    "module": "freelancer",
    "name": "FRoomCamera"
   },
   {
-   "file": "src/freelancer/Client/gf_thorn_component.h",
+   "file": "src/freelancer/Client/gf/gf_thorn_component.h",
    "line": 24,
    "module": "freelancer",
    "name": "FGfScript"
   },
   {
-   "file": "src/freelancer/Client/gf_thorn_component.h",
+   "file": "src/freelancer/Client/gf/gf_thorn_component.h",
    "line": 25,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/gf_thorn_compound.h",
+   "file": "src/freelancer/Client/gf/gf_thorn_compound.h",
    "line": 14,
    "module": "freelancer",
    "name": "FRoomObject"
   },
   {
-   "file": "src/freelancer/Client/gf_thorn_deformable.h",
+   "file": "src/freelancer/Client/gf/gf_thorn_deformable.h",
    "line": 14,
    "module": "freelancer",
    "name": "FCharacterObject"
   },
   {
-   "file": "src/freelancer/Client/gf_thorn_light.h",
+   "file": "src/freelancer/Client/gf/gf_thorn_light.h",
    "line": 16,
    "module": "freelancer",
    "name": "FGfLightWrapper"
   },
   {
-   "file": "src/freelancer/Client/gf_thorn_psys.h",
+   "file": "src/freelancer/Client/gf/gf_thorn_psys.h",
    "line": 17,
    "module": "freelancer",
    "name": "FVisEffectArch"
   },
   {
-   "file": "src/freelancer/Client/gf_thorn_sound.h",
+   "file": "src/freelancer/Client/gf/gf_thorn_sound.h",
    "line": 23,
    "module": "freelancer",
    "name": "ISoundSource"
@@ -36886,391 +36886,391 @@
    "name": "Win3D"
   },
   {
-   "file": "src/freelancer/Client/hud_comm.h",
+   "file": "src/freelancer/Client/space/hud/hud_comm.h",
    "line": 48,
    "module": "freelancer",
    "name": "INI_Reader"
   },
   {
-   "file": "src/freelancer/Client/hud_comm.h",
+   "file": "src/freelancer/Client/space/hud/hud_comm.h",
    "line": 49,
    "module": "freelancer",
    "name": "NnTextControl"
   },
   {
-   "file": "src/freelancer/Client/hud_comm.h",
+   "file": "src/freelancer/Client/space/hud/hud_comm.h",
    "line": 50,
    "module": "freelancer",
    "name": "CObject"
   },
   {
-   "file": "src/freelancer/Client/hud_comm.h",
+   "file": "src/freelancer/Client/space/hud/hud_comm.h",
    "line": 51,
    "module": "freelancer",
    "name": "FEngineCharacterBody"
   },
   {
-   "file": "src/freelancer/Client/hud_comm.h",
+   "file": "src/freelancer/Client/space/hud/hud_comm.h",
    "line": 52,
    "module": "freelancer",
    "name": "FEngineLight"
   },
   {
-   "file": "src/freelancer/Client/hud_comm.h",
+   "file": "src/freelancer/Client/space/hud/hud_comm.h",
    "line": 53,
    "module": "freelancer",
    "name": "FVoiceMsg"
   },
   {
-   "file": "src/freelancer/Client/hud_comm.h",
+   "file": "src/freelancer/Client/space/hud/hud_comm.h",
    "line": 54,
    "module": "freelancer",
    "name": "FVoiceProfile"
   },
   {
-   "file": "src/freelancer/Client/hud_comm.h",
+   "file": "src/freelancer/Client/space/hud/hud_comm.h",
    "line": 55,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/hud_comm.h",
+   "file": "src/freelancer/Client/space/hud/hud_comm.h",
    "line": 56,
    "module": "freelancer",
    "name": "ISoundSource"
   },
   {
-   "file": "src/freelancer/Client/hud_command_dispatch.h",
+   "file": "src/freelancer/Client/space/hud/hud_command_dispatch.h",
    "line": 6,
    "module": "freelancer",
    "name": "EventHandler"
   },
   {
-   "file": "src/freelancer/Client/hud_contact_list.h",
+   "file": "src/freelancer/Client/space/hud/hud_contact_list.h",
    "line": 35,
    "module": "freelancer",
    "name": "CEquip"
   },
   {
-   "file": "src/freelancer/Client/hud_contact_list.h",
+   "file": "src/freelancer/Client/space/hud/hud_contact_list.h",
    "line": 36,
    "module": "freelancer",
    "name": "CShip"
   },
   {
-   "file": "src/freelancer/Client/hud_contact_list.h",
+   "file": "src/freelancer/Client/space/hud/hud_contact_list.h",
    "line": 37,
    "module": "freelancer",
    "name": "CSimple"
   },
   {
-   "file": "src/freelancer/Client/hud_contact_list.h",
+   "file": "src/freelancer/Client/space/hud/hud_contact_list.h",
    "line": 38,
    "module": "freelancer",
    "name": "FClientGameobj"
   },
   {
-   "file": "src/freelancer/Client/hud_contact_list.h",
+   "file": "src/freelancer/Client/space/hud/hud_contact_list.h",
    "line": 39,
    "module": "freelancer",
    "name": "INI_Reader"
   },
   {
-   "file": "src/freelancer/Client/hud_contact_list.h",
+   "file": "src/freelancer/Client/space/hud/hud_contact_list.h",
    "line": 40,
    "module": "freelancer",
    "name": "IFont"
   },
   {
-   "file": "src/freelancer/Client/hud_contact_list.h",
+   "file": "src/freelancer/Client/space/hud/hud_contact_list.h",
    "line": 41,
    "module": "freelancer",
    "name": "UiScroll"
   },
   {
-   "file": "src/freelancer/Client/hud_contact_list.h",
+   "file": "src/freelancer/Client/space/hud/hud_contact_list.h",
    "line": 42,
    "module": "freelancer",
    "name": "FButtonMontageTile"
   },
   {
-   "file": "src/freelancer/Client/hud_contact_list.h",
+   "file": "src/freelancer/Client/space/hud/hud_contact_list.h",
    "line": 43,
    "module": "freelancer",
    "name": "FFontString"
   },
   {
-   "file": "src/freelancer/Client/hud_contact_list.h",
+   "file": "src/freelancer/Client/space/hud/hud_contact_list.h",
    "line": 44,
    "module": "freelancer",
    "name": "IObjRW"
   },
   {
-   "file": "src/freelancer/Client/hud_cruise_progress.h",
+   "file": "src/freelancer/Client/space/hud/hud_cruise_progress.h",
    "line": 24,
    "module": "freelancer",
    "name": "INI_Reader"
   },
   {
-   "file": "src/freelancer/Client/hud_damage_indicator.h",
+   "file": "src/freelancer/Client/space/hud/hud_damage_indicator.h",
    "line": 34,
    "module": "freelancer",
    "name": "INI_Reader"
   },
   {
-   "file": "src/freelancer/Client/hud_damage_indicator.h",
+   "file": "src/freelancer/Client/space/hud/hud_damage_indicator.h",
    "line": 35,
    "module": "freelancer",
    "name": "Vector"
   },
   {
-   "file": "src/freelancer/Client/hud_element_list.h",
+   "file": "src/freelancer/Client/space/hud/hud_element_list.h",
    "line": 20,
    "module": "freelancer",
    "name": "INI_Reader"
   },
   {
-   "file": "src/freelancer/Client/hud_element_list.h",
+   "file": "src/freelancer/Client/space/hud/hud_element_list.h",
    "line": 21,
    "module": "freelancer",
    "name": "IObjRW"
   },
   {
-   "file": "src/freelancer/Client/hud_element_list.h",
+   "file": "src/freelancer/Client/space/hud/hud_element_list.h",
    "line": 22,
    "module": "freelancer",
    "name": "FSpaceCamera"
   },
   {
-   "file": "src/freelancer/Client/hud_element_list.h",
+   "file": "src/freelancer/Client/space/hud/hud_element_list.h",
    "line": 23,
    "module": "freelancer",
    "name": "FTextureRef"
   },
   {
-   "file": "src/freelancer/Client/hud_maneuvers.h",
+   "file": "src/freelancer/Client/space/hud/hud_maneuvers.h",
    "line": 40,
    "module": "freelancer",
    "name": "INI_Reader"
   },
   {
-   "file": "src/freelancer/Client/hud_maneuvers.h",
+   "file": "src/freelancer/Client/space/hud/hud_maneuvers.h",
    "line": 41,
    "module": "freelancer",
    "name": "FButtonMontageTile"
   },
   {
-   "file": "src/freelancer/Client/hud_status_core.h",
+   "file": "src/freelancer/Client/space/hud/hud_status_core.h",
    "line": 12,
    "module": "freelancer",
    "name": "CEqObj"
   },
   {
-   "file": "src/freelancer/Client/hud_status_core.h",
+   "file": "src/freelancer/Client/space/hud/hud_status_core.h",
    "line": 13,
    "module": "freelancer",
    "name": "INI_Reader"
   },
   {
-   "file": "src/freelancer/Client/hud_status_core.h",
+   "file": "src/freelancer/Client/space/hud/hud_status_core.h",
    "line": 30,
    "module": "freelancer",
    "name": "HUD_Status"
   },
   {
-   "file": "src/freelancer/Client/hud_target.h",
+   "file": "src/freelancer/Client/space/hud/hud_target.h",
    "line": 40,
    "module": "freelancer",
    "name": "INI_Reader"
   },
   {
-   "file": "src/freelancer/Client/hud_target.h",
+   "file": "src/freelancer/Client/space/hud/hud_target.h",
    "line": 41,
    "module": "freelancer",
    "name": "IFont"
   },
   {
-   "file": "src/freelancer/Client/hud_target.h",
+   "file": "src/freelancer/Client/space/hud/hud_target.h",
    "line": 42,
    "module": "freelancer",
    "name": "FSpaceCamera"
   },
   {
-   "file": "src/freelancer/Client/hud_target.h",
+   "file": "src/freelancer/Client/space/hud/hud_target.h",
    "line": 43,
    "module": "freelancer",
    "name": "IObjRW"
   },
   {
-   "file": "src/freelancer/Client/hud_target.h",
+   "file": "src/freelancer/Client/space/hud/hud_target.h",
    "line": 44,
    "module": "freelancer",
    "name": "CEquip"
   },
   {
-   "file": "src/freelancer/Client/hud_target.h",
+   "file": "src/freelancer/Client/space/hud/hud_target.h",
    "line": 45,
    "module": "freelancer",
    "name": "CObject"
   },
   {
-   "file": "src/freelancer/Client/hud_target.h",
+   "file": "src/freelancer/Client/space/hud/hud_target.h",
    "line": 46,
    "module": "freelancer",
    "name": "CShip"
   },
   {
-   "file": "src/freelancer/Client/hud_target.h",
+   "file": "src/freelancer/Client/space/hud/hud_target.h",
    "line": 47,
    "module": "freelancer",
    "name": "CSimple"
   },
   {
-   "file": "src/freelancer/Client/hud_targetable_objects.h",
+   "file": "src/freelancer/Client/space/hud/hud_targetable_objects.h",
    "line": 36,
    "module": "freelancer",
    "name": "INI_Reader"
   },
   {
-   "file": "src/freelancer/Client/hud_targetable_objects.h",
+   "file": "src/freelancer/Client/space/hud/hud_targetable_objects.h",
    "line": 37,
    "module": "freelancer",
    "name": "IFont"
   },
   {
-   "file": "src/freelancer/Client/hud_targetable_objects.h",
+   "file": "src/freelancer/Client/space/hud/hud_targetable_objects.h",
    "line": 38,
    "module": "freelancer",
    "name": "IObjRW"
   },
   {
-   "file": "src/freelancer/Client/hud_targetable_objects.h",
+   "file": "src/freelancer/Client/space/hud/hud_targetable_objects.h",
    "line": 39,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/hud_targetable_objects.h",
+   "file": "src/freelancer/Client/space/hud/hud_targetable_objects.h",
    "line": 40,
    "module": "freelancer",
    "name": "FSpaceCamera"
   },
   {
-   "file": "src/freelancer/Client/hud_targetable_objects.h",
+   "file": "src/freelancer/Client/space/hud/hud_targetable_objects.h",
    "line": 41,
    "module": "freelancer",
    "name": "FButtonMontageTile"
   },
   {
-   "file": "src/freelancer/Client/hud_targetable_objects.h",
+   "file": "src/freelancer/Client/space/hud/hud_targetable_objects.h",
    "line": 42,
    "module": "freelancer",
    "name": "FClientGameobj"
   },
   {
-   "file": "src/freelancer/Client/hud_waypoint.h",
+   "file": "src/freelancer/Client/space/hud/hud_waypoint.h",
    "line": 36,
    "module": "freelancer",
    "name": "INI_Reader"
   },
   {
-   "file": "src/freelancer/Client/hud_waypoint.h",
+   "file": "src/freelancer/Client/space/hud/hud_waypoint.h",
    "line": 37,
    "module": "freelancer",
    "name": "Vector"
   },
   {
-   "file": "src/freelancer/Client/hud_waypoint.h",
+   "file": "src/freelancer/Client/space/hud/hud_waypoint.h",
    "line": 38,
    "module": "freelancer",
    "name": "IObjRW"
   },
   {
-   "file": "src/freelancer/Client/hud_weapon_groups.h",
+   "file": "src/freelancer/Client/space/hud/hud_weapon_groups.h",
    "line": 30,
    "module": "freelancer",
    "name": "CObject"
   },
   {
-   "file": "src/freelancer/Client/hud_weapon_groups.h",
+   "file": "src/freelancer/Client/space/hud/hud_weapon_groups.h",
    "line": 31,
    "module": "freelancer",
    "name": "IObjRW"
   },
   {
-   "file": "src/freelancer/Client/image.h",
+   "file": "src/freelancer/Client/interface/image.h",
    "line": 11,
    "module": "freelancer",
    "name": "IBigImage2"
   },
   {
-   "file": "src/freelancer/Client/intro_page_util.h",
+   "file": "src/freelancer/Client/interface/intro_page_util.h",
    "line": 10,
    "module": "freelancer",
    "name": "Win3D"
   },
   {
-   "file": "src/freelancer/Client/jump_effect.h",
+   "file": "src/freelancer/Client/space/jump_effect.h",
    "line": 24,
    "module": "freelancer",
    "name": "ISoundSource"
   },
   {
-   "file": "src/freelancer/Client/jump_effect.h",
+   "file": "src/freelancer/Client/space/jump_effect.h",
    "line": 25,
    "module": "freelancer",
    "name": "FParticleEffect"
   },
   {
-   "file": "src/freelancer/Client/jump_effect.h",
+   "file": "src/freelancer/Client/space/jump_effect.h",
    "line": 26,
    "module": "freelancer",
    "name": "FGameLight"
   },
   {
-   "file": "src/freelancer/Client/jump_effect.h",
+   "file": "src/freelancer/Client/space/jump_effect.h",
    "line": 27,
    "module": "freelancer",
    "name": "FGateTunnel"
   },
   {
-   "file": "src/freelancer/Client/jump_effect.h",
+   "file": "src/freelancer/Client/space/jump_effect.h",
    "line": 28,
    "module": "freelancer",
    "name": "FClientShipGameobj"
   },
   {
-   "file": "src/freelancer/Client/jump_effect.h",
+   "file": "src/freelancer/Client/space/jump_effect.h",
    "line": 63,
    "module": "freelancer",
    "name": "FClientSolarGameobj"
   },
   {
-   "file": "src/freelancer/Client/knowledge_map.h",
+   "file": "src/freelancer/Client/nn/knowledge_map.h",
    "line": 17,
    "module": "freelancer",
    "name": "FmtStr"
   },
   {
-   "file": "src/freelancer/Client/lights_camera.h",
+   "file": "src/freelancer/Client/cmn/lights_camera.h",
    "line": 8,
    "module": "freelancer",
    "name": "FVisEffectArch"
   },
   {
-   "file": "src/freelancer/Client/lights_camera.h",
+   "file": "src/freelancer/Client/cmn/lights_camera.h",
    "line": 9,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/lights_camera.h",
+   "file": "src/freelancer/Client/cmn/lights_camera.h",
    "line": 10,
    "module": "freelancer",
    "name": "IFxEffect"
   },
   {
-   "file": "src/freelancer/Client/loading_screen.h",
+   "file": "src/freelancer/Client/interface/loading_screen.h",
    "line": 12,
    "module": "freelancer",
    "name": "Image"
@@ -37294,817 +37294,817 @@
    "name": "FServerInfo"
   },
   {
-   "file": "src/freelancer/Client/menu_enter_state.h",
+   "file": "src/freelancer/Client/interface/menu_enter_state.h",
    "line": 22,
    "module": "freelancer",
    "name": "WinControl"
   },
   {
-   "file": "src/freelancer/Client/menu_enter_state.h",
+   "file": "src/freelancer/Client/interface/menu_enter_state.h",
    "line": 23,
    "module": "freelancer",
    "name": "Win3D"
   },
   {
-   "file": "src/freelancer/Client/menu_fonts_load.h",
+   "file": "src/freelancer/Client/interface/menu_fonts_load.h",
    "line": 6,
    "module": "freelancer",
    "name": "IFileSystem"
   },
   {
-   "file": "src/freelancer/Client/menu_keymap_config.h",
+   "file": "src/freelancer/Client/interface/menu_keymap_config.h",
    "line": 91,
    "module": "freelancer",
    "name": "FHudCmdRecord"
   },
   {
-   "file": "src/freelancer/Client/menu_mp_session.h",
+   "file": "src/freelancer/Client/interface/menu_mp_session.h",
    "line": 3,
    "module": "freelancer",
    "name": "FServerInfo"
   },
   {
-   "file": "src/freelancer/Client/menu_sound_arch.h",
+   "file": "src/freelancer/Client/cmn/menu_sound_arch.h",
    "line": 51,
    "module": "freelancer",
    "name": "FClientEquippedObj"
   },
   {
-   "file": "src/freelancer/Client/menu_sound_arch.h",
+   "file": "src/freelancer/Client/cmn/menu_sound_arch.h",
    "line": 52,
    "module": "freelancer",
    "name": "ISoundSource"
   },
   {
-   "file": "src/freelancer/Client/menu_universe_base.h",
+   "file": "src/freelancer/Client/gf/menu_universe_base.h",
    "line": 6,
    "module": "freelancer",
    "name": "RoomData"
   },
   {
-   "file": "src/freelancer/Client/menu_universe_base.h",
+   "file": "src/freelancer/Client/gf/menu_universe_base.h",
    "line": 28,
    "module": "freelancer",
    "name": "TMirrorPropertyBucket"
   },
   {
-   "file": "src/freelancer/Client/menu_universe_base.h",
+   "file": "src/freelancer/Client/gf/menu_universe_base.h",
    "line": 29,
    "module": "freelancer",
    "name": "MissionVendorProperties"
   },
   {
-   "file": "src/freelancer/Client/menu_universe_base.h",
+   "file": "src/freelancer/Client/gf/menu_universe_base.h",
    "line": 32,
    "module": "freelancer",
    "name": "NewsBroadcastProperties"
   },
   {
-   "file": "src/freelancer/Client/menu_universe_base.h",
+   "file": "src/freelancer/Client/gf/menu_universe_base.h",
    "line": 44,
    "module": "freelancer",
    "name": "CharacterProperties"
   },
   {
-   "file": "src/freelancer/Client/menu_universe_base.h",
+   "file": "src/freelancer/Client/gf/menu_universe_base.h",
    "line": 45,
    "module": "freelancer",
    "name": "ScriptBehavior"
   },
   {
-   "file": "src/freelancer/Client/menu_universe_base.h",
+   "file": "src/freelancer/Client/gf/menu_universe_base.h",
    "line": 46,
    "module": "freelancer",
    "name": "AmbientScriptProperties"
   },
   {
-   "file": "src/freelancer/Client/misc_util.h",
+   "file": "src/freelancer/Client/cmn/misc_util.h",
    "line": 14,
    "module": "freelancer",
    "name": "FAnimScriptSet"
   },
   {
-   "file": "src/freelancer/Client/misc_util.h",
+   "file": "src/freelancer/Client/cmn/misc_util.h",
    "line": 73,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/nav_bar.h",
+   "file": "src/freelancer/Client/gf/nav_bar.h",
    "line": 40,
    "module": "freelancer",
    "name": "RoomButtonInfo"
   },
   {
-   "file": "src/freelancer/Client/nav_bar.h",
+   "file": "src/freelancer/Client/gf/nav_bar.h",
    "line": 41,
    "module": "freelancer",
    "name": "FCharacterObject"
   },
   {
-   "file": "src/freelancer/Client/nebula_volume.h",
+   "file": "src/freelancer/Client/space/nebula_volume.h",
    "line": 14,
    "module": "freelancer",
    "name": "FNebulaEffect"
   },
   {
-   "file": "src/freelancer/Client/nebula_volume.h",
+   "file": "src/freelancer/Client/space/nebula_volume.h",
    "line": 15,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/nn_arrival_text.h",
+   "file": "src/freelancer/Client/nn/nn_arrival_text.h",
    "line": 28,
    "module": "freelancer",
    "name": "NnTextControl"
   },
   {
-   "file": "src/freelancer/Client/nn_button_control.h",
+   "file": "src/freelancer/Client/nn/nn_button_control.h",
    "line": 53,
    "module": "freelancer",
    "name": "FButtonMontageTile"
   },
   {
-   "file": "src/freelancer/Client/nn_dealer.h",
+   "file": "src/freelancer/Client/nn/nn_dealer.h",
    "line": 20,
    "module": "freelancer",
    "name": "UiScroll"
   },
   {
-   "file": "src/freelancer/Client/nn_dealer.h",
+   "file": "src/freelancer/Client/nn/nn_dealer.h",
    "line": 21,
    "module": "freelancer",
    "name": "FClientMarketGood"
   },
   {
-   "file": "src/freelancer/Client/nn_group_control.h",
+   "file": "src/freelancer/Client/nn/nn_group_control.h",
    "line": 35,
    "module": "freelancer",
    "name": "RichTextWin"
   },
   {
-   "file": "src/freelancer/Client/nn_group_control.h",
+   "file": "src/freelancer/Client/nn/nn_group_control.h",
    "line": 36,
    "module": "freelancer",
    "name": "RichTextWireButtonControl"
   },
   {
-   "file": "src/freelancer/Client/nn_help.h",
+   "file": "src/freelancer/Client/nn/nn_help.h",
    "line": 30,
    "module": "freelancer",
    "name": "RenderDisplayList"
   },
   {
-   "file": "src/freelancer/Client/nn_help.h",
+   "file": "src/freelancer/Client/nn/nn_help.h",
    "line": 31,
    "module": "freelancer",
    "name": "RichTextWin"
   },
   {
-   "file": "src/freelancer/Client/nn_help.h",
+   "file": "src/freelancer/Client/nn/nn_help.h",
    "line": 32,
    "module": "freelancer",
    "name": "IObjRW"
   },
   {
-   "file": "src/freelancer/Client/nn_inventory.h",
+   "file": "src/freelancer/Client/nn/nn_inventory.h",
    "line": 35,
    "module": "freelancer",
    "name": "ShipViewControl"
   },
   {
-   "file": "src/freelancer/Client/nn_inventory.h",
+   "file": "src/freelancer/Client/nn/nn_inventory.h",
    "line": 36,
    "module": "freelancer",
    "name": "NnDealer"
   },
   {
-   "file": "src/freelancer/Client/nn_inventory.h",
+   "file": "src/freelancer/Client/nn/nn_inventory.h",
    "line": 37,
    "module": "freelancer",
    "name": "RichTextWin"
   },
   {
-   "file": "src/freelancer/Client/nn_load_save.h",
+   "file": "src/freelancer/Client/nn/nn_load_save.h",
    "line": 65,
    "module": "freelancer",
    "name": "RichTextEditWin"
   },
   {
-   "file": "src/freelancer/Client/nn_load_save.h",
+   "file": "src/freelancer/Client/nn/nn_load_save.h",
    "line": 66,
    "module": "freelancer",
    "name": "UiScroll"
   },
   {
-   "file": "src/freelancer/Client/nn_mission_message.h",
+   "file": "src/freelancer/Client/nn/nn_mission_message.h",
    "line": 31,
    "module": "freelancer",
    "name": "RichTextWin"
   },
   {
-   "file": "src/freelancer/Client/nn_mission_vendor.h",
+   "file": "src/freelancer/Client/nn/nn_mission_vendor.h",
    "line": 38,
    "module": "freelancer",
    "name": "MissionVendorAcceptance"
   },
   {
-   "file": "src/freelancer/Client/nn_mission_vendor.h",
+   "file": "src/freelancer/Client/nn/nn_mission_vendor.h",
    "line": 39,
    "module": "freelancer",
    "name": "MissionVendorProperties"
   },
   {
-   "file": "src/freelancer/Client/nn_mission_vendor.h",
+   "file": "src/freelancer/Client/nn/nn_mission_vendor.h",
    "line": 40,
    "module": "freelancer",
    "name": "RichTextWin"
   },
   {
-   "file": "src/freelancer/Client/nn_mission_vendor.h",
+   "file": "src/freelancer/Client/nn/nn_mission_vendor.h",
    "line": 41,
    "module": "freelancer",
    "name": "UiScroll"
   },
   {
-   "file": "src/freelancer/Client/nn_modal.h",
+   "file": "src/freelancer/Client/nn/nn_modal.h",
    "line": 28,
    "module": "freelancer",
    "name": "NN_MainButton"
   },
   {
-   "file": "src/freelancer/Client/nn_modal.h",
+   "file": "src/freelancer/Client/nn/nn_modal.h",
    "line": 29,
    "module": "freelancer",
    "name": "WinControl"
   },
   {
-   "file": "src/freelancer/Client/nn_modal.h",
+   "file": "src/freelancer/Client/nn/nn_modal.h",
    "line": 65,
    "module": "freelancer",
    "name": "NnArrivalText"
   },
   {
-   "file": "src/freelancer/Client/nn_navmap.h",
+   "file": "src/freelancer/Client/nn/nn_navmap.h",
    "line": 55,
    "module": "freelancer",
    "name": "FFontString"
   },
   {
-   "file": "src/freelancer/Client/nn_navmap.h",
+   "file": "src/freelancer/Client/nn/nn_navmap.h",
    "line": 56,
    "module": "freelancer",
    "name": "I3DMathEngine"
   },
   {
-   "file": "src/freelancer/Client/nn_navmap.h",
+   "file": "src/freelancer/Client/nn/nn_navmap.h",
    "line": 57,
    "module": "freelancer",
    "name": "IFont"
   },
   {
-   "file": "src/freelancer/Client/nn_navmap.h",
+   "file": "src/freelancer/Client/nn/nn_navmap.h",
    "line": 58,
    "module": "freelancer",
    "name": "IRPDraw"
   },
   {
-   "file": "src/freelancer/Client/nn_navmap.h",
+   "file": "src/freelancer/Client/nn/nn_navmap.h",
    "line": 59,
    "module": "freelancer",
    "name": "IRPIndexBuffer"
   },
   {
-   "file": "src/freelancer/Client/nn_navmap.h",
+   "file": "src/freelancer/Client/nn/nn_navmap.h",
    "line": 60,
    "module": "freelancer",
    "name": "IRPVertexBuffer"
   },
   {
-   "file": "src/freelancer/Client/nn_navmap.h",
+   "file": "src/freelancer/Client/nn/nn_navmap.h",
    "line": 61,
    "module": "freelancer",
    "name": "RichTextWin"
   },
   {
-   "file": "src/freelancer/Client/nn_navmap.h",
+   "file": "src/freelancer/Client/nn/nn_navmap.h",
    "line": 62,
    "module": "freelancer",
    "name": "UiScroll"
   },
   {
-   "file": "src/freelancer/Client/nn_navmap.h",
+   "file": "src/freelancer/Client/nn/nn_navmap.h",
    "line": 66,
    "module": "freelancer",
    "name": "ISystem"
   },
   {
-   "file": "src/freelancer/Client/nn_navmap.h",
+   "file": "src/freelancer/Client/nn/nn_navmap.h",
    "line": 67,
    "module": "freelancer",
    "name": "IZone"
   },
   {
-   "file": "src/freelancer/Client/nn_news.h",
+   "file": "src/freelancer/Client/nn/nn_news.h",
    "line": 35,
    "module": "freelancer",
    "name": "NewsBroadcastProperties"
   },
   {
-   "file": "src/freelancer/Client/nn_news.h",
+   "file": "src/freelancer/Client/nn/nn_news.h",
    "line": 36,
    "module": "freelancer",
    "name": "RichTextWin"
   },
   {
-   "file": "src/freelancer/Client/nn_news.h",
+   "file": "src/freelancer/Client/nn/nn_news.h",
    "line": 37,
    "module": "freelancer",
    "name": "UiScroll"
   },
   {
-   "file": "src/freelancer/Client/nn_offer_dialog.h",
+   "file": "src/freelancer/Client/nn/nn_offer_dialog.h",
    "line": 35,
    "module": "freelancer",
    "name": "FmtStr"
   },
   {
-   "file": "src/freelancer/Client/nn_offer_dialog.h",
+   "file": "src/freelancer/Client/nn/nn_offer_dialog.h",
    "line": 36,
    "module": "freelancer",
    "name": "RichTextWin"
   },
   {
-   "file": "src/freelancer/Client/nn_player_info.h",
+   "file": "src/freelancer/Client/nn/nn_player_info.h",
    "line": 31,
    "module": "freelancer",
    "name": "RichTextWin"
   },
   {
-   "file": "src/freelancer/Client/nn_player_info.h",
+   "file": "src/freelancer/Client/nn/nn_player_info.h",
    "line": 32,
    "module": "freelancer",
    "name": "UiScroll"
   },
   {
-   "file": "src/freelancer/Client/nn_player_info.h",
+   "file": "src/freelancer/Client/nn/nn_player_info.h",
    "line": 63,
    "module": "freelancer",
    "name": "FPlayerStatsRepEntry"
   },
   {
-   "file": "src/freelancer/Client/nn_preferences.h",
+   "file": "src/freelancer/Client/nn/nn_preferences.h",
    "line": 33,
    "module": "freelancer",
    "name": "NnButtonControl"
   },
   {
-   "file": "src/freelancer/Client/nn_preferences.h",
+   "file": "src/freelancer/Client/nn/nn_preferences.h",
    "line": 34,
    "module": "freelancer",
    "name": "NnTextControl"
   },
   {
-   "file": "src/freelancer/Client/nn_preferences.h",
+   "file": "src/freelancer/Client/nn/nn_preferences.h",
    "line": 35,
    "module": "freelancer",
    "name": "RichTextWin"
   },
   {
-   "file": "src/freelancer/Client/nn_preferences.h",
+   "file": "src/freelancer/Client/nn/nn_preferences.h",
    "line": 36,
    "module": "freelancer",
    "name": "UiScroll"
   },
   {
-   "file": "src/freelancer/Client/nn_preferences.h",
+   "file": "src/freelancer/Client/nn/nn_preferences.h",
    "line": 37,
    "module": "freelancer",
    "name": "WireButtonControl"
   },
   {
-   "file": "src/freelancer/Client/nn_preferences.h",
+   "file": "src/freelancer/Client/nn/nn_preferences.h",
    "line": 38,
    "module": "freelancer",
    "name": "WireStaticControl"
   },
   {
-   "file": "src/freelancer/Client/nn_prompt.h",
+   "file": "src/freelancer/Client/nn/nn_prompt.h",
    "line": 34,
    "module": "freelancer",
    "name": "RenderDisplayList"
   },
   {
-   "file": "src/freelancer/Client/nn_prompt.h",
+   "file": "src/freelancer/Client/nn/nn_prompt.h",
    "line": 35,
    "module": "freelancer",
    "name": "RichTextEditWin"
   },
   {
-   "file": "src/freelancer/Client/nn_prompt.h",
+   "file": "src/freelancer/Client/nn/nn_prompt.h",
    "line": 36,
    "module": "freelancer",
    "name": "RichTextWin"
   },
   {
-   "file": "src/freelancer/Client/nn_prompt.h",
+   "file": "src/freelancer/Client/nn/nn_prompt.h",
    "line": 37,
    "module": "freelancer",
    "name": "RichTextWireButtonControl"
   },
   {
-   "file": "src/freelancer/Client/nn_repair.h",
+   "file": "src/freelancer/Client/nn/nn_repair.h",
    "line": 34,
    "module": "freelancer",
    "name": "UiScroll"
   },
   {
-   "file": "src/freelancer/Client/nn_ship_trader.h",
+   "file": "src/freelancer/Client/nn/nn_ship_trader.h",
    "line": 29,
    "module": "freelancer",
    "name": "GoodInfo"
   },
   {
-   "file": "src/freelancer/Client/nn_ship_trader.h",
+   "file": "src/freelancer/Client/nn/nn_ship_trader.h",
    "line": 30,
    "module": "freelancer",
    "name": "RichTextWin"
   },
   {
-   "file": "src/freelancer/Client/nn_ship_trader.h",
+   "file": "src/freelancer/Client/nn/nn_ship_trader.h",
    "line": 31,
    "module": "freelancer",
    "name": "ShipViewControl"
   },
   {
-   "file": "src/freelancer/Client/nn_story_star.h",
+   "file": "src/freelancer/Client/nn/nn_story_star.h",
    "line": 38,
    "module": "freelancer",
    "name": "NnTextControl"
   },
   {
-   "file": "src/freelancer/Client/nn_story_star.h",
+   "file": "src/freelancer/Client/nn/nn_story_star.h",
    "line": 39,
    "module": "freelancer",
    "name": "RichTextWin"
   },
   {
-   "file": "src/freelancer/Client/nn_trade.h",
+   "file": "src/freelancer/Client/nn/nn_trade.h",
    "line": 34,
    "module": "freelancer",
    "name": "CShip"
   },
   {
-   "file": "src/freelancer/Client/nn_trade.h",
+   "file": "src/freelancer/Client/nn/nn_trade.h",
    "line": 35,
    "module": "freelancer",
    "name": "NnTextControl"
   },
   {
-   "file": "src/freelancer/Client/nn_trade.h",
+   "file": "src/freelancer/Client/nn/nn_trade.h",
    "line": 36,
    "module": "freelancer",
    "name": "RichTextWin"
   },
   {
-   "file": "src/freelancer/Client/nn_trade.h",
+   "file": "src/freelancer/Client/nn/nn_trade.h",
    "line": 37,
    "module": "freelancer",
    "name": "ScrollControl"
   },
   {
-   "file": "src/freelancer/Client/nn_trade.h",
+   "file": "src/freelancer/Client/nn/nn_trade.h",
    "line": 38,
    "module": "freelancer",
    "name": "ShipViewControl"
   },
   {
-   "file": "src/freelancer/Client/object_prop.h",
+   "file": "src/freelancer/Client/gf/object_prop.h",
    "line": 18,
    "module": "freelancer",
    "name": "HardpointSummary"
   },
   {
-   "file": "src/freelancer/Client/page_account_select.h",
+   "file": "src/freelancer/Client/interface/page_account_select.h",
    "line": 23,
    "module": "freelancer",
    "name": "UiRichTextWin"
   },
   {
-   "file": "src/freelancer/Client/page_account_select.h",
+   "file": "src/freelancer/Client/interface/page_account_select.h",
    "line": 24,
    "module": "freelancer",
    "name": "UiTextEdit"
   },
   {
-   "file": "src/freelancer/Client/page_account_select.h",
+   "file": "src/freelancer/Client/interface/page_account_select.h",
    "line": 25,
    "module": "freelancer",
    "name": "UiTextMsgButton"
   },
   {
-   "file": "src/freelancer/Client/page_character_create.h",
+   "file": "src/freelancer/Client/interface/page_character_create.h",
    "line": 34,
    "module": "freelancer",
    "name": "SCreateCharacterInfo"
   },
   {
-   "file": "src/freelancer/Client/page_character_create.h",
+   "file": "src/freelancer/Client/interface/page_character_create.h",
    "line": 35,
    "module": "freelancer",
    "name": "UiRichTextWin"
   },
   {
-   "file": "src/freelancer/Client/page_character_create.h",
+   "file": "src/freelancer/Client/interface/page_character_create.h",
    "line": 36,
    "module": "freelancer",
    "name": "UiTextEdit"
   },
   {
-   "file": "src/freelancer/Client/page_character_create.h",
+   "file": "src/freelancer/Client/interface/page_character_create.h",
    "line": 37,
    "module": "freelancer",
    "name": "UiTextMsgButton"
   },
   {
-   "file": "src/freelancer/Client/page_character_create.h",
+   "file": "src/freelancer/Client/interface/page_character_create.h",
    "line": 38,
    "module": "freelancer",
    "name": "UiWinDeform"
   },
   {
-   "file": "src/freelancer/Client/page_character_create.h",
+   "file": "src/freelancer/Client/interface/page_character_create.h",
    "line": 39,
    "module": "freelancer",
    "name": "UiWinObject"
   },
   {
-   "file": "src/freelancer/Client/page_character_select.h",
+   "file": "src/freelancer/Client/interface/page_character_select.h",
    "line": 30,
    "module": "freelancer",
    "name": "UiFastTable"
   },
   {
-   "file": "src/freelancer/Client/page_character_select.h",
+   "file": "src/freelancer/Client/interface/page_character_select.h",
    "line": 31,
    "module": "freelancer",
    "name": "UiRichTextWin"
   },
   {
-   "file": "src/freelancer/Client/page_character_select.h",
+   "file": "src/freelancer/Client/interface/page_character_select.h",
    "line": 32,
    "module": "freelancer",
    "name": "UiScroll"
   },
   {
-   "file": "src/freelancer/Client/page_character_select.h",
+   "file": "src/freelancer/Client/interface/page_character_select.h",
    "line": 33,
    "module": "freelancer",
    "name": "UiTextMsgButton"
   },
   {
-   "file": "src/freelancer/Client/page_character_select_single.h",
+   "file": "src/freelancer/Client/interface/page_character_select_single.h",
    "line": 36,
    "module": "freelancer",
    "name": "UiListBox"
   },
   {
-   "file": "src/freelancer/Client/page_character_select_single.h",
+   "file": "src/freelancer/Client/interface/page_character_select_single.h",
    "line": 37,
    "module": "freelancer",
    "name": "UiRichTextWin"
   },
   {
-   "file": "src/freelancer/Client/page_character_select_single.h",
+   "file": "src/freelancer/Client/interface/page_character_select_single.h",
    "line": 38,
    "module": "freelancer",
    "name": "UiScroll"
   },
   {
-   "file": "src/freelancer/Client/page_character_select_single.h",
+   "file": "src/freelancer/Client/interface/page_character_select_single.h",
    "line": 39,
    "module": "freelancer",
    "name": "UiTextMsgButton"
   },
   {
-   "file": "src/freelancer/Client/page_options.h",
+   "file": "src/freelancer/Client/interface/page_options.h",
    "line": 22,
    "module": "freelancer",
    "name": "WinControl"
   },
   {
-   "file": "src/freelancer/Client/page_server_select.h",
+   "file": "src/freelancer/Client/interface/page_server_select.h",
    "line": 29,
    "module": "freelancer",
    "name": "UiFastTable"
   },
   {
-   "file": "src/freelancer/Client/page_server_select.h",
+   "file": "src/freelancer/Client/interface/page_server_select.h",
    "line": 30,
    "module": "freelancer",
    "name": "UiRichTextWin"
   },
   {
-   "file": "src/freelancer/Client/page_server_select.h",
+   "file": "src/freelancer/Client/interface/page_server_select.h",
    "line": 31,
    "module": "freelancer",
    "name": "UiScroll"
   },
   {
-   "file": "src/freelancer/Client/page_server_select.h",
+   "file": "src/freelancer/Client/interface/page_server_select.h",
    "line": 32,
    "module": "freelancer",
    "name": "UiTextMsgButton"
   },
   {
-   "file": "src/freelancer/Client/part_cache.h",
+   "file": "src/freelancer/Client/cmn/part_cache.h",
    "line": 14,
    "module": "freelancer",
    "name": "IVMeshWire"
   },
   {
-   "file": "src/freelancer/Client/part_cache.h",
+   "file": "src/freelancer/Client/cmn/part_cache.h",
    "line": 15,
    "module": "freelancer",
    "name": "IMesh"
   },
   {
-   "file": "src/freelancer/Client/part_cache.h",
+   "file": "src/freelancer/Client/cmn/part_cache.h",
    "line": 101,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/particle_effect.h",
+   "file": "src/freelancer/Client/space/particle_effect.h",
    "line": 13,
    "module": "freelancer",
    "name": "FGameLight"
   },
   {
-   "file": "src/freelancer/Client/particle_effect.h",
+   "file": "src/freelancer/Client/space/particle_effect.h",
    "line": 98,
    "module": "freelancer",
    "name": "FSpaceCamera"
   },
   {
-   "file": "src/freelancer/Client/particle_effect.h",
+   "file": "src/freelancer/Client/space/particle_effect.h",
    "line": 212,
    "module": "freelancer",
    "name": "FCliEffectFactory"
   },
   {
-   "file": "src/freelancer/Client/particle_effect.h",
+   "file": "src/freelancer/Client/space/particle_effect.h",
    "line": 232,
    "module": "freelancer",
    "name": "ISoundSource"
   },
   {
-   "file": "src/freelancer/Client/player_spawn.h",
+   "file": "src/freelancer/Client/space/player_spawn.h",
    "line": 10,
    "module": "freelancer",
    "name": "FClientShipGameobj"
   },
   {
-   "file": "src/freelancer/Client/player_spawn.h",
+   "file": "src/freelancer/Client/space/player_spawn.h",
    "line": 46,
    "module": "freelancer",
    "name": "FGfScriptSequence"
   },
   {
-   "file": "src/freelancer/Client/render_ex.h",
+   "file": "src/freelancer/Client/cmn/render_ex.h",
    "line": 9,
    "module": "freelancer",
    "name": "FRPExCaps"
   },
   {
-   "file": "src/freelancer/Client/render_ex.h",
+   "file": "src/freelancer/Client/cmn/render_ex.h",
    "line": 10,
    "module": "freelancer",
    "name": "IRenderPipelineEx"
   },
   {
-   "file": "src/freelancer/Client/render_ex.h",
+   "file": "src/freelancer/Client/cmn/render_ex.h",
    "line": 11,
    "module": "freelancer",
    "name": "IRPDrawEx"
   },
   {
-   "file": "src/freelancer/Client/rich_text_win.h",
+   "file": "src/freelancer/Client/interface/rich_text_win.h",
    "line": 67,
    "module": "freelancer",
    "name": "UiScroll"
   },
   {
-   "file": "src/freelancer/Client/rich_text_win.h",
+   "file": "src/freelancer/Client/interface/rich_text_win.h",
    "line": 68,
    "module": "freelancer",
    "name": "FLImeInputBox"
   },
   {
-   "file": "src/freelancer/Client/rich_text_win.h",
+   "file": "src/freelancer/Client/interface/rich_text_win.h",
    "line": 71,
    "module": "freelancer",
    "name": "DebugWindow"
   },
   {
-   "file": "src/freelancer/Client/room_camera.h",
+   "file": "src/freelancer/Client/gf/room_camera.h",
    "line": 18,
    "module": "freelancer",
    "name": "Rect"
   },
   {
-   "file": "src/freelancer/Client/room_camera.h",
+   "file": "src/freelancer/Client/gf/room_camera.h",
    "line": 19,
    "module": "freelancer",
    "name": "ViewRect"
   },
   {
-   "file": "src/freelancer/Client/room_camera.h",
+   "file": "src/freelancer/Client/gf/room_camera.h",
    "line": 133,
    "module": "freelancer",
    "name": "I3DMathEngine"
   },
   {
-   "file": "src/freelancer/Client/room_control.h",
+   "file": "src/freelancer/Client/gf/room_control.h",
    "line": 13,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/room_control.h",
+   "file": "src/freelancer/Client/gf/room_control.h",
    "line": 14,
    "module": "freelancer",
    "name": "RoomData"
   },
   {
-   "file": "src/freelancer/Client/room_control.h",
+   "file": "src/freelancer/Client/gf/room_control.h",
    "line": 15,
    "module": "freelancer",
    "name": "IRenderPipeline"
   },
   {
-   "file": "src/freelancer/Client/room_control.h",
+   "file": "src/freelancer/Client/gf/room_control.h",
    "line": 17,
    "module": "freelancer",
    "name": "FRoomRuntime"
   },
   {
-   "file": "src/freelancer/Client/room_control.h",
+   "file": "src/freelancer/Client/gf/room_control.h",
    "line": 21,
    "module": "freelancer",
    "name": "FCliMaterialEntry"
   },
   {
-   "file": "src/freelancer/Client/room_control.h",
+   "file": "src/freelancer/Client/gf/room_control.h",
    "line": 101,
    "module": "freelancer",
    "name": "FRoomCamera"
   },
   {
-   "file": "src/freelancer/Client/room_control.h",
+   "file": "src/freelancer/Client/gf/room_control.h",
    "line": 121,
    "module": "freelancer",
    "name": "CharacterProperties"
   },
   {
-   "file": "src/freelancer/Client/room_control.h",
+   "file": "src/freelancer/Client/gf/room_control.h",
    "line": 122,
    "module": "freelancer",
    "name": "CharPlaceInfo"
   },
   {
-   "file": "src/freelancer/Client/room_control.h",
+   "file": "src/freelancer/Client/gf/room_control.h",
    "line": 123,
    "module": "freelancer",
    "name": "FCharacterObject"
   },
   {
-   "file": "src/freelancer/Client/room_control.h",
+   "file": "src/freelancer/Client/gf/room_control.h",
    "line": 151,
    "module": "freelancer",
    "name": "FObjectProp"
   },
   {
-   "file": "src/freelancer/Client/screen_quad_state.h",
+   "file": "src/freelancer/Client/cmn/screen_quad_state.h",
    "line": 16,
    "module": "freelancer",
    "name": "IRenderPipeline"
   },
   {
-   "file": "src/freelancer/Client/screen_quad_state.h",
+   "file": "src/freelancer/Client/cmn/screen_quad_state.h",
    "line": 17,
    "module": "freelancer",
    "name": "FSpaceCamera"
   },
   {
-   "file": "src/freelancer/Client/screen_quad_state.h",
+   "file": "src/freelancer/Client/cmn/screen_quad_state.h",
    "line": 83,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/screen_quad_state.h",
+   "file": "src/freelancer/Client/cmn/screen_quad_state.h",
    "line": 108,
    "module": "freelancer",
    "name": "ICamera"
@@ -38134,313 +38134,313 @@
    "name": "RichTextWin"
   },
   {
-   "file": "src/freelancer/Client/ship_camera_params.h",
+   "file": "src/freelancer/Client/space/camera/ship_camera_params.h",
    "line": 10,
    "module": "freelancer",
    "name": "INI_Reader"
   },
   {
-   "file": "src/freelancer/Client/ship_view_control.h",
+   "file": "src/freelancer/Client/interface/ship_view_control.h",
    "line": 59,
    "module": "freelancer",
    "name": "FEngineLight"
   },
   {
-   "file": "src/freelancer/Client/ship_view_control.h",
+   "file": "src/freelancer/Client/interface/ship_view_control.h",
    "line": 60,
    "module": "freelancer",
    "name": "FEquipVisualSet"
   },
   {
-   "file": "src/freelancer/Client/ship_view_control.h",
+   "file": "src/freelancer/Client/interface/ship_view_control.h",
    "line": 64,
    "module": "freelancer",
    "name": "Equipment"
   },
   {
-   "file": "src/freelancer/Client/space_camera.h",
+   "file": "src/freelancer/Client/space/camera/space_camera.h",
    "line": 8,
    "module": "freelancer",
    "name": "FSpaceCamera"
   },
   {
-   "file": "src/freelancer/Client/space_camera_first.h",
+   "file": "src/freelancer/Client/space/camera/space_camera_first.h",
    "line": 69,
    "module": "freelancer",
    "name": "I3DMathEngine"
   },
   {
-   "file": "src/freelancer/Client/space_letterbox.h",
+   "file": "src/freelancer/Client/space/space_letterbox.h",
    "line": 25,
    "module": "freelancer",
    "name": "FSpaceCamera"
   },
   {
-   "file": "src/freelancer/Client/space_letterbox.h",
+   "file": "src/freelancer/Client/space/space_letterbox.h",
    "line": 26,
    "module": "freelancer",
    "name": "FRoomCamera"
   },
   {
-   "file": "src/freelancer/Client/space_scene_obj_draw.h",
+   "file": "src/freelancer/Client/space/space_scene_obj_draw.h",
    "line": 9,
    "module": "freelancer",
    "name": "FSpaceCamera"
   },
   {
-   "file": "src/freelancer/Client/space_scene_obj_draw.h",
+   "file": "src/freelancer/Client/space/space_scene_obj_draw.h",
    "line": 10,
    "module": "freelancer",
    "name": "IObjInspect"
   },
   {
-   "file": "src/freelancer/Client/space_scene_obj_draw.h",
+   "file": "src/freelancer/Client/space/space_scene_obj_draw.h",
    "line": 11,
    "module": "freelancer",
    "name": "I3DMathEngine"
   },
   {
-   "file": "src/freelancer/Client/space_scene_obj_draw.h",
+   "file": "src/freelancer/Client/space/space_scene_obj_draw.h",
    "line": 12,
    "module": "freelancer",
    "name": "FClientGameobj"
   },
   {
-   "file": "src/freelancer/Client/space_scene_obj_draw.h",
+   "file": "src/freelancer/Client/space/space_scene_obj_draw.h",
    "line": 13,
    "module": "freelancer",
    "name": "FClientEquippedObj"
   },
   {
-   "file": "src/freelancer/Client/space_scene_obj_draw.h",
+   "file": "src/freelancer/Client/space/space_scene_obj_draw.h",
    "line": 18,
    "module": "freelancer",
    "name": "FGameobjEffectList"
   },
   {
-   "file": "src/freelancer/Client/space_state.h",
+   "file": "src/freelancer/Client/space/space_state.h",
    "line": 8,
    "module": "freelancer",
    "name": "SpaceApp"
   },
   {
-   "file": "src/freelancer/Client/star_sphere.h",
+   "file": "src/freelancer/Client/space/star_sphere.h",
    "line": 51,
    "module": "freelancer",
    "name": "IObjInspect"
   },
   {
-   "file": "src/freelancer/Client/star_sphere.h",
+   "file": "src/freelancer/Client/space/star_sphere.h",
    "line": 52,
    "module": "freelancer",
    "name": "FStarSphere"
   },
   {
-   "file": "src/freelancer/Client/star_sphere.h",
+   "file": "src/freelancer/Client/space/star_sphere.h",
    "line": 148,
    "module": "freelancer",
    "name": "Vector"
   },
   {
-   "file": "src/freelancer/Client/star_sys.h",
+   "file": "src/freelancer/Client/space/star_sys.h",
    "line": 33,
    "module": "freelancer",
    "name": "FNebulaEffect"
   },
   {
-   "file": "src/freelancer/Client/star_sys.h",
+   "file": "src/freelancer/Client/space/star_sys.h",
    "line": 34,
    "module": "freelancer",
    "name": "Vector"
   },
   {
-   "file": "src/freelancer/Client/star_sys.h",
+   "file": "src/freelancer/Client/space/star_sys.h",
    "line": 35,
    "module": "freelancer",
    "name": "IObjRW"
   },
   {
-   "file": "src/freelancer/Client/star_sys.h",
+   "file": "src/freelancer/Client/space/star_sys.h",
    "line": 39,
    "module": "freelancer",
    "name": "ISystem"
   },
   {
-   "file": "src/freelancer/Client/star_sys.h",
+   "file": "src/freelancer/Client/space/star_sys.h",
    "line": 146,
    "module": "freelancer",
    "name": "IObjInspect"
   },
   {
-   "file": "src/freelancer/Client/texture_shapes.h",
+   "file": "src/freelancer/Client/cmn/texture_shapes.h",
    "line": 34,
    "module": "freelancer",
    "name": "IFileSystem"
   },
   {
-   "file": "src/freelancer/Client/tooltip_hover.h",
+   "file": "src/freelancer/Client/interface/tooltip_hover.h",
    "line": 12,
    "module": "freelancer",
    "name": "FToolTipHoverInfo"
   },
   {
-   "file": "src/freelancer/Client/trade_equip_list.h",
+   "file": "src/freelancer/Client/nn/trade_equip_list.h",
    "line": 32,
    "module": "freelancer",
    "name": "CTradeEquipList"
   },
   {
-   "file": "src/freelancer/Client/trade_equip_list.h",
+   "file": "src/freelancer/Client/nn/trade_equip_list.h",
    "line": 33,
    "module": "freelancer",
    "name": "CargoBarControl"
   },
   {
-   "file": "src/freelancer/Client/trade_equip_list.h",
+   "file": "src/freelancer/Client/nn/trade_equip_list.h",
    "line": 34,
    "module": "freelancer",
    "name": "NnButtonControl"
   },
   {
-   "file": "src/freelancer/Client/tradelane_fx.h",
+   "file": "src/freelancer/Client/space/tradelane_fx.h",
    "line": 9,
    "module": "freelancer",
    "name": "XGoTradelane"
   },
   {
-   "file": "src/freelancer/Client/ui_fast_table.h",
+   "file": "src/freelancer/Client/interface/ui_fast_table.h",
    "line": 59,
    "module": "freelancer",
    "name": "UiScroll"
   },
   {
-   "file": "src/freelancer/Client/ui_fast_table.h",
+   "file": "src/freelancer/Client/interface/ui_fast_table.h",
    "line": 191,
    "module": "freelancer",
    "name": "FRegKeyStack"
   },
   {
-   "file": "src/freelancer/Client/ui_scroll.h",
+   "file": "src/freelancer/Client/interface/ui_scroll.h",
    "line": 42,
    "module": "freelancer",
    "name": "FTexShape"
   },
   {
-   "file": "src/freelancer/Client/ui_table.h",
+   "file": "src/freelancer/Client/interface/ui_table.h",
    "line": 39,
    "module": "freelancer",
    "name": "BaseRichTextWin"
   },
   {
-   "file": "src/freelancer/Client/vis_effect_arch.h",
+   "file": "src/freelancer/Client/cmn/vis_effect_arch.h",
    "line": 14,
    "module": "freelancer",
    "name": "FCliMaterialEntry"
   },
   {
-   "file": "src/freelancer/Client/voice_profiles.h",
+   "file": "src/freelancer/Client/cmn/voice_profiles.h",
    "line": 22,
    "module": "freelancer",
    "name": "FVoiceProfile"
   },
   {
-   "file": "src/freelancer/Client/win3d.h",
+   "file": "src/freelancer/Client/interface/win3d.h",
    "line": 24,
    "module": "freelancer",
    "name": "Win3D"
   },
   {
-   "file": "src/freelancer/Client/win3d.h",
+   "file": "src/freelancer/Client/interface/win3d.h",
    "line": 25,
    "module": "freelancer",
    "name": "WinControl"
   },
   {
-   "file": "src/freelancer/Client/win3d.h",
+   "file": "src/freelancer/Client/interface/win3d.h",
    "line": 26,
    "module": "freelancer",
    "name": "FSpaceCamera"
   },
   {
-   "file": "src/freelancer/Client/win3d.h",
+   "file": "src/freelancer/Client/interface/win3d.h",
    "line": 194,
    "module": "freelancer",
    "name": "FHudCmdRecord"
   },
   {
-   "file": "src/freelancer/Client/win3d.h",
+   "file": "src/freelancer/Client/interface/win3d.h",
    "line": 232,
    "module": "freelancer",
    "name": "FVector"
   },
   {
-   "file": "src/freelancer/Client/win3d.h",
+   "file": "src/freelancer/Client/interface/win3d.h",
    "line": 233,
    "module": "freelancer",
    "name": "FMatrix"
   },
   {
-   "file": "src/freelancer/Client/win3d.h",
+   "file": "src/freelancer/Client/interface/win3d.h",
    "line": 240,
    "module": "freelancer",
    "name": "I3DMathEngine"
   },
   {
-   "file": "src/freelancer/Client/win3d_engine_submit.h",
+   "file": "src/freelancer/Client/interface/win3d_engine_submit.h",
    "line": 25,
    "module": "freelancer",
    "name": "I3DMathEngine"
   },
   {
-   "file": "src/freelancer/Client/win3d_immediate.h",
+   "file": "src/freelancer/Client/cmn/win3d_immediate.h",
    "line": 17,
    "module": "freelancer",
    "name": "FSpaceCamera"
   },
   {
-   "file": "src/freelancer/Client/win3d_immediate.h",
+   "file": "src/freelancer/Client/cmn/win3d_immediate.h",
    "line": 129,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/win3d_render.h",
+   "file": "src/freelancer/Client/interface/win3d_render.h",
    "line": 34,
    "module": "freelancer",
    "name": "ICamera"
   },
   {
-   "file": "src/freelancer/Client/win3d_renderables.h",
+   "file": "src/freelancer/Client/interface/win3d_renderables.h",
    "line": 9,
    "module": "freelancer",
    "name": "IRPVertexBuffer"
   },
   {
-   "file": "src/freelancer/Client/win3d_renderables.h",
+   "file": "src/freelancer/Client/interface/win3d_renderables.h",
    "line": 10,
    "module": "freelancer",
    "name": "IRPIndexBuffer"
   },
   {
-   "file": "src/freelancer/Client/win3d_renderables.h",
+   "file": "src/freelancer/Client/interface/win3d_renderables.h",
    "line": 11,
    "module": "freelancer",
    "name": "IRPDraw"
   },
   {
-   "file": "src/freelancer/Client/wincontrol_base.h",
+   "file": "src/freelancer/Client/interface/wincontrol_base.h",
    "line": 39,
    "module": "freelancer",
    "name": "RichTextWin"
   },
   {
-   "file": "src/freelancer/Client/wincontrol_base.h",
+   "file": "src/freelancer/Client/interface/wincontrol_base.h",
    "line": 40,
    "module": "freelancer",
    "name": "RichTextEditWin"
   },
   {
-   "file": "src/freelancer/Client/wincontrol_base.h",
+   "file": "src/freelancer/Client/interface/wincontrol_base.h",
    "line": 41,
    "module": "freelancer",
    "name": "UiScroll"
@@ -39850,13 +39850,13 @@
    "name": "CDPServer"
   },
   {
-   "file": "src/freelancer/Client/font.h",
+   "file": "src/freelancer/Client/cmn/font.h",
    "line": 14,
    "module": "freelancer",
    "name": "tagLOGFONTA"
   },
   {
-   "file": "src/freelancer/Client/font.h",
+   "file": "src/freelancer/Client/cmn/font.h",
    "line": 15,
    "module": "freelancer",
    "name": "HFONT__"

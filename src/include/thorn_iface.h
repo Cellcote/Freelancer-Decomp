@@ -38,7 +38,7 @@ struct IMotionPath : IDAComponent
 
 // ---------------------------------------------------------------------------------------
 // Entity and event records the slots below hand out and take in. Declared here once, for
-// thorn.dll (src/Thorn/ThornScene.h) and freelancer's Gf script layer (gf_script_object.h,
+// thorn.dll (src/Thorn/ThornScene.h) and freelancer's Gf script layer (Client/gf/gf_script_object.h,
 // gf_thorn_*.h); no module may keep a private copy -- earlier port-invented copies in
 // freelancer disagreed on the size.
 // ---------------------------------------------------------------------------------------

@@ -7,14 +7,14 @@
 #include "login_mgr.h"
 #include "msvcrt_compat.h" // MsvcrtAtoi/MsvcrtWtoi: retail MSVCRT.DLL wraps mod 2^32, the UCRT saturates
 
-#include "character_select_equip.h" // ApplyCharacterSelectEquipFields (FUN_005ab250 tail)
+#include "interface/character_select_equip.h" // ApplyCharacterSelectEquipFields (FUN_005ab250 tail)
 #include "common_ini.h"
 #include "common_misc.h"   // ParseGUID
 #include "server_pub.h" // IServer
 #include "dacom.h"         // FDUMP
 #include "globals.h"       // g_client.packed_version (DAT_0067ecb8)
 #include "perf_options.h"  // GetPerfOptionSlot (FUN_005b3510)
-#include "player_spawn.h"  // DAT_00673344
+#include "space/player_spawn.h"  // DAT_00673344
 #include "platform.h"
 #include "server_filter.h" // ServerFilter::Match (GetFilteredServers)
 #include "reg_key_stack.h" // FRegKeyStack (login history)
@@ -1484,7 +1484,7 @@ bool CLoginMgr::SelectCharacter(CCharacterSet::CharacterInfo* Info)
         return false;
     }
     // .text:005ab29c..005ab36d: the record into the player globals, then its name into
-    // DAT_006732f0 (character_select_equip.cpp).
+    // DAT_006732f0 (interface/character_select_equip.cpp).
     ApplyCharacterSelectEquipFields(Info);
     return true;
 }

@@ -86,7 +86,7 @@ struct ClientGlobals
     HWND window;
     HMODULE resources;
     unsigned int packed_version;
-    IEnvironment* current_state; // DAT_0067ecac — the current client state (client_environment.h)
+    IEnvironment* current_state; // DAT_0067ecac — the current client state (space/environment.h)
 };
 
 extern DisplaySettings g_display; // DAT_00679bc0
@@ -153,7 +153,7 @@ void ShutdownRenderMgr(bool bRestoreWindowedMode);
 bool RenderMgrCreateBuffers(HWND Hwnd, const DisplaySettings* Mode, DisplaySettings* Out);
 // FUN_00424ce0 (cdecl) -- try Mode (its first 0x28 bytes); a windowed mode then retries Format
 // 32/24/16, then the options object itself, then a 640x480 window. Callers: InitializeEngine
-// (engine_init.cpp) and NN_Preferences::TryApplyVideoMode 0x004b1ce4.
+// (cmn/engine_init.cpp) and NN_Preferences::TryApplyVideoMode 0x004b1ce4.
 bool SetRenderModeWithFallback(HWND Hwnd, const DisplaySettings* Mode);
 LRESULT CALLBACK ClientWndProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
 
@@ -168,7 +168,7 @@ bool RenderMgrFrameReady();
 // DAT_0067ecc8 / DAT_0067ecc9 — WinMain arms the quit screen once InitializeEngine returns and
 // replays a close that arrived earlier.
 void ClientNoteEngineReady();
-// FUN_00471f30(0) — raise NN_Exit (nn_exit.h NnExitOpen).
+// FUN_00471f30(0) — raise NN_Exit (nn/nn_exit.h NnExitOpen).
 void RequestClientQuitDialog();
 
 bool PumpMessages(int* exit_code); // FUN_005b0b60

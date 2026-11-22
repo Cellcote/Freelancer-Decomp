@@ -10,7 +10,7 @@
 #include "common_text.h"
 #include "dacom.h"
 #include "globals.h"
-#include "misc_util.h" // FormatGroupedNumber (FUN_004779a0)
+#include "cmn/misc_util.h" // FormatGroupedNumber (FUN_004779a0)
 
 #include <stdarg.h>
 #include <stdio.h>

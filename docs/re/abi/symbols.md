@@ -8,7 +8,7 @@
 |-----|------:|------:|--------------|-----------|------|
 | `Act` | 3 | 3 | `src/Content/MissionAct.h:32` | private (Content) | — |
 | `Action` | 2 | 2 | `src/include/common_async.h:23` | **public** | — |
-| `AnimationArch` | 1 | 3 | `src/freelancer/Client/engine_light.h:299` | private (freelancer) | `public OwnerList<AnimFrame>` |
+| `AnimationArch` | 1 | 3 | `src/freelancer/Client/cmn/engine_light.h:299` | private (freelancer) | `public OwnerList<AnimFrame>` |
 | `ArchEnumerator` | 1 | 1 | `src/include/common_archetype.h:309` | **public** | — |
 | `Armor` | 4 | 17 | `src/include/common_archetype.h:981` | **public** | `public Equipment` |
 | `Asteroid` | 2 | 8 | `src/include/common_archetype.h:1550` | **public** | `public Root` |
@@ -19,14 +19,14 @@
 | `BaseHint` | 4 | 4 | `src/include/common_goods.h:767` | **public** | — |
 | `BaseIdea` | 6 | 6 | `src/Common/ai/idea.h:181` | private (Common) | — |
 | `BaseOp` | 1 | 1 | `src/include/common_pub.h:695` | **public** | — |
-| `BaseRichTextWin` | 2 | 47 | `src/freelancer/Client/rich_text_win.h:83` | private (freelancer) | `public WinControl` |
+| `BaseRichTextWin` | 2 | 47 | `src/freelancer/Client/interface/rich_text_win.h:83` | private (freelancer) | `public WinControl` |
 | `Behavior` | 27 | 27 | `src/Common/ai/behavior.h:538` | private (Common) | — |
 | `BinaryRDLReader` | 3 | 3 | `src/include/common_text.h:1170` | **public** | — |
 | `BinaryRDLWriter` | 2 | 2 | `src/include/common_text.h:1190` | **public** | — |
 | `BroadcastRecord` | 3 | 3 | `src/Server/server_basedb.h:123` | private (Server) | — |
 | `Bullet` | 1 | 24 | `src/include/server_gameobject.h:1576` | **public** | `public Munition` |
-| `ButtonMover` | 2 | 2 | `src/freelancer/Client/button_mover.h:48` | private (freelancer) | — |
-| `ButtonScaler` | 2 | 2 | `src/freelancer/Client/button_mover.h:82` | private (freelancer) | — |
+| `ButtonMover` | 2 | 2 | `src/freelancer/Client/interface/button_mover.h:48` | private (freelancer) | — |
+| `ButtonScaler` | 2 | 2 | `src/freelancer/Client/interface/button_mover.h:82` | private (freelancer) | — |
 | `CAccount` | 1 | 1 | `src/include/server_playerdb.h:69` | **public** | — |
 | `CAccountsDlg` | 2 | 2 | `src/FLServer/AccountsDlg.h:11` | private (FLServer) | `public CDialog` |
 | `CAreYouSureDlg` | 1 | 1 | `src/FLServer/AreYouSureDlg.h:6` | private (FLServer) | `public CDialog` |
@@ -90,8 +90,8 @@
 | `CImeUiFont_Base` | 5 | 5 | `src/include/imeui.h:160` | **public** | — |
 | `CInputBox` | 11 | 11 | `src/include/imeui.h:68` | **public** | — |
 | `CInternalEquip` | 2 | 24 | `src/include/common_cequip.h:280` | **public** | `public CEquip` |
-| `ClientIgniteFuseAction` | 1 | 1 | `src/freelancer/Client/client_fuse.h:215` | private (freelancer) | `public ClientFuseAction` |
-| `ClientImpulseAction` | 1 | 1 | `src/freelancer/Client/client_fuse.h:190` | private (freelancer) | `public ClientFuseAction` |
+| `ClientIgniteFuseAction` | 1 | 1 | `src/freelancer/Client/space/fuse.h:215` | private (freelancer) | `public ClientFuseAction` |
+| `ClientImpulseAction` | 1 | 1 | `src/freelancer/Client/space/fuse.h:190` | private (freelancer) | `public ClientFuseAction` |
 | `ClipNode` | 9 | 41 | `src/include/common_text.h:979` | **public** | `public RDLNode` |
 | `CloakingDevice` | 3 | 20 | `src/include/common_archetype.h:1303` | **public** | `public AttachedEquipment` |
 | `CLoginMgr` | 2 | 3 | `src/freelancer/Client/login_mgr.h:114` | private (freelancer) | `public IGunQueueReader, public CDPClient` |
@@ -131,8 +131,8 @@
 | `CSolar` | 11 | 109 | `src/include/common_cobject.h:2329` | **public** | `public CEqObj` |
 | `CSteering` | 3 | 17 | `src/include/common_cequip.h:2130` | **public** | `public CPhysControllerEquip` |
 | `CStrafeEngine` | 3 | 17 | `src/include/common_cequip.h:2212` | **public** | `public CPhysControllerEquip` |
-| `CTradeEquipList` | 1 | 1 | `src/freelancer/Client/trade_equip_list.h:93` | private (freelancer) | — |
-| `CTradeEquipListLine` | 1 | 1 | `src/freelancer/Client/trade_equip_list.h:58` | private (freelancer) | — |
+| `CTradeEquipList` | 1 | 1 | `src/freelancer/Client/nn/trade_equip_list.h:93` | private (freelancer) | — |
+| `CTradeEquipListLine` | 1 | 1 | `src/freelancer/Client/nn/trade_equip_list.h:58` | private (freelancer) | — |
 | `CUniverseChatDlg` | 4 | 4 | `src/FLServer/UniverseChatDlg.h:10` | private (FLServer) | `public CDialog` |
 | `DamageGroupAction` | 1 | 1 | `src/include/server_fuse.h:165` | **public** | `public ServerFuseAction` |
 | `DamageHardpointAttachmentAction` | 1 | 1 | `src/include/server_fuse.h:208` | **public** | `public ServerFuseAction` |
@@ -154,16 +154,16 @@
 | `FAnimScript` | 3 | 3 | `src/EngBase/EngBase.h:438` | private (EngBase) | — |
 | `FApproach2Base` | 11 | 11 | `src/movie/MovieObject.h:20` | private (movie) | — |
 | `FCargoScanRoute` | 5 | 11 | `src/Content/GuidesInternal.h:234` | private (Content) | `public FGuideRoute` |
-| `FCliDynamicAsteroidGameobj` | 1 | 28 | `src/freelancer/Client/cli_asteroid_dynamic.h:19` | private (freelancer) | `public FClientGameobj` |
-| `FCliEffectFactory` | 3 | 3 | `src/freelancer/Client/particle_effect.h:233` | private (freelancer) | — |
-| `FClientEquip` | 2 | 3 | `src/freelancer/Client/client_equip_fx.h:15` | private (freelancer) | `INotify` |
-| `FClientEquippedObj` | 4 | 32 | `src/freelancer/Client/client_gameobj.h:427` | private (freelancer) | `public FClientSimpleGameobj, public INotify` |
-| `FClientGameobj` | 26 | 27 | `src/freelancer/Client/client_gameobj.h:169` | private (freelancer) | `public IObjInspectImpl` |
-| `FClientProjectileGameobj` | 1 | 29 | `src/freelancer/Client/client_gameobj.h:824` | private (freelancer) | `public FClientSimpleGameobj` |
-| `FClientShipGameobj` | 1 | 33 | `src/freelancer/Client/client_gameobj.h:598` | private (freelancer) | `public FClientEquippedObj` |
-| `FClientSimpleGameobj` | 1 | 28 | `src/freelancer/Client/client_gameobj.h:401` | private (freelancer) | `public FClientGameobj` |
-| `FCliLauncherFx` | 3 | 6 | `src/freelancer/Client/cli_projectile_fx.h:60` | private (freelancer) | `FClientEquip` |
-| `FCliMedAsteroidGameobj` | 1 | 28 | `src/freelancer/Client/cli_asteroid_med.h:23` | private (freelancer) | `public FClientGameobj` |
+| `FCliDynamicAsteroidGameobj` | 1 | 28 | `src/freelancer/Client/space/cli_asteroid_dynamic.h:19` | private (freelancer) | `public FClientGameobj` |
+| `FCliEffectFactory` | 3 | 3 | `src/freelancer/Client/space/particle_effect.h:233` | private (freelancer) | — |
+| `FClientEquip` | 2 | 3 | `src/freelancer/Client/space/equip_fx.h:15` | private (freelancer) | `INotify` |
+| `FClientEquippedObj` | 4 | 32 | `src/freelancer/Client/space/gameobj.h:427` | private (freelancer) | `public FClientSimpleGameobj, public INotify` |
+| `FClientGameobj` | 26 | 27 | `src/freelancer/Client/space/gameobj.h:169` | private (freelancer) | `public IObjInspectImpl` |
+| `FClientProjectileGameobj` | 1 | 29 | `src/freelancer/Client/space/gameobj.h:824` | private (freelancer) | `public FClientSimpleGameobj` |
+| `FClientShipGameobj` | 1 | 33 | `src/freelancer/Client/space/gameobj.h:598` | private (freelancer) | `public FClientEquippedObj` |
+| `FClientSimpleGameobj` | 1 | 28 | `src/freelancer/Client/space/gameobj.h:401` | private (freelancer) | `public FClientGameobj` |
+| `FCliLauncherFx` | 3 | 6 | `src/freelancer/Client/space/cli_projectile_fx.h:60` | private (freelancer) | `FClientEquip` |
+| `FCliMedAsteroidGameobj` | 1 | 28 | `src/freelancer/Client/space/cli_asteroid_med.h:23` | private (freelancer) | `public FClientGameobj` |
 | `FContentGuide` | 12 | 15 | `src/Content/Guides.h:237` | private (Content) | `public FContentRefObject` |
 | `FContentMessageRouter` | 2 | 2 | `src/Content/ContentMessageRouter.h:35` | private (Content) | `public FContentMessageRouterBase` |
 | `FContentNpcShip` | 2 | 7 | `src/Content/NpcShip.h:97` | private (Content) | `public FContentShipBase, public pub::AI::ContentCallback` |
@@ -172,14 +172,14 @@
 | `FContentSpaceObj` | 2 | 2 | `src/Content/NpcBase.h:107` | private (Content) | — |
 | `FDeformMesh` | 7 | 7 | `src/Deformable2/Deformable2.h:151` | private (Deformable2) | — |
 | `FDestroyMission` | 1 | 46 | `src/Content/RandomMissionObject.h:142` | private (Content) | `public FRandomMissionObject` |
-| `FEffectBase` | 9 | 9 | `src/freelancer/Client/effect_base.h:15` | private (freelancer) | — |
-| `FEngineLight` | 3 | 3 | `src/freelancer/Client/engine_light.h:40` | private (freelancer) | — |
+| `FEffectBase` | 9 | 9 | `src/freelancer/Client/space/effect_base.h:15` | private (freelancer) | — |
+| `FEngineLight` | 3 | 3 | `src/freelancer/Client/cmn/engine_light.h:40` | private (freelancer) | — |
 | `FEyeMaterialImpl` | 1 | 33 | `src/Deformable2/EyeMaterial.h:119` | private (Deformable2) | `public IMaterial` |
 | `FFxEmitterBase` | 1 | 73 | `src/alchemy/alchemy_emitters.h:123` | private (alchemy) | `public FGenericFxObjectBase` |
 | `FFxNodePropertySet` | 3 | 27 | `src/alchemy/alchemy_types.h:307` | private (alchemy) | `public IFxNodePropertySet` |
-| `FGameCamera` | 12 | 12 | `src/freelancer/Client/space_camera_game.h:75` | private (freelancer) | `FSpaceCamera` |
-| `FGameLight` | 1 | 4 | `src/freelancer/Client/engine_light.h:347` | private (freelancer) | `FEngineLight` |
-| `FGateTunnel` | 5 | 5 | `src/freelancer/Client/gate_tunnel.h:102` | private (freelancer) | — |
+| `FGameCamera` | 12 | 12 | `src/freelancer/Client/space/camera/space_camera_game.h:75` | private (freelancer) | `FSpaceCamera` |
+| `FGameLight` | 1 | 4 | `src/freelancer/Client/cmn/engine_light.h:347` | private (freelancer) | `FEngineLight` |
+| `FGateTunnel` | 5 | 5 | `src/freelancer/Client/space/gate_tunnel.h:102` | private (freelancer) | — |
 | `FGcsCloneableLine` | 1 | 6 | `src/Content/Gcs.h:157` | private (Content) | `public FGcsLine` |
 | `FGcsConversation` | 5 | 5 | `src/Content/Gcs.h:821` | private (Content) | — |
 | `FGcsConversationManager` | 1 | 1 | `src/Content/Gcs.h:1147` | private (Content) | `public FGcsConversationManagerInstance` |
@@ -189,8 +189,8 @@
 | `FGcsLine` | 5 | 5 | `src/Content/Gcs.h:101` | private (Content) | — |
 | `FGenericFxObjectBase` | 4 | 72 | `src/alchemy/alchemy_genericfx.h:126` | private (alchemy) | `public IGenericFx` |
 | `FGuideRoute` | 6 | 6 | `src/Content/GuidesInternal.h:103` | private (Content) | — |
-| `FHotspot` | 1 | 1 | `src/freelancer/Client/gf_hotspot.h:25` | private (freelancer) | — |
-| `FMeshHolder` | 1 | 1 | `src/freelancer/Client/client_mesh_load.h:53` | private (freelancer) | — |
+| `FHotspot` | 1 | 1 | `src/freelancer/Client/gf/gf_hotspot.h:25` | private (freelancer) | — |
+| `FMeshHolder` | 1 | 1 | `src/freelancer/Client/space/mesh_load.h:53` | private (freelancer) | — |
 | `FMetaBehavior` | 1 | 1 | `src/Content/Guides.h:160` | private (Content) | `public FGuideDescBase` |
 | `FMissionNag` | 3 | 3 | `src/Content/MissionAct.h:525` | private (Content) | — |
 | `FMissionNagDist` | 1 | 4 | `src/Content/MissionAct.h:557` | private (Content) | `public FMissionNag` |
@@ -201,9 +201,9 @@
 | `FMissionShip` | 1 | 1 | `src/Content/MissionObject.h:71` | private (Content) | — |
 | `FMixerNode` | 4 | 4 | `src/EngBase/EngBase.h:631` | private (EngBase) | — |
 | `FObjListDirective` | 4 | 7 | `src/Content/ObjListDirective.h:33` | private (Content) | `public FContentRefObject` |
-| `FontStringElement` | 10 | 10 | `src/freelancer/Client/font_string.h:45` | private (freelancer) | — |
+| `FontStringElement` | 10 | 10 | `src/freelancer/Client/cmn/font_string.h:45` | private (freelancer) | — |
 | `FPacketBase` | 3 | 4 | `src/include/rpc_packet.h:60` | **public** | `public FRpcRefObject` |
-| `FParticleEffect` | 1 | 10 | `src/freelancer/Client/particle_effect.h:19` | private (freelancer) | `FEffectBase` |
+| `FParticleEffect` | 1 | 10 | `src/freelancer/Client/space/particle_effect.h:19` | private (freelancer) | `FEffectBase` |
 | `FPatrolGuide` | 1 | 20 | `src/Content/GuidesInternal.h:298` | private (Content) | `public FTargetGuide` |
 | `FPatrolRoute` | 2 | 8 | `src/Content/GuidesInternal.h:197` | private (Content) | `public FGuideRoute` |
 | `FRandEncParams` | 3 | 6 | `src/Content/RandomEncounters.h:70` | private (Content) | `public FContentRefObject` |
@@ -237,12 +237,12 @@
 | `FRmVignetteMachine` | 1 | 22 | `src/Content/RandomMissionMachine.h:477` | private (Content) | `public FRmRuntimeMachine` |
 | `FRmVignetteNode` | 1 | 1 | `src/Content/RandomMissionGen.h:205` | private (Content) | — |
 | `FRmVignetteParams` | 2 | 2 | `src/Content/RandomMissionGen.h:183` | private (Content) | — |
-| `FRoomCamera` | 3 | 23 | `src/freelancer/Client/room_camera.h:21` | private (freelancer) | `public ICamera` |
-| `FRoomObject` | 13 | 13 | `src/freelancer/Client/room_control.h:34` | private (freelancer) | — |
+| `FRoomCamera` | 3 | 23 | `src/freelancer/Client/gf/room_camera.h:21` | private (freelancer) | `public ICamera` |
+| `FRoomObject` | 13 | 13 | `src/freelancer/Client/gf/room_control.h:34` | private (freelancer) | — |
 | `FRpcRefObject` | 1 | 1 | `src/include/rpc_packet.h:29` | **public** | — |
-| `FStarSphere` | 7 | 7 | `src/freelancer/Client/star_sphere.h:55` | private (freelancer) | — |
+| `FStarSphere` | 7 | 7 | `src/freelancer/Client/space/star_sphere.h:55` | private (freelancer) | — |
 | `FTargetGuide` | 4 | 19 | `src/Content/GuidesInternal.h:40` | private (Content) | `public FContentGuide` |
-| `FThorn_Scene` | 2 | 2 | `src/freelancer/Client/gf_thorn_scene.h:22` | private (freelancer) | `FThornComponent` |
+| `FThorn_Scene` | 2 | 2 | `src/freelancer/Client/gf/gf_thorn_scene.h:22` | private (freelancer) | `FThornComponent` |
 | `FThornEntity` | 5 | 5 | `src/Thorn/ThornScene.h:130` | private (Thorn) | — |
 | `FThornEvent` | 6 | 6 | `src/Thorn/ThornScene.h:302` | private (Thorn) | — |
 | `FTradeGuide` | 2 | 21 | `src/Content/GuidesInternal.h:159` | private (Content) | `public FTargetGuide` |
@@ -253,9 +253,9 @@
 | `Guided` | 2 | 25 | `src/include/server_gameobject.h:1516` | **public** | `public Munition, public PhySys::Controller, public PhySys::CObjectCB` |
 | `Gun` | 4 | 24 | `src/include/common_archetype.h:1086` | **public** | `public Launcher` |
 | `HardpointSummary` | 1 | 1 | `src/include/common_goods.h:370` | **public** | — |
-| `HUDItem` | 11 | 11 | `src/freelancer/Client/hud_element_list.h:51` | private (freelancer) | — |
-| `HUDItem_Factory` | 2 | 2 | `src/freelancer/Client/hud_element_list.h:109` | private (freelancer) | — |
-| `HudTargetBase` | 6 | 17 | `src/freelancer/Client/hud_target.h:259` | private (freelancer) | `public HUDItem, public WinControl, public ButtonMover, public EventHandler` |
+| `HUDItem` | 11 | 11 | `src/freelancer/Client/space/hud/hud_element_list.h:51` | private (freelancer) | — |
+| `HUDItem_Factory` | 2 | 2 | `src/freelancer/Client/space/hud/hud_element_list.h:109` | private (freelancer) | — |
+| `HudTargetBase` | 6 | 17 | `src/freelancer/Client/space/hud/hud_target.h:259` | private (freelancer) | `public HUDItem, public WinControl, public ButtonMover, public EventHandler` |
 | `I3DMathEngine` | 24 | 27 | `src/include/x86math.h:51` | **public** | `IDAComponent` |
 | `IAction` | 3 | 3 | `src/include/common_cequip.h:1796` | **public** | — |
 | `IAggregateComponent` | 1 | 4 | `src/include/dacom.h:30` | **public** | `IDAComponent` |
@@ -288,19 +288,19 @@
 | `IDAComponent` | 3 | 3 | `src/include/dacom.h:22` | **public** | — |
 | `IDatabase` | 16 | 16 | `src/include/common_newchar.h:218` | **public** | — |
 | `IDataBuffer` | 1 | 4 | `src/include/readfile.h:94` | **public** | `IDAComponent` |
-| `IDataViewOwner` | 2 | 2 | `src/freelancer/Client/wincontrol_base.h:46` | private (freelancer) | — |
+| `IDataViewOwner` | 2 | 2 | `src/freelancer/Client/interface/wincontrol_base.h:46` | private (freelancer) | — |
 | `IDeformable` | 36 | 39 | `src/include/engine/engbase.h:393` | **public** | `IDAComponent` |
 | `IDLL` | 2 | 2 | `src/include/content.h:8` | **public** | — |
 | `IDPMsgHandler` | 3 | 3 | `src/include/dalib_net.h:71` | **public** | — |
 | `IEngine` | 55 | 58 | `src/include/engine/engbase.h:46` | **public** | `IDAComponent` |
 | `IEngineComponent` | 10 | 13 | `src/include/engine/engbase.h:138` | **public** | `IDAComponent` |
 | `IEngineInstance` | 14 | 14 | `src/include/common_cobject.h:57` | **public** | — |
-| `IEnvironment` | 10 | 15 | `src/freelancer/Client/client_environment.h:59` | private (freelancer) | `public IInputEvent` |
+| `IEnvironment` | 10 | 15 | `src/freelancer/Client/space/environment.h:59` | private (freelancer) | `public IInputEvent` |
 | `IFileSystem` | 38 | 42 | `src/include/readfile.h:38` | **public** | `IComponentFactory` |
 | `IFLAppearance` | 11 | 14 | `src/include/render/IFLAppearance.h:7` | **public** | `IDAComponent` |
 | `IFLListBox` | 10 | 10 | `src/FLServer/IFLListBox.h:9` | private (FLServer) | — |
 | `IFogControl` | 11 | 14 | `src/include/thorn_controls.h:214` | **public** | `IDAComponent` |
-| `IFont` | 11 | 11 | `src/freelancer/Client/font.h:17` | private (freelancer) | — |
+| `IFont` | 11 | 11 | `src/freelancer/Client/cmn/font.h:17` | private (freelancer) | — |
 | `IFxAnimatedSingle` | 16 | 19 | `src/alchemy/alchemy_types.h:1231` | private (alchemy) | `IDAComponent` |
 | `IFxEffect` | 16 | 19 | `src/include/alchemy.h:176` | **public** | `IDAComponent` |
 | `IFxEffectArchetype` | 18 | 21 | `src/include/alchemy.h:34` | **public** | `IDAComponent` |
@@ -314,7 +314,7 @@
 | `IGenericFx` | 65 | 68 | `src/alchemy/alchemy_types.h:617` | private (alchemy) | `IDAComponent` |
 | `IGeoTransformControl` | 4 | 7 | `src/include/thorn_controls.h:46` | **public** | `IDAComponent` |
 | `IgniteFuseAction` | 1 | 1 | `src/include/server_fuse.h:89` | **public** | `public ServerFuseAction` |
-| `IGraph` | 10 | 10 | `src/freelancer/Client/graph_library.h:61` | private (freelancer) | — |
+| `IGraph` | 10 | 10 | `src/freelancer/Client/cmn/graph_library.h:61` | private (freelancer) | — |
 | `IGunBrowser` | 3 | 3 | `src/include/dalib_net.h:416` | **public** | `public IUnknown` |
 | `IGunConnection` | 6 | 6 | `src/include/dalib_net.h:366` | **public** | `public IUnknown` |
 | `IGunHost` | 7 | 7 | `src/include/dalib_net.h:393` | **public** | `public IUnknown` |
@@ -322,9 +322,9 @@
 | `IHardpoint` | 5 | 8 | `src/include/engine/engbase.h:320` | **public** | `IDAComponent` |
 | `IIKControl` | 3 | 6 | `src/include/thorn_controls.h:139` | **public** | `IDAComponent` |
 | `IImaData` | 2 | 5 | `src/include/render/shading.h:260` | **public** | `public IDAComponent` |
-| `IImage` | 3 | 3 | `src/freelancer/Client/image.h:14` | private (freelancer) | — |
+| `IImage` | 3 | 3 | `src/freelancer/Client/interface/image.h:14` | private (freelancer) | — |
 | `IImaInstance` | 4 | 7 | `src/include/render/shading.h:267` | **public** | `public IDAComponent` |
-| `IInputEvent` | 5 | 5 | `src/freelancer/Client/client_environment.h:40` | private (freelancer) | — |
+| `IInputEvent` | 5 | 5 | `src/freelancer/Client/space/environment.h:40` | private (freelancer) | — |
 | `IInstanceTransform` | 14 | 14 | `src/include/engine/engbase.h:25` | **public** | — |
 | `IIVPAnchorEvents` | 1 | 1 | `src/IVP/ivp_physics/ivp_real_object.h:707` | **public** | — |
 | `ILightControl` | 17 | 20 | `src/include/thorn_controls.h:154` | **public** | `IDAComponent` |
@@ -343,7 +343,7 @@
 | `IMessageRouter` | 4 | 4 | `src/include/common_net.h:405` | **public** | — |
 | `IMotionPath` | 5 | 8 | `src/include/thorn_iface.h:6` | **public** | `IDAComponent` |
 | `ImpulseAction` | 1 | 1 | `src/include/server_fuse.h:229` | **public** | `public ServerFuseAction` |
-| `INebula` | 23 | 23 | `src/freelancer/Client/cli_nebula.h:76` | private (freelancer) | — |
+| `INebula` | 23 | 23 | `src/freelancer/Client/space/cli_nebula.h:76` | private (freelancer) | — |
 | `INestedSingleRamp` | 15 | 18 | `src/alchemy/alchemy_types.h:1158` | private (alchemy) | `IDAComponent` |
 | `INotify` | 1 | 1 | `src/include/common_cequip.h:150` | **public** | — |
 | `InternalFXEquip` | 3 | 16 | `src/include/common_archetype.h:1266` | **public** | `public Equipment` |
@@ -353,7 +353,7 @@
 | `IObjInspectImpl` | 1 | 1 | `src/include/common_iface.h:828` | **public** | `public IObjRW, public CBase` |
 | `IParamCurve` | 16 | 19 | `src/include/thorn_iface.h:175` | **public** | `IDAComponent` |
 | `IPersistString` | 3 | 6 | `src/include/thorn_iface.h:103` | **public** | `IDAComponent` |
-| `IPlanetRing` | 13 | 14 | `src/freelancer/Client/texture_panels.h:35` | private (freelancer) | `public Universe::IZoneImmersion` |
+| `IPlanetRing` | 13 | 14 | `src/freelancer/Client/space/texture_panels.h:35` | private (freelancer) | `public Universe::IZoneImmersion` |
 | `IProfileParser` | 6 | 9 | `src/include/luaprofile.h:33` | **public** | `IDAComponent` |
 | `IPSysControl` | 5 | 8 | `src/include/thorn_controls.h:251` | **public** | `IDAComponent` |
 | `IRampColor` | 18 | 21 | `src/alchemy/alchemy_types.h:1126` | private (alchemy) | `IDAComponent` |
@@ -380,7 +380,7 @@
 | `IServer` | 92 | 92 | `src/include/server_iserver.h:45` | **public** | — |
 | `IServerImpl` | 1 | 93 | `src/include/rpc_iserver.h:49` | **public** | `public IServer, public IChatServer` |
 | `IServerImpl` | 1 | 93 | `src/include/server_iserverimpl.h:44` | **public** | `public IServer, public IChatServer` |
-| `ISound` | 15 | 15 | `src/freelancer/Client/sound_archetype.h:22` | private (freelancer) | — |
+| `ISound` | 15 | 15 | `src/freelancer/Client/cmn/sound_archetype.h:22` | private (freelancer) | — |
 | `ISoundArchetype` | 10 | 13 | `src/include/soundmanager.h:25` | **public** | `IDAComponent` |
 | `ISoundControl` | 8 | 11 | `src/include/thorn_controls.h:262` | **public** | `IDAComponent` |
 | `ISoundListenerPose` | 6 | 9 | `src/include/soundmanager.h:196` | **public** | `IDAComponent` |
@@ -400,13 +400,13 @@
 | `IThornLoadParser` | 6 | 6 | `src/include/thorn_iface.h:512` | **public** | — |
 | `IThornSaveParser` | 4 | 4 | `src/include/thorn_iface.h:527` | **public** | — |
 | `ITriMeshAnim` | 1 | 4 | `src/include/render/rendcomp.h:125` | **public** | `IDAComponent` |
-| `IUIPage` | 4 | 4 | `src/freelancer/Client/ui_page.h:39` | private (freelancer) | — |
+| `IUIPage` | 4 | 4 | `src/freelancer/Client/interface/ui_page.h:39` | private (freelancer) | — |
 | `IUserEventControl` | 13 | 16 | `src/include/thorn_controls.h:304` | **public** | `IDAComponent` |
 | `IVertexBufferManager` | 6 | 9 | `src/include/render/IRenderPipeline.h:297` | **public** | `IDAComponent` |
 | `IVMeshLibrary` | 2 | 5 | `src/include/render/rendcomp.h:131` | **public** | `IDAComponent` |
 | `IVMeshPart` | 4 | 7 | `src/include/render/rendcomp.h:97` | **public** | `IDAComponent` |
 | `IVMeshWire` | 3 | 6 | `src/include/render/mesh_iface.h:45` | **public** | `IDAComponent` |
-| `IVoice` | 8 | 8 | `src/freelancer/Client/sound_archetype.h:69` | private (freelancer) | — |
+| `IVoice` | 8 | 8 | `src/freelancer/Client/cmn/sound_archetype.h:69` | private (freelancer) | — |
 | `IVP_Anomaly_Limits` | 2 | 2 | `src/IVP/ivp_physics/ivp_anomaly_manager.h:79` | private (Common) | — |
 | `IVP_Anomaly_Manager` | 7 | 7 | `src/IVP/ivp_physics/ivp_anomaly_manager.h:130` | private (Common) | — |
 | `IVP_Collision` | 4 | 5 | `src/IVP/ivp_collision/ivp_collision.h:67` | private (Common) | `public IVP_Time_Event` |
@@ -480,12 +480,12 @@
 | `Mine` | 1 | 18 | `src/include/server_gameobject.h:1445` | **public** | `public Projectile, public PhySys::Controller, public PhySys::CObjectCB` |
 | `MineDropper` | 2 | 22 | `src/include/common_archetype.h:1142` | **public** | `public Launcher` |
 | `Munition` | 6 | 23 | `src/include/common_archetype.h:1444` | **public** | `public Projectile` |
-| `NavBar` | 2 | 47 | `src/freelancer/Client/nav_bar.h:61` | private (freelancer) | `public WinControl, public ButtonMover, public ButtonScaler` |
-| `NnButtonControl` | 1 | 46 | `src/freelancer/Client/nn_button_control.h:55` | private (freelancer) | `public WinControl` |
-| `NnInventory` | 2 | 47 | `src/freelancer/Client/nn_inventory.h:110` | private (freelancer) | `public WinControl` |
-| `NnTextControl` | 1 | 46 | `src/freelancer/Client/nn_text_control.h:21` | private (freelancer) | `public WinControl` |
+| `NavBar` | 2 | 47 | `src/freelancer/Client/gf/nav_bar.h:61` | private (freelancer) | `public WinControl, public ButtonMover, public ButtonScaler` |
+| `NnButtonControl` | 1 | 46 | `src/freelancer/Client/nn/nn_button_control.h:55` | private (freelancer) | `public WinControl` |
+| `NnInventory` | 2 | 47 | `src/freelancer/Client/nn/nn_inventory.h:110` | private (freelancer) | `public WinControl` |
+| `NnTextControl` | 1 | 46 | `src/freelancer/Client/nn/nn_text_control.h:21` | private (freelancer) | `public WinControl` |
 | `NullNode` | 9 | 41 | `src/include/common_text.h:659` | **public** | `public RDLNode` |
-| `NumberStringChild` | 3 | 13 | `src/freelancer/Client/font_string.h:138` | private (freelancer) | `public FontStringElement` |
+| `NumberStringChild` | 3 | 13 | `src/freelancer/Client/cmn/font_string.h:138` | private (freelancer) | `public FontStringElement` |
 | `Observer` | 1 | 1 | `src/include/server_sysdb.h:308` | **public** | — |
 | `OwnerList` | 1 | 2 | `src/include/common_metalist.h:295` | **public** | `public MetaList<T>` |
 | `ParagraphNode` | 9 | 41 | `src/include/common_text.h:921` | **public** | `public RDLNode` |
@@ -500,9 +500,9 @@
 | `RepairDroid` | 4 | 17 | `src/include/common_archetype.h:1284` | **public** | `public Equipment` |
 | `RepairKit` | 4 | 17 | `src/include/common_archetype.h:1357` | **public** | `public Equipment` |
 | `RepGroupCB` | 1 | 1 | `src/include/common_reputation.h:289` | **public** | — |
-| `RichTextEditWin` | 5 | 53 | `src/freelancer/Client/rich_text_win.h:298` | private (freelancer) | `public RichTextWin, public EventHandler` |
-| `RichTextWin` | 1 | 48 | `src/freelancer/Client/rich_text_win.h:220` | private (freelancer) | `public BaseRichTextWin` |
-| `RoomButton` | 3 | 3 | `src/freelancer/Client/room_control_hotspot.h:30` | private (freelancer) | — |
+| `RichTextEditWin` | 5 | 53 | `src/freelancer/Client/interface/rich_text_win.h:298` | private (freelancer) | `public RichTextWin, public EventHandler` |
+| `RichTextWin` | 1 | 48 | `src/freelancer/Client/interface/rich_text_win.h:220` | private (freelancer) | `public BaseRichTextWin` |
+| `RoomButton` | 3 | 3 | `src/freelancer/Client/gf/room_control_hotspot.h:30` | private (freelancer) | — |
 | `Root` | 6 | 6 | `src/include/common_archetype.h:343` | **public** | — |
 | `ScanList` | 1 | 1 | `src/include/common_cequip.h:1504` | **public** | — |
 | `Scanner` | 4 | 17 | `src/include/common_archetype.h:1176` | **public** | `public Equipment` |
@@ -518,27 +518,27 @@
 | `SphereIntruderChecker` | 2 | 4 | `src/include/common_physys.h:622` | **public** | `public PhySys::CObjectCB` |
 | `SrvGun` | 2 | 8 | `src/include/server_gameobject.h:1010` | **public** | `public SrvLauncher` |
 | `SrvLauncher` | 3 | 6 | `src/include/server_gameobject.h:950` | **public** | `public ServerEquip` |
-| `StartCameraParticlesAction` | 1 | 1 | `src/freelancer/Client/client_fuse.h:112` | private (freelancer) | `public ClientFuseAction` |
-| `StartEffectAction` | 1 | 1 | `src/freelancer/Client/client_fuse.h:150` | private (freelancer) | `public ClientFuseAction` |
-| `StartExplosionAction` | 1 | 1 | `src/freelancer/Client/client_fuse.h:81` | private (freelancer) | `public ClientFuseAction` |
+| `StartCameraParticlesAction` | 1 | 1 | `src/freelancer/Client/space/fuse.h:112` | private (freelancer) | `public ClientFuseAction` |
+| `StartEffectAction` | 1 | 1 | `src/freelancer/Client/space/fuse.h:150` | private (freelancer) | `public ClientFuseAction` |
+| `StartExplosionAction` | 1 | 1 | `src/freelancer/Client/space/fuse.h:81` | private (freelancer) | `public ClientFuseAction` |
 | `StateMachine` | 1 | 1 | `src/include/common_net.h:452` | **public** | — |
 | `StyleNode` | 9 | 41 | `src/include/common_text.h:1015` | **public** | `public RDLNode` |
 | `SysObjEnumerator` | 1 | 1 | `src/include/server_pub.h:381` | **public** | — |
 | `TextNode` | 9 | 41 | `src/include/common_text.h:725` | **public** | `public RDLNode` |
 | `TextPtrNode` | 9 | 41 | `src/include/common_text.h:764` | **public** | `public RDLNode` |
 | `TextRenderContext` | 13 | 13 | `src/include/common_text.h:315` | **public** | — |
-| `TextWin` | 1 | 29 | `src/freelancer/Client/text_win.h:33` | private (freelancer) | `public Win3D` |
+| `TextWin` | 1 | 29 | `src/freelancer/Client/interface/text_win.h:33` | private (freelancer) | `public Win3D` |
 | `Thruster` | 4 | 21 | `src/include/common_archetype.h:1065` | **public** | `public AttachedEquipment` |
 | `Tractor` | 4 | 17 | `src/include/common_archetype.h:1216` | **public** | `public Equipment` |
 | `TradeLaneEquip` | 1 | 14 | `src/include/common_archetype.h:1401` | **public** | `public Equipment` |
 | `TRANode` | 9 | 41 | `src/include/common_text.h:681` | **public** | `public RDLNode` |
 | `TumbleAction` | 1 | 1 | `src/include/server_fuse.h:252` | **public** | `public ServerFuseAction` |
-| `UiFastTableRefCounter` | 1 | 1 | `src/freelancer/Client/ui_fast_table.h:65` | private (freelancer) | — |
+| `UiFastTableRefCounter` | 1 | 1 | `src/freelancer/Client/interface/ui_fast_table.h:65` | private (freelancer) | — |
 | `VChannel` | 2 | 2 | `src/include/common_animdb.h:19` | **public** | — |
-| `Win3D` | 28 | 28 | `src/freelancer/Client/win3d.h:47` | private (freelancer) | `public LinkTree<Win3D>` |
-| `WinControl` | 17 | 45 | `src/freelancer/Client/wincontrol_base.h:52` | private (freelancer) | `public Win3D, public IDataViewOwner` |
-| `WinFactory` | 1 | 1 | `src/freelancer/Client/win_factory.h:24` | private (freelancer) | — |
-| `WireButtonControl` | 1 | 1 | `src/freelancer/Client/wire_controls.h:121` | private (freelancer) | `public WireStaticControl` |
+| `Win3D` | 28 | 28 | `src/freelancer/Client/interface/win3d.h:47` | private (freelancer) | `public LinkTree<Win3D>` |
+| `WinControl` | 17 | 45 | `src/freelancer/Client/interface/wincontrol_base.h:52` | private (freelancer) | `public Win3D, public IDataViewOwner` |
+| `WinFactory` | 1 | 1 | `src/freelancer/Client/interface/win_factory.h:24` | private (freelancer) | — |
+| `WireButtonControl` | 1 | 1 | `src/freelancer/Client/interface/wire_controls.h:121` | private (freelancer) | `public WireStaticControl` |
 | `XMLReader` | 3 | 3 | `src/include/common_text.h:1212` | **public** | — |
 | `XMLWriter` | 2 | 2 | `src/include/common_text.h:1242` | **public** | — |
 | `ZoneEnumerator` | 1 | 1 | `src/include/server_pub.h:388` | **public** | — |

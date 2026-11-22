@@ -1820,7 +1820,7 @@ void StarSystem::munition_collision(SSPMunitionCollisionInfo const& Info)
     // PORT(deviation) SERVER-INPUT-GUARDS: retail reads MunitionArch->ObjectType below with no
     // null test and then uses it as a Munition. The client's only senders are its beam (gun
     // shot) and guided (missile) objects, which send their own Munition archetype
-    // (client_gameobj.cpp, 0x0053f790 and 0x0053ee00); an unknown id crashed the server and
+    // (Client/space/gameobj.cpp, 0x0053f790 and 0x0053ee00); an unknown id crashed the server and
     // another equipment class was read as a Munition.
     if (MunitionArch == nullptr || MunitionArch->get_class_type() != Archetype::AClassMunition)
         return;

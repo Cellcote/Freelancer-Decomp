@@ -339,11 +339,11 @@ namespace {
 // that is not built for a remote caller. The port drops them before decoding.
 bool IsUnsentClientPacket(unsigned int Channel, unsigned int Opcode) {
     if (Channel == 1)
-        // SET_MISSION_LOG: sent only in single player (nn_story_star.cpp, 0x004ba0f4,
+        // SET_MISSION_LOG: sent only in single player (Client/nn/nn_story_star.cpp, 0x004ba0f4,
         // 0x004ba1a0, 0x004ba3e5).
         return Opcode == 0x19;
     switch (Opcode) {
-    case 0x1E: // SAVEGAME: the save page only exists in single player (nn_pause.cpp)
+    case 0x1E: // SAVEGAME: the save page only exists in single player (Client/nn/nn_pause.cpp)
     // The DBG packets have no client sender; retail logs "encountered in release mode".
     case 0x22: // DBGCREATESHIP
     case 0x23: // DBGLOADSYSTEM
@@ -351,9 +351,9 @@ bool IsUnsentClientPacket(unsigned int Channel, unsigned int Opcode) {
     case 0x2D: // DBGCONSOLE
     case 0x2E: // DBGFREESYSTEM
     case 0x30: // DBGRELOCATE_SHIP
-    case 0x24: // DOCK: single player only (space_state.cpp, 0x0054a79a)
+    case 0x24: // DOCK: single player only (Client/space/space_state.cpp, 0x0054a79a)
     case 0x27: // TRADERESPONSE: no client sender
-    case 0x37: // COMMCOMPLETE: single player only (hud_comm.cpp)
+    case 0x37: // COMMCOMPLETE: single player only (Client/space/hud/hud_comm.cpp)
         return true;
     default:
         return false;

@@ -5,7 +5,7 @@ It is a client extension, not a restoration of the original game's behaviour.
 
 Build: the `FreelancerWalkMode` switch (`-DFreelancerWalkMode=0|1`,
 [building.md](building.md#switches)), `1` by default. All of the code
-(`base_walk.cpp` and the hooks in `gameflow`, `gf_character_object`, `input_manager`, `menu_keymap`,
+(`Client/gf/base_walk.cpp` and the hooks in `gameflow`, `gf_character_object`, `input_manager`, `menu_keymap`,
 `nav_bar`, `nn_main_button`, `room_control`, `screen_quad_state`, `win3d*`) sits under
 `#ifdef FREELANCER_WALK_MODE`; with `0` the client is identical to master.
 
@@ -32,8 +32,8 @@ Build: the `FreelancerWalkMode` switch (`-DFreelancerWalkMode=0|1`,
 
 ## Design
 
-`src/freelancer/Client/base_walk.cpp` owns the mode state, the Win3D button, input, animations and
-the camera. `base_walk_math.h` holds the engine-independent movement and camera math. The hooks
+`src/freelancer/Client/gf/base_walk.cpp` owns the mode state, the Win3D button, input, animations and
+the camera. `Client/gf/base_walk_math.h` holds the engine-independent movement and camera math. The hooks
 are called from Gameflow, the keyboard/mouse handlers and the room/character life cycle. The
 controls are applied before the RoomObject update; after the animation mixer the root pose is set
 again and the camera is updated, so that root motion from the animation clip does not pull the
