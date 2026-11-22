@@ -169,7 +169,7 @@ namespace
     };
 
     // ---------------------------------------------------------------------------------------
-    // IDirectPlay8Address:a service provider, a device and named components, as
+    // IDirectPlay8Address: a service provider, a device and named components, as
     // dpnet.dll keeps them. Enough for DALib: SetSP, AddComponent, GetComponentByName, GetURLA.
 
     class FAddressObject final : public IDirectPlay8Address
@@ -657,6 +657,10 @@ namespace
                 CloseSocket();
                 return DPNERR_GENERIC;
             }
+            // A loop that a Close from a message handler stopped has torn down and returned, but
+            // nobody joined it.
+            if (NetThread.joinable())
+                NetThread.join();
             bStop = false;
             NetThread = std::thread([this] { NetLoop(); });
             return S_OK;
@@ -787,7 +791,7 @@ namespace
             if (!Socket || To.Family != 4)
                 return;
             const sockaddr_in Target = ToSockaddr(To);
-            sendto(Socket.Get(),reinterpret_cast<const char*>(Data), (int)Size, 0,
+            sendto(Socket.Get(), reinterpret_cast<const char*>(Data), (int)Size, 0,
                    reinterpret_cast<const sockaddr*>(&Target), sizeof(Target));
         }
 
