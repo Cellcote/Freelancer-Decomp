@@ -6,6 +6,7 @@
 
 #include "msvcrt_atof.h"
 
+#include <bit>
 #include <cctype>
 #include <cstdint>
 #include <cstring>
@@ -248,8 +249,7 @@ namespace
                 Bits |= Fraction;
             }
         }
-        double Result;
-        memcpy(&Result, &Bits, sizeof(Result));
+        double Result = std::bit_cast<double>(Bits);
         return Result;
     }
 }
@@ -314,8 +314,7 @@ double MsvcrtAtof(char const* Text)
     if (Stored == 0)
     {
         uint64_t Bits = bNegative ? UINT64_C(0x8000000000000000) : 0;
-        double Result;
-        memcpy(&Result, &Bits, sizeof(Result));
+        double Result = std::bit_cast<double>(Bits);
         return Result;
     }
 

@@ -9,6 +9,7 @@
 #include "MaterialLibrary.h"
 #include "engine/engbase.h"
 
+#include <bit>
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
@@ -2006,8 +2007,7 @@ static I3DMathEngine* AcquireMathEngine()
 
 static float AtmosphereEps()
 {
-    float Value;
-    std::memcpy(&Value, &kAtmosphereEpsBits, sizeof(Value));
+    float Value = std::bit_cast<float>(kAtmosphereEpsBits);
     return Value;
 }
 

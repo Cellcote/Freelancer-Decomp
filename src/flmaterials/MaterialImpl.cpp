@@ -12,6 +12,7 @@
 #include "x64_low_arena.h"   // pipeline texture handles and engine instances in 32-bit values
 #include "x86math.h"        // I3DMathEngine
 
+#include <bit>
 #include <cctype>
 #include <cstdarg>
 #include <cmath>
@@ -3669,8 +3670,7 @@ GENRESULT FMaterialImpl::BindColorize(void* Context)
                     ~FScopedParameterValue() noexcept(false) { FlmReleaseTypedValue(Words); }
                 } Value;
                 ((IMaterial*)(Submit->Candidate))->GetParameterValue(5, Value.Words);
-                float CandidateOpacity;
-                std::memcpy(&CandidateOpacity, &Value.Words[1], sizeof(CandidateOpacity));
+                float CandidateOpacity = std::bit_cast<float>(Value.Words[1]);
                 // FLD float / FMUL float / FSTP float: multiply before rounding.
                 Opacity = (float)((double)(CandidateOpacity) *
                                              (double)(Opacity));

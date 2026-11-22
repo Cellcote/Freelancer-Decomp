@@ -31,6 +31,7 @@
 #include "server_pub.h"
 #include "x86math.h"                // FVector, FMatrix
 
+#include <bit>
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -509,11 +510,9 @@ namespace
             double const Dz = static_cast<double>(RingPosition.z) - Position->z;
             double const LengthSq = (Dz * Dz + Dy * Dy) + Dx * Dx;
             float const LengthSqF = static_cast<float>(LengthSq);                  // FST dword
-            int Bits;
-            std::memcpy(&Bits, &LengthSqF, sizeof(Bits));
+            int Bits = std::bit_cast<int>(LengthSqF);
             Bits = 0x5f3759df - (Bits >> 1);
-            float Guess;
-            std::memcpy(&Guess, &Bits, sizeof(Guess));
+            float Guess = std::bit_cast<float>(Bits);
             double const Length =
                 ((1.5f - static_cast<double>(Guess) * Guess * LengthSq * 0.5f) * Guess) * LengthSq;
             // FILD qword DAT_06fd0eb0 / FCOMPP, TEST AH,5 / JP: found when 5000 is below it.
@@ -877,8 +876,7 @@ namespace
         TRefHandle<FObjListDirective> Directive;
         CreateObjListDirective(0x14, &Directive.Pointer);                           // FUN_06f24870
         // 06f65e65-06f65e7a: the offset's float bits go to the op's +0x14.
-        unsigned int OffsetBits;
-        std::memcpy(&OffsetBits, &Offset, sizeof(OffsetBits));
+        unsigned int OffsetBits = std::bit_cast<unsigned int>(Offset);
         static_cast<FObjListInstantTradelane*>(Directive.Pointer)->SetLane(&RingId, OffsetBits,
                                                                            &NextRingId); // FUN_06f27870
         AddLeaderDirective(&Leader, Directive);

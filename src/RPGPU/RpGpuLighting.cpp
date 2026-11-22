@@ -11,6 +11,7 @@
 
 #include "RpGpuCommon.h"
 
+#include <bit>
 #include <cmath>
 #include <cstring>
 
@@ -46,8 +47,7 @@ namespace
 
     float StateFloat(int Bits)
     {
-        float Value;
-        std::memcpy(&Value, &Bits, sizeof(Value));
+        float Value = std::bit_cast<float>(Bits);
         return Value;
     }
 

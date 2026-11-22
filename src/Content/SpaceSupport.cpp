@@ -36,6 +36,7 @@
 #include "server_gameobject.h"  // FObjectDestroyedEvent, FSubObjDamageEvent, FEquipLootEvent
 #include "float_bits.h"
 
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -1108,11 +1109,9 @@ bool __cdecl TestExclusionSpheres(float const* Position,
         double DZ = static_cast<double>(Position[2]) - It->Z;
         double Square = DZ * DZ + DY * DY + DX * DX;
         float StoredSquare = static_cast<float>(Square);
-        int Bits;
-        std::memcpy(&Bits, &StoredSquare, sizeof(Bits));
+        int Bits = std::bit_cast<int>(StoredSquare);
         Bits = 0x5f3759df - (Bits >> 1);
-        float Guess;
-        std::memcpy(&Guess, &Bits, sizeof(Guess));
+        float Guess = std::bit_cast<float>(Bits);
         double Distance =
             (1.5f - static_cast<double>(Guess) * Guess * Square * 0.5f) * Guess * Square;
         if (Distance < It->Radius)

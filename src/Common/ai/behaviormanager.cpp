@@ -61,6 +61,7 @@ namespace
     };
 }
 
+#include <bit>
 #include <intrin.h> // __debugbreak -- UpdateBehaviorTick's retail INT3 (.text:062d32fd)
 #include <cmath>
 #include <cstdint>
@@ -858,11 +859,9 @@ void IBehaviorManager::update_current_behavior_direction(Vector const& Dir)
 
     // DAT_063a033c (0x3f34fdf4, 0.707f) and DAT_063a0350 (0x3dcccccd, 0.1f).
     unsigned int const LevelThresholdBits = 0x3f34fdf4u;
-    float LevelThreshold;
-    std::memcpy(&LevelThreshold, &LevelThresholdBits, sizeof(LevelThreshold));
+    float LevelThreshold = std::bit_cast<float>(LevelThresholdBits);
     unsigned int const BlendBits = 0x3dcccccdu;
-    float Blend;
-    std::memcpy(&Blend, &BlendBits, sizeof(Blend));
+    float Blend = std::bit_cast<float>(BlendBits);
 
     if (CurrentBehaviorIndex != -1 && BehaviorDispatchTable[CurrentBehaviorIndex] != nullptr)
     {
@@ -2013,8 +2012,7 @@ void IBehaviorManager::RelevelShipUpDirection(bool bApply)
     double const ForwardY =
         std::fabs((static_cast<double>(Rotation.E[2][2]) + Rotation.E[0][2]) * 0.0f + Rotation.E[1][2]);
     unsigned int const LevelThresholdBits = 0x3f34fdf4u;      // DAT_063a033c, 0.707f
-    float LevelThreshold;
-    std::memcpy(&LevelThreshold, &LevelThresholdBits, sizeof(LevelThreshold));
+    float LevelThreshold = std::bit_cast<float>(LevelThresholdBits);
     if (!(LevelThreshold > ForwardY))
         return;
 

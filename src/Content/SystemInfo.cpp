@@ -26,6 +26,7 @@
 #include "server_pub.h"
 #include "server_cobject.h"     // pub::SpaceObj::Destroy, DESTROY_NORMAL
 
+#include <bit>
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -1569,8 +1570,7 @@ void FSystemInfo::SpawnTradeLaneAttack(FContentPlayerShip* PlayerShip, int const
     // the iteration that selected it). Affiliation ([ESP+0x1c], the last draw's target) is
     // always written: pub::Reputation::GetAffiliation stores -1 on failure.
     FTradeLaneRing const Ring = TheLane->Rings[Selected->RingIndex];
-    int Rep;
-    std::memcpy(&Rep, &DistanceSq, sizeof(Rep));
+    int Rep = std::bit_cast<int>(DistanceSq);
     unsigned int Affiliation = 0;
     pub::SpaceObj::GetSolarRep(Ring.ObjectId, Rep);
     pub::Reputation::GetAffiliation(Rep, Affiliation);
@@ -1959,11 +1959,9 @@ double __cdecl DistanceSquaredToSegment(Vector const* Point, Vector const* Start
 // 0x5f3759df - (bits >> 1), SAR on the float's bits.
 static float ReciprocalSqrtGuess(float Value)
 {
-    int Bits;
-    std::memcpy(&Bits, &Value, sizeof(Bits));
+    int Bits = std::bit_cast<int>(Value);
     int const GuessBits = 0x5f3759df - (Bits >> 1);
-    float Guess;
-    std::memcpy(&Guess, &GuessBits, sizeof(Guess));
+    float Guess = std::bit_cast<float>(GuessBits);
     return Guess;
 }
 

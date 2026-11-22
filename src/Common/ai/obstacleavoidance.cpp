@@ -26,6 +26,7 @@
 #include "common_spatial.h"       // ISpatialPartition, FSpatialQueryResult (ClassifyShipObstaclePhase)
 #include "x87_trig.h"             // retail's inline FSIN / FCOS
 
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -754,11 +755,9 @@ namespace
     // Not the arithmetic of FUN_062df7f0 (1.5f*y - (0.5f*X*y)*(y*y)).
     double FastInvSqrtNewton(float X)
     {
-        int Bits;
-        std::memcpy(&Bits, &X, sizeof(Bits));
+        int Bits = std::bit_cast<int>(X);
         Bits = 0x5f3759df - (Bits >> 1);
-        float Y;
-        std::memcpy(&Y, &Bits, sizeof(Y));
+        float Y = std::bit_cast<float>(Bits);
         return (1.5f - (((double)Y * Y) * X) * 0.5f) * Y;
     }
 

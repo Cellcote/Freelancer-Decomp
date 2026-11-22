@@ -29,6 +29,7 @@
 #include "server_controller.h"   // pub::Controller::_SendMessage
 #include "server_cobject.h"      // EQInfo, TerminalInfo, ActivateEquipment, GetTerminalInfo
 
+#include <bit>
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
@@ -119,11 +120,9 @@ namespace
     // ((1.5 - y*y*Square*0.5) * y) * Square.
     double ApproximateSqrt(float StoredSquare, double Square)
     {
-        int Bits;
-        std::memcpy(&Bits, &StoredSquare, sizeof(Bits));
+        int Bits = std::bit_cast<int>(StoredSquare);
         Bits = 0x5f3759df - (Bits >> 1);
-        float Y;
-        std::memcpy(&Y, &Bits, sizeof(Y));
+        float Y = std::bit_cast<float>(Bits);
         double Step = 1.5 - static_cast<double>(Y) * Y * Square * 0.5;
         return Step * Y * Square;
     }

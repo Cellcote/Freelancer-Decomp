@@ -22,6 +22,7 @@
 #include "server_pub.h"
 #include "x86math.h"
 
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -53,11 +54,9 @@ namespace
     float SqrtGuess(double LengthSquared)
     {
         float const Stored = static_cast<float>(LengthSquared);
-        int32_t Bits;
-        memcpy(&Bits, &Stored, sizeof(Bits));
+        int32_t Bits = std::bit_cast<int32_t>(Stored);
         Bits = 0x5f3759df - (Bits >> 1);
-        float Guess;
-        memcpy(&Guess, &Bits, sizeof(Guess));
+        float Guess = std::bit_cast<float>(Bits);
         return Guess;
     }
 

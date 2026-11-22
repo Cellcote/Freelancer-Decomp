@@ -10,6 +10,7 @@
 #include "alchemy_common.h"
 #include "alchemy_genericfx.h"
 
+#include <bit>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -440,8 +441,7 @@ namespace AlchemyImpl
                 else
                     Ext[0] = '\0';
             }
-            unsigned int SuffixBits;
-            std::memcpy(&SuffixBits, &Suffix, sizeof(SuffixBits));
+            unsigned int SuffixBits = std::bit_cast<unsigned int>(Suffix);
             ++SuffixBits;
             std::memcpy(&Suffix, &SuffixBits, sizeof(Suffix));
             std::sprintf(G_NodeLibraryResolvedName, "%s#%d%s", Base, Suffix, Ext);

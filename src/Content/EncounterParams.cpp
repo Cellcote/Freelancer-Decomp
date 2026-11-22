@@ -29,6 +29,7 @@
 #include "common_tstring.h"
 #include "x86math.h"            // FTransform
 
+#include <bit>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -629,8 +630,7 @@ bool FEncounterParameters::Refresh(float Time)
 {
     // 06ef52d8-06ef5303: the -1.0f tests compare the raw bits (CMP EAX,0xbf800000). A reroll
     // is due unless Time - LastRerollTime < RerollInterval (TEST AH,1 / JZ: C0 clear).
-    unsigned int LastBits;
-    memcpy(&LastBits, &LastRerollTime, sizeof(LastBits));
+    unsigned int LastBits = std::bit_cast<unsigned int>(LastRerollTime);
     bool const bFirst = LastBits == 0xbf800000u;
     bool bReroll;
     if (bFirst)

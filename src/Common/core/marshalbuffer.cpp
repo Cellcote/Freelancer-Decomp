@@ -13,6 +13,7 @@
 #include "common_goods.h" // EquipDescList, GoodDescList, GoodDesc
 #include "common_ini.h"   // StringAlloc -- get_EquipDescList's hardpoint names
 
+#include <bit>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -219,8 +220,7 @@ float MarshalBuffer::get_float()
 {
     FlULong Bits = (FlULong)(std::uintptr_t)this;
     get_void(&Bits, 4);
-    float V;
-    memcpy(&V, &Bits, sizeof(V));
+    float V = std::bit_cast<float>(Bits);
     return V;
 }
 

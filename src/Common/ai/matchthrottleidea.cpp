@@ -18,6 +18,7 @@
 #include "common_systemmanager.h" // SystemManager / ThrustManager (BaseIdea::Handle)
 #include "x86math.h"          // I3DMathEngine::TransformMatrix
 
+#include <bit>
 #include <cmath>
 #include <cstring>
 
@@ -212,11 +213,9 @@ int MatchThrottle2Idea::Update(float DeltaTime)
     double const DistSq = (static_cast<double>(Delta.x) * Delta.x + static_cast<double>(Delta.y) * Delta.y) +
                           static_cast<double>(Delta.z) * Delta.z;
     float const DistSqF = static_cast<float>(DistSq);
-    int DistSqBits;
-    std::memcpy(&DistSqBits, &DistSqF, sizeof(DistSqBits));
+    int DistSqBits = std::bit_cast<int>(DistSqF);
     int const SeedBits = 0x5f3759df - (DistSqBits >> 1);           // SAR ECX,1; SUB
-    float Seed;
-    std::memcpy(&Seed, &SeedBits, sizeof(Seed));
+    float Seed = std::bit_cast<float>(SeedBits);
     float const Distance = static_cast<float>(
         ((1.5f - ((static_cast<double>(Seed) * Seed) * DistSq) * 0.5f) * Seed) * DistSq);   // B+0x14
 

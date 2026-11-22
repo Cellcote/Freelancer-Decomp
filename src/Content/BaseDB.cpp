@@ -29,6 +29,7 @@
 #include "common_ini.h"
 #include "server_pub.h"
 
+#include <bit>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -1488,8 +1489,7 @@ void FBaseNpc::ChooseOffer(FBarOffer* Out, FContentPlayerState* Player) const
         std::vector<FBaseNpcMission>::const_iterator Mission = PickRandom(Missions);
         unsigned int PlayerId = Player->PlayerId;
         // 06ea86c3: the ship id lives in the pick's slot; a failed query leaves its bits.
-        unsigned int ShipId;
-        memcpy(&ShipId, &PickSlot, sizeof(ShipId));
+        unsigned int ShipId = std::bit_cast<unsigned int>(PickSlot);
         pub::Player::GetShipID(PlayerId, ShipId);
         if (Mission == Missions.end() || ShipId == 0)
             break;

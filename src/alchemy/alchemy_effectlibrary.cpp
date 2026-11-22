@@ -11,6 +11,7 @@
 #include "alchemy_effectarchetype.h"
 #include "alchemy_effectobject.h"
 
+#include <bit>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -260,11 +261,9 @@ namespace AlchemyImpl
             return GR_ALE_LOAD_FAIL;
         }
 
-        float Version;
-        std::memcpy(&Version, &VersionBits, sizeof(Version));
+        float Version = std::bit_cast<float>(VersionBits);
         const FlULong ThresholdBits = kAleVersion11Bits;
-        float Threshold;
-        std::memcpy(&Threshold, &ThresholdBits, sizeof(Threshold));
+        float Threshold = std::bit_cast<float>(ThresholdBits);
 
         for (FlLong Index = 0; Index < Count; ++Index)
         {
@@ -381,8 +380,7 @@ namespace AlchemyImpl
                     Ext[0] = '\0';
             }
             // INC EBP wraps all 32 bits; avoid signed C++ overflow at INT_MAX.
-            unsigned int SuffixBits;
-            std::memcpy(&SuffixBits, &Suffix, sizeof(SuffixBits));
+            unsigned int SuffixBits = std::bit_cast<unsigned int>(Suffix);
             ++SuffixBits;
             std::memcpy(&Suffix, &SuffixBits, sizeof(Suffix));
             std::sprintf(G_EffectResolvedName, "%s#%d%s", Base, Suffix, Ext);

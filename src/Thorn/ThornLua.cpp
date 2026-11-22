@@ -9,6 +9,7 @@
 #include "ThornScene.h"
 #include "ThornModernAdapters.h"
 
+#include <bit>
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
@@ -120,8 +121,7 @@ namespace
     {
         const unsigned int SumBits = static_cast<unsigned int>(StartMs) +
                                      static_cast<unsigned int>(DurationMs);
-        int Sum;
-        std::memcpy(&Sum, &SumBits, sizeof(Sum));
+        int Sum = std::bit_cast<int>(SumBits);
         return Sum;
     }
 
@@ -1186,8 +1186,7 @@ namespace
                 mov dword ptr [edx + 0ch], esi
             }
 #else
-            float ColorScale;
-            std::memcpy(&ColorScale, &ColorScaleBits, sizeof(ColorScale));
+            float ColorScale = std::bit_cast<float>(ColorScaleBits);
             ColorBits[3] = 0x3f800000u;
             for (int Index = 0; Index < 3; ++Index)
             {
@@ -1419,8 +1418,7 @@ namespace
             fldcw OldControl
         }
 #else
-        float Scale;
-        std::memcpy(&Scale, &ScaleBits, sizeof(Scale));
+        float Scale = std::bit_cast<float>(ScaleBits);
         Result = X87TruncateToInt64(Number * static_cast<double>(Scale));
 #endif
         return static_cast<int>(static_cast<unsigned int>(Result));

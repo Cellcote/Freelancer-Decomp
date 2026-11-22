@@ -10,6 +10,7 @@
 #include "ThornX87.h"
 #endif
 
+#include <bit>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -896,8 +897,7 @@ namespace
     void QuatConjugate(FQuat& Dst, const FQuat& Q)
     {
         const float X = -Q.X;
-        unsigned int W;
-        std::memcpy(&W, &Q.W, sizeof(W));
+        unsigned int W = std::bit_cast<unsigned int>(Q.W);
         const float Y = -Q.Y;
         const double Z = -static_cast<double>(Q.Z);
         std::memcpy(&Dst.W, &W, sizeof(W));
@@ -2328,8 +2328,7 @@ namespace
                 NeighborPoints(static_cast<int>(Segment), P0, P1, P2, P3);
 
                 float SegmentLength = 0.0f;
-                float IncomingTotal;
-                std::memcpy(&IncomingTotal, &TotalLength_, sizeof(float));
+                float IncomingTotal = std::bit_cast<float>(TotalLength_);
                 {
                     std::vector<float> SegmentSamples(G_SamplesPerSegment, 0.0f);
                     float* Table = SegmentSamples.data();

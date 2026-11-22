@@ -24,6 +24,7 @@
 #include "server_controller.h"
 #include "x86math.h"
 
+#include <bit>
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -1124,11 +1125,9 @@ Vector __cdecl SubtractVectors(Vector const& A, Vector const& B)
 // returned on the x87 stack, kept in double here.
 double __cdecl FastReciprocalSqrt(float Value)
 {
-    int Bits;
-    std::memcpy(&Bits, &Value, sizeof(Bits));
+    int Bits = std::bit_cast<int>(Value);
     Bits = 0x5f3759df - (Bits >> 1);
-    float Guess;
-    std::memcpy(&Guess, &Bits, sizeof(Guess));
+    float Guess = std::bit_cast<float>(Bits);
     double const Step = 1.5f - static_cast<double>(Guess) * Guess * Value * 0.5f;
     return Step * Guess;
 }

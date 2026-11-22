@@ -18,6 +18,7 @@
 #include "msvcrt_compat.h"
 #include "render/rp8_semantics.h"
 
+#include <bit>
 #include <cmath>
 #include <cstdarg>
 #include <cstddef>
@@ -3521,8 +3522,7 @@ GENRESULT DACOM_API FDirectX9::ClearBuffers(unsigned long Flags, const void* Rec
     }
     if ((Flags & 4) != 0)
         D3dFlags |= D3DCLEAR_STENCIL;
-    float Z;
-    memcpy(&Z, &ZBits, sizeof(Z));
+    float Z = std::bit_cast<float>(ZBits);
     const unsigned long Color = (unsigned long)(PipelineStateValue(8));
     const unsigned long Stencil = (unsigned long)(PipelineStateValue(0xA));
     const DWORD Count = (Rects != nullptr) ? 1 : 0;

@@ -31,6 +31,7 @@
 #include "server_controller.h"
 #include "common_text.h"
 
+#include <bit>
 #include <cmath>
 #include <cstdarg>
 #include <cstdio>
@@ -4325,11 +4326,9 @@ namespace
             float const LengthSq = static_cast<float>(static_cast<double>(DX) * DX +
                                                       static_cast<double>(DY) * DY +
                                                       static_cast<double>(DZ) * DZ);
-            int Bits;
-            memcpy(&Bits, &LengthSq, sizeof(Bits));
+            int Bits = std::bit_cast<int>(LengthSq);
             Bits = 0x5f3759df - (Bits >> 1);
-            float Guess;
-            memcpy(&Guess, &Bits, sizeof(Guess));
+            float Guess = std::bit_cast<float>(Bits);
             double const Inverse = (1.5 - static_cast<double>(Guess) * Guess * LengthSq * 0.5) *
                                    Guess;
             double const NX = DX * Inverse;

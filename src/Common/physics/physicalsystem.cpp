@@ -40,6 +40,7 @@
 #include "ivp_collision/ivp_ray_solver.h"   // PhySys::RaySolver_MaskedSurface's base
 #include "ivp_collision/ivp_sphere_query.h" // PhysicalSystem::FindSphereCollisions (06350740)
 
+#include <bit>
 #include <assert.h>
 #include <float.h>   // FLT_MAX (PhySys::GetClosestPhantomIntruderPos, DAT_0639c39c)
 #include <math.h>
@@ -121,8 +122,7 @@ namespace
     unsigned PhySys_PartIdOfEdge(IVP_Compact_Edge const* Edge)
     {
         IVP_U_Float_Point const* Point = Edge->GetStartPoint();
-        unsigned PartId;
-        memcpy(&PartId, &Point->HesseVal, sizeof(PartId));
+        unsigned PartId = std::bit_cast<unsigned>(Point->HesseVal);
         return PartId;
     }
 }

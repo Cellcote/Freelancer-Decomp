@@ -11,6 +11,7 @@
 #include "vc6_sort.h" // Vc6Sort::Sort (SortMasterEvents, SortActiveEventTypes)
 #include "float_bits.h"
 
+#include <bit>
 #include <cmath>
 #include <cstdarg>
 #include <cstddef>
@@ -1256,14 +1257,12 @@ namespace
 #else
         const auto FloatBits = [](unsigned int Bits)
         {
-            float Value;
-            std::memcpy(&Value, &Bits, sizeof(Value));
+            float Value = std::bit_cast<float>(Bits);
             return Value;
         };
         const auto DoubleBits = [](unsigned long long Bits)
         {
-            double Value;
-            std::memcpy(&Value, &Bits, sizeof(Value));
+            double Value = std::bit_cast<double>(Bits);
             return Value;
         };
         // TEST AH,05h: PF is set when the masked bits have even parity (greater, equal,
@@ -1804,8 +1803,7 @@ namespace
                 fstp st(0)
             }
 #else
-            float PiOver180;
-            std::memcpy(&PiOver180, &PiOver180Bits, sizeof(PiOver180));
+            float PiOver180 = std::bit_cast<float>(PiOver180Bits);
             const double Radians = static_cast<double>(*DeltaDeg) * PiOver180;
             CosValue = X87CosF(Radians);
             const double SinValue = X87Sin(Radians);
@@ -1988,8 +1986,7 @@ namespace
         // 41b64..41b97: FLD32/FMUL255 followed by qword ftol, consuming low32.
         const __int64 Converted = static_cast<__int64>(static_cast<double>(*Value) * 255.0);
         const unsigned int Word = static_cast<unsigned int>(Converted);
-        int Result;
-        std::memcpy(&Result, &Word, sizeof(Result));
+        int Result = std::bit_cast<int>(Word);
         return Result;
     }
 
@@ -2127,8 +2124,7 @@ namespace
     int ThornFieldAsWord(const T& Field)
     {
         static_assert(sizeof(T) == sizeof(int), "an event descriptor word is four bytes");
-        int Word;
-        std::memcpy(&Word, &Field, sizeof(Word));
+        int Word = std::bit_cast<int>(Field);
         return Word;
     }
 
@@ -2772,8 +2768,7 @@ namespace
         for (int Index = 0; Index < 4; ++Index)
         {
             const int Field = StoreOrder[Index];
-            unsigned int Word;
-            std::memcpy(&Word, &FovNearFarAspect[Field], sizeof(Word));
+            unsigned int Word = std::bit_cast<unsigned int>(FovNearFarAspect[Field]);
             std::memcpy(&Entity->CameraRuntimeProps[Field], &Word, sizeof(Word));
         }
         if (Entity->CameraControl != nullptr)
@@ -2883,8 +2878,7 @@ namespace
         // 4617f..46195 copies forward one raw DWORD at a time.
         for (int Index = 0; Index < 4; ++Index)
         {
-            unsigned int Word;
-            std::memcpy(&Word, &Entity->CameraRuntimeProps[Index], sizeof(Word));
+            unsigned int Word = std::bit_cast<unsigned int>(Entity->CameraRuntimeProps[Index]);
             std::memcpy(&Out4[Index], &Word, sizeof(Word));
         }
     }
@@ -5461,8 +5455,7 @@ unsigned char FThornEvent::Start(FThornScene* Scene, int TimeMs)
         IScriptControl* Control = Primary->ScriptControl;
         const __int64 Converted = static_cast<__int64>(SubSceneStartTime);
         const unsigned int LowWord = static_cast<unsigned int>(Converted);
-        int StartValue;
-        std::memcpy(&StartValue, &LowWord, sizeof(StartValue));
+        int StartValue = std::bit_cast<int>(LowWord);
         return HrToAl(Control->Slot3Start(StartValue));
     }
     if (NativeEventType == kThornTypeStartPsys)
@@ -5809,8 +5802,7 @@ unsigned char FThornEvent::TickPsysPropAnim(int TimeMs, FThornScene* Scene)
     // and before the curve callback. No secondary GetSparam call occurs here.
     if (PsysMask != 0)
     {
-        float Target;
-        std::memcpy(&Target, &SparamTarget, sizeof(Target));
+        float Target = std::bit_cast<float>(SparamTarget);
         if (SecondaryIndex != -1)
         {
             FThornEntity* Secondary = Scene->EntityAt(SecondaryIndex);
@@ -5830,8 +5822,7 @@ unsigned char FThornEvent::TickPsysPropAnim(int TimeMs, FThornScene* Scene)
                 // 48ae3/48af0 reload the selected node payload after the
                 // curve and the concrete descriptor-type getter, respectively.
                 FThornEntity* Primary = *PrimaryEntry;
-                float Result;
-                std::memcpy(&Result, &Primary->PsysRuntimeSparam, sizeof(Result));
+                float Result = std::bit_cast<float>(Primary->PsysRuntimeSparam);
                 if ((PsysMask & 1) != 0)
                 {
                     const float* Capture = &SparamCapture;
@@ -6883,8 +6874,7 @@ void FThornEntity::InnerApplyDesc(const FThornEntitySnap* SnapIn)
     {
         for (int Index = 0; Index < 15; ++Index)
         {
-            unsigned int Word;
-            std::memcpy(&Word, &SnapIn->SceneBlob[Index], sizeof(Word));
+            unsigned int Word = std::bit_cast<unsigned int>(SnapIn->SceneBlob[Index]);
             std::memcpy(&Snap.SceneBlob[Index], &Word, sizeof(Word));
         }
         Fun06f431d0(this, Snap.SceneBlob, 0xFF);
@@ -6966,8 +6956,7 @@ void FThornEntity::InnerSetPos(const float* Pos)
     // 40914..40921 are raw forward word transfers, including overlap.
     for (int Index = 0; Index < 3; ++Index)
     {
-        unsigned int Word;
-        std::memcpy(&Word, &Pos[Index], sizeof(Word));
+        unsigned int Word = std::bit_cast<unsigned int>(Pos[Index]);
         std::memcpy(&Snap.Pos[Index], &Word, sizeof(Word));
     }
     if (GeoControl != nullptr)
@@ -7008,8 +6997,7 @@ void FThornEntity::InnerSetOrient(const float* Mat9)
     // 40acb REP MOVSD copies forward; do not collapse overlapping input.
     for (int Index = 0; Index < 9; ++Index)
     {
-        unsigned int Word;
-        std::memcpy(&Word, &Mat9[Index], sizeof(Word));
+        unsigned int Word = std::bit_cast<unsigned int>(Mat9[Index]);
         std::memcpy(&Snap.Orient[Index], &Word, sizeof(Word));
     }
     if (GeoControl != nullptr)
@@ -8858,8 +8846,7 @@ namespace
         if ((Mask & 0x1) != 0)
         {
             SaveBufAppendStringValue(Buf, "%s = ", "env");
-            int Environment;
-            std::memcpy(&Environment, &Props->Environment, sizeof(Environment));
+            int Environment = std::bit_cast<int>(Props->Environment);
             SaveBufAppendInteger(Buf, "%d, ", Environment);
         }
         if ((Mask & 0x2) != 0)
@@ -8890,8 +8877,7 @@ namespace
     int SaveLightAngle(FThornSaveBuf* Buf, const float* Value)
     {
         const unsigned int ScaleBits = 0x42652ee0u;
-        float Scale;
-        std::memcpy(&Scale, &ScaleBits, sizeof(Scale));
+        float Scale = std::bit_cast<float>(ScaleBits);
         const float Scaled = *Value * Scale;
         return SaveBufAppendFloat(Buf, "%.6f, ", &Scaled);
     }

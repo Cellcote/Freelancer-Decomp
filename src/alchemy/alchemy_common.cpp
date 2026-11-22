@@ -26,6 +26,7 @@
 #include "alchemy_ramp.h"
 #include "float_bits.h"
 
+#include <bit>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -1428,11 +1429,9 @@ namespace AlchemyImpl
     // precision and CVTTSS2SI's indefinite result, without C++ conversion UB.
     static void ComputeSinCosSse(float AngleRadians, float* Out)
     {
-        FlULong AngleBits;
-        std::memcpy(&AngleBits, &AngleRadians, sizeof(AngleBits));
+        FlULong AngleBits = std::bit_cast<FlULong>(AngleRadians);
         const FlULong AbsBits = AngleBits & 0x7FFFFFFFu;
-        float AbsAngle;
-        std::memcpy(&AbsAngle, &AbsBits, sizeof(AbsAngle));
+        float AbsAngle = std::bit_cast<float>(AbsBits);
         __m128 CosValue = _mm_load_ss(&AbsAngle);
         CosValue = _mm_mul_ss(CosValue, _mm_set_ss(FloatFromBits(0x3F22F983u)));
         __m128 SinValue = CosValue;
@@ -2343,8 +2342,7 @@ namespace AlchemyImpl
             }
             else
             {
-                float FloatValue;
-                std::memcpy(&FloatValue, &Value, sizeof(FloatValue));
+                float FloatValue = std::bit_cast<float>(Value);
                 Set->SetPropFloat(Hash, FloatValue);
             }
         }

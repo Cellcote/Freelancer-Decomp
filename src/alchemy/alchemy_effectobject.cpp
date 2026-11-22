@@ -8,6 +8,7 @@
 
 #include "alchemy_common.h"
 
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -492,11 +493,9 @@ namespace AlchemyImpl
             const double Dot = (DzWide * Dz + static_cast<double>(Dy) * Dy) + static_cast<double>(Dx) * Dx;
             const volatile float DotStored = static_cast<float>(Dot);
             const float DotForBits = DotStored;
-            std::uint32_t DotBits;
-            std::memcpy(&DotBits, &DotForBits, sizeof(DotBits));
+            std::uint32_t DotBits = std::bit_cast<std::uint32_t>(DotForBits);
             const std::uint32_t SeedBits = 0x5f3759dfu - static_cast<std::uint32_t>(static_cast<std::int32_t>(DotBits) >> 1);
-            float Seed;
-            std::memcpy(&Seed, &SeedBits, sizeof(Seed));
+            float Seed = std::bit_cast<float>(SeedBits);
             const double SeedSquared = static_cast<double>(Seed) * Seed;
             const double Correction = 1.5 - (SeedSquared * Dot) * 0.5;
             const volatile float Distance = static_cast<float>((Correction * Seed) * Dot);

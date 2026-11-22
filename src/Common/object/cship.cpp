@@ -21,6 +21,8 @@
 
 #include "DALib.h"
 
+#include <numbers>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <stdio.h>
@@ -1790,11 +1792,9 @@ bool CShip::check_formation_follower_status(float MaxDistance)
         // one Newton step against the unrounded S (0.5 = DAT_0639c13c, 1.5 = DAT_0639e6d0),
         // times S again: an approximate distance.
         float const SRounded = (float)(S);
-        int Bits;
-        memcpy(&Bits, &SRounded, sizeof(Bits));
+        int Bits = std::bit_cast<int>(SRounded);
         Bits = 0x5f3759df - (Bits >> 1);
-        float Y;
-        memcpy(&Y, &Bits, sizeof(Y));
+        float Y = std::bit_cast<float>(Bits);
         double Dist = (double)(Y) * Y;
         Dist *= S;
         Dist *= (double)(0.5f);
