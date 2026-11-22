@@ -845,6 +845,15 @@ namespace
                 SOCKET Created = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
                 if (Created == INVALID_SOCKET)
                     return false;
+#if !defined(_WIN32)
+                // PORT(macOS): NetLoop waits with select, whose fd_set holds only descriptors below
+                // FD_SETSIZE on POSIX (a Windows fd_set is a list of handles, with no such limit).
+                if (Created >= FD_SETSIZE)
+                {
+                    closesocket(Created);
+                    return false;
+                }
+#endif
 #if defined(_WIN32)
                 BOOL Exclusive = TRUE;
                 setsockopt(Created, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char*>(&Exclusive),
