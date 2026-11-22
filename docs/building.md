@@ -157,3 +157,25 @@ phase 6, M2): one that is in `FL_PROJECTS` without `PORTABLE` compiles against t
 `<windows.h>` of `src/include/posix` over the POSIX backend of `src/include/platform.h`
 ([platform.md](platform.md)). A DLL module is named as on Windows, without a `lib` prefix
 (`dacom.dylib`, `dacom.so`), so that `Platform::ModuleLoad("dacom.dll")` finds it.
+
+## Warnings, formatting and static analysis
+
+- **Warnings.** On Windows every first-party module builds at `/W4` (`fl_add_module`'s default);
+  the vendored zlib and qhull keep their own levels. Headers included with `<...>` (CRT, STL,
+  Windows SDK, MFC, DirectX) are external and their warnings are off. Warnings never fail the
+  build: CI shows a table per warning and per module on the run page
+  (`.github/scripts/warning_summary.py`) and keeps the full build output as an artifact. The
+  portable build uses `-Wall -Wextra`.
+- **Formatting.** `.clang-format` (clang-format 19) describes the code style. The tree is not
+  reformatted in bulk, which would rewrite about a quarter of all lines and break upstream merges:
+  CI checks only the lines a pull request changes. Format your own changes with
+  `git clang-format origin/master`. Reformat a whole file only in a commit that changes nothing
+  else. The modules that put opening braces on the same line (rpclocal, RemoteClient,
+  RemoteServer, RemoteCommon) have a `.clang-format` of their own that inherits the root file
+  and changes only their local habits (attached braces, `template<`, `{ a, b }`).
+- **clang-tidy.** `.clang-tidy` lists bug-finding checks; checks that would push changes to
+  retail layout or ownership (`modernize-*` and the like) are left out. Configure with
+  `-DFL_CLANG_TIDY=ON` to run it while building (needs clang-tidy 19 or later on `PATH`; on
+  macOS with a non-Apple clang-tidy also pass `-DCMAKE_OSX_SYSROOT=$(xcrun --show-sdk-path)`).
+  Vendored modules are skipped. CI runs it on the portable modules (Linux, Clang) and reports the
+  findings without failing.

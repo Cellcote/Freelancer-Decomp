@@ -6,7 +6,7 @@ if(NOT FL_WIN32)
   return()
 endif()
 
-fl_add_module(MemoryDiagnostics EXE TOOL NO_WPO UNICODE NO_INCREMENTAL WARNING_LEVEL 4 ITEM_DEFAULTS DebugInformationFormat ProgramDatabase
+fl_add_module(MemoryDiagnostics EXE TOOL NO_WPO UNICODE NO_INCREMENTAL ITEM_DEFAULTS DebugInformationFormat ProgramDatabase
   SOURCES
     main.cpp
     diagnostics.cpp
