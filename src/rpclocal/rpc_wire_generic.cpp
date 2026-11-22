@@ -367,14 +367,22 @@ unsigned int RpcEncodeWireDwordPair(FPacketBase& Packet, unsigned char** BufferH
                                     unsigned int Capacity, unsigned int* OutLength) {
     const FPayloadServerDwordPair* Wire =
         reinterpret_cast<const FPayloadServerDwordPair*>(Packet.Payload());
+    return RpcEncodeWireDwordPairValues(Packet, BufferHolder, Capacity, OutLength, Wire->Field_0x00,
+                                        Wire->Field_0x04);
+}
 
+// The body of 0x06da9110 with the two dwords given: a payload whose second dword is a
+// pointer on Win32 (TRADERESPONSE) passes it as Win32 sends it.
+unsigned int RpcEncodeWireDwordPairValues(FPacketBase& Packet, unsigned char** BufferHolder,
+                                          unsigned int Capacity, unsigned int* OutLength,
+                                          unsigned int First, unsigned int Second) {
     FRpcMarshalStream Stream(Packet, *BufferHolder, Capacity);
     Stream.PutHeaderUnchecked(RpcPacketHeaderWord(Packet.PacketId));   // 06da9140
-    Stream.PutDword(Wire->Field_0x00);                                 // 06da9182
+    Stream.PutDword(First); // 06da9182
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06da9177
     }
-    Stream.PutDword(Wire->Field_0x04);                                 // 06da91b7
+    Stream.PutDword(Second); // 06da91b7
     if (Stream.Failed()) {
         return Stream.GetError();                                      // 06da91ac / 06da91d7
     }

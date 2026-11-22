@@ -3679,7 +3679,17 @@ public:
     }
     unsigned int Encode(unsigned char** BufferHolder, unsigned int Capacity,
                         unsigned int* OutLength) override {   // 06da9110
+#if defined(FL_PTR64)
+        // Retail's encoder is the generic dword pair: Size, then the Buffer pointer itself as
+        // a dword (not the blob its decoder reads; retail's pair does not round-trip). On
+        // 64-bit the payload's second dword would be padding, so the pointer's low dword is
+        // sent instead, as Win32 sends the whole of it.
+        return RpcEncodeWireDwordPairValues(
+            *this, BufferHolder, Capacity, OutLength, Wire.Size,
+            static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(Wire.Buffer)));
+#else
         return RpcEncodeWireDwordPair(*this, BufferHolder, Capacity, OutLength);
+#endif
     }
     unsigned int Decode(const unsigned char* Buffer, unsigned int Size,
                         unsigned int* OutLength) override {   // 06d9a660
