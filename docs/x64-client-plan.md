@@ -305,7 +305,7 @@ without the Windows API. Milestones:
   Larger APIs go through `Platform::` at the call site. `FL_POSIX_DLLMAIN` runs a module's
   `DllMain` as it loads. So far: dacom, zlib, DALib, x86math, system, ReadFile, luaprofile, Thorn,
   EngBase, ximage, Shading, flmaterials, RendComp, alchemy, Deformable2, Common, Server,
-  rpclocal and RemoteClient,
+  rpclocal, RemoteClient and Content,
   loaded and checked by `src/PortTest/module_tests.cpp`. The POSIX handles are small numbers in a table, as Windows
   kernel handles are, so a file handle survives retail's 32-bit fields there too
   (`Platform::HandleToValue` / `HandleFromValue`, as HandleToULong / LongToHandle). The kernel32
@@ -360,7 +360,11 @@ without the Windows API. Milestones:
   signal handlers and recorded with Windows' exception codes), and its output matches the
   Win32 build's byte for byte. Not yet: `SLoginInfo`'s byte offsets in rpclocal's in-process
   login path still assume a 2-byte `wchar_t`, and some rpclocal payloads overflow their fixed
-  bodies with 64-bit pointers. Next: Content, then FLDedicated on macOS.
+  bodies with 64-bit pointers. Content builds as it is; its save and load handlers read
+  Server's `{player, FILE*}` / `{player, INI_Reader*}` events through structs (the pointer is
+  the second member, not a dword), and module_tests loads it with an empty data path, as its
+  random mission generator reads `RandomMissions\*.ini` while the module loads. Next:
+  FLDedicated on macOS.
 - **M3:** an SDL window to the main menu, drawn by RPGPU through Metal, without sound.
 - **M4:** audio, input and gameplay.
 

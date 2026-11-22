@@ -4660,6 +4660,10 @@ BOOL WINAPI DllMain(HMODULE hModule, DWORD fdwReason, LPVOID lpReserved) {
     return TRUE;
 }
 
+#if !defined(_WIN32)
+FL_POSIX_DLLMAIN(DllMain) // PORT(macOS): run as the module loads (posix/windows.h)
+#endif
+
 // PORT(deviation) SERVER-OWNERSHIP: see the declarations at the top of this file.
 static bool Server_IsSessionShip(unsigned int SessionId, unsigned int ObjectId)
 {

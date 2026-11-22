@@ -442,6 +442,41 @@ int main(int argc, char** argv)
     Check(PhantomDestroy != nullptr && PhantomDestroy(nullptr) == -2,
           "Server's pub::Phantom::Destroy");
 
+    // Content loads (on Server) and exports the controller entry points Server looks up. Its
+    // random mission generator is a static that reads RandomMissions\*.ini through
+    // pub::GetDataPath() (DALib::Data) as the module loads, as retail's does, so the data path
+    // is opened first, as FLServer has it before it loads Content: an empty folder here, where
+    // every table is missing and skipped.
+    {
+        Platform::Module const DALibModule = Platform::ModuleLoad((Folder + "DALib.dll").c_str());
+        auto const OpenData = reinterpret_cast<void (*)(const char*)>(
+            Platform::ModuleSymbol(DALibModule, "_ZN5DALib8OpenDataEPKc"));
+        auto const CloseData = reinterpret_cast<void (*)()>(
+            Platform::ModuleSymbol(DALibModule, "_ZN5DALib9CloseDataEv"));
+        // OpenData makes its file system through DALib::Dacom, which DALib::Startup sets.
+        auto* const DALibDacom =
+            static_cast<ICOManager**>(Platform::ModuleSymbol(DALibModule, "_ZN5DALib5DacomE"));
+        char DataTemplate[] = "/tmp/module_tests_data_XXXXXX";
+        bool const bDataFolder = mkdtemp(DataTemplate) != nullptr;
+        Check(OpenData != nullptr && CloseData != nullptr && DALibDacom != nullptr && bDataFolder,
+              "DALib's OpenData / CloseData / Dacom and a data folder for Content");
+        if (OpenData != nullptr && CloseData != nullptr && DALibDacom != nullptr && bDataFolder &&
+            Manager != nullptr)
+        {
+            ICOManager* const PreviousDacom = *DALibDacom;
+            *DALibDacom = Manager;
+            OpenData(DataTemplate);
+            Platform::Module const Content = Platform::ModuleLoad((Folder + "Content.dll").c_str());
+            Check(Content != nullptr, "Content.dll loads (with an empty data path)");
+            Check(Platform::ModuleSymbol(Content, "CreateInstance") != nullptr &&
+                      Platform::ModuleSymbol(Content, "DestroyInstance") != nullptr,
+                  "Content exports CreateInstance and DestroyInstance");
+            CloseData();
+            *DALibDacom = PreviousDacom;
+            rmdir(DataTemplate);
+        }
+    }
+
     using FEventCreate = Platform::Handle (*)();
     using FEventSet = bool (*)(Platform::Handle);
     using FEventWait = FlULong (*)(Platform::Handle);
