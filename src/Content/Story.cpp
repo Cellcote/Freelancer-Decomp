@@ -46,17 +46,8 @@ namespace
     };
 
     // Message 4 / 5 parameter blocks (HandleMessage 06ea6140 / 06ea6198).
-    struct FStorySaveMessage
-    {
-        unsigned int PlayerId;
-        FILE* File;
-    };
-
-    struct FStoryLoadMessage
-    {
-        unsigned int PlayerId;
-        INI_Reader* Reader;
-    };
+    using FStorySaveMessage = pub::Controller::PlayerSaveParms;
+    using FStoryLoadMessage = pub::Controller::PlayerLoadParms;
 
     class FStory : public IDLL, public IStoryMissionEvents
     {

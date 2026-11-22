@@ -1044,13 +1044,9 @@ bool __cdecl PlayerData_LoadSelectedCharacter(PlayerData& Slot,
 
     // .text:06d4b115 .. .text:06d4b132 -- FUN_06d43650(5, &{SessionId, &reader}):
     // the character-loaded broadcast hands the controllers the open reader.
-    struct FCharacterLoadedEvent {
-        unsigned int SessionId;                                         // S+0x64
-        INI_Reader* Reader;                                             // S+0x68
-    };
-    FCharacterLoadedEvent Event;
-    Event.SessionId = SessionId;
-    Event.Reader = &Reader;
+    pub::Controller::PlayerLoadParms Event;
+    Event.PlayerId = SessionId; // S+0x64
+    Event.Reader = &Reader; // S+0x68
     Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerLoad, &Event);
 
     // .text:06d4b13a .. .text:06d4b1dc -- ~FmtStr, ~INI_Reader, fclose, the buffer.

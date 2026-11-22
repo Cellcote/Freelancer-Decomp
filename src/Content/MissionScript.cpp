@@ -1061,14 +1061,8 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         bBaseBody = false;
         if (Parms[0] != PlayerId || !pub::SinglePlayer())
             break;
-        // The pointer is Server's {player, FILE*} second member (+0x04 on Win32, +0x08 on
-        // 64-bit builds), not a dword.
-        struct FSaveParms
-        {
-            unsigned int PlayerId;
-            FILE* File;
-        };
-        FILE* File = static_cast<FSaveParms const*>(MessageParms)->File;
+        // The pointer is the payload's second member, not a dword (server_controller.h).
+        FILE* File = static_cast<pub::Controller::PlayerSaveParms const*>(MessageParms)->File;
         fprintf(File, "\n[MissionState]\n");
         SaveMissionState(File);
         FMissionObject::HandleMissionMessage(MessageId, MessageParms);
@@ -1087,13 +1081,9 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         }
         else if (Parms[0] == PlayerId)
         {
-            // Server's {player, INI_Reader*}: the pointer is the second member, not a dword.
-            struct FLoadParms
-            {
-                unsigned int PlayerId;
-                INI_Reader* Reader;
-            };
-            INI_Reader* Reader = static_cast<FLoadParms const*>(MessageParms)->Reader;
+            // The pointer is the payload's second member, not a dword (server_controller.h).
+            INI_Reader* Reader =
+                static_cast<pub::Controller::PlayerLoadParms const*>(MessageParms)->Reader;
             INI_Reader::State SavedState;
             Reader->get_state(SavedState);
             Reader->reset();
