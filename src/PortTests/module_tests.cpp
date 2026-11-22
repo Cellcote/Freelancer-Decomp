@@ -10,6 +10,7 @@
 #include "engine/engbase.h"
 #include "platform.h"
 #include "readfile.h"
+#include "render/shading.h"
 
 #include <intrin.h>
 #include <xmmintrin.h>
@@ -118,6 +119,66 @@ void TestReadFile(ICOManager* Manager)
     std::system(("rm -rf '" + Root + "'").c_str());
 }
 
+// The string a shading payload names: an id in the process's HandleValue table, held by dacom
+// (render/shading.h). The test reads the table through dacom's export, as the modules do.
+// bForget drops the id, as ShadingPayloadForget does when the string is freed.
+const char* PayloadText(Platform::Module Dacom, FlULong Payload, bool bForget = false)
+{
+    auto const Shared = reinterpret_cast<HandleValue::Detail::FTable* (*)()>(
+        Platform::ModuleSymbol(Dacom, "FlHandleValueShared"));
+    if (Shared == nullptr || Payload == 0)
+        return nullptr;
+    HandleValue::Detail::FTable& Table = *Shared();
+    std::lock_guard<std::mutex> Guard(Table.Lock);
+    auto const Found = Table.Objects.find(Payload);
+    if (Found == Table.Objects.end())
+        return nullptr;
+    const char* const Text = static_cast<const char*>(Found->second);
+    if (bForget)
+    {
+        Table.Ids.erase(Found->second);
+        Table.Objects.erase(Found);
+    }
+    return Text;
+}
+
+// flmaterials' Glass material: its declared parameters are FShadingPropertyRecords whose names
+// are pointers and whose texture-name default is a string payload ("(None)").
+void TestFlMaterials(ICOManager* Manager, Platform::Module Dacom)
+{
+    FAGGDESC14 Desc = {sizeof(FAGGDESC14), "GlassMaterial", nullptr, nullptr, nullptr};
+    IMaterial* Material = nullptr;
+    Check(Manager->CreateInstance((AGGDESC*)(&Desc), (void**)(&Material)) == GR_OK &&
+              Material != nullptr,
+          "flmaterials makes a GlassMaterial");
+    if (Material == nullptr)
+        return;
+    FlULong Count = 0;
+    Check(Material->GetParameterCount(&Count) == GR_OK && Count == 10,
+          "GlassMaterial declares ten parameters");
+    FShadingPropertyRecord Record = {};
+    Check(Material->GetParameterDescriptor(6, &Record) == GR_OK, "GetParameterDescriptor(6)");
+    Check(Record.Name != nullptr && std::strcmp(Record.Name, "Dt_name") == 0 &&
+              Record.Description != nullptr && std::strcmp(Record.Description, "Texture Name") == 0,
+          "the texture-name descriptor's tag and name");
+    Check(Record.Current.Type == 7 && Record.Default.Type == 7 && Record.Saved.Type == 7,
+          "the texture-name descriptor's values are strings");
+    const char* const Text = PayloadText(Dacom, Record.Current.Payload0);
+    Check(Text != nullptr && std::strcmp(Text, "(None)") == 0,
+          "the texture-name default is \"(None)\", a string payload");
+    // The descriptor copy owns its strings (ProcessHeap copies; HeapFree is free here).
+    for (FShadingPropertyValue* Value : {&Record.Current, &Record.Default, &Record.Saved})
+    {
+        std::free(const_cast<char*>(PayloadText(Dacom, Value->Payload0, true)));
+        Value->Payload0 = 0;
+    }
+    Check(Material->GetParameterDescriptor(0, &Record) != GR_OK || Record.Current.Type == 3,
+          "the ambient colour descriptor is a three-float value");
+    Check(Material->GetParameterDescriptor(10, &Record) != GR_OK,
+          "there is no eleventh Glass parameter");
+    Material->Release();
+}
+
 // EngBase's engine: a compound archetype and an instance of it, which are LowArena blocks
 // whose encoded values key the engine's maps (the root-instance map walked here).
 void TestEngine(ICOManager* Manager)
@@ -224,7 +285,7 @@ int main(int argc, char** argv)
         int After = 0;
         Manager->EnumerateComponents(nullptr, &CountComponent, &After);
         Check(After > Before, "Shading's DllMain registered its components");
-        for (const char* Module : {"RendComp.dll", "alchemy.dll"})
+        for (const char* Module : {"RendComp.dll", "alchemy.dll", "flmaterials.dll"})
         {
             Before = After;
             Check(Platform::ModuleLoad((Folder + Module).c_str()) != nullptr,
@@ -233,6 +294,13 @@ int main(int argc, char** argv)
             Manager->EnumerateComponents(nullptr, &CountComponent, &After);
             Check(After > Before, "the render module's DllMain registered its components");
         }
+        for (const char* Component : {"GlassMaterial", "NomadMaterial", "FLAppearance"})
+        {
+            Count = 0;
+            Manager->EnumerateComponents(Component, &CountComponent, &Count);
+            Check(Count == 1, "flmaterials' DllMain registered its materials and FLAppearance");
+        }
+        TestFlMaterials(Manager, Dacom);
         // Deformable2 registers its one component, "Deformable", as it loads.
         Check(Platform::ModuleLoad((Folder + "Deformable2.dll").c_str()) != nullptr,
               "Deformable2.dll loads");

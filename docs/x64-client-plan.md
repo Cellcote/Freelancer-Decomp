@@ -304,7 +304,7 @@ without the Windows API. Milestones:
   with MSVC's behaviour (`posix/msvc_crt.h`), and small Win32 calls with an obvious meaning here.
   Larger APIs go through `Platform::` at the call site. `FL_POSIX_DLLMAIN` runs a module's
   `DllMain` as it loads. So far: dacom, zlib, x86math, system, ReadFile, luaprofile, Thorn, EngBase, ximage,
-  Shading, RendComp, alchemy and Deformable2,
+  Shading, flmaterials, RendComp, alchemy and Deformable2,
   loaded and checked by `src/PortTests/module_tests.cpp`. The POSIX handles are small numbers in a table, as Windows
   kernel handles are, so a file handle survives retail's 32-bit fields there too
   (`Platform::HandleToValue` / `HandleFromValue`, as HandleToULong / LongToHandle). The kernel32
@@ -326,6 +326,8 @@ without the Windows API. Milestones:
   compile against a stand-in `<d3d8.h>` (`src/include/posix`): the Direct3D 8 names with the
   SDK's values and layouts, the render states generated from `render/rp_types.h`; there is no
   Direct3D, the names reach RPGPU. The pipeline's texture handles are LowArena blocks.
+  A material's declared parameters are `FShadingPropertyRecord`s (pointer-sized names), never
+  arrays of dwords, and FLAppearance's instance values are keyed by the instance's `Encode`.
   MSVC's x86 intrinsics come from stand-ins too (`posix/intrin.h`, `posix/xmmintrin.h`): the
   compiler's own on x86, and on Apple Silicon an emulation of the scalar SSE operations with
   SSE's results (alchemy's retail-exact math).
