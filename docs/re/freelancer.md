@@ -10,6 +10,10 @@ decomp-tracker (module `freelancer.exe`, listing `EXE/Disasm/freelancer.exe.{txt
 Thorn, EngBase, alchemy, Common) — the client gives them data and calls their interfaces rather than
 duplicating them.
 
+Related documents: [freelancer_cliobj.md](freelancer_cliobj.md) (client companions of archetypes),
+[equip_fx_factory.md](equip_fx_factory.md) (equipment FX), [options_screen.md](options_screen.md),
+[dealer_equip_stats.md](dealer_equip_stats.md), [winmain.md](winmain.md), [deviations.md](deviations.md).
+
 ## Source layout
 
 `src/freelancer/Client/` follows retail's own source tree (`E:\FL\Scratch\Source\Client\...`, known
@@ -25,10 +29,6 @@ from the `__FILE__` strings), in lower case:
 | `space/` | `Client\Space\` | the client objects in space (`gameobj`, `cli_*`), effects, the space scene; `space/hud/` the HUD and `space/camera/` the cameras (retail keeps both in `Space\` too) |
 
 `cli_` is retail's own prefix (`CliAsteroid.cpp`); the client's files carry no other module prefix.
-
-Related documents: [freelancer_cliobj.md](freelancer_cliobj.md) (client companions of archetypes),
-[equip_fx_factory.md](equip_fx_factory.md) (equipment FX), [options_screen.md](options_screen.md),
-[dealer_equip_stats.md](dealer_equip_stats.md), [winmain.md](winmain.md), [deviations.md](deviations.md).
 
 ## Startup and the main loop
 
