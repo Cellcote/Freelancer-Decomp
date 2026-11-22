@@ -564,6 +564,9 @@ namespace
                 static_cast<FAddressObject*>(Devices[0])->GetDword(DPNA_KEY_PORT, Port);
             if (!OpenSocket((unsigned short)Port))
                 return DPNERR_INVALIDDEVICEADDRESS;
+            // Once per session: a host-name lookup can block, and every enumeration query and
+            // connect names the device address.
+            Local = ResolveLocalEndpoint();
 
             LARGE_INTEGER Counter;
             QueryPerformanceCounter(&Counter);
@@ -892,8 +895,11 @@ namespace
             BoundPort = 0;
         }
 
-        // The address the clients reach: the first IPv4 address of this host, else loopback.
-        DPNet::FAddress LocalEndpoint() const
+        // The address the clients reach, resolved when the session started.
+        DPNet::FAddress LocalEndpoint() const { return Local; }
+
+        // The first IPv4 address of this host, else loopback.
+        DPNet::FAddress ResolveLocalEndpoint() const
         {
             DPNet::FAddress Endpoint = DPNet::FAddress::Ipv4(127, 0, 0, 1, BoundPort);
             char HostName[256] = {};
@@ -966,6 +972,7 @@ namespace
         std::unique_ptr<DPNet::FServer> Server;
         SOCKET Socket = INVALID_SOCKET;
         unsigned short BoundPort = 0;
+        DPNet::FAddress Local;
         std::thread NetThread;
         std::atomic<bool> bStop{false};
         std::map<DPNHANDLE, DPNet::FBytes> ReceiveBuffers;

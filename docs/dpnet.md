@@ -93,9 +93,26 @@ DPNet (x64); both must pass, and both report the same session, player count and 
   (with the DirectPlay reasons), receive, send complete. Refusals carry the `dplay8.h` codes;
   Freelancer's client shows "server full" for `DPNERR_SESSIONFULL` (`0x80158610`) and
   "wrong password" for `DPNERR_INVALIDPASSWORD`.
-- **Join limits:** a connection that has not become a player within 30 s is dropped, and at
-  most 64 may be joining at once (`FServer::SetJoinLimits`), so half-open connections cannot
-  hold the player slots.
+- **Limits.** DirectPlay has none of these; they keep one sender from exhausting the server:
+  - *Joining:* a connection that has not become a player within 30 s is dropped, and at most
+    64 may be joining at once (`FServer::SetJoinLimits`), so half-open connections cannot hold
+    the player slots. One still in the handshake (CONNECTED sent, never answered) is dropped
+    after 5 s, and one IP address may have at most 8 connections joining
+    (`FServer::SetHandshakeLimits`). When all 64 are taken, a new CONNECT replaces the oldest
+    connection still in the handshake. A real client leaves the handshake one round trip after
+    its CONNECT; only a forged or vanished sender stays in it. A refused connection waits for
+    its `DN_CONNECT_FAILED` to be acknowledged, but no longer than the 30 s.
+  - *Send queue:* at most 8,192 messages or 16 MB per connection may be queued or unacknowledged
+    (`FLinkConfig::MaxQueuedMessages`, `MaxQueuedBytes`; a single larger message still goes).
+    A send beyond that drops the connection, which the server reports as connection lost. A
+    client that stops acknowledging, or sends 1-byte pings (each answered by a guaranteed
+    1-byte reply in `CDPServer::DispatchMsgs`) without taking the replies, would otherwise grow
+    the queue without bound.
+  - *Enumeration:* each IP address gets 16 replies at once, refilled at 4 a second
+    (`FServer::SetEnumLimits`). The reply is many times the size of the query, and a UDP sender
+    can be forged, so an unrationed server reflects floods at whoever a query names. The game's
+    server list sends two queries per server per refresh. The adapter resolves its own address
+    (`gethostname`, `getaddrinfo`) once when the session starts, not on every query.
 
 ## Left out
 
@@ -164,7 +181,10 @@ cmake -S src/DPNet -B build/dpnet && cmake --build build/dpnet && ctest --test-d
      links but never joins (dropped after the join timeout);
    - two idle minutes held by KeepAlives, `DestroyClient` with reply data, a client that
      vanishes, and closing the session;
-   - a hard disconnect.
+   - a hard disconnect;
+   - the limits: rationed enumeration replies, a connection dropped when its send queue passes
+     the limits, at most 8 handshakes per address, handshakes dropped after 5 s, and a real
+     client getting in at once while forged CONNECTs fill the joining table.
 3. **Malformed input:** 30,000 random and corrupted datagrams, from strangers and from a
    connected client's own address. Nothing may crash, and other clients are unaffected.
 

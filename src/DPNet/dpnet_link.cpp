@@ -619,10 +619,22 @@ namespace DPNet
         if (Message.empty() || bCloseRequested || State == ELinkState::Idle || State == ELinkState::HardClosing ||
             State == ELinkState::Closed)
             return 0;
+        // A partner that never acknowledges, or keeps asking for replies, must not grow the
+        // queue without bound (docs/dpnet.md, Limits). The first message always fits.
+        const size_t RoomBytes =
+            Config.MaxQueuedBytes - std::min(OutstandingBytes, Config.MaxQueuedBytes);
+        if (OutstandingMessages != 0 &&
+            (OutstandingMessages >= Config.MaxQueuedMessages || Message.size() > RoomBytes))
+        {
+            HardClose(Now);
+            return 0;
+        }
         auto Msg = std::make_shared<FOutMessage>();
         Msg->Id = NextMessageId++;
         Msg->Data = std::move(Message);
         Msg->Flags = (uint8_t)(Flags & (MsgFlags::Mask | MsgFlags::Coalesce));
+        ++OutstandingMessages;
+        OutstandingBytes += Msg->Data.size();
         Queue.push_back(Msg);
         // DPNSEND_COALESCE messages wait for the next Tick to share frames.
         if ((Msg->Flags & MsgFlags::Coalesce) == 0)
@@ -899,6 +911,8 @@ namespace DPNet
         if (Msg.bDone)
             return;
         Msg.bDone = true;
+        --OutstandingMessages;
+        OutstandingBytes -= Msg.Data.size();
         if (bOk)
             ++Stats.MessagesSent;
         else

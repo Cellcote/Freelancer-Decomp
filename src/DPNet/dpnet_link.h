@@ -47,6 +47,12 @@ namespace DPNet
         uint32_t HardDisconnects = 3;
         // After our END_STREAM is acknowledged, how long to wait for the partner's own.
         uint32_t CloseLingerMs = 10000;
+
+        // The most messages, and message bytes, queued or sent but not yet acknowledged. A Send
+        // beyond either drops the link (HardClose): the partner has stopped acknowledging, or
+        // asks for replies faster than it takes them. DirectPlay itself queues without limit.
+        uint32_t MaxQueuedMessages = 8192;
+        size_t MaxQueuedBytes = 16 * 1024 * 1024;
     };
 
     struct FLinkStats
@@ -130,7 +136,8 @@ namespace DPNet
         void Tick(uint32_t Now);
 
         // Queues a message. Flags: MsgFlags. Returns its id for LinkSendComplete, or 0 when
-        // the link no longer sends (closing, closed) or the message is empty.
+        // the link no longer sends (closing, closed) or the message is empty. A message past
+        // the queue limits (FLinkConfig::MaxQueued*) hard-closes the link and returns 0.
         uint64_t Send(FBytes Message, uint8_t Flags, uint32_t Now);
         // Graceful: END_STREAM after everything queued has gone out.
         void Close(uint32_t Now);
@@ -259,6 +266,8 @@ namespace DPNet
         std::deque<std::shared_ptr<FOutMessage>> Queue;
         std::deque<FOutFrame> InFlight;
         uint64_t NextMessageId = 1;
+        uint32_t OutstandingMessages = 0; // sent with Send, not yet completed
+        size_t OutstandingBytes = 0;
         uint8_t NextSend = 0;
         uint8_t SendBase = 0;   // the partner's last bNRcv: oldest sequence not yet acknowledged
         std::array<bool, 256> Dropped{};

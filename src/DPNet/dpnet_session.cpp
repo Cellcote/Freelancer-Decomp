@@ -4,6 +4,7 @@
 
 #include "dpnet_session.h"
 
+#include <algorithm>
 #include <cstdio>
 
 namespace DPNet
@@ -276,11 +277,13 @@ namespace DPNet
         {
             It->second->Link.OnDatagram(Data, Size, Now);
         }
-        else if (bHosting && !bClosing && Peers.size() - Players.size() < MaxJoining)
+        else if (bHosting && !bClosing)
         {
             // [MC-DPL8R] 3.1.5.1.1: a CONNECT from an unknown address is a new connection.
             FCommandFrame Frame;
-            if (DecodeCommandFrame(Data, Size, Frame) && Frame.Op == ExtOp::Connect)
+            if (DecodeCommandFrame(Data, Size, Frame) && Frame.Op == ExtOp::Connect &&
+                JoiningFrom(From) < MaxJoiningPerHost &&
+                (Peers.size() - Players.size() < MaxJoining || EvictHandshake()))
             {
                 auto Peer = std::make_unique<FPeer>(*this, From);
                 if (Peer->Link.Accept(Frame.Connect, Now))
@@ -299,12 +302,81 @@ namespace DPNet
         {
             FPeer& Peer = *Entry.second;
             Peer.Link.Tick(Now);
-            const bool bJoining = Peer.State == FPeer::EState::Linking || Peer.State == FPeer::EState::AwaitingAck;
-            if (bJoining && !Peer.Link.IsClosed() && !Peer.Link.IsClosing() && Now - Peer.Since >= JoinTimeoutMs)
+            const ELinkState LinkState = Peer.Link.GetState();
+            if (Peer.State == FPeer::EState::Player || LinkState == ELinkState::Closed ||
+                LinkState == ELinkState::HardClosing)
+                continue;
+            // A refused connection (Gone) waits for its DN_CONNECT_FAILED to be acknowledged, but
+            // no longer than a joining one may take.
+            const uint32_t Age = Now - Peer.Since;
+            if ((LinkState == ELinkState::Accepting && Age >= HandshakeTimeoutMs) ||
+                Age >= JoinTimeoutMs)
                 Peer.Link.HardClose(Now);
         }
         --Depth;
         Reap();
+    }
+
+    // Connections from From's IP address (any port) that are not players.
+    uint32_t FServer::JoiningFrom(const FAddress& From) const
+    {
+        FAddress First = From;
+        First.Port = 0;
+        uint32_t Count = 0;
+        for (auto It = Peers.lower_bound(First);
+             It != Peers.end() && It->first.Family == From.Family && It->first.Ip == From.Ip; ++It)
+            if (It->second->State != FPeer::EState::Player)
+                ++Count;
+        return Count;
+    }
+
+    // Drops the oldest connection still in the handshake, to make room for a new one. A client
+    // that answers CONNECTED leaves the handshake one round trip after its CONNECT; only
+    // connections that never answer (a spoofed or vanished sender) stay in it.
+    bool FServer::EvictHandshake()
+    {
+        FPeer* Oldest = nullptr;
+        for (auto& Entry : Peers)
+        {
+            FPeer& Peer = *Entry.second;
+            if (Peer.State == FPeer::EState::Linking &&
+                Peer.Link.GetState() == ELinkState::Accepting &&
+                (Oldest == nullptr || Now - Peer.Since > Now - Oldest->Since))
+                Oldest = &Peer;
+        }
+        if (Oldest == nullptr)
+            return false;
+        Oldest->Link.HardClose(Now); // closes at once; reaped at the end of this call
+        return true;
+    }
+
+    bool FServer::AllowEnumReply(const FAddress& From)
+    {
+        if (EnumPerSecond == 0 && EnumBurst == 0)
+            return true;
+        // FNV-1a over the address family and IP.
+        uint32_t Hash = 2166136261u;
+        Hash = (Hash ^ From.Family) * 16777619u;
+        const size_t Bytes = From.Family == 4 ? 4 : From.Ip.size();
+        for (size_t i = 0; i < Bytes; ++i)
+            Hash = (Hash ^ From.Ip[i]) * 16777619u;
+        FEnumBucket& Bucket = EnumBuckets[Hash % EnumBuckets.size()];
+        const uint64_t Full = (uint64_t)EnumBurst * 1000;
+        if (!Bucket.bUsed)
+        {
+            Bucket.bUsed = true;
+            Bucket.MilliTokens = Full;
+        }
+        else
+        {
+            Bucket.MilliTokens = std::min<uint64_t>(
+                Full, Bucket.MilliTokens + (uint64_t)(Now - Bucket.Last) * EnumPerSecond);
+        }
+        Bucket.Last = Now;
+        if (Bucket.MilliTokens < 1000)
+            return false;
+        Bucket.MilliTokens -= 1000;
+        return true;
     }
 
     void FServer::HandleEnumQuery(const FAddress& From, const uint8_t* Data, size_t Size)
@@ -315,6 +387,10 @@ namespace DPNet
         if (!FEnumQuery::Read(Data, Size, Query))
             return;
         if (Query.bHasApplication && Query.Application != Desc.Application)
+            return;
+        // The reply is many times the size of the query, and UDP senders can be forged: a
+        // budget per address keeps the server from flooding whoever a query names.
+        if (!AllowEnumReply(From))
             return;
         FEnumResponse Response;
         if (!Events.ServerEnumQuery(From, Query.UserData, Response.UserData))

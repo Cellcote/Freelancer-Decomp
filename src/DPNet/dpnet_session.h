@@ -132,18 +132,46 @@ namespace DPNet
         bool GetSendQueueInfo(uint32_t Dpnid, uint32_t& Messages, uint32_t& Bytes) const;
 
         // A connection that has not become a player within TimeoutMs is dropped, and at most
-        // MaxJoining connections may be on their way in at once (further CONNECTs are ignored).
+        // MaxJoining connections may be on their way in at once. When they are all taken, a new
+        // CONNECT replaces the oldest one still in the handshake, or is ignored.
         void SetJoinLimits(uint32_t TimeoutMs, uint32_t InMaxJoining)
         {
             JoinTimeoutMs = TimeoutMs;
             MaxJoining = InMaxJoining;
+        }
+        // A connection still in the handshake (CONNECTED sent, no answer) after HandshakeMs is
+        // dropped, and one IP address may have at most PerHost connections joining at once.
+        void SetHandshakeLimits(uint32_t HandshakeMs, uint32_t PerHost)
+        {
+            HandshakeTimeoutMs = HandshakeMs;
+            MaxJoiningPerHost = PerHost;
+        }
+        // Host enumeration: each IP address gets at most Burst replies at once, refilled at
+        // PerSecond. Further queries go unanswered.
+        void SetEnumLimits(uint32_t Burst, uint32_t PerSecond)
+        {
+            EnumBurst = Burst;
+            EnumPerSecond = PerSecond;
+            for (FEnumBucket& Bucket : EnumBuckets)
+                Bucket = FEnumBucket();
         }
 
     private:
         struct FPeer;
         friend struct FPeer;
 
+        // A token bucket per hashed IP address; addresses that share a slot share its budget.
+        struct FEnumBucket
+        {
+            bool bUsed = false;
+            uint32_t Last = 0;
+            uint64_t MilliTokens = 0;
+        };
+
         void HandleEnumQuery(const FAddress& From, const uint8_t* Data, size_t Size);
+        bool AllowEnumReply(const FAddress& From);
+        uint32_t JoiningFrom(const FAddress& From) const;
+        bool EvictHandshake();
         void HandleConnectInfo(FPeer& Peer, const FBytes& Message);
         void PeerClosed(FPeer& Peer, ECloseReason Reason);
         void Reap();
@@ -162,6 +190,11 @@ namespace DPNet
         uint64_t NextHandle = 1;
         uint32_t JoinTimeoutMs = 30000;
         uint32_t MaxJoining = 64;
+        uint32_t HandshakeTimeoutMs = 5000;
+        uint32_t MaxJoiningPerHost = 8;
+        uint32_t EnumBurst = 16;
+        uint32_t EnumPerSecond = 4;
+        std::array<FEnumBucket, 1024> EnumBuckets;
         int Depth = 0;   // nesting of public calls; peers are reaped at the outermost
         std::map<FAddress, std::unique_ptr<FPeer>> Peers;
         std::map<uint32_t, FPeer*> Players;
