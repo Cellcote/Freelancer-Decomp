@@ -423,6 +423,16 @@ int main(int argc, char** argv)
               "a HandleValue id made in one module names the object in another");
     }
 
+    // Common loads (with DALib, qhull and the physics it carries) and runs: a sphere inside another
+    // overlaps by its own volume, two spheres apart by nothing.
+    Platform::Module const Common = Platform::ModuleLoad((Folder + "Common.dll").c_str());
+    Check(Common != nullptr, "Common.dll loads");
+    auto const SphereVolume = reinterpret_cast<float (*)(float, float, float)>(
+        Platform::ModuleSymbol(Common, "_Z21GetSphereIntersectVolfff"));
+    Check(SphereVolume != nullptr && SphereVolume(10.0f, 1.0f, 1.0f) == 0.0f &&
+              SphereVolume(0.0f, 1.0f, 5.0f) == 4.1887903f,
+          "Common's GetSphereIntersectVol");
+
     // SearchPathA finds a module by its Windows name (DACOM's AddLibrary looks it up so).
     char Found[1024] = {};
     char* FilePart = nullptr;

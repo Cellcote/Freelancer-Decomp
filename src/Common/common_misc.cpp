@@ -1093,6 +1093,10 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID /*lpvReserved*/)
     return TRUE;
 }
 
+#if !defined(_WIN32)
+FL_POSIX_DLLMAIN(DllMain) // PORT(macOS): run as the module loads (posix/windows.h)
+#endif
+
 
 // Common.dll.txt 06304320..06304408. Dist is the first argument (the centre distance), the
 // two radii follow. Values the listing keeps on the x87 stack are double here; the result is
@@ -1276,7 +1280,7 @@ namespace
 
 void __cdecl ComputeExplosiveImpulses(FlLong EngineHandle, Vector& OutLinear, Vector& OutAngular1, Vector& OutAngular2)
 {
-    void* const Instance = (void*)EngineHandle;
+    void* const Instance = EngineHandleFromId(EngineHandle);
     // 062aa680..062aa6b6: parent first (EBP), then the relative block (EBX).
     void* const Parent = DALib::Engine->GetInstanceParent(Instance);
     FlULong* const Relative = DALib::Engine->GetInstanceRelative(Instance);

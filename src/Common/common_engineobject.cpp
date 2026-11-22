@@ -23,7 +23,7 @@ namespace
     // instance, 0, 0) -- no test on DALib::Engine.
     void UpdateEngineInstance(FlLong Instance)
     {
-        DALib::Engine->UpdateInstance((void*)Instance, 0, nullptr);
+        DALib::Engine->UpdateInstance(EngineHandleFromId(Instance), 0, nullptr);
     }
 }
 

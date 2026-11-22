@@ -625,7 +625,7 @@ Csys __cdecl DALib_Engine_get_csys(FlLong Handle)
     // 06307937..06307940: its 3x3 (9 dwords, REP MOVSD) into the orientation; 06307942..0630794d:
     // the 0x30-byte local copied to the result. Nothing is tested.
     Transform const* const Xform =
-        (Transform const*)DALib::Engine->GetInstanceTransform((void*)Handle);
+        (Transform const*)DALib::Engine->GetInstanceTransform(EngineHandleFromId(Handle));
 
     Csys Out;
     Out.Pos = Xform->Translation;
@@ -708,7 +708,7 @@ Csys __cdecl Csys_interpolate(Csys A, Csys B, float T)
 void __cdecl DALib_Engine_set_csys(FlLong Handle, Csys const& InCsys)
 {
     Transform Xform = InCsys.get_transform();
-    DALib::Engine->SetInstanceMatrix((void*)Handle, &Xform);
+    DALib::Engine->SetInstanceMatrix(EngineHandleFromId(Handle), &Xform);
 }
 
 // DELIBERATE DEVIATION FROM RETAIL, 2026-09-17 -- read this before "fixing" it back.

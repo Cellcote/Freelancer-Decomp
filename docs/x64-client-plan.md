@@ -304,7 +304,7 @@ without the Windows API. Milestones:
   with MSVC's behaviour (`posix/msvc_crt.h`), and small Win32 calls with an obvious meaning here.
   Larger APIs go through `Platform::` at the call site. `FL_POSIX_DLLMAIN` runs a module's
   `DllMain` as it loads. So far: dacom, zlib, DALib, x86math, system, ReadFile, luaprofile, Thorn,
-  EngBase, ximage, Shading, flmaterials, RendComp, alchemy and Deformable2,
+  EngBase, ximage, Shading, flmaterials, RendComp, alchemy, Deformable2 and Common,
   loaded and checked by `src/PortTests/module_tests.cpp`. The POSIX handles are small numbers in a table, as Windows
   kernel handles are, so a file handle survives retail's 32-bit fields there too
   (`Platform::HandleToValue` / `HandleFromValue`, as HandleToULong / LongToHandle). The kernel32
@@ -339,6 +339,13 @@ without the Windows API. Milestones:
   header), Winsock over BSD sockets (`posix/winsock2.h`, `ws2tcpip.h`, `mstcpip.h`) and the
   DirectSound interfaces the sound headers name (`posix/dsound.h`, declared only until M4).
   `CDPClient`, the client's DirectPlay, has no DirectPlay class here yet.
+  Common keeps engine handles in retail's long / int fields: they go through
+  `EngineIdFromHandle` / `EngineHandleFromId` (`engine/engbase.h`, LowArena), and an animation
+  script id through `AnimScriptId` / `AnimScriptFromId` (a HandleValue id). Its stand-ins:
+  GDI's text calls fail (no font backend before M3: text is not drawn), the registry has no
+  keys, MSXML's SAX reader does not exist (RDL text cannot be parsed until the client brings an
+  XML reader), and `SHGetFolderPathA` gives ~/Documents, ~/Pictures and the application-data
+  folder. Next: Server and RemoteClient, for a headless FLDedicated on macOS.
 - **M3:** an SDL window to the main menu, drawn by RPGPU through Metal, without sound.
 - **M4:** audio, input and gameplay.
 

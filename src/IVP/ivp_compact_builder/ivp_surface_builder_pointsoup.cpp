@@ -40,6 +40,19 @@ extern "C" {
 // the whole report when qh ferr is NULL; src/qhull/vendor does the same.
 // ============================================================================
 
+// The value these hashes keep for a point or triangle is only ever tested against 0 (present or
+// not); retail stores the address. PORT(x64): an address cut to 32 bits can be 0, so 64-bit
+// builds set bit 0.
+template <class T>
+static unsigned PresenceValue(T* Object)
+{
+#if defined(FL_PTR64)
+    return static_cast<unsigned>(reinterpret_cast<uintptr_t>(Object)) | 1u;
+#else
+    return reinterpret_cast<unsigned>(Object);
+#endif
+}
+
 namespace
 {
     const float kDegenerateTriangle = FloatFromBits(0x358637bdu); // DAT_063a5610, 1e-6f
@@ -760,7 +773,7 @@ void FLedgeConvexHullBuilder::BuildHull()
                 const uint8_t* Point = LedgeEdgePoint(Ledge, Triangle, K);
                 if (PointHash.Find(Point) != 0)
                     continue;
-                PointHash.Add(Point, reinterpret_cast<unsigned>(Point));
+                PointHash.Add(Point, PresenceValue(Point));
 
                 const IVP_U_Float_Point* Source = reinterpret_cast<const IVP_U_Float_Point*>(Point);
                 IVP_U_Float_Point* Copy = static_cast<IVP_U_Float_Point*>(::operator new(0x10));
@@ -819,13 +832,13 @@ void FLedgeConvexHullBuilder::MarkVirtualFeatures()
 
             const int32_t TriangleKey[3] = { Index[0], Index[1], Index[2] };
             if (TriangleHash.Find(TriangleKey) == 0)
-                TriangleHash.Add(TriangleKey, reinterpret_cast<unsigned>(Triangle));
+                TriangleHash.Add(TriangleKey, PresenceValue(Triangle));
 
             for (int32_t K = 0; K < 3; ++K)
             {
                 const int32_t EdgeKey[2] = { Index[K], Index[(K + 1) % 3] };
                 if (EdgeHash.Find(EdgeKey) == 0)
-                    EdgeHash.Add(EdgeKey, reinterpret_cast<unsigned>(Triangle));
+                    EdgeHash.Add(EdgeKey, PresenceValue(Triangle));
             }
         }
     }

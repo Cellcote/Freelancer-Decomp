@@ -132,10 +132,11 @@ void CArchGroup::AttachDamageObjs(CObject* Target, Archetype::DamageObjInfoList 
         FHardpointKey ParentKey;
         ParentKey.Name = Info.Hardpoint.Value;
         ParentKey.Crc = DACOM_CRC::GetCRC32(Info.Hardpoint.Value);
-        if (DALib::Hardpoint->ConnectHardpoints((void*)Handle, &ParentKey,
-                                                (void*)Obj->EngineInstanceId, &ChildKey) == 0)
+        if (DALib::Hardpoint->ConnectHardpoints(EngineHandleFromId(Handle), &ParentKey,
+                                                EngineHandleFromId(Obj->EngineInstanceId),
+                                                &ChildKey) == 0)
         {
-            DALib::Engine->UpdateInstance((void*)Obj->EngineInstanceId, 0, nullptr);
+            DALib::Engine->UpdateInstance(EngineHandleFromId(Obj->EngineInstanceId), 0, nullptr);
 
             PhySys::CreateParms Phy;
             Phy.Mass = Simple->Mass;
@@ -195,7 +196,7 @@ void CArchGroup::Destroy()
     {
         AttachDamageObjs(Owner, ParentDamageObjs());                      // 062a0477, Arch+0x40
         // 062a047c-062a048b: IEngine +0xd4 on the root instance; the result is not used.
-        (void)DALib::Engine->GetInstanceParent((void*)RootIndex);
+        (void)DALib::Engine->GetInstanceParent(EngineHandleFromId(RootIndex));
 
         if (Fate == 2)
         {
@@ -319,7 +320,8 @@ bool CArchGroup::GetVelocity(Vector& Out) const
     Out.z = 0.0f;
     if (State == 3 || RootIndex == -1)
         return false;
-    Out = PhySys::GetVelocity((CObject const*)DALib::Engine->GetInstanceUserData((void*)RootIndex));
+    Out = PhySys::GetVelocity(
+        (CObject const*)DALib::Engine->GetInstanceUserData(EngineHandleFromId(RootIndex)));
     return true;
 }
 
@@ -356,12 +358,12 @@ void CArchGroup::GetBoundingSphere(float& OutRadius, Vector& OutCenter) const
     // path) writes both, so the initial values here are never seen.
     float RootExtent = 0.0f;
     FVector RootLocal = { 0.0f, 0.0f, 0.0f };
-    DALib::Engine->GetInstanceExtent((void*)RootInst, 1, &RootExtent, &RootLocal.X);
+    DALib::Engine->GetInstanceExtent(EngineHandleFromId(RootInst), 1, &RootExtent, &RootLocal.X);
 
     // 062a07f5-062a080d: the engine's root transform is copied into the frame (REP MOVSD 12
     // dwords); the tail reuses the copy.
     FTransform const RootXform =
-        *(FTransform const*)DALib::Engine->GetInstanceTransform((void*)RootInst);
+        *(FTransform const*)DALib::Engine->GetInstanceTransform(EngineHandleFromId(RootInst));
     I3DMathEngine* const Math = Acquire3DMathEngine();
 
     // 062a0831: TransformXform (+0x28) into the root's parent frame.
@@ -382,10 +384,10 @@ void CArchGroup::GetBoundingSphere(float& OutRadius, Vector& OutCenter) const
 
     // 062a08b1 / 062a0a33: IEngine GetRelatedInstance(RootInst, 0, Cursor), seeded with the
     // invalid handle and ended by it.
-    for (FlLong Child = (FlLong)DALib::Engine->GetRelatedInstance((void*)RootInst, 0,
-                                                              G_InvalidEngineHandle);
-         Child != -1;
-         Child = (FlLong)DALib::Engine->GetRelatedInstance((void*)RootInst, 0, (void*)Child))
+    for (FlLong Child = EngineIdFromHandle(DALib::Engine->GetRelatedInstance(
+             EngineHandleFromId(RootInst), 0, G_InvalidEngineHandle));
+         Child != -1; Child = EngineIdFromHandle(DALib::Engine->GetRelatedInstance(
+                          EngineHandleFromId(RootInst), 0, EngineHandleFromId(Child))))
     {
         // 062a08d0-062a08e3: only instances the owner maps to this group (CEqObj vtable +0xf4
         // inst_to_subobj_id, a 16-bit compare with Arch->Id).
@@ -395,11 +397,11 @@ void CArchGroup::GetBoundingSphere(float& OutRadius, Vector& OutCenter) const
         // 062a08ef-062a0909: the radius output is pre-zeroed, the centre output is not.
         float ChildExtent = 0.0f;
         FVector ChildLocal;
-        DALib::Engine->GetInstanceExtent((void*)Child, 1, &ChildExtent, &ChildLocal.X);
+        DALib::Engine->GetInstanceExtent(EngineHandleFromId(Child), 1, &ChildExtent, &ChildLocal.X);
 
         // 062a0918-062a0943: each child through its own instance transform (no copy).
         FTransform const* const ChildXform =
-            (FTransform const*)DALib::Engine->GetInstanceTransform((void*)Child);
+            (FTransform const*)DALib::Engine->GetInstanceTransform(EngineHandleFromId(Child));
         FVector ChildCenter;
         Math->TransformXform(ChildCenter, *ChildXform, ChildLocal);
 
@@ -513,7 +515,7 @@ bool CArchGroup::GetCenterOfMass(Vector& Out) const
     // read before the cache fill (EBP), then the math singleton (DAT_063fc26c, created on
     // first use) slot +0x28 TransformXform(&World, xform, &BoundCenter). No null tests.
     FTransform const* const Xform =
-        (FTransform const*)DALib::Engine->GetInstanceTransform((void*)RootIndex);
+        (FTransform const*)DALib::Engine->GetInstanceTransform(EngineHandleFromId(RootIndex));
     I3DMathEngine* const Math = Acquire3DMathEngine();
 
     FVector World;

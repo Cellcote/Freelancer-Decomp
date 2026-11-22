@@ -1184,7 +1184,7 @@ ZONE::~ZONE()
     // ReleaseHandle) and the handle is reset.
     if (MeshHandle != -1)
     {
-        DALib::Engine->ReleaseHandle((void*)MeshHandle);
+        DALib::Engine->ReleaseHandle(EngineHandleFromId(MeshHandle));
         MeshHandle = -1;
     }
     // .text:06339057-06339067: the owned loot record (FUN_06391d5a is free()).

@@ -135,7 +135,10 @@ if(NOT FL_WINDOWS)
       # names come from the stand-in posix/d3d8.h.
       set(_posix_options "-D__declspec(x)=" -D__cdecl= -D__stdcall= -D__fastcall= -D__thiscall=
           "-D__int64=long long"
-          -Wno-unknown-pragmas -Wno-deprecated-declarations)
+          -Wno-unknown-pragmas -Wno-deprecated-declarations
+          # MSVC's CRT names (_strdup, _stricmp, ...) in every C++ source, as MSVC's own headers
+          # declare them whether or not a source includes <windows.h>.
+          "$<$<COMPILE_LANGUAGE:CXX>:SHELL:-include \"${FL_SRC_DIR}/include/posix/msvc_crt.h\">")
     endif()
     target_compile_definitions(${name} PRIVATE FREELANCER_ENABLE_TICK_PROFILE=0)
     target_compile_options(${name} PRIVATE

@@ -564,7 +564,8 @@ bool CExternalEquip::GetHardPointInfo(HardpointInfo& Info) const
     if (GetParentConnector(false) == kInvalidEngineInstance)
         return false;
 
-    void* Handle = DALib::Engine->GetInstanceArchetype((void*)(GetParentConnector(false)));
+    void* Handle =
+        DALib::Engine->GetInstanceArchetype(EngineHandleFromId((GetParentConnector(false))));
 
     FHardpointKey Key;
     Key.Name = HardpointName.Value;
@@ -603,8 +604,8 @@ bool CExternalEquip::GetConnectionPosition(Vector* OutPos, Matrix* OutMatrix) co
     if (!GetHardPointInfo(Buf))
         return false;
 
-    Transform const* XformPtr = (Transform const*)(
-        DALib::Engine->GetInstanceTransform((void*)(ConnectionIndex)));
+    Transform const* XformPtr = (Transform const*)(DALib::Engine->GetInstanceTransform(
+        EngineHandleFromId((ConnectionIndex))));
 
     if (OutPos != nullptr)
     {
@@ -654,7 +655,7 @@ bool CExternalEquip::GetCenterOfMass(Vector& Out) const
     if (IsConnected())
     {
         FlLong const ConnIdx = GetParentConnector(false);
-        float const* Pos = DALib::Engine->GetInstancePosition((void*)(ConnIdx));
+        float const* Pos = DALib::Engine->GetInstancePosition(EngineHandleFromId((ConnIdx)));
         Out.x = Pos[0];
         Out.y = Pos[1];
         Out.z = Pos[2];

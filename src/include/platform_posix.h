@@ -61,6 +61,13 @@
 #include <sys/syscall.h> // renameat2
 #endif
 
+// FILETIME's layout and tag (see Platform::FileTime).
+struct _FILETIME
+{
+    FlULong dwLowDateTime;
+    FlULong dwHighDateTime;
+};
+
 namespace Platform
 {
     // ---------------------------------------------------------------------------------------
@@ -540,11 +547,9 @@ namespace Platform
     }
 
     // WIN32_FIND_DATAA with its field names and layout (320 bytes).
-    struct FileTime
-    {
-        FlULong dwLowDateTime;
-        FlULong dwHighDateTime;
-    };
+    // FILETIME: the global _FILETIME, the tag Windows' headers give it (retail headers forward-
+    // declare `struct _FILETIME`).
+    using FileTime = ::_FILETIME;
     struct FindData
     {
         FlULong dwFileAttributes;

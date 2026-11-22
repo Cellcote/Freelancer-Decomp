@@ -36,8 +36,8 @@ namespace
         IEngine* const Engine = DALib::Engine;
 
         // The archetype (part) handle of the instance; -1 when there is none.
-        void* const Part = Engine->GetInstanceArchetype((void*)Handle);
-        if ((FlLong)Part == kNoEngineHandle)
+        void* const Part = Engine->GetInstanceArchetype(EngineHandleFromId(Handle));
+        if (EngineIdFromHandle(Part) == kNoEngineHandle)
             return false;
 
         // 0630e89e writes the name, 0630e8b0 the CRC just above it -- FHardpointKey.
@@ -59,7 +59,8 @@ namespace
         FlLong Child = kNoEngineHandle;
         while (true)
         {
-            Child = (FlLong)Engine->GetRelatedInstance((void*)Handle, 1, (void*)Child);
+            Child = EngineIdFromHandle(Engine->GetRelatedInstance(EngineHandleFromId(Handle), 1,
+                                                                  EngineHandleFromId(Child)));
             if (Child == kNoEngineHandle)
                 return false;
             if (FindHardpointCore(Child, Name, OutHandle, OutInfo))
@@ -73,7 +74,7 @@ namespace
     {
         // Retail FindHardpoint_PS (0630e9c6) loads Engine and calls +0xa0 with no null gate.
         IEngine* const Engine = DALib::Engine;
-        return (Transform const*)Engine->GetInstanceTransform((void*)Handle);
+        return (Transform const*)Engine->GetInstanceTransform(EngineHandleFromId(Handle));
     }
 
     // 3DMathEngine slot 7 (+0x1c, MulTransform): Out = Parent * Local - what retail's
@@ -318,7 +319,7 @@ void HardpointSummary::hardpoint_callback1(char const* Name, void* Context)
 // releases the part. No null tests.
 void HardpointSummary::count_hardpoints_callback(FlLong Instance, void* Context)
 {
-    void* const Part = DALib::Engine->GetInstanceArchetype((void*)Instance);
+    void* const Part = DALib::Engine->GetInstanceArchetype(EngineHandleFromId(Instance));
     DALib::Hardpoint->EnumerateHardpoints(&hardpoint_callback1, Part, Context);
     DALib::Engine->ReleaseHandle(Part);
 }
@@ -356,7 +357,7 @@ void HardpointSummary::hardpoint_callback2(char const* Name, void* Context)
 // releases the part. No null tests.
 void HardpointSummary::fill_hardpoints_callback(FlLong Instance, void* Context)
 {
-    void* const Part = DALib::Engine->GetInstanceArchetype((void*)Instance);
+    void* const Part = DALib::Engine->GetInstanceArchetype(EngineHandleFromId(Instance));
     HardpointSummary* const Self = (HardpointSummary*)Context;
     Self->FillInstance = Instance;
     Self->FillPart = Part;

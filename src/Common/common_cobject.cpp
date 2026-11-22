@@ -391,7 +391,7 @@ CObject::~CObject()
     // 062af4be..062af4d1: IEngine+0x60 DestroyInstance if the instance is set; the field is
     // not reset.
     if (EngineInstanceId != -1)
-        DALib::Engine->DestroyInstance((void*)EngineInstanceId);
+        DALib::Engine->DestroyInstance(EngineHandleFromId(EngineInstanceId));
     // 062af4d4..062af4f1: every advisor gets CBase::notify_of_destruction(this) (the ICF body
     // at .text:062ed730, `RET 4`).
     for (std::list<CBase*>::iterator It = Advisors.begin(); It != Advisors.end(); ++It)
@@ -693,7 +693,8 @@ float CObject::get_physical_radius_r(Vector& OutCenter) const
     // this+0x08 (Orientation + WorldPosition, one Transform), OutCenter); Out = tmp; return
     // Radius. No null tests.
     float Radius = 0.0f;
-    DALib::Engine->GetInstanceExtent((void*)EngineInstanceId, 0, &Radius, (float*)&OutCenter);
+    DALib::Engine->GetInstanceExtent(EngineHandleFromId(EngineInstanceId), 0, &Radius,
+                                     (float*)&OutCenter);
     I3DMathEngine* const Math = Acquire3DMathEngine();
     Vector World;
     // this+0x08: Orientation followed by WorldPosition, one Transform.
@@ -722,11 +723,13 @@ namespace
     void CollectHierarchyObjects(CObject* Parent, FlLong Inst, CheapSet<CObject*, std::less<CObject*>>& Set)
     {
         // IEngine passes instance handles as pointer-sized values.
-        void* const InstHandle = (void*)Inst;
-        FlLong Child = (FlLong)DALib::Engine->GetRelatedInstance(InstHandle, 1, (void*)(intptr_t)-1);
+        void* const InstHandle = EngineHandleFromId(Inst);
+        FlLong Child = EngineIdFromHandle(
+            DALib::Engine->GetRelatedInstance(InstHandle, 1, (void*)(intptr_t)-1));
         while (Child != -1)
         {
-            CObject* const Obj = (CObject*)DALib::Engine->GetInstanceUserData((void*)Child);
+            CObject* const Obj =
+                (CObject*)DALib::Engine->GetInstanceUserData(EngineHandleFromId(Child));
             if (Obj == Parent)
             {
                 CollectHierarchyObjects(Parent, Child, Set);              // 062ad785..062ad788
@@ -736,7 +739,8 @@ namespace
                 Set.Insert(Obj);                                           // 062ad73a..062ad77b
                 CollectHierarchyObjects(Obj, Obj->EngineInstanceId, Set); // 062ad77d..062ad788
             }
-            Child = (FlLong)DALib::Engine->GetRelatedInstance(InstHandle, 1, (void*)Child);
+            Child = EngineIdFromHandle(
+                DALib::Engine->GetRelatedInstance(InstHandle, 1, EngineHandleFromId(Child)));
         }
     }
 }

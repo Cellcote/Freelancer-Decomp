@@ -142,7 +142,17 @@ namespace CmnPhySys
     // Shutdown, BuildPartIVP_Real 0628929e, FindRayCollisions 06289c5b) keep using find().
     inline PhysicalSystem& PhySys_FindSystem(unsigned SystemId)
     {
+#if defined(_MSC_VER)
         return G_PhysicalSystems.find(SystemId)._Ptr->_Myval.second;
+#else
+        // PORT(macOS): other standard libraries do not expose the node, so a miss gets storage
+        // of its own that is just as unconstructed (the named gap is the same: its content).
+        const auto Found = G_PhysicalSystems.find(SystemId);
+        if (Found != G_PhysicalSystems.end())
+            return Found->second;
+        alignas(PhysicalSystem) static unsigned char UnconstructedHead[sizeof(PhysicalSystem)];
+        return *reinterpret_cast<PhysicalSystem*>(UnconstructedHead);
+#endif
     }
 
     // IEngine (engine/engbase.h) types its instance parameters and results as void*, but
@@ -151,12 +161,12 @@ namespace CmnPhySys
     // exactly one IEngine slot call, nothing more.
     inline void* PhySys_InstanceHandle(FlLong Instance)
     {
-        return (void*)(intptr_t)Instance;
+        return EngineHandleFromId(Instance);
     }
 
     inline FlLong PhySys_InstanceId(void* Handle)
     {
-        return (FlLong)(intptr_t)Handle;
+        return EngineIdFromHandle(Handle);
     }
 
     // IEngine +0xd8 GetRelatedInstance(From, Flags, Cursor): Cursor -1 starts a walk, -1 ends it.
