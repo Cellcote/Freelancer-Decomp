@@ -185,8 +185,8 @@ bool FRpGpuSdlBackend::Create(RpWindowHandle Hwnd, std::uint32_t Width, std::uin
         // The client's window, not a new one (SDL_PROP_WINDOW_CREATE_WIN32_HWND_POINTER).
         const SDL_PropertiesID Props = SDL_CreateProperties();
         SDL_SetPointerProperty(Props, SDL_PROP_WINDOW_CREATE_WIN32_HWND_POINTER, Hwnd);
-        std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> Window(SDL_CreateWindowWithProperties(Props),
-                                                                          &SDL_DestroyWindow);
+        std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> Window(
+            SDL_CreateWindowWithProperties(Props), &SDL_DestroyWindow);
         SDL_DestroyProperties(Props);
         if (Window == nullptr)
             return false;
@@ -355,7 +355,8 @@ bool FRpGpuSdlBackend::CreateShaders()
     };
     // The vertex shader takes FTransform and FLighting; the fragment shader FStages and, per
     // stage, a 2D texture and a cube texture with their samplers.
-    VertexShader_ = Own(Make(Vert, SDL_GPU_SHADERSTAGE_VERTEX, 0, 3)); // FTransform, FLighting, FBlend
+    VertexShader_ =
+        Own(Make(Vert, SDL_GPU_SHADERSTAGE_VERTEX, 0, 3)); // FTransform, FLighting, FBlend
     FragmentShader_ = Own(Make(Frag, SDL_GPU_SHADERSTAGE_FRAGMENT, 2 * kRpGpuStages, 1));
     return VertexShader_ != nullptr && FragmentShader_ != nullptr;
 }
@@ -521,7 +522,8 @@ bool FRpGpuSdlBackend::EnsureDepth(std::uint32_t Width, std::uint32_t Height)
     return Depth_ != nullptr;
 }
 
-bool FRpGpuSdlBackend::EnsureBuffer(TGpuHandle<SDL_GPUBuffer>* Buffer, std::uint32_t* Capacity, std::uint32_t Size, bool bIndex)
+bool FRpGpuSdlBackend::EnsureBuffer(TGpuHandle<SDL_GPUBuffer>* Buffer, std::uint32_t* Capacity,
+                                    std::uint32_t Size, bool bIndex)
 {
     if (*Buffer != nullptr && *Capacity >= Size)
         return true;
@@ -792,7 +794,8 @@ bool FRpGpuSdlBackend::UploadFrame(SDL_GPUCommandBuffer* Commands, const FRpGpuF
     BlockOffsets.reserve(PendingBlocks_.size());
 
     // cycle: the previous frame may still be reading the transfer buffer.
-    std::uint8_t* const Mapped = static_cast<std::uint8_t*>(SDL_MapGPUTransferBuffer(Device_, Transfer_.get(), true));
+    std::uint8_t* const Mapped =
+        static_cast<std::uint8_t*>(SDL_MapGPUTransferBuffer(Device_, Transfer_.get(), true));
     if (Mapped == nullptr)
         return false;
     std::uint32_t Offset = 0;
@@ -1042,9 +1045,11 @@ bool FRpGpuSdlBackend::Present(const FRpGpuFrameRecording& Frame)
                 const bool bFound = Found != Textures_.end();
                 const bool bCube = bFound && Found->second.bCube;
                 SDL_GPUSampler* const Sampling = Sampler(Command.Sampler[Index]);
-                Bindings[Index].texture = bFound && !bCube ? Found->second.Texture.get() : White_.get();
+                Bindings[Index].texture =
+                    bFound && !bCube ? Found->second.Texture.get() : White_.get();
                 Bindings[Index].sampler = Sampling;
-                Bindings[kRpGpuStages + Index].texture = bCube ? Found->second.Texture.get() : WhiteCube_.get();
+                Bindings[kRpGpuStages + Index].texture =
+                    bCube ? Found->second.Texture.get() : WhiteCube_.get();
                 Bindings[kRpGpuStages + Index].sampler = Sampling;
                 if (!bFound)
                     Stage.Misc[Index][1] = 0;
@@ -1186,7 +1191,8 @@ bool FRpGpuSdlBackend::ReadBack(FRpGpuFrame* Out)
     SDL_GPUTransferBufferCreateInfo BufferInfo = {};
     BufferInfo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
     BufferInfo.size = Bytes;
-    const TGpuHandle<SDL_GPUTransferBuffer> Download = Own(SDL_CreateGPUTransferBuffer(Device_, &BufferInfo));
+    const TGpuHandle<SDL_GPUTransferBuffer> Download =
+        Own(SDL_CreateGPUTransferBuffer(Device_, &BufferInfo));
     if (Download == nullptr)
         return false;
     SDL_GPUCommandBuffer* const Commands = SDL_AcquireGPUCommandBuffer(Device_);

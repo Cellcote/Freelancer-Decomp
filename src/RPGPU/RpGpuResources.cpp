@@ -146,7 +146,8 @@ GENRESULT DACOM_API FRpGpu::CreateTexture(int Width, int Height, unsigned int* F
         Texture->Images.resize(Count);
         for (unsigned int Level = 0; Level < Count; ++Level)
         {
-            if (!MakeImage(Concrete, Texture->Width >> Level, Texture->Height >> Level, &Texture->Images[Level]))
+            if (!MakeImage(Concrete, Texture->Width >> Level, Texture->Height >> Level,
+                           &Texture->Images[Level]))
                 return GR_OUT_OF_MEMORY;
         }
         Textures_.emplace(Handle, std::move(Texture));

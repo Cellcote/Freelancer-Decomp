@@ -41,7 +41,8 @@ struct FRpGpuRelease
     void operator()(SDL_GPUBuffer* Object) const;
     void operator()(SDL_GPUTransferBuffer* Object) const;
 };
-template <typename T> using TGpuHandle = std::unique_ptr<T, FRpGpuRelease>;
+template <typename T>
+using TGpuHandle = std::unique_ptr<T, FRpGpuRelease>;
 
 class FRpGpuSdlBackend final : public IRpGpuBackend
 {
@@ -124,11 +125,16 @@ private:
     SDL_GPUSampler* Sampler(const FRpGpuSamplerKey& Key);
     bool EnsureDepth(std::uint32_t Width, std::uint32_t Height);
     bool EnsureTarget(std::uint32_t Width, std::uint32_t Height);
-    bool EnsureBuffer(TGpuHandle<SDL_GPUBuffer>* Buffer, std::uint32_t* Capacity, std::uint32_t Size, bool bIndex);
+    bool EnsureBuffer(TGpuHandle<SDL_GPUBuffer>* Buffer, std::uint32_t* Capacity,
+                      std::uint32_t Size, bool bIndex);
     bool UploadFrame(SDL_GPUCommandBuffer* Commands, const FRpGpuFrameRecording& Frame);
     // Object, owned: released to Device_ (whose address its handle keeps; the backend is never
     // copied or moved) unless that is null by then.
-    template <typename T> TGpuHandle<T> Own(T* Object) { return TGpuHandle<T>(Object, FRpGpuRelease{&Device_}); }
+    template <typename T>
+    TGpuHandle<T> Own(T* Object)
+    {
+        return TGpuHandle<T>(Object, FRpGpuRelease{&Device_});
+    }
     SDL_GPURenderPass* BeginPass(SDL_GPUCommandBuffer* Commands, SDL_GPUTexture* Image, const FRpGpuCommand* Clear,
                                  bool bFirst);
 
@@ -159,7 +165,7 @@ private:
     std::unordered_map<std::uint64_t, TGpuHandle<SDL_GPUBuffer>> Blocks_;
     std::vector<FPendingBlock> PendingBlocks_;
     std::unordered_set<std::uint64_t> LostBlocks_; // blocks whose buffer could not be made
-    TGpuHandle<SDL_GPUTexture> White_;     // bound when a draw has no texture
+    TGpuHandle<SDL_GPUTexture> White_; // bound when a draw has no texture
     TGpuHandle<SDL_GPUTexture> WhiteCube_; // bound to the cube slots when a stage has no cube map
     bool bWhiteUploaded_ = false;
     // The frame is drawn here, then copied to the swap-chain image, so it can be read back.
