@@ -130,7 +130,10 @@ namespace
     public:
         FUdpSocket() = default;
         explicit FUdpSocket(SOCKET InHandle) : Handle(InHandle) {}
-        FUdpSocket(FUdpSocket&& Other) noexcept : Handle(Other.Handle) { Other.Handle = INVALID_SOCKET; }
+        FUdpSocket(FUdpSocket&& Other) noexcept : Handle(Other.Handle)
+        {
+            Other.Handle = INVALID_SOCKET;
+        }
         FUdpSocket& operator=(FUdpSocket&& Other) noexcept
         {
             std::swap(Handle, Other.Handle);
@@ -933,21 +936,22 @@ namespace
 #endif
 #if defined(_WIN32)
                 BOOL Exclusive = TRUE;
-                setsockopt(Created.Get(), SOL_SOCKET, SO_EXCLUSIVEADDRUSE, reinterpret_cast<const char*>(&Exclusive),
-                           sizeof(Exclusive));
+                setsockopt(Created.Get(), SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
+                           reinterpret_cast<const char*>(&Exclusive), sizeof(Exclusive));
 #endif // (macOS and Linux bind exclusively unless SO_REUSEADDR / SO_REUSEPORT is set)
                 sockaddr_in Local{};
                 Local.sin_family = AF_INET;
                 Local.sin_addr.s_addr = htonl(INADDR_ANY);
                 Local.sin_port = htons((unsigned short)Candidate);
-                if (bind(Created.Get(), reinterpret_cast<const sockaddr*>(&Local), sizeof(Local)) == 0)
+                if (bind(Created.Get(), reinterpret_cast<const sockaddr*>(&Local), sizeof(Local)) ==
+                    0)
                 {
                     // An ICMP port-unreachable from a vanished client must not fail the next
                     // recvfrom (Windows reports it as WSAECONNRESET on a UDP socket).
                     BOOL Report = FALSE;
                     DWORD Returned = 0;
-                    WSAIoctl(Created.Get(), SIO_UDP_CONNRESET, &Report, sizeof(Report), nullptr, 0, &Returned, nullptr,
-                             nullptr);
+                    WSAIoctl(Created.Get(), SIO_UDP_CONNRESET, &Report, sizeof(Report), nullptr, 0,
+                             &Returned, nullptr, nullptr);
                     u_long NonBlocking = 1;
                     ioctlsocket(Created.Get(), FIONBIO, &NonBlocking);
                     Bound = (unsigned short)Candidate;
