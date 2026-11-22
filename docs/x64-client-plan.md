@@ -363,8 +363,14 @@ without the Windows API. Milestones:
   bodies with 64-bit pointers. Content builds as it is; its save and load handlers read
   Server's `{player, FILE*}` / `{player, INI_Reader*}` events through structs (the pointer is
   the second member, not a dword), and module_tests loads it with an empty data path, as its
-  random mission generator reads `RandomMissions\*.ini` while the module loads. Next:
-  FLDedicated on macOS.
+  random mission generator reads `RandomMissions\*.ini` while the module loads.
+  FLDedicated builds and runs on macOS with retail data: it loads the universe, hosts on
+  DPNet ("Server running, ready for log in."), runs its frames and shuts down cleanly, also
+  under AddressSanitizer and UBSan. Its Win32 calls are kernel32 stand-ins over the platform
+  layer; the console control handler is a thread that takes SIGINT, SIGTERM and SIGHUP with
+  sigwait; TerminateThread has no POSIX equivalent, so a server thread that does not stop
+  ends the process. Next: a client check on macOS and Linux (DPNet's FClient, as DPNetCheck
+  does with Microsoft's DirectPlay on Windows), then a CI job that runs the server there.
 - **M3:** an SDL window to the main menu, drawn by RPGPU through Metal, without sound.
 - **M4:** audio, input and gameplay.
 
