@@ -3779,16 +3779,18 @@ void FGcsDockHailHandler::HandleMessage(pub::Controller::EMessage MessageId, voi
     for (std::list<std::pair<void*, unsigned int>>::iterator It = RecentHails.begin();
          It != RecentHails.end(); ++It)
     {
-        if ((It->first == Touch->Phantom || It->first == nullptr) && It->second == Touch->Ship)
+        if ((It->first == Touch->PhantomHandle() || It->first == nullptr) &&
+            It->second == Touch->Ship)
             return;
     }
 
-    std::map<void*, unsigned int>::iterator PhantomIt = SystemIt->second.find(Touch->Phantom);
+    std::map<void*, unsigned int>::iterator PhantomIt =
+        SystemIt->second.find(Touch->PhantomHandle());
     if (PhantomIt == SystemIt->second.end())
         return;
 
     // 06ee9ceb-06ee9d3b: remembered for 30 s (0x41f00000).
-    RecentHails.push_back(std::make_pair(Touch->Phantom, Touch->Ship));
+    RecentHails.push_back(std::make_pair(Touch->PhantomHandle(), Touch->Ship));
     pub::Controller::TimerExpired Timer;
     Timer.Param1 = GGcsDockHailTimerId;
     Timer.Param2 = static_cast<unsigned int>(reinterpret_cast<std::uintptr_t>(&RecentHails.back()));

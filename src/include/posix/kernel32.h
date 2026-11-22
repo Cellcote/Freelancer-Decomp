@@ -643,6 +643,12 @@ inline BOOL SystemTimeToFileTime(const SYSTEMTIME* Time, LPFILETIME Out)
         Time->wDay < 1 || Time->wDay > 31 || Time->wHour > 23 || Time->wMinute > 59 ||
         Time->wSecond > 59 || Time->wMilliseconds > 999)
         return FALSE;
+    // The day must exist in its month (February 29 only in a leap year).
+    static const unsigned char kDaysInMonth[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    const unsigned FullYear = Time->wYear;
+    const bool bLeap = (FullYear % 4 == 0 && FullYear % 100 != 0) || FullYear % 400 == 0;
+    if (Time->wDay > kDaysInMonth[Time->wMonth - 1] + (Time->wMonth == 2 && bLeap ? 1 : 0))
+        return FALSE;
     // Days from 1970-01-01 to the civil date (Howard Hinnant's days_from_civil).
     const int Year = (int)Time->wYear - (Time->wMonth <= 2 ? 1 : 0);
     const int Era = (Year >= 0 ? Year : Year - 399) / 400;
