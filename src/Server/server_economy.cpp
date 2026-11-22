@@ -34,6 +34,15 @@ struct FLedger
     long long Balance = 0;                 // payments less the least the purchases cost
     unsigned int FreeAmmoGood = 0;         // a gun's ammo package, bought after the gun
     int FreeAmmoLeft = 0;
+    // A refused GFGoodBuy: the client sends its payment anyway (BuyFromDealer does not wait),
+    // and that payment, the next cash change, is refused too.
+    bool bRefusedBuy = false;
+    // The price the client paid per unit this dock, by good. A dock's prices are fixed
+    // (LoadLocationBase fills the market once per dock), and the client buys and sells a good
+    // at the same price, so a sale this dock pays no more than that.
+    unsigned int PricedGood = 0; // the purchase whose payment is due next
+    long long PricedCount = 0;
+    std::map<unsigned int, long long> UnitPaid;
 
     bool bCredit = false;                  // a sale credit, waiting for its sale
     int Credit = 0;
@@ -45,6 +54,8 @@ struct FLedger
     unsigned int ShipGood = 0;             // the package
     int StartCash = 0;
     std::map<unsigned int, long long> OldCounts;
+    EquipDescList OldEquipment; // restored when the purchase does not complete
+    bool bEquipmentSet = false; // ReqEquipment changed the loadout
     bool bHullSet = false;                 // ReqShipArch arrived
     unsigned int OldHull = 0;
 };
@@ -164,33 +175,25 @@ void DropCredit(PlayerSlot& Slot, FLedger& Ledger)
     Ledger.SaleCount = 0;
 }
 
-    // NnDealer::BuyShip sets the cash to `credits - (hull price - trade-in - resale of the
-    // items left in the dealer's window + resale of the player's items in its own)`
-    // (NnLoadoutResaleValue counts each window's own items). So the cash may rise by at most
-    // the old hull's price (when the hull changed) and the price of every item, old or from
-    // the package, that the new loadout leaves behind, less the least the new hull costs.
-void FinishShip(PlayerSlot& Slot, FLedger& Ledger)
+// NnDealer::BuyShip sets the cash to `credits - (hull price - trade-in - resale of the
+// items left in the dealer's window + resale of the player's items in its own)`
+// (NnLoadoutResaleValue counts each window's own items). So, with the new hull, the cash
+// may be at most the cash before, less the least the hull costs, plus the old hull's price
+// and the price of every item, old or from the package, that the new loadout leaves behind.
+long long ShipCeiling(PlayerSlot const& Slot, FLedger const& Ledger)
 {
-    if (!Ledger.bShip)
-        return;
-    Ledger.bShip = false;
     BaseData const* const Base = FindBaseData(Slot.current_base);
     GoodInfo const* const Package = GoodList::find_by_id(Ledger.ShipGood);
     GoodInfo const* const Hull =
         Package != nullptr ? GoodList::find_by_id(Package->HullGoodId) : nullptr;
 
     long long Ceiling = Ledger.StartCash;
-    if (Ledger.bHullSet)
-    {
-        if (Hull != nullptr)
-            Ceiling -= MinUnit(Base, Hull->Id);
-        GoodInfo const* const OldHull = GoodList_get()->find_by_ship_arch(Ledger.OldHull);
-        if (OldHull != nullptr)
-            Ceiling += MaxUnit(Base, OldHull->Id);
-    }
+    if (Hull != nullptr)
+        Ceiling -= MinUnit(Base, Hull->Id);
+    GoodInfo const* const OldHull = GoodList_get()->find_by_ship_arch(Ledger.OldHull);
+    if (OldHull != nullptr)
+        Ceiling += MaxUnit(Base, OldHull->Id);
 
-        // Everything of the old loadout and the package's addons that the new loadout does not
-        // hold may have been sold back.
     std::map<unsigned int, long long> Pool = Ledger.OldCounts;
     if (Package != nullptr)
     {
@@ -210,13 +213,42 @@ void FinishShip(PlayerSlot& Slot, FLedger& Ledger)
         if (Sold > 0)
             Ceiling += Sold * MaxUnit(Base, Arch2Good(It->first));
     }
+    return Ceiling;
+    }
 
-    if (Slot.cash > Ceiling)
-        PlayerData_SetCash(Slot, ClampCash(Ceiling));
-}
+    // A ship purchase that did not complete, or that the player could not pay for: the
+    // loadout and cash it changed go back to what they were.
+    void RollBackShip(PlayerSlot& Slot, FLedger& Ledger)
+    {
+        Ledger.bShip = false;
+        if (Ledger.bEquipmentSet)
+            PlayerData_LoadEquipment(Slot, Ledger.OldEquipment);
+        if (Slot.cash != Ledger.StartCash)
+            PlayerData_SetCash(Slot, Ledger.StartCash);
+    }
+
+    // An open ship purchase is closed: complete when the hull arrived (cash held to the
+    // ceiling), otherwise undone.
+    void FinishShip(PlayerSlot& Slot, FLedger& Ledger)
+    {
+        if (!Ledger.bShip)
+            return;
+        if (!Ledger.bHullSet)
+        {
+            RollBackShip(Slot, Ledger);
+            return;
+        }
+        Ledger.bShip = false;
+        long long const Ceiling = ShipCeiling(Slot, Ledger);
+        if (Slot.cash > Ceiling)
+            PlayerData_SetCash(Slot, ClampCash(Ceiling));
+    }
 
 void SettleAll(PlayerSlot& Slot, FLedger& Ledger)
 {
+    Ledger.bRefusedBuy = false;
+    Ledger.PricedGood = 0;
+    Ledger.PricedCount = 0;
     SettleBuys(Slot, Ledger);
     DropCredit(Slot, Ledger);
     FinishShip(Slot, Ledger);
@@ -271,33 +303,50 @@ bool Ledger_OnGoodBuy(PlayerSlot& Slot, unsigned int SessionId, SGFGoodBuyInfo c
     unsigned int const BaseId = Info.Field_0x00;
     unsigned int const GoodId = Info.Field_0x08;
     long long const Count = static_cast<int>(Info.Field_0x0c);
-    if (!Docked(Slot) || BaseId != Slot.current_base || Count < 1)
-        return false;
+    FLedger& Ledger = LedgerOf(SessionId);
+
+    // A gun's ammo package comes after the gun is paid for, and its price is part of the
+    // gun's package price (NnInventory::GetMarketPackagePrice), so it adds no cost here. No
+    // payment follows it, so a refused one leaves the next cash change alone.
+    bool const bAmmo = Ledger.FreeAmmoLeft > 0 && GoodId == Ledger.FreeAmmoGood;
+
     BaseData const* const Base = FindBaseData(BaseId);
     GoodInfo const* const Good = GoodList::find_by_id(GoodId);
-    if (Good == nullptr || !Sells(Base, GoodId))
-        return false;
-
-    FLedger& Ledger = LedgerOf(SessionId);
-    // A gun's ammo package comes after the gun is paid for, and its price is part of the
-    // gun's package price (NnInventory::GetMarketPackagePrice), so it adds no cost here.
-    if (Ledger.FreeAmmoLeft > 0 && GoodId == Ledger.FreeAmmoGood && Count <= Ledger.FreeAmmoLeft)
+    bool bOk = Docked(Slot) && BaseId == Slot.current_base && Count >= 1 && Good != nullptr &&
+               Sells(Base, GoodId);
+    if (bOk && bAmmo)
     {
+        if (Count > Ledger.FreeAmmoLeft)
+            return false;
         Ledger.FreeAmmoLeft -= static_cast<int>(Count);
         Ledger.Allowance[Good->ArchId] += Count;
         return true;
     }
+    if (bOk)
+        SettleAll(Slot, Ledger);
+    // The dealer refuses what the player cannot pay for, at the client's price, which is never
+    // below MinUnit. (A ship's price is only known once the trade-in is: Ledger_MaySetShipArch.)
+    if (bOk && Good->Category != GoodCategoryShip &&
+        Count * MinUnit(Base, GoodId) > static_cast<long long>(Slot.cash))
+        bOk = false;
+    if (bOk && Good->Category == GoodCategoryShip && Count != 1)
+        bOk = false;
+    if (!bOk)
+    {
+        if (!bAmmo)
+            Ledger.bRefusedBuy = true;
+        return false;
+    }
 
-    SettleAll(Slot, Ledger);
     if (Good->Category == GoodCategoryShip)
     {
-        if (Count != 1)
-            return false;
         Ledger.bShip = true;
         Ledger.ShipGood = GoodId;
         Ledger.StartCash = Slot.cash;
         Ledger.OldCounts.clear();
         CountByArch(Slot.equipment, Ledger.OldCounts);
+        Ledger.OldEquipment = Slot.equipment;
+        Ledger.bEquipmentSet = false;
         Ledger.OldHull = Slot.ship_archetype;
         Ledger.bHullSet = false;
         return true;
@@ -305,6 +354,8 @@ bool Ledger_OnGoodBuy(PlayerSlot& Slot, unsigned int SessionId, SGFGoodBuyInfo c
 
     Ledger.Allowance[Good->ArchId] += Count;
     Ledger.Balance -= Count * MinUnit(Base, GoodId);
+    Ledger.PricedGood = GoodId;
+    Ledger.PricedCount = Count;
     if (Good->FreeAmmoArchId != 0 && Good->FreeAmmoCount > 0)
     {
         Ledger.FreeAmmoGood = Arch2Good(Good->FreeAmmoArchId);
@@ -321,6 +372,7 @@ bool Ledger_OnGoodSell(PlayerSlot& Slot, unsigned int SessionId, SGFGoodSellInfo
     // listed by the base or not, so the market is not checked.
     unsigned int const BaseId = Info.Field_0x00;
     FLedger& Ledger = LedgerOf(SessionId);
+    Ledger.bRefusedBuy = false;
     if (!Docked(Slot) || BaseId != Slot.current_base || static_cast<int>(Info.Field_0x08) < 1)
     {
         DropCredit(Slot, Ledger);
@@ -417,6 +469,8 @@ bool Ledger_MayLoadEquipment(PlayerSlot& Slot, unsigned int SessionId,
             bOk = false;
     if (!bOk)
         ResyncEquipment(Slot);
+    else if (Ledger.bShip)
+        Ledger.bEquipmentSet = true;
     return bOk;
 }
 
@@ -424,13 +478,18 @@ bool Ledger_MaySetShipArch(PlayerSlot& Slot, unsigned int SessionId, unsigned in
 {
     if (SinglePlayer())
         return true;
-    // Only the hull of the package being bought (NnDealer::BuyShip: Hull->ShipArchId).
+    // Only the hull of the package being bought (NnDealer::BuyShip: Hull->ShipArchId), and
+    // only when the player can pay for the loadout it keeps: the cash ceiling of the trade
+    // must not be negative (the client checks `credits >= cost` before it sends anything).
     FLedger& Ledger = LedgerOf(SessionId);
     GoodInfo const* const Package = Ledger.bShip ? GoodList::find_by_id(Ledger.ShipGood) : nullptr;
     GoodInfo const* const Hull =
         Package != nullptr ? GoodList::find_by_id(Package->HullGoodId) : nullptr;
-    if (Hull == nullptr || Hull->ShipArchId != ArchId)
+    bool const bHull = Hull != nullptr && Hull->ShipArchId == ArchId;
+    if (!bHull || ShipCeiling(Slot, Ledger) < 0)
     {
+        if (Ledger.bShip)
+            RollBackShip(Slot, Ledger);
         g_pClientInterface->SendServerSetShipArch(Slot.client_id, Slot.ship_archetype);
         return false;
     }
@@ -468,7 +527,23 @@ bool Ledger_OnChangeCash(PlayerSlot& Slot, unsigned int SessionId, int Delta)
     FLedger& Ledger = LedgerOf(SessionId);
     if (Delta <= 0)
     {
+        // The payment for a purchase the server refused: refused too, and the client is told
+        // its real cash.
+        if (Ledger.bRefusedBuy)
+        {
+            Ledger.bRefusedBuy = false;
+            ResyncCash(Slot);
+            return false;
+        }
         Ledger.Balance -= Delta;   // a payment
+        if (Ledger.PricedCount > 0)
+        {
+            // The client paid package price x count (BuyFromDealer); one credit of slack.
+            Ledger.UnitPaid[Ledger.PricedGood] =
+                -static_cast<long long>(Delta) / Ledger.PricedCount + 1;
+            Ledger.PricedGood = 0;
+            Ledger.PricedCount = 0;
+        }
         return true;
     }
     // A sale credit comes first, then GFGoodSell and ReqRemoveItem (SellSelected). It is paid
@@ -503,7 +578,13 @@ void Ledger_RemoveItem(PlayerSlot& Slot, unsigned int SessionId, unsigned short 
     // The client pays price * count, or health * count * (0.3 * price + 0.5) for a used item,
     // at its scaled price (SellSelected).
     long long const Sold = std::min<long long>((std::min)(Count, Held), Ledger.SaleCount);
-    long long const Bound = Sold * MaxUnit(FindBaseData(Slot.current_base), Ledger.SaleGood);
+    // A good bought this dock sells for no more than it was bought for: a dock's prices are
+    // fixed. Otherwise the highest price the base's variance allows.
+    long long Unit = MaxUnit(FindBaseData(Slot.current_base), Ledger.SaleGood);
+    std::map<unsigned int, long long>::const_iterator Paid = Ledger.UnitPaid.find(Ledger.SaleGood);
+    if (Paid != Ledger.UnitPaid.end() && Paid->second < Unit)
+        Unit = Paid->second;
+    long long const Bound = Sold * Unit;
     long long const Pay = std::min<long long>(Ledger.Credit, Bound);
     Ledger.bCredit = false;
     Ledger.Credit = 0;

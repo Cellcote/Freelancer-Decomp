@@ -401,10 +401,14 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 **Pricing.** Each client price is `ftol(market price × scale)`, where scale is a random factor in `[1 - price_variance, 1 + price_variance)` (`client_base_market.cpp`). The server checks against bounds built from its own market data (`BaseData::Market`, the nominal price for goods the base doesn't list), the base's `price_variance`, and one credit of rounding per unit.
 
 **Port (multiplayer only).** A ledger is kept per player per dock:
-- **GFGoodBuy:** must name the base the player is docked at, and a good the base stocks. That lets `ReqAddItem` add that many of the item, and records the least the purchase costs. The gun's own ammo package is allowed after it, at no extra cost.
-- **Payments:** negative `ReqChangeCash` always applies and counts toward the purchases. At the next purchase, sale or BaseExit, anything unpaid is charged.
-- **Sales:** a positive `ReqChangeCash` is held. It is paid when `GFGoodSell` has named the good and `ReqRemoveItem` has removed it, capped at count × the highest client price. A credit with no matching sale is never paid.
-- **Ship purchase:** `ReqSetCash` is accepted only while one is open. `ReqEquipment` may hold only the old items and the package's addons. `ReqShipArch` must be the package's hull. When the hull arrives, the cash is capped at: the cash before the purchase, less the least the hull costs, plus the old hull's price and the highest price of every old or package item the new loadout left behind.
+- **GFGoodBuy:** must name the base the player is docked at, and a good the base stocks, and the player must have the cash for it at the lowest client price. That lets `ReqAddItem` add that many of the item, and records the least the purchase costs. The gun's own ammo package is allowed after it, at no extra cost.
+- **Refused purchases:** the client sends its payment without waiting for an answer, so the cash change right after a refused `GFGoodBuy` is refused as well. The client is then sent its real cash.
+- **Payments:** negative `ReqChangeCash` applies and counts toward the purchases. At the next purchase, sale or BaseExit, anything unpaid is charged, though cash never goes below 0. The affordability check at `GFGoodBuy` makes sure the cash is there.
+- **Sales:** a positive `ReqChangeCash` is held. It is paid when `GFGoodSell` has named the good and `ReqRemoveItem` has removed it. The client fills a base's market once per dock (`LoadLocationBase`), and buys and sells a good at the same price there. So a good bought this dock pays out no more per unit than was paid for it. Any other good pays at most count × the highest price the base's variance allows. A credit with no matching sale is never paid.
+- **Ship purchase:** `ReqSetCash` is accepted only while one is open. `ReqEquipment` may hold only the old items and the package's addons. `ReqShipArch` must be the package's hull, and the player must be able to pay for the loadout it keeps.
+  - **Cash ceiling:** the cash before the purchase, less the least the hull costs, plus the old hull's price and the highest price of every old or package item the new loadout left behind.
+  - **On a valid hull:** the cash is capped at that ceiling.
+  - **When it fails:** a negative ceiling, a wrong hull, or a purchase that never sends its hull (closed at the next purchase, sale or BaseExit) is undone: the old loadout and cash are restored.
 - **Other docked changes:** `ReqEquipment` may only rearrange or repair what the player has. `ReqModifyItem` may not raise an item's count or health. `ReqAddItem` needs an allowance.
 - **BaseEnter:** must name the base the server placed the player in (character load), the base its own ship just landed on, or, with no ship in space, its last base (respawn).
 - **MineAsteroid:** must be in the player's own system, with its ship there.
@@ -412,6 +416,7 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 
 **Known limits.**
 - The ammo that comes with a gun is not charged separately.
-- Repairs are not priced.
+- Repairs are not priced. A ship purchase that is undone still keeps its full-health collision groups and hull.
+- Selling in a later dock pays up to the highest variance price, because the client draws new prices on every dock. So the price spread is open to whoever docks again, as it is in retail.
 - A mod whose client market differs from the server's prices against the server's data.
 - Rolling back at undock with retail's net-worth check is not done.
