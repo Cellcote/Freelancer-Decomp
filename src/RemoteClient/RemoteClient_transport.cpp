@@ -366,9 +366,7 @@ void CRemoteClientProxy::OnReceive(unsigned char* Data, FlULong Size)
     // 1-byte pings before this is called. So: one header, one decode, and anything else
     // disconnects. Trailing bytes after the packet are ignored; retail would have decoded
     // them as another packet.
-    if (Data == nullptr || Size == 0)
-        return;
-    if (Size < 2) {
+    if (Data == nullptr || Size < 2) {
         Disconnect();
         return;
     }

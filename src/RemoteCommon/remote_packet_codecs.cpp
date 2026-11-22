@@ -1015,9 +1015,14 @@ unsigned int FRpcCreateNewCharacterPacket::Decode(const unsigned char* Buffer,
     if (RpcDecodeWideString(*this, &Temporary) != 0) return 0x17u;
 #if defined(REMOTECLIENT_EXPORTS)
     // PORT(deviation) REMOTE-PACKET-HARDENING: the client's create page refuses an empty name
-    // (PageCharacterCreate::Confirm, 0x005615c6), so only a forged packet carries one.
+    // (PageCharacterCreate::Confirm, 0x005615c6), and the length it sends is wcslen, so no
+    // terminator is on the wire. Only a forged packet carries an empty or NUL-led name.
     if (Temporary == nullptr)
         return 0x17u;
+    if (Temporary[0] == L'\0') {
+        ::operator delete(Temporary);
+        return 0x17u;
+    }
 #endif
     if (Temporary != nullptr) {
 #if defined(REMOTECLIENT_EXPORTS)

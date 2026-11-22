@@ -313,7 +313,7 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 **Rule.** A change here may only refuse input that no retail client sends. Each item below names the client code that shows it never does. Legitimate traffic decodes to the same packets, and the same handlers are called in the same order.
 
 **Retail → port:**
-- **Receive loop (06b3932d).** Retail loops while bytes remain in a message, but moves the cursor by the 2-byte header only, and an odd remainder reaches `Decode` as `0xffffffff`. It decodes every registered type, the server-to-client (channel 2) ones included. The port decodes one packet per message. A message under 2 bytes, or one on a channel other than 1 or 3, disconnects the peer. The retail client sends one channel-1 or channel-3 packet per message (RemoteServer `PushToServer`, 06bd9ac0), and DALib answers 1-byte pings before `OnReceive`.
+- **Receive loop (06b3932d).** Retail loops while bytes remain in a message, but moves the cursor by the 2-byte header only, and an odd remainder reaches `Decode` as `0xffffffff`. It decodes every registered type, the server-to-client (channel 2) ones included. The port decodes one packet per message. An empty message, one under 2 bytes, or one on a channel other than 1 or 3 disconnects the peer. The retail client sends one channel-1 or channel-3 packet per message (RemoteServer `PushToServer`, 06bd9ac0), and DALib answers 1-byte pings before `OnReceive`.
 - **Packets a multiplayer client never sends** are dropped before decoding:
   - SET_MISSION_LOG, SAVEGAME, DOCK and COMMCOMPLETE: sent only in single player. See `nn_story_star.cpp`, the save page, `space_state.cpp` 0x0054a79a and `hud_comm.cpp`.
   - The six DBG packets, which retail logs as "encountered in release mode".
@@ -321,7 +321,7 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 - **Length checks.** `FRpcWireStream::Advance` and every `MarshalCursor + N > MarshalLimit` preflight computed the sum in 32 bits, so a size near `0xffffffff` wrapped and passed. `RpcRunExceedsLimit` gives the same answer whenever the sum does not wrap, and refuses the wrapped ones. This covers SET_WEAPON_GROUP, CREATESHIP and SETREPUTATION, and is in both DLLs' codecs.
 - **SENDCOMM.** The accessory count is refused above 8, the size of `Costume::AccessoryIds`. This applies in both DLLs.
 - **SAVEGAME.** `Description` and `DescriptionCount` start empty. Retail left them uninitialised, and the destructor freed `Description` after a count-0 decode.
-- **CREATENEWCHAR.** `Name` starts empty. RemoteClient also refuses an empty name, which the create page never sends (0x005615c6).
+- **CREATENEWCHAR.** `Name` starts empty. RemoteClient also refuses an empty name, or one that starts with a NUL. The create page never sends either (0x005615c6), and it sends the length without a terminator.
 - **PLAYER_TRADE on a multiplayer server.** Retail read the uncounted target DWORD (actions 04/08/10) and wrote one (action 40) past the received message. The port touches it only when it is counted. Clients leave it out there, and the dispatch does not use it.
 - **Hardpoint names.** In REQEQUIPMENT, REQCARGO, REQADDITEM and REQMODIFYITEM, RemoteClient refuses a non-empty hardpoint whose last byte is not 0. The client always sends `strlen + 1` bytes, and `StringAlloc` reads to the terminator.
 
