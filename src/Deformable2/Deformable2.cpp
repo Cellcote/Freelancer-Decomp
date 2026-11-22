@@ -1542,7 +1542,9 @@ static bool LoadGeometry(FMeshArchetype* Arch, IFileSystem* Fs)
     }
 
     FSkinPair* Cursor = Arch->SkinPairs;
-    Arch->SkinTable = (FSkinVertex*)new unsigned char[(size_t)(unsigned int)Arch->VertexCount * 8];
+    // sizeof(FSkinVertex) is 8 on Win32 (an int and a pointer), 16 on 64-bit builds.
+    Arch->SkinTable = (FSkinVertex*)new unsigned char[(size_t)(unsigned int)Arch->VertexCount *
+                                                      sizeof(FSkinVertex)];
     for (unsigned int Index = 0; Index < (unsigned int)Arch->VertexCount; ++Index)
     {
         const FlULong Influence = BoneCounts[Index];
@@ -3439,12 +3441,14 @@ static FlULong NodePlaybackId(const FIkListNode* Node)
 }
 
 // The 32-bit value CopyList hands out for a node and DestroyHandle matches: its +4. An IK node's
-// is its event, which on 64-bit builds is a HandleValue id (dropped when the event is deleted).
+// is its event's address on Win32. On 64-bit builds it is the event's HandleValue id (dropped
+// when the event is deleted) tagged with bit 30, so it never equals a playback id (a counter
+// from 0xED; it would take 2^30 playbacks to reach the tag).
 static int ListNodeHandle(const FIkListNode* Node)
 {
 #if defined(FL_PTR64)
     if (Node->Active != 0)
-        return (int)HandleValue::Of(Node->Event);
+        return (int)(HandleValue::Of(Node->Event) | 0x40000000u);
 #endif
     return (int)(std::uintptr_t)(Node->Event);
 }
@@ -4433,7 +4437,8 @@ static FIkListNode* AllocAimEvent(FDeformInstance* Instance, const unsigned char
     Event->JointIds = (int*)new unsigned char[Count4];
     if (Count > 0)
         std::memcpy(Event->JointIds, &JointIds[0], Count4);
-    Event->Channels = (void**)new unsigned char[Count4];
+    // Pointer-sized elements: Count4 on Win32, twice that on 64-bit builds.
+    Event->Channels = (void**)new unsigned char[(size_t)Count * sizeof(*Event->Channels)];
     Event->Quats = (float*)new unsigned char[(size_t)Count * 0x10];
     Event->Flags28 = Desc->Flags;
     Event->StartJoint = Desc->RootPart;
