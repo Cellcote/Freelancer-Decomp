@@ -1487,3 +1487,12 @@ FL_LAYOUT_ASSERT(sizeof(OwnerList<pub::SpaceObj::CargoDesc>) == 0x14, "OwnerList
     template SHARED_INLINE_API OwnerList<pub::SpaceObj::CargoDesc>&                               \
         OwnerList<pub::SpaceObj::CargoDesc>::operator=(OwnerList<pub::SpaceObj::CargoDesc> const&); \
     template SHARED_INLINE_API void OwnerList<pub::SpaceObj::CargoDesc>::free();
+
+// PORT(deviation) SERVER-OWNERSHIP: port-only checks for remoteclient.dll, which knows who sent a
+// packet. LaunchComplete, JumpInComplete, Hail and StopTradeRequest reach IServer without the
+// sender's id (the vtable is retail's), so the transport asks before dispatching them.
+// True when ObjectId is ClientId's ship.
+SERVER_API bool __cdecl Server_IsClientShip(unsigned int ClientId, unsigned int ObjectId);
+// True when ClientId may withdraw or decline TargetId's trade request: its own (TargetId is
+// ClientId) or one TargetId sent to ClientId.
+SERVER_API bool __cdecl Server_MayStopTradeRequest(unsigned int ClientId, unsigned int TargetId);
