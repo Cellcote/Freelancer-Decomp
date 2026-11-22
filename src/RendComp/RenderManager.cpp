@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "RendComp.h"
+#include "x64_low_arena.h" // render archetype handles are LowArena blocks on 64-bit
 #include "common_misc.h" // ICamera (IRenderer Slot7 reads the camera)
 
 #include <cmath>
@@ -37,7 +38,7 @@ typedef std::map<int, FLodSet> FArchetypeMap;
 
 static int ArchetypeKey(void* Handle)
 {
-    return (int)((intptr_t)Handle);
+    return (int)LowArena::Encode(Handle); // a render archetype: a LowArena block on 64-bit
 }
 
 static void* const kNoArchetype = (void*)((intptr_t)-1);
@@ -477,7 +478,7 @@ int FRenderManager::MultiLevel(int Id, void* FileArg)
             const int Claimed = Walk->Plugin->Claim(Level);
             if (Claimed != -1)
             {
-                Set.Entries[Index].Handle = (void*)((intptr_t)Claimed);
+                Set.Entries[Index].Handle = LowArena::Decode<void>(Claimed);
                 Set.Entries[Index].Plugin = Walk->Plugin;
                 bClaimed = true;
             }
@@ -522,7 +523,7 @@ int FRenderManager::WalkPlugins(int Id, void* File)
         LodSetResize(Set, 1);
         Set.Switch[0] = 0.0f;
         Set.Switch[1] = G_DefaultLodDistance;
-        Set.Entries[0].Handle = (void*)((intptr_t)Claimed);
+        Set.Entries[0].Handle = LowArena::Decode<void>(Claimed);
         Set.Entries[0].Plugin = Walk->Plugin;
         return 0;
     }
@@ -562,8 +563,8 @@ int DACOM_API FRenderManager::DuplicateArchetype(void* Arg1, void* Arg2)
     for (int Index = 0; Index < Count; ++Index)
     {
         FLodEntry& Entry = Dest.Entries[Index];
-        Entry.Handle = (void*)((intptr_t)(
-            Entry.Plugin->CloneHandle(Source->second.Entries[Index].Handle)));
+        Entry.Handle =
+            LowArena::Decode<void>(Entry.Plugin->CloneHandle(Source->second.Entries[Index].Handle));
     }
     return 0;
 }

@@ -175,3 +175,35 @@ inline char* _strupr(char* Text)
     return Text;
 }
 inline char* _strdup(char const* Text) { return strdup(Text); }
+
+// _itoa / _ltoa / _ultoa: Value in Radix (2..36), lower-case digits; a negative value has a
+// '-' only in radix 10 (otherwise its two's-complement bits), as MSVC.
+inline char* _ultoa(unsigned long long Value, char* Buffer, int Radix)
+{
+    char Digits[72];
+    int Length = 0;
+    do
+    {
+        const unsigned Digit = (unsigned)(Value % (unsigned)Radix);
+        Digits[Length++] = (char)(Digit < 10 ? '0' + Digit : 'a' + Digit - 10);
+        Value /= (unsigned)Radix;
+    } while (Value != 0);
+    for (int Index = 0; Index < Length; ++Index)
+        Buffer[Index] = Digits[Length - 1 - Index];
+    Buffer[Length] = 0;
+    return Buffer;
+}
+inline char* _itoa(int Value, char* Buffer, int Radix)
+{
+    if (Radix == 10 && Value < 0)
+    {
+        Buffer[0] = '-';
+        _ultoa(0ull - (unsigned long long)(long long)Value, Buffer + 1, 10);
+        return Buffer;
+    }
+    return _ultoa((unsigned int)Value, Buffer, Radix);
+}
+inline char* _ltoa(FlLong Value, char* Buffer, int Radix)
+{
+    return _itoa((int)Value, Buffer, Radix);
+}

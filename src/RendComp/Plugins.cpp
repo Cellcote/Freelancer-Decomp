@@ -846,7 +846,7 @@ public:
         FTriMeshArch* Clone = nullptr;
         if (((FTriMeshArch*)Handle)->Clone(&Clone) < 0 || Clone == nullptr)
             return (int)G_HandleFail;
-        return (int)((intptr_t)Clone);
+        return (int)LowArena::Encode(Clone);
     }
 
     // formerly Slot7
@@ -895,7 +895,7 @@ public:
         if (Arch->ResetMesh() >= 0 &&
             Arch->Load((IFileSystem*)File, G_Pipeline, G_VbManager,
                        G_MaterialLibrary, Tristrips) >= 0)
-            return (int)((intptr_t)Arch);
+            return (int)LowArena::Encode(Arch);
         delete Arch;
         return (int)G_HandleFail;
     }
@@ -1195,13 +1195,12 @@ public:
                             if (Value.Type == 5 || Value.Type == 7)
                             {
                                 if (Value.Payload0 != 0)
-                                    HeapFree(GetProcessHeap(), 0,
-                                             (void*)Value.Payload0);
+                                    ShadingPayloadFreeString(Value.Payload0);
                             }
                             else if (Value.Type == 6)
                             {
                                 IDAComponent* Component =
-                                    (IDAComponent*)Value.Payload0;
+                                    ShadingPayloadTo<IDAComponent>(Value.Payload0);
                                 Value.Payload0 = 0;
                                 if (Component != nullptr)
                                     Component->Release();
@@ -2407,7 +2406,7 @@ public:
         if (Handle->ResetChecked() >= 0 &&
             Handle->Load((IFileSystem*)File, G_Pipeline, G_VbManager,
                          G_MaterialLibrary) >= 0)
-            return (int)((intptr_t)Handle);
+            return (int)LowArena::Encode(Handle);
         delete Handle;
         return -1;
     }

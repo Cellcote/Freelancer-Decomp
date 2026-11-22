@@ -5,6 +5,7 @@
 // Author: Giperion.
 
 #include "RendComp.h"
+#include "x64_low_arena.h" // render archetype handles are LowArena blocks on 64-bit
 
 #include <cstdint>
 #include <cstring>
@@ -288,7 +289,7 @@ int DACOM_API FVMeshWire::CreateArchetype(void* Archetype, void* FileSystem)
     Wire->Blob = (FVwireDataHeader*)Blob;
     if (Result >= 0)
     {
-        const int Key = (int)((intptr_t)Archetype);
+        const int Key = (int)LowArena::Encode(Archetype);
         std::pair<std::map<int, FVmeshWireInstance*>::iterator, bool> Inserted =
             Archetypes.insert(std::make_pair(Key, (FVmeshWireInstance*)nullptr));
         FVmeshWireInstance*& Slot = Inserted.first->second;
@@ -313,12 +314,12 @@ int DACOM_API FVMeshWire::CreateArchetype(void* Archetype, void* FileSystem)
 // set on either path in retail; 0 here.
 int DACOM_API FVMeshWire::DuplicateArchetype(void* NewArchetype, void* OldArchetype)
 {
-    const int OldKey = (int)((intptr_t)OldArchetype);
+    const int OldKey = (int)LowArena::Encode(OldArchetype);
     std::map<int, FVmeshWireInstance*>::iterator Found = Archetypes.find(OldKey);
     if (Found == Archetypes.end())
         return 0;
     FVmeshWireInstance* Shared = Found->second;
-    const int NewKey = (int)((intptr_t)NewArchetype);
+    const int NewKey = (int)LowArena::Encode(NewArchetype);
     std::pair<std::map<int, FVmeshWireInstance*>::iterator, bool> Inserted =
         Archetypes.insert(std::make_pair(NewKey, (FVmeshWireInstance*)nullptr));
     FVmeshWireInstance*& Slot = Inserted.first->second;
@@ -337,7 +338,7 @@ int DACOM_API FVMeshWire::DuplicateArchetype(void* NewArchetype, void* OldArchet
 // retail; 0 here.
 int DACOM_API FVMeshWire::DestroyArchetype(void* Archetype)
 {
-    EraseArchetype((int)((intptr_t)Archetype));
+    EraseArchetype((int)LowArena::Encode(Archetype));
     return 0;
 }
 
@@ -348,7 +349,7 @@ int DACOM_API FVMeshWire::QueryArchetype(void* Archetype, const char* Name, void
     if (std::strcmp(Name, Iids::VMeshWire) != 0)
         return -1;
     std::map<int, FVmeshWireInstance*>::iterator Found =
-        Archetypes.find((int)((intptr_t)Archetype));
+        Archetypes.find((int)LowArena::Encode(Archetype));
     if (Found == Archetypes.end())
         return -1;
     Found->second->AddRef();
