@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -27,6 +28,20 @@ struct SDL_GPUBuffer;
 struct SDL_GPUTransferBuffer;
 struct SDL_GPUCommandBuffer;
 struct SDL_GPURenderPass;
+
+// Releases an SDL_GPU object to the device its owner holds in *Device, as the owner's device
+// objects are released: not at all once that is null (no device, or an abandoned one).
+struct FRpGpuRelease
+{
+    SDL_GPUDevice* const* Device = nullptr;
+    void operator()(SDL_GPUShader* Object) const;
+    void operator()(SDL_GPUGraphicsPipeline* Object) const;
+    void operator()(SDL_GPUSampler* Object) const;
+    void operator()(SDL_GPUTexture* Object) const;
+    void operator()(SDL_GPUBuffer* Object) const;
+    void operator()(SDL_GPUTransferBuffer* Object) const;
+};
+template <typename T> using TGpuHandle = std::unique_ptr<T, FRpGpuRelease>;
 
 class FRpGpuSdlBackend final : public IRpGpuBackend
 {
@@ -79,7 +94,7 @@ public:
 private:
     struct FTexture
     {
-        SDL_GPUTexture* Texture = nullptr;
+        TGpuHandle<SDL_GPUTexture> Texture;
         ERpGpuTextureFormat Format = ERpGpuTextureFormat::Bgra8;
         std::uint32_t Width = 0;
         std::uint32_t Height = 0;
@@ -109,8 +124,11 @@ private:
     SDL_GPUSampler* Sampler(const FRpGpuSamplerKey& Key);
     bool EnsureDepth(std::uint32_t Width, std::uint32_t Height);
     bool EnsureTarget(std::uint32_t Width, std::uint32_t Height);
-    bool EnsureBuffer(SDL_GPUBuffer** Buffer, std::uint32_t* Capacity, std::uint32_t Size, bool bIndex);
+    bool EnsureBuffer(TGpuHandle<SDL_GPUBuffer>* Buffer, std::uint32_t* Capacity, std::uint32_t Size, bool bIndex);
     bool UploadFrame(SDL_GPUCommandBuffer* Commands, const FRpGpuFrameRecording& Frame);
+    // Object, owned: released to Device_ (whose address its handle keeps; the backend is never
+    // copied or moved) unless that is null by then.
+    template <typename T> TGpuHandle<T> Own(T* Object) { return TGpuHandle<T>(Object, FRpGpuRelease{&Device_}); }
     SDL_GPURenderPass* BeginPass(SDL_GPUCommandBuffer* Commands, SDL_GPUTexture* Image, const FRpGpuCommand* Clear,
                                  bool bFirst);
 
@@ -128,35 +146,35 @@ private:
     std::uint32_t ClearArgb_ = 0xFF000000u;
 
     // Device objects, made once per device (ReleaseDeviceObjects drops them with it).
-    SDL_GPUShader* VertexShader_ = nullptr;
-    SDL_GPUShader* FragmentShader_ = nullptr;
+    TGpuHandle<SDL_GPUShader> VertexShader_;
+    TGpuHandle<SDL_GPUShader> FragmentShader_;
     std::uint32_t DepthFormat_ = 0;
-    std::unordered_map<std::uint64_t, SDL_GPUGraphicsPipeline*> Pipelines_;
+    std::unordered_map<std::uint64_t, TGpuHandle<SDL_GPUGraphicsPipeline>> Pipelines_;
     // By FRpGpuSamplerKey: Packed() and the LOD bias's bits.
-    std::map<std::pair<std::uint64_t, std::uint32_t>, SDL_GPUSampler*> Samplers_;
+    std::map<std::pair<std::uint64_t, std::uint32_t>, TGpuHandle<SDL_GPUSampler>> Samplers_;
     std::unordered_map<std::uint64_t, FTexture> Textures_;
     std::vector<FPendingUpload> PendingUploads_;
     // Static vertex and index buffers kept on the GPU (UploadVertexBlock, UploadIndexBlock), one
     // GPU buffer each.
-    std::unordered_map<std::uint64_t, SDL_GPUBuffer*> Blocks_;
+    std::unordered_map<std::uint64_t, TGpuHandle<SDL_GPUBuffer>> Blocks_;
     std::vector<FPendingBlock> PendingBlocks_;
     std::unordered_set<std::uint64_t> LostBlocks_; // blocks whose buffer could not be made
-    SDL_GPUTexture* White_ = nullptr;     // bound when a draw has no texture
-    SDL_GPUTexture* WhiteCube_ = nullptr; // bound to the cube slots when a stage has no cube map
+    TGpuHandle<SDL_GPUTexture> White_;     // bound when a draw has no texture
+    TGpuHandle<SDL_GPUTexture> WhiteCube_; // bound to the cube slots when a stage has no cube map
     bool bWhiteUploaded_ = false;
     // The frame is drawn here, then copied to the swap-chain image, so it can be read back.
-    SDL_GPUTexture* Target_ = nullptr;
+    TGpuHandle<SDL_GPUTexture> Target_;
     std::uint32_t TargetWidth_ = 0;
     std::uint32_t TargetHeight_ = 0;
     bool bHasFrame_ = false; // Target_ holds a presented frame
-    SDL_GPUTexture* Depth_ = nullptr;
+    TGpuHandle<SDL_GPUTexture> Depth_;
     std::uint32_t DepthWidth_ = 0;
     std::uint32_t DepthHeight_ = 0;
-    SDL_GPUBuffer* VertexBuffer_ = nullptr;
+    TGpuHandle<SDL_GPUBuffer> VertexBuffer_;
     std::uint32_t VertexCapacity_ = 0; // bytes
-    SDL_GPUBuffer* IndexBuffer_ = nullptr;
+    TGpuHandle<SDL_GPUBuffer> IndexBuffer_;
     std::uint32_t IndexCapacity_ = 0; // bytes
-    SDL_GPUTransferBuffer* Transfer_ = nullptr;
+    TGpuHandle<SDL_GPUTransferBuffer> Transfer_;
     std::uint32_t TransferCapacity_ = 0; // bytes
     std::uint32_t Width_ = 0;
     std::uint32_t Height_ = 0;
