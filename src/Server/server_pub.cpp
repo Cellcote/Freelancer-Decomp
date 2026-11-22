@@ -1840,14 +1840,13 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
     //   .text:06d4ddbb  PUSH EAX / PUSH FILE* / CALL fprintf   -- two arguments
     // An empty string reaches fprintf as an empty format and prints nothing,
     // which is what c_str() of an empty std::string does here as well.
-    // KNOWN retail UB: the stored text is used as the FORMAT, so a '%' in it
-    // is interpreted by fprintf with no arguments behind it. Reproduced as a
-    // path, not escaped (was `fprintf(Out, "%s", ...)` until 2026-09-24).
+    // Retail UB: the stored text is used as the FORMAT, so a '%' in it is
+    // interpreted by fprintf with no arguments behind it.
+    // PORT(deviation) SERVER-INPUT-GUARDS: written with fputs. Text without a
+    // '%' is written byte for byte as before; a '%' is written as itself
+    // instead of being read as a conversion with no argument behind it.
     // -----------------------------------------------------------------------
-#pragma warning(push)
-#pragma warning(disable : 4774 6387)  // non-literal format string: retail's own call shape
-    fprintf(Out, Player.weapon_group_name.c_str());                        // .text:06d4ddc1
-#pragma warning(pop)
+    fputs(Player.weapon_group_name.c_str(), Out); // .text:06d4ddc1
 
     // .text:06d4ddca -- bare newline.
     fprintf(Out, "\n");

@@ -5524,6 +5524,10 @@ int Ship::set_strafe_dir(StrafeDir Dir)
     if (Raw->get_strafe_dir() == Dir)
         return 0;
     CEquip* const Engine = Raw->EquipManager.FindFirst(0x20000u);
+    // PORT(deviation) SERVER-INPUT-GUARDS: retail uses the engine untested; a ship
+    // without one (an equipment list sent without it) crashed the server.
+    if (Engine == nullptr)
+        return 0;
     if (!Engine->IsActive())
     {
         unsigned short const EngineId = Engine->GetID();
@@ -5783,8 +5787,11 @@ int Ship::slot_50(bool bEngage, bool bArg2, int SourceClient)
     if (!(SinglePlayer() && SourceClient != 0))
     {
         bool bChanged = false;
-        CEEngine* const Engine =
-            CEEngine::cast(static_cast<CEqObj*>(Object)->EquipManager.FindFirst(0x20000u));
+        CEquip* const EngineEquip = static_cast<CEqObj*>(Object)->EquipManager.FindFirst(0x20000u);
+        // PORT(deviation) SERVER-INPUT-GUARDS: no engine, no cruise (retail crashed).
+        if (EngineEquip == nullptr)
+            return -5;
+        CEEngine* const Engine = CEEngine::cast(EngineEquip);
         if (Engine->bCruiseActive != static_cast<unsigned char>(bEngage))
         {
             bChanged = true;
@@ -5831,6 +5838,9 @@ int Ship::slot_54(bool bActivate, int SourceClient)
         bool bChanged = false;
         CEqObj* const Raw = static_cast<CEqObj*>(Object);
         CEquip* const Engine = Raw->EquipManager.FindFirst(0x20000u);
+        // PORT(deviation) SERVER-INPUT-GUARDS: no engine, no thrusters (retail crashed).
+        if (Engine == nullptr)
+            return -5;
         unsigned char const bCruiseActive = static_cast<CEEngine*>(Engine)->bCruiseActive;
         bool const bEngineActive = Engine->IsActive();
         if (SourceClient == 0 && bActivate)

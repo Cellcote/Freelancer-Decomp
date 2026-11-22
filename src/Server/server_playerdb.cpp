@@ -3992,6 +3992,10 @@ bool PlayerDB::create_new_character(const SCreateCharacterInfo& Info, unsigned i
     CAccount* Account = reinterpret_cast<CAccount*>(Player->account_ptr);
     // (w4-server-guards) no null test: 06d54173 `MOV ECX,[EBP+0x400]` feeds
     // 06d54179 `CMP dword ptr [ECX+0x2c],0x5` directly.
+    // PORT(deviation) SERVER-INPUT-GUARDS: a slot that never logged in has no
+    // account; refuse instead of dereferencing it.
+    if (Account == nullptr)
+        return false;
 
     // Check the per-account character limit. Retail:
     //   06d54173  MOV ECX,[EBP + 0x400]          ; the owning CAccount

@@ -59,6 +59,9 @@ namespace
         // PORT(deviation): set once DisconnectClient has released this proxy's slot; the id is kept
         // for packets still in flight, as in retail (see DisconnectClient).
         bool bReleased = false;
+        // PORT(deviation) SERVER-INPUT-GUARDS: set when the server answers this client's LOGIN
+        // with status 3. Until then only LOGIN is dispatched.
+        bool bLoggedIn = false;
     };
 
     class CRemoteClientHost : public CDPServer
@@ -381,6 +384,12 @@ void CRemoteClientProxy::OnReceive(unsigned char* Data, FlULong Size)
     }
     if (IsUnsentClientPacket(Channel, Opcode))
         return;
+    // PORT(deviation) SERVER-INPUT-GUARDS: before the server accepts its login, the retail
+    // client sends nothing but LOGIN: it waits for the reply and shuts the connection down on
+    // any other result (login_mgr.cpp, connect_flow.cpp), and delivery is in order. Retail
+    // dispatched every packet regardless, to handlers that assume a logged-in slot.
+    if (!bLoggedIn && !(Channel == 3 && Opcode == 0x01))
+        return;
 
     FPacketBase* Packet = nullptr;
     unsigned int DecodedSize = 0;
@@ -394,6 +403,12 @@ void CRemoteClientProxy::OnReceive(unsigned char* Data, FlULong Size)
     }
 
     HandleClientPacket(ClientId, Packet->AsRaw());
+}
+
+void RemoteClientNoteLoginResponse(unsigned int ClientId, unsigned char Status) {
+    CDPClientProxy* const Proxy = Client.FindProxy(ClientId);
+    if (Proxy != nullptr && Status == 3)
+        static_cast<CRemoteClientProxy*>(Proxy)->bLoggedIn = true;
 }
 
 int GetClientStats(FClientStats* Stats, int* Count)
