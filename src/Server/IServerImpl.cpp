@@ -90,6 +90,15 @@ static bool Server_IsClientWeaponGroupText(const unsigned char* Data, int Size)
     return true;
 }
 
+// PORT(deviation) SERVER-OWNERSHIP: retail never checks that the object a multiplayer command
+// names belongs to the sender, so a client could fire, steer, jettison or teleport any ship and
+// report collisions that destroy anything. These two tests answer "is this the sender's ship"
+// and "does the sender own this object": its ship (CSimple::OwnerPlayer is the session id) or a
+// projectile its ship launched (CProjectile::OwnerId). Both pass in single player, which keeps
+// retail's behaviour there.
+static bool Server_IsSessionShip(unsigned int SessionId, unsigned int ObjectId);
+static bool Server_SessionOwnsObject(unsigned int SessionId, GameObject const* Obj);
+
 // Server_ControllerDispatch (server_controller.h), pub::Controller::_SendMessage's
 // dispatch core, is defined further down this file. Retail's FUN_06d43650 (exported by the
 // port from Common.dll as Server_SendMessage) is only `_SendMessage(0 /* broadcast */,
@@ -349,7 +358,11 @@ void IServerImpl::ElapseTime(float dt) {
     //   06cf0e0e  FUN_06d50af0 on Players' raw slot (terminate_trade)
     //   06cf0e13  count = Hardpoints.Begin ? (End - Begin) >> 1 : 0
     //   06cf0e35  IObjAffect +0x34 (Hardpoints.Begin, count, &info.TargetPos, player_id)
-void IServerImpl::FireWeapon(unsigned int player_id, const XFireWeaponInfo& info) {
+    void IServerImpl::FireWeapon(unsigned int player_id, const XFireWeaponInfo& info)
+    {
+        // PORT(deviation) SERVER-OWNERSHIP: the client fires its own ship (cli_projectile_fx.cpp).
+        if (!Server_IsSessionShip(player_id, info.ObjectId))
+            return;
         GameObject* const Obj = Server_LookupGameObject(info.ObjectId);
         if (Obj == nullptr)
             return;
@@ -366,7 +379,11 @@ void IServerImpl::FireWeapon(unsigned int player_id, const XFireWeaponInfo& info
     //   06cf0992  FUN_06d006c0(&info.ObjectId, ...); miss (06cf099c), obj == 0
     //             (06cf09a4), is_destroyed (06cf09b2) -> out
     //   06cf09c9  IObjAffect +0x4c (&info.EquipId, byte info+6, player_id)
-void IServerImpl::ActivateEquip(unsigned int player_id, const XActivateEquip& info) {
+    void IServerImpl::ActivateEquip(unsigned int player_id, const XActivateEquip& info)
+    {
+        // PORT(deviation) SERVER-OWNERSHIP: the client sends this for its own ship only.
+        if (!Server_IsSessionShip(player_id, info.ObjectId))
+            return;
         GameObject* const Obj = Server_LookupGameObject(info.ObjectId);
         if (Obj == nullptr)
             return;
@@ -379,7 +396,11 @@ void IServerImpl::ActivateEquip(unsigned int player_id, const XActivateEquip& in
     //   06cf09f2  lookup; miss (06cf09fc), obj == 0 (06cf0a04), is_destroyed
     //             (06cf0a12) -> out
     //   06cf0a2b  IObjAffect +0x50 (byte info+4, byte info+5, player_id)
-void IServerImpl::ActivateCruise(unsigned int player_id, const XActivateCruise& info) {
+    void IServerImpl::ActivateCruise(unsigned int player_id, const XActivateCruise& info)
+    {
+        // PORT(deviation) SERVER-OWNERSHIP: the client sends this for its own ship only.
+        if (!Server_IsSessionShip(player_id, info.ObjectId))
+            return;
         GameObject* const Obj = Server_LookupGameObject(info.ObjectId);
         if (Obj == nullptr)
             return;
@@ -392,7 +413,11 @@ void IServerImpl::ActivateCruise(unsigned int player_id, const XActivateCruise& 
     //   06cf0a52  lookup; miss (06cf0a5c), obj == 0 (06cf0a64), is_destroyed
     //             (06cf0a72) -> out
     //   06cf0a85  IObjAffect +0x54 (byte info+4, player_id)
-void IServerImpl::ActivateThrusters(unsigned int player_id, const XActivateThrusters& info) {
+    void IServerImpl::ActivateThrusters(unsigned int player_id, const XActivateThrusters& info)
+    {
+        // PORT(deviation) SERVER-OWNERSHIP: the client sends this for its own ship only.
+        if (!Server_IsSessionShip(player_id, info.ObjectId))
+            return;
         GameObject* const Obj = Server_LookupGameObject(info.ObjectId);
         if (Obj == nullptr)
             return;
@@ -411,9 +436,14 @@ void IServerImpl::ActivateThrusters(unsigned int player_id, const XActivateThrus
     //     06cf0d18  the same lookup of the target (06cf0d24 zeroes it on a miss)
     //     06cf0d44  IObjAffect +0x44 (&info.SubObjId, target, info.TargetSubObjId,
     //               player_id)
-void IServerImpl::SetTarget(unsigned int player_id, const XSetTarget& info) {
+    void IServerImpl::SetTarget(unsigned int player_id, const XSetTarget& info)
+    {
         GameObject* const Obj = Server_LookupGameObject(info.ObjectId);
         if (Obj == nullptr)
+            return;
+        // PORT(deviation) SERVER-OWNERSHIP: the client sets the target of its own ship, or of a
+        // missile it launched (client_gameobj.cpp); retail let it retarget anyone's missiles.
+        if (!Server_SessionOwnsObject(player_id, Obj))
             return;
         if (Obj->is_destroyed())
             return;
@@ -425,8 +455,7 @@ void IServerImpl::SetTarget(unsigned int player_id, const XSetTarget& info) {
             return;
         }
         IObjRW* const Target = Server_LookupGameObject(info.TargetObjectId);
-        Affect->slot_44(&info.SubObjId, Target, info.TargetSubObjId,
-                        static_cast<int>(player_id));
+        Affect->slot_44(&info.SubObjId, Target, info.TargetSubObjId, static_cast<int>(player_id));
     }
     // Slot 5: TractorObjects -- retail .text:06cf0b50 .. 06cf0c68, RET 8, with an
     // SEH frame for the local std::vector<IObjRW*>.
@@ -440,7 +469,11 @@ void IServerImpl::SetTarget(unsigned int player_id, const XSetTarget& info) {
     //   06cf0c23  vector<IObjRW*>::_Insert_n(end, 1, &target) -- a push_back
     //   06cf0c46  IObjAffect +0x3c (&info.TractorEquipId, vector, player_id)
     //   06cf0c4e  operator delete on the vector's storage
-void IServerImpl::TractorObjects(unsigned int player_id, const XTractorObjects& info) {
+    void IServerImpl::TractorObjects(unsigned int player_id, const XTractorObjects& info)
+    {
+        // PORT(deviation) SERVER-OWNERSHIP: the client sends this for its own ship only.
+        if (!Server_IsSessionShip(player_id, info.ObjectId))
+            return;
         GameObject* const Obj = Server_LookupGameObject(info.ObjectId);
         if (Obj == nullptr)
             return;
@@ -499,7 +532,11 @@ void IServerImpl::StopTradelane(unsigned int session_id, unsigned int arg1, unsi
     //             (06cf0d82) -> out
     //   06cf0d9e  FUN_06d50af0 on Players' raw slot (terminate_trade)
     //   06cf0db5  IObjAffect +0x38 (info.ItemId, info.Count, player_id)
-void IServerImpl::JettisonCargo(unsigned int player_id, const XJettisonCargo& info) {
+    void IServerImpl::JettisonCargo(unsigned int player_id, const XJettisonCargo& info)
+    {
+        // PORT(deviation) SERVER-OWNERSHIP: the client sends this for its own ship only.
+        if (!Server_IsSessionShip(player_id, info.ObjectId))
+            return;
         GameObject* const Obj = Server_LookupGameObject(info.ObjectId);
         if (Obj == nullptr)
             return;
@@ -1622,19 +1659,29 @@ void IServerImpl::Hail(unsigned int object_id, unsigned int arg1, unsigned int a
     //   06cf067d .. 06cf069f  FUN_06d498f0 (PlayerData_CheckPositionBound) on the slot with
     //                         (&info.Position, info+0x20, info+0x24); false -> return
     //   06cf06a1 .. 06cf06a5  sys->FUN_06d0bbc0(info, session_id) (StarSystem::sp_obj_update)
-void IServerImpl::SPObjUpdate(const SSPObjUpdateInfo& info, unsigned int session_id) {
-        if (SinglePlayer()) return;                                          // .text:06cf062c
+    void IServerImpl::SPObjUpdate(const SSPObjUpdateInfo& info, unsigned int session_id)
+    {
+        if (SinglePlayer())
+            return; // .text:06cf062c
+        // PORT(deviation) SERVER-OWNERSHIP: only the player's ship carries the remote-physics
+        // block that sends this (player_spawn.cpp); retail let a client move any object.
+        if (!Server_IsSessionShip(session_id, info.ObjectId))
+            return;
         GameObject* Obj = nullptr;
         StarSystem* System = nullptr;
-        if (!Server_FindObject(info.ObjectId, Obj, System)) return;          // .text:06cf0647
-        if (System == nullptr) return;                                       // .text:06cf064f
-        if (Players.is_valid(session_id)) {                                  // .text:06cf0657 .. 06cf067b
+        if (!Server_FindObject(info.ObjectId, Obj, System))
+            return; // .text:06cf0647
+        if (System == nullptr)
+            return; // .text:06cf064f
+        if (Players.is_valid(session_id))
+        { // .text:06cf0657 .. 06cf067b
             // FUN_06d498f0 reads only its first stack argument; the port's helper takes
             // just that one (common_server_playerdb.h).
-            if (!PlayerData_CheckPositionBound(Players[session_id], &info.Position)) // .text:06cf0698
-                return;                                                      // .text:06cf069f
+            if (!PlayerData_CheckPositionBound(Players[session_id],
+                                               &info.Position)) // .text:06cf0698
+                return; // .text:06cf069f
         }
-        System->sp_obj_update(info, session_id);                             // .text:06cf06a5
+        System->sp_obj_update(info, session_id); // .text:06cf06a5
     }
 
     // SPMunitionCollision -- retail .text:06cf06c0 .. 06cf0744, RET 8. Ported
@@ -1649,19 +1696,31 @@ void IServerImpl::SPObjUpdate(const SSPObjUpdateInfo& info, unsigned int session
     //   06cf0729  FUN_06d006c0(&info.ObjectId [info+8], &obj, &sys); AL == 0 -> out
     //   06cf073b  sys == 0 -> out
     //   06cf073e  sys->FUN_06d0d500(info) = StarSystem::munition_collision
-void IServerImpl::SPMunitionCollision(const SSPMunitionCollisionInfo& info, unsigned int session_id) {
+    void IServerImpl::SPMunitionCollision(const SSPMunitionCollisionInfo& info,
+                                          unsigned int session_id)
+    {
         unsigned int max_players = PlayerDB_GetMaxPlayers();
-        if (session_id == 0 || (session_id - 1) >= max_players) return;
+        if (session_id == 0 || (session_id - 1) >= max_players)
+            return;
         PlayerSlot* p = GetPlayerBySession(session_id);
-        if (!p) return;
-        if ((p->ship_object_id & 0x3fffffff) == 0) return;        // .text:06cf0703
-        double const Health = static_cast<double>(p->relative_health);   // FUN_06d4ed00
-        if (Health < 0.0001 || Health == 0.0001) return;          // .text:06cf0715
+        if (!p)
+            return;
+        if ((p->ship_object_id & 0x3fffffff) == 0)
+            return; // .text:06cf0703
+        double const Health = static_cast<double>(p->relative_health); // FUN_06d4ed00
+        if (Health < 0.0001 || Health == 0.0001)
+            return; // .text:06cf0715
         GameObject* Obj = nullptr;
         StarSystem* Sys = nullptr;
         if (!Server_FindObject(info.ObjectId, Obj, Sys))
             return;
         if (Sys == nullptr)
+            return;
+        // PORT(deviation) SERVER-OWNERSHIP: a client reports its own gun shots, which carry its
+        // ship as the shooter, and missiles hitting an object it owns, whoever fired them
+        // (client_gameobj.cpp, 0x0053f790 and 0x0053ee00). Anything else is refused.
+        if (!Server_IsSessionShip(session_id, info.Field_0x04) &&
+            !Server_SessionOwnsObject(session_id, Obj))
             return;
         Sys->munition_collision(info);
     }
@@ -1672,13 +1731,19 @@ void IServerImpl::SPMunitionCollision(const SSPMunitionCollisionInfo& info, unsi
     //   06cf07b6  sys == 0 -> out
     //   06cf07b9  sys->FUN_06d0d6e0(info) = StarSystem::badlands_collision
     // session_id is not read.
-void IServerImpl::SPBadLandsObjCollision(const SSPBadLandsObjCollisionInfo& info, unsigned int session_id) {
+    void IServerImpl::SPBadLandsObjCollision(const SSPBadLandsObjCollisionInfo& info,
+                                             unsigned int session_id)
+    {
         (void)session_id;
         GameObject* Obj = nullptr;
         StarSystem* Sys = nullptr;
         if (!Server_FindObject(info.ObjectId, Obj, Sys))
             return;
         if (Sys == nullptr)
+            return;
+        // PORT(deviation) SERVER-OWNERSHIP: the client reports its own ship or what it launched
+        // hitting a badlands asteroid (cli_asteroid_med.cpp); retail destroyed any object named.
+        if (!Server_SessionOwnsObject(session_id, Obj))
             return;
         Sys->badlands_collision(info);
     }
@@ -1694,21 +1759,30 @@ void IServerImpl::SPBadLandsObjCollision(const SSPBadLandsObjCollisionInfo& info
     // target's sub-object, +0x10 the damage). The static_asserts below pin the
     // two declarations to the same offsets; the pointer is passed unchanged, as
     // retail passes ESI. session_id is not read.
-void IServerImpl::SPObjCollision(const SSPObjCollisionInfo& info, unsigned int session_id) {
+    void IServerImpl::SPObjCollision(const SSPObjCollisionInfo& info, unsigned int session_id)
+    {
         FL_LAYOUT_ASSERT(sizeof(SSPObjCollisionInfo) == sizeof(FCollisionDamage),
-                      "SSPObjCollisionInfo is the FCollisionDamage record");
-        FL_LAYOUT_ASSERT(offsetof(SSPObjCollisionInfo, ObjectId) == offsetof(FCollisionDamage, TargetId),
-                      "+8 is the target FUN_06d006c0 resolves");
-        FL_LAYOUT_ASSERT(offsetof(SSPObjCollisionInfo, SubObjId) == offsetof(FCollisionDamage, TargetSubObjId),
-                      "+0xc is the target's sub-object");
-        FL_LAYOUT_ASSERT(offsetof(SSPObjCollisionInfo, Field_0x10) == offsetof(FCollisionDamage, Damage),
-                      "+0x10 is the damage");
+                         "SSPObjCollisionInfo is the FCollisionDamage record");
+        FL_LAYOUT_ASSERT(offsetof(SSPObjCollisionInfo, ObjectId) ==
+                             offsetof(FCollisionDamage, TargetId),
+                         "+8 is the target FUN_06d006c0 resolves");
+        FL_LAYOUT_ASSERT(offsetof(SSPObjCollisionInfo, SubObjId) ==
+                             offsetof(FCollisionDamage, TargetSubObjId),
+                         "+0xc is the target's sub-object");
+        FL_LAYOUT_ASSERT(offsetof(SSPObjCollisionInfo, Field_0x10) ==
+                             offsetof(FCollisionDamage, Damage),
+                         "+0x10 is the damage");
         (void)session_id;
         GameObject* Obj = nullptr;
         StarSystem* Sys = nullptr;
         if (!Server_FindObject(info.ObjectId, Obj, Sys))
             return;
         if (Sys == nullptr)
+            return;
+        // PORT(deviation) SERVER-OWNERSHIP: the damaged object (+8) is the client's own side of
+        // the collision, its ship or what it launched (client_gameobj.cpp); retail applied the
+        // reported damage to any object.
+        if (!Server_SessionOwnsObject(session_id, Obj))
             return;
         Sys->collision_damage(reinterpret_cast<FCollisionDamage const&>(info), Obj);
     }
@@ -1721,7 +1795,12 @@ void IServerImpl::SPObjCollision(const SSPObjCollisionInfo& info, unsigned int s
     //   06cf135b  IObjAffect +0x58 (word info+4 ItemId, MOVZX word info+6 Count,
     //             session_id); a non-zero result -> out (06cf1360)
     //   06cf1374  FUN_06d50af0 on Players' raw slot (terminate_trade)
-void IServerImpl::SPRequestUseItem(const SSPUseItem& info, unsigned int session_id) {
+    void IServerImpl::SPRequestUseItem(const SSPUseItem& info, unsigned int session_id)
+    {
+        // PORT(deviation) SERVER-OWNERSHIP: the client uses items on its own ship
+        // (hud_status_core.cpp).
+        if (!Server_IsSessionShip(session_id, info.ObjectId))
+            return;
         GameObject* const Obj = Server_LookupGameObject(info.ObjectId);
         if (Obj == nullptr)
             return;
@@ -1840,13 +1919,17 @@ void IServerImpl::MissionSaveB(unsigned int session_id, FlULong mission_id) {
     //   06cf0921  IObjAffect +0x5c (event_type, &p2, &p3, p4, PUSH 0 -- no
     //             RequestCB)
     // p5 is never read. No controller message: the port's id 0x21 was invented.
-void IServerImpl::RequestEvent(int event_type, unsigned int p1, unsigned int p2, unsigned int p3, FlULong p4, unsigned int p5) {
-        (void)p5;
+    void IServerImpl::RequestEvent(int event_type, unsigned int p1, unsigned int p2,
+                                   unsigned int p3, FlULong p4, unsigned int p5)
+    {
+        // PORT(deviation) SERVER-OWNERSHIP: p1 is the requesting ship, the client's own
+        // (client_gameobj.cpp); p2 / p3 name the dock or formation target and stay unchecked.
+        if (!Server_IsSessionShip(p5, p1))
+            return;
         GameObject* const Obj = Server_LookupGameObject(p1);
         if (Obj == nullptr)
             return;
-        static_cast<IObjAffect*>(Obj)->slot_5c(event_type, &p2, &p3, static_cast<int>(p4),
-                                               nullptr);
+        static_cast<IObjAffect*>(Obj)->slot_5c(event_type, &p2, &p3, static_cast<int>(p4), nullptr);
     }
     // RequestCancel -- retail .text:06cf0930 .. 06cf0970, RET 0x14 (five stack
     // arguments). Ported 2026-09-24 (claude-code:w5-server-06cf):
@@ -1854,8 +1937,12 @@ void IServerImpl::RequestEvent(int event_type, unsigned int p1, unsigned int p2,
     //   06cf0954  obj == 0 -> out
     //   06cf096a  IObjAffect +0x60 (event_type, &p2, p3)
     // p4 is never read. No controller message: the port's id 0x22 was invented.
-void IServerImpl::RequestCancel(int event_type, unsigned int p1, unsigned int p2, FlULong p3, unsigned int p4) {
-        (void)p4;
+    void IServerImpl::RequestCancel(int event_type, unsigned int p1, unsigned int p2, FlULong p3,
+                                    unsigned int p4)
+    {
+        // PORT(deviation) SERVER-OWNERSHIP: as in RequestEvent; p4 is the session.
+        if (!Server_IsSessionShip(p4, p1))
+            return;
         GameObject* const Obj = Server_LookupGameObject(p1);
         if (Obj == nullptr)
             return;
@@ -4517,4 +4604,38 @@ static HMODULE g_hInstance = nullptr;
 BOOL WINAPI DllMain(HMODULE hModule, DWORD fdwReason, LPVOID lpReserved) {
     if (fdwReason == DLL_PROCESS_ATTACH) { g_hInstance = hModule; DisableThreadLibraryCalls(hModule); }
     return TRUE;
+}
+
+// PORT(deviation) SERVER-OWNERSHIP: see the declarations at the top of this file.
+static bool Server_IsSessionShip(unsigned int SessionId, unsigned int ObjectId)
+{
+    if (SinglePlayer())
+        return true;
+    if (SessionId == 0 || SessionId - 1 >= PlayerDB_GetMaxPlayers())
+        return false;
+    unsigned int const Ship = Players[SessionId].ship_object_id;
+    return Ship != 0 && ObjectId == Ship;
+}
+
+static bool Server_SessionOwnsObject(unsigned int SessionId, GameObject const* Obj)
+{
+    if (SinglePlayer())
+        return true;
+    if (SessionId == 0 || SessionId - 1 >= PlayerDB_GetMaxPlayers() || Obj == nullptr)
+        return false;
+    CObject* const Raw = Obj->cobj();
+    if (Raw == nullptr)
+        return false;
+    if (Obj->csimple()->OwnerPlayer == SessionId)
+        return true;
+    // The server creates missiles, mines and countermeasures with OwnerPlayer 0 and only their
+    // launcher in CProjectile::OwnerId (StarSystem::create_guided / create_mine /
+    // create_counter_measure), so a projectile is the sender's when its launcher is the
+    // sender's ship. Every projectile class (0x0f, 0x17, 0x67, 0xa7) has the 7 bits set.
+    if ((static_cast<unsigned int>(Raw->ObjectClass) & 7u) == 7u)
+    {
+        unsigned int const Ship = Players[SessionId].ship_object_id;
+        return Ship != 0 && static_cast<CProjectile const*>(Raw)->OwnerId == Ship;
+    }
+    return false;
 }
