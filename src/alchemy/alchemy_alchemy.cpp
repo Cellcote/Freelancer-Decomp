@@ -540,7 +540,9 @@ namespace AlchemyImpl
         FlULong FilterResult = 0;
         if (G_FilterCallback != nullptr)
             FilterResult = G_FilterCallback(A, B);
-        return AttachNode((void*)FilterResult, B);
+        // PORT(x64): the filter answers in a dword (retail's callback type); no caller in the tree
+        // installs one, and a node address would not fit it on 64-bit builds.
+        return AttachNode((void*)(std::uintptr_t)FilterResult, B);
     }
 
     GENRESULT DACOM_API FAlchemy::DetachNode(void* Node)

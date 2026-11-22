@@ -899,7 +899,7 @@ public:
             File->OpenNode(".."); // 06c2d799: DAT_06c37250 = ".." (2E 2E 00)
             return Handle;
         }
-        Handle = (int)((intptr_t)Part);
+        Handle = (int)LowArena::Encode(Part);
         File->OpenNode(".."); // 06c2d7c8
         return Handle;
     }
@@ -914,7 +914,7 @@ public:
         const int Result = (int)0xFFFFFFF9;
         if (Result < 0 || Clone == nullptr)
             return -1;
-        return (int)((intptr_t)Clone);
+        return (int)LowArena::Encode(Clone);
     }
 
     // FUN_06c2d820 (RET 8): a valid handle is destroyed. EAX is not set in retail; 0 here.

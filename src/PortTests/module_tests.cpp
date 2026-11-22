@@ -11,6 +11,10 @@
 #include "platform.h"
 #include "readfile.h"
 
+#include <intrin.h>
+#include <xmmintrin.h>
+
+#include <climits>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -220,6 +224,15 @@ int main(int argc, char** argv)
         int After = 0;
         Manager->EnumerateComponents(nullptr, &CountComponent, &After);
         Check(After > Before, "Shading's DllMain registered its components");
+        for (const char* Module : {"RendComp.dll", "alchemy.dll"})
+        {
+            Before = After;
+            Check(Platform::ModuleLoad((Folder + Module).c_str()) != nullptr,
+                  "a render module loads");
+            After = 0;
+            Manager->EnumerateComponents(nullptr, &CountComponent, &After);
+            Check(After > Before, "the render module's DllMain registered its components");
+        }
         if (EngBase != nullptr)
             TestEngine(Manager);
         if (Files != nullptr)
@@ -309,6 +322,22 @@ int main(int argc, char** argv)
     Check(Pages != nullptr && static_cast<unsigned char*>(Pages)[0x2FFF] == 0 &&
               VirtualFree(Pages, 0, MEM_RELEASE) && !VirtualFree(Pages, 0, MEM_RELEASE),
           "VirtualAlloc / VirtualFree");
+
+    // SSE's scalar conversions (posix/xmmintrin.h on Apple Silicon, the real ones on x86).
+    // The inputs are volatile so the compiler runs the conversions instead of folding them (GCC
+    // folds an out-of-range constant as C++'s undefined conversion, not as the instruction).
+    volatile float const Half = 2.5f, OneAndHalf = 3.5f, MinusHalf = -2.5f, Fraction = -1.7f,
+                         Big = 3.0e9f;
+    Check(_mm_cvtss_si32(_mm_set_ss(Half)) == 2 && _mm_cvtss_si32(_mm_set_ss(OneAndHalf)) == 4 &&
+              _mm_cvtss_si32(_mm_set_ss(MinusHalf)) == -2,
+          "_mm_cvtss_si32 rounds to nearest even");
+    Check(_mm_cvtt_ss2si(_mm_set_ss(Fraction)) == -1 && _mm_cvtt_ss2si(_mm_set_ss(Big)) == INT_MIN,
+          "_mm_cvtt_ss2si truncates; out of range is 0x80000000");
+    unsigned long BitIndex = 0;
+    Check(_BitScanReverse(&BitIndex, 0x00F0u) && BitIndex == 7 &&
+              _BitScanForward(&BitIndex, 0x00F0u) && BitIndex == 4 &&
+              !_BitScanForward(&BitIndex, 0u),
+          "_BitScanReverse / _BitScanForward");
 
     if (G_Failures == 0)
         std::printf("module_tests: all passed\n");
