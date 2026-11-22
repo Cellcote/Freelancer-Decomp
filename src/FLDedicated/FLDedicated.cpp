@@ -40,7 +40,7 @@
 #include "common_server_types.h"  // SStartupInfo, ServerStats
 #include "dacom.h"                // FDUMP
 #include "dalib_core.h"           // DALib::Startup / OpenData / CloseData / Shutdown, CriticalWarningFn
-#include "port_scope.h"           // TScopeExit, FComInit
+#include "port_scope.h" // TScopeExit, FComInit
 #include "remoteclient.h"         // GetNumClients, SetServerLogFunction
 #include "server_host.h"          // the host shared with FLServer (src/ServerHost)
 #include "server_iserverimpl.h"   // Server
@@ -771,10 +771,12 @@ namespace
             fprintf(stderr, "FLDedicated: DALib::Startup failed\n");
             return 1;
         }
-        const TScopeExit ShutdownDALib([] {
-            DALib::CloseData();
-            DALib::Shutdown(nullptr);
-        });
+        const TScopeExit ShutdownDALib(
+            []
+            {
+                DALib::CloseData();
+                DALib::Shutdown(nullptr);
+            });
         const bool bDataPath = ReadFreelancerIni(IniPath);
         const bool bLocalDataPath = ReadFreelancerIni(LocalIniPath);
         if (!bDataPath && !bLocalDataPath)

@@ -102,7 +102,8 @@ namespace
     ComPtr<IDirectPlay8Address> NewAddress()
     {
         ComPtr<IDirectPlay8Address> Address;
-        if (FAILED(CoCreateInstance(CLSID_DirectPlay8Address, nullptr, CLSCTX_INPROC_SERVER, IID_IDirectPlay8Address,
+        if (FAILED(CoCreateInstance(CLSID_DirectPlay8Address, nullptr, CLSCTX_INPROC_SERVER,
+                                    IID_IDirectPlay8Address,
                                     reinterpret_cast<void**>(Address.GetAddressOf()))))
             return nullptr;
         Address->SetSP(&CLSID_DP8SP_TCPIP);
@@ -141,16 +142,19 @@ int main(int argc, char** argv)
     // Torn down in reverse order on every path, failures included: Close, the addresses, the
     // client, the address the enumeration answer came from, COM.
     const FComInit Com(COINIT_MULTITHREADED);
-    const TScopeExit ReleaseAnsweredAddress([] {
-        if (GHostAddress != nullptr)
-            GHostAddress->Release();
-    });
+    const TScopeExit ReleaseAnsweredAddress(
+        []
+        {
+            if (GHostAddress != nullptr)
+                GHostAddress->Release();
+        });
 
     ComPtr<IDirectPlay8Client> Client;
     ComPtr<IDirectPlay8Address> HostAddress;
     ComPtr<IDirectPlay8Address> DeviceAddress;
-    HRESULT Result = CoCreateInstance(CLSID_DirectPlay8Client, nullptr, CLSCTX_INPROC_SERVER, IID_IDirectPlay8Client,
-                                      reinterpret_cast<void**>(Client.GetAddressOf()));
+    HRESULT Result =
+        CoCreateInstance(CLSID_DirectPlay8Client, nullptr, CLSCTX_INPROC_SERVER,
+                         IID_IDirectPlay8Client, reinterpret_cast<void**>(Client.GetAddressOf()));
     if (FAILED(Result))
         return Fail("create the DirectPlay 8 client (is DirectPlay installed?)", Result);
     Result = Client->Initialize(nullptr, HandleMessage, 0);
@@ -174,8 +178,8 @@ int main(int argc, char** argv)
     DPN_APPLICATION_DESC EnumDesc{};
     EnumDesc.dwSize = sizeof(EnumDesc);
     DPNHANDLE EnumHandle = 0;
-    Result = Client->EnumHosts(&EnumDesc, HostAddress.Get(), DeviceAddress.Get(), nullptr, 0, 5, 500, 3000, nullptr,
-                               &EnumHandle, 0);
+    Result = Client->EnumHosts(&EnumDesc, HostAddress.Get(), DeviceAddress.Get(), nullptr, 0, 5,
+                               500, 3000, nullptr, &EnumHandle, 0);
     if (FAILED(Result))
         return Fail("EnumHosts", Result);
     if (WaitForSingleObject(GEnumDone, TimeoutMs) != WAIT_OBJECT_0)
@@ -189,8 +193,9 @@ int main(int argc, char** argv)
     ConnectDesc.dwSize = sizeof(ConnectDesc);
     ConnectDesc.guidApplication = GApplication;
     ConnectDesc.guidInstance = GInstance;
-    Result = Client->Connect(&ConnectDesc, GHostAddress != nullptr ? GHostAddress : HostAddress.Get(), DeviceAddress.Get(),
-                             nullptr, nullptr, nullptr, 0, nullptr, nullptr, DPNCONNECT_SYNC);
+    Result = Client->Connect(
+        &ConnectDesc, GHostAddress != nullptr ? GHostAddress : HostAddress.Get(),
+        DeviceAddress.Get(), nullptr, nullptr, nullptr, 0, nullptr, nullptr, DPNCONNECT_SYNC);
     if (FAILED(Result))
         return Fail("connect", Result);
     std::printf("PASS connect\n");

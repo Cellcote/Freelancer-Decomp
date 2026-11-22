@@ -43,7 +43,7 @@
 #include "common_timing.h"        // Timing::UpdateGlobalTime
 #include "dacom.h"                // FDUMP
 #include "dalib_core.h"           // DALib::Startup / OpenData / CloseData / Shutdown
-#include "port_scope.h"           // TScopeExit, FComInit
+#include "port_scope.h" // TScopeExit, FComInit
 #include "regress_client.h"
 #include "regress_crash.h"
 #include "regress_dump.h"
@@ -515,10 +515,12 @@ namespace
             fprintf(stderr, "FLRegress: Server::Startup failed\n");
             return 1;
         }
-        const TScopeExit ShutdownServer([] {
-            Phase("shutdown");
-            Server.Shutdown();
-        });
+        const TScopeExit ShutdownServer(
+            []
+            {
+                Phase("shutdown");
+                Server.Shutdown();
+            });
 
         if (Options.bCrashTest)
         {
