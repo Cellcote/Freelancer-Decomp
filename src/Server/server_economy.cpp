@@ -119,15 +119,18 @@ long long MaxUnit(BaseData const* Base, unsigned int GoodId)
 
 long long MinUnit(BaseData const* Base, unsigned int GoodId)
 {
-    double const V = Variance(Base);
-    double Low = MarketPrice(Base, GoodId) * (1.0 - V);
-    if (Low > kMaxClientPrice)
-        Low = kMaxClientPrice;
-    // With no variance the client's scale is exactly 1.0f (Low = 1 - 0, Range = 0), so its
-    // price is the market price truncated, with nothing to round. Otherwise its float scale
-    // can land a hair under the bound: one credit of slack.
-    long long const Unit = static_cast<long long>(Low) - (V > 0.0 ? 1 : 0);
-    return Unit > 0 ? Unit : 0;
+    // The client's lowest price, computed as it computes it (ClientMarketFill and
+    // ClientMarketGetPrice): the scale is float(Low + rand / 32768 * Range) with
+    // Low = float(1 - price_variance), so its least value is Low itself (rand() == 0), and the
+    // price is ftol(double(price) * double(scale)), capped at 9999999.
+    double const Variance = Base != nullptr ? static_cast<double>(Base->PriceVariance) : 0.0;
+    float const Low = static_cast<float>(1.0 - Variance);
+    double Price = MarketPrice(Base, GoodId) * static_cast<double>(Low);
+    if (Price > kMaxClientPrice)
+        Price = kMaxClientPrice;
+    long long const Unit = static_cast<long long>(Price);
+    // A negative price (a variance above 1) becomes 1.0 (ClientMarketGetPrice).
+    return Unit < 0 ? 1 : Unit;
 }
 
     // What the client's dealer offers: a market entry with stock (ClientMarket build,
@@ -208,12 +211,12 @@ long long ShipCeiling(PlayerSlot const& Slot, FLedger const& Ledger)
     std::map<unsigned int, long long> Pool = Ledger.OldCounts;
     if (Package != nullptr)
     {
-        std::vector<EquipDesc> const* const Lists[3] = {&Package->AddonLow, &Package->AddonMid,
-                                                        &Package->AddonHigh};
-        for (std::vector<EquipDesc> const* List : Lists)
-            for (std::vector<EquipDesc>::const_iterator It = List->begin(); It != List->end(); ++It)
-                if (It->Count > 0)
-                    Pool[It->ArchId] += It->Count;
+        // Only the package's first addon list: the dealer shows and sells that one
+        // (NnDealer::ShowShipPackage loads AddonLow).
+        for (std::vector<EquipDesc>::const_iterator It = Package->AddonLow.begin();
+             It != Package->AddonLow.end(); ++It)
+            if (It->Count > 0)
+                Pool[It->ArchId] += It->Count;
     }
     std::map<unsigned int, long long> NewCounts;
     CountByArch(Slot.equipment, NewCounts);
@@ -496,13 +499,12 @@ bool Ledger_MayLoadEquipment(PlayerSlot& Slot, unsigned int SessionId,
         GoodInfo const* const Package = GoodList::find_by_id(Ledger.ShipGood);
         if (Package != nullptr)
         {
-            std::vector<EquipDesc> const* const Lists[3] = {&Package->AddonLow, &Package->AddonMid,
-                                                            &Package->AddonHigh};
-            for (std::vector<EquipDesc> const* List : Lists)
-                for (std::vector<EquipDesc>::const_iterator It = List->begin(); It != List->end();
-                     ++It)
-                    if (It->Count > 0)
-                        Allowed[It->ArchId] += It->Count;
+            // Only the package's first addon list: the dealer shows and sells that one
+            // (NnDealer::ShowShipPackage loads AddonLow).
+            for (std::vector<EquipDesc>::const_iterator It = Package->AddonLow.begin();
+                 It != Package->AddonLow.end(); ++It)
+                if (It->Count > 0)
+                    Allowed[It->ArchId] += It->Count;
         }
     }
     else
