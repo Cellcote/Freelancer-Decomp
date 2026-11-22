@@ -16,8 +16,13 @@
 //   it ends. They share one lock and condition variable, which keeps WaitMany simple and exact.
 // - FindData keeps WIN32_FIND_DATAA's field names and 320-byte layout: IFileSystem hands it
 //   across modules. DateTime keeps SYSTEMTIME's.
-// - Not available here: ThreadTerminate (POSIX has no safe equivalent; it fails), and
-//   ResourceModuleLoad (resource DLLs are Windows PE images; reading their resources is M3).
+// - Handles are counted: CloseHandle releases one reference, a running thread keeps its own,
+//   and a named event or mutex is one object per name within the process (CreateEventA /
+//   CreateMutexA open the existing one). A mutex whose owning thread ends is abandoned: the
+//   next wait takes it and returns kWaitAbandoned.
+// - Not available here: ThreadTerminate (POSIX has no safe equivalent; it fails), objects
+//   shared between processes, and ResourceModuleLoad (resource DLLs are Windows PE images;
+//   reading their resources is M3).
 
 #include "fl_layout.h" // FlULong / FlLong (also forced into every source)
 
@@ -31,7 +36,10 @@
 #include <cctype>
 #include <cstring>
 #include <ctime>
+#include <map>
 #include <mutex>
+#include <set>
+#include <vector>
 #include <new>
 #include <string>
 #include <thread>
@@ -46,6 +54,9 @@
 
 #if defined(__APPLE__)
 #include <mach-o/dyld.h>
+#include <stdio.h> // renamex_np
+#else
+#include <sys/syscall.h> // renameat2
 #endif
 
 namespace Platform
@@ -60,9 +71,12 @@ namespace Platform
 
     namespace Detail
     {
-        // Every handle points at one of these; CloseHandle deletes it.
+        // Every handle points at one of these. References counts the open handles (and, for a
+        // thread, the running thread itself); Name is set for a named event or mutex.
         struct FObject
         {
+            std::atomic<int> References{1};
+            std::string Name;
             virtual ~FObject() = default;
         };
 
@@ -90,17 +104,41 @@ namespace Platform
         struct FWaitable : FObject
         {
             virtual bool Signalled() const = 0;
-            virtual void Acquire() {}
+            // Takes the object for a waiter that it released (under WaitLock); true for an
+            // abandoned mutex.
+            virtual bool Acquire() { return false; }
         };
 
         inline bool Valid(Handle Object) { return Object != nullptr && Object != InvalidHandle(); }
+
+        // The named events and mutexes of this process, under WaitLock.
+        inline std::map<std::string, FObject*>& Names()
+        {
+            static std::map<std::string, FObject*> Registry;
+            return Registry;
+        }
+
+        // Drops one reference; the last one deletes the object (outside WaitLock).
+        inline void Release(FObject* Object)
+        {
+            bool bLast = false;
+            {
+                std::lock_guard<std::mutex> Lock(WaitLock());
+                bLast = --Object->References == 0;
+                if (bLast && !Object->Name.empty())
+                    Names().erase(Object->Name);
+            }
+            if (bLast)
+                delete Object;
+        }
     }
 
+    // CloseHandle: releases the handle's reference.
     inline bool CloseHandle(Handle Object)
     {
         if (!Detail::Valid(Object))
             return false;
-        delete static_cast<Detail::FObject*>(Object);
+        Detail::Release(static_cast<Detail::FObject*>(Object));
         return true;
     }
 
@@ -215,6 +253,8 @@ namespace Platform
     {
         (void)Share;
         (void)FlagsAndAttributes;
+        if (Creation == kTruncateExisting && (Access & kAccessWrite) == 0)
+            return InvalidHandle(); // CreateFileA refuses to truncate without write access
         int Flags = (Access & kAccessWrite) != 0 ? ((Access & kAccessRead) != 0 ? O_RDWR : O_WRONLY) : O_RDONLY;
         switch (Creation)
         {
@@ -315,38 +355,66 @@ namespace Platform
         return (Info.st_mode & S_IWUSR) != 0 ? kAttributeNormal : kAttributeReadOnly;
     }
 
-    // CopyFileA. FailIfExists false overwrites the destination.
+    // CopyFileA. FailIfExists false overwrites the destination. Copying a file onto itself (the
+    // same file under another spelling, or a hard link) fails without touching it.
     inline bool FileCopy(char const* From, char const* To, bool FailIfExists)
     {
-        Handle const Source = FileOpen(From, kAccessRead, kShareRead, kOpenExisting);
-        if (Source == InvalidHandle())
+        int const Source = open(Detail::ResolvePath(From).c_str(), O_RDONLY | O_CLOEXEC);
+        if (Source < 0)
             return false;
-        Handle const Target = FileOpen(To, kAccessWrite, 0, FailIfExists ? kCreateNew : kCreateAlways);
-        bool bOk = Target != InvalidHandle();
+        int const Target = open(Detail::ResolvePath(To).c_str(),
+                                O_WRONLY | O_CREAT | O_CLOEXEC | (FailIfExists ? O_EXCL : 0), 0644);
+        struct stat SourceInfo;
+        struct stat TargetInfo;
+        bool bOk = Target >= 0 && fstat(Source, &SourceInfo) == 0 && fstat(Target, &TargetInfo) == 0 &&
+                   !(SourceInfo.st_dev == TargetInfo.st_dev && SourceInfo.st_ino == TargetInfo.st_ino) &&
+                   ftruncate(Target, 0) == 0;
         char Buffer[64 * 1024];
         while (bOk)
         {
-            FlULong Read = 0;
-            FlULong Written = 0;
-            bOk = FileRead(Source, Buffer, sizeof(Buffer), &Read);
-            if (!bOk || Read == 0)
+            ssize_t const Read = read(Source, Buffer, sizeof(Buffer));
+            if (Read < 0 && errno == EINTR)
+                continue;
+            if (Read <= 0)
+            {
+                bOk = Read == 0;
                 break;
-            bOk = FileWrite(Target, Buffer, Read, &Written) && Written == Read;
+            }
+            ssize_t Written = 0;
+            while (bOk && Written < Read)
+            {
+                ssize_t const Count = write(Target, Buffer + Written, static_cast<std::size_t>(Read - Written));
+                if (Count < 0 && errno == EINTR)
+                    continue;
+                bOk = Count > 0;
+                Written += Count > 0 ? Count : 0;
+            }
         }
-        CloseHandle(Source);
-        if (Target != InvalidHandle())
-            CloseHandle(Target);
+        close(Source);
+        if (Target >= 0)
+            close(Target);
         return bOk;
     }
 
-    // MoveFileA: fails when the destination exists, as on Windows.
+    // MoveFileA: fails when the destination exists, as on Windows, checked by the rename itself
+    // (no window for another process to create it in between).
     inline bool FileMove(char const* From, char const* To)
     {
+        std::string const Source = Detail::ResolvePath(From);
         std::string const Target = Detail::ResolvePath(To);
-        struct stat Info;
-        if (stat(Target.c_str(), &Info) == 0)
+#if defined(__APPLE__)
+        return renamex_np(Source.c_str(), Target.c_str(), RENAME_EXCL) == 0;
+#else
+        constexpr unsigned kRenameNoReplace = 1; // RENAME_NOREPLACE
+        if (syscall(SYS_renameat2, AT_FDCWD, Source.c_str(), AT_FDCWD, Target.c_str(), kRenameNoReplace) == 0)
+            return true;
+        if (errno != ENOSYS && errno != EINVAL)
             return false;
-        return std::rename(Detail::ResolvePath(From).c_str(), Target.c_str()) == 0;
+        // No renameat2 here (or the file system lacks it): link() refuses an existing target too.
+        if (link(Source.c_str(), Target.c_str()) != 0)
+            return false;
+        return unlink(Source.c_str()) == 0;
+#endif
     }
 
     // WIN32_FIND_DATAA with its field names and layout (320 bytes).
@@ -385,21 +453,42 @@ namespace Platform
         };
 
         // FindFirstFileA's wildcards, without regard to case: '*' any run, '?' one character.
-        // "*.*" also matches names without a dot, as on Windows.
+        // "*.*" also matches names without a dot, as on Windows. Linear backtracking to the last
+        // '*', so no pattern makes it slow.
         inline bool Matches(char const* Pattern, char const* Name)
         {
             if (std::strcmp(Pattern, "*.*") == 0)
                 return true;
-            if (*Pattern == 0)
-                return *Name == 0;
-            if (*Pattern == '*')
-                return Matches(Pattern + 1, Name) || (*Name != 0 && Matches(Pattern, Name + 1));
-            if (*Name == 0)
-                return false;
-            if (*Pattern == '?' || std::tolower(static_cast<unsigned char>(*Pattern)) ==
-                                       std::tolower(static_cast<unsigned char>(*Name)))
-                return Matches(Pattern + 1, Name + 1);
-            return false;
+            char const* StarPattern = nullptr;
+            char const* StarName = nullptr;
+            auto Same = [](char Left, char Right) {
+                return std::tolower(static_cast<unsigned char>(Left)) == std::tolower(static_cast<unsigned char>(Right));
+            };
+            while (*Name != 0)
+            {
+                if (*Pattern == '*')
+                {
+                    StarPattern = ++Pattern;
+                    StarName = Name;
+                }
+                else if (*Pattern != 0 && (*Pattern == '?' || Same(*Pattern, *Name)))
+                {
+                    ++Pattern;
+                    ++Name;
+                }
+                else if (StarPattern != nullptr)
+                {
+                    Pattern = StarPattern;
+                    Name = ++StarName;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            while (*Pattern == '*')
+                ++Pattern;
+            return *Pattern == 0;
         }
 
         // The next entry of Search that matches, filled into Data.
@@ -478,39 +567,108 @@ namespace Platform
             bool bManualReset = false;
             bool bSet = false;
             bool Signalled() const override { return bSet; }
-            void Acquire() override
+            bool Acquire() override
             {
                 if (!bManualReset)
                     bSet = false;
+                return false;
             }
         };
+
+        struct FMutex;
+
+        // Every mutex of the process, under WaitLock, so that a thread's end can abandon the
+        // ones it still owns.
+        inline std::set<FMutex*>& Mutexes()
+        {
+            static std::set<FMutex*> Registry;
+            return Registry;
+        }
 
         struct FMutex : FWaitable
         {
             FlULong Owner = 0;
             FlULong Count = 0;
+            bool bAbandoned = false; // its owner ended without releasing it; the next wait says so
+            FMutex();
+            ~FMutex() override;
             bool Signalled() const override { return Count == 0 || Owner == ThisThreadId(); }
-            void Acquire() override
+            bool Acquire() override;
+        };
+
+        // Abandons the mutexes the current thread still owns when it ends (WAIT_ABANDONED for the
+        // next waiter). Constructed by a thread's first mutex acquisition.
+        struct FThreadExit
+        {
+            ~FThreadExit()
             {
-                Owner = ThisThreadId();
-                ++Count;
+                FlULong const Self = ThisThreadId();
+                bool bAny = false;
+                {
+                    std::lock_guard<std::mutex> Lock(WaitLock());
+                    for (FMutex* Mutex : Mutexes())
+                    {
+                        if (Mutex->Count != 0 && Mutex->Owner == Self)
+                        {
+                            Mutex->Owner = 0;
+                            Mutex->Count = 0;
+                            Mutex->bAbandoned = true;
+                            bAny = true;
+                        }
+                    }
+                }
+                if (bAny)
+                    WaitSignal().notify_all();
             }
         };
 
-        // Waits for one object (WaitAll false: any, true: all), as WaitForMultipleObjects.
+        // Callers hold WaitLock.
+        inline FMutex::FMutex() { Mutexes().insert(this); }
+        inline FMutex::~FMutex()
+        {
+            std::lock_guard<std::mutex> Lock(WaitLock());
+            Mutexes().erase(this);
+        }
+        inline bool FMutex::Acquire()
+        {
+            thread_local FThreadExit Exit;
+            (void)Exit;
+            Owner = ThisThreadId();
+            ++Count;
+            bool const bWasAbandoned = bAbandoned;
+            bAbandoned = false;
+            return bWasAbandoned;
+        }
+
+        // The waitable object behind a handle, or nullptr (a file, a search, a closed value).
+        inline FWaitable* Waitable(Handle Object)
+        {
+            return Valid(Object) ? dynamic_cast<FWaitable*>(static_cast<FObject*>(Object)) : nullptr;
+        }
+
+        template <class T>
+        T* As(Handle Object)
+        {
+            return Valid(Object) ? dynamic_cast<T*>(static_cast<FObject*>(Object)) : nullptr;
+        }
+
+        // Waits for one object (WaitAll false: any, true: all), as WaitForMultipleObjects. An
+        // abandoned mutex returns kWaitAbandoned (+ its index when WaitAll is false).
         inline FlULong Wait(FlULong Count, Handle const* Objects, bool WaitAll, FlULong TimeoutMs)
         {
             if (Count == 0 || Objects == nullptr)
                 return kWaitFailed;
+            std::vector<FWaitable*> Items(Count);
             for (FlULong Index = 0; Index < Count; ++Index)
             {
-                if (!Valid(Objects[Index]))
+                Items[Index] = Waitable(Objects[Index]);
+                if (Items[Index] == nullptr)
                     return kWaitFailed;
             }
             auto Ready = [&](FlULong* Which) {
                 for (FlULong Index = 0; Index < Count; ++Index)
                 {
-                    bool const bSignalled = static_cast<FWaitable*>(Objects[Index])->Signalled();
+                    bool const bSignalled = Items[Index]->Signalled();
                     if (!WaitAll && bSignalled)
                     {
                         *Which = Index;
@@ -534,64 +692,97 @@ namespace Platform
             }
             if (WaitAll)
             {
+                bool bAbandoned = false;
                 for (FlULong Index = 0; Index < Count; ++Index)
-                    static_cast<FWaitable*>(Objects[Index])->Acquire();
-                return kWaitSignaled;
+                    bAbandoned = Items[Index]->Acquire() || bAbandoned;
+                return bAbandoned ? kWaitAbandoned : kWaitSignaled;
             }
-            static_cast<FWaitable*>(Objects[Which])->Acquire();
-            return kWaitSignaled + Which;
+            return (Items[Which]->Acquire() ? kWaitAbandoned : kWaitSignaled) + Which;
+        }
+
+        // A named event or mutex: the existing one of that name (one more reference), or a new one
+        // made by Make and registered. nullptr when the name is taken by another kind of object.
+        template <class T, class FMake>
+        Handle OpenOrCreate(char const* Name, FMake Make)
+        {
+            if (Name == nullptr || *Name == 0)
+            {
+                std::lock_guard<std::mutex> Lock(WaitLock());
+                return Make();
+            }
+            std::lock_guard<std::mutex> Lock(WaitLock());
+            auto const Found = Names().find(Name);
+            if (Found != Names().end())
+            {
+                T* const Existing = dynamic_cast<T*>(Found->second);
+                if (Existing == nullptr)
+                    return nullptr;
+                ++Existing->References;
+                return Existing;
+            }
+            T* const Created = Make();
+            if (Created != nullptr)
+            {
+                Created->Name = Name;
+                Names().emplace(Name, Created);
+            }
+            return Created;
         }
     }
 
-    // CreateEventA. Named events are not shared between processes here. nullptr on failure.
+    // CreateEventA. A named event is shared within this process (an existing one is opened, its
+    // settings unchanged), not between processes. nullptr on failure.
     inline Handle EventCreate(bool ManualReset, bool InitiallySet, char const* Name = nullptr)
     {
-        (void)Name;
-        Detail::FEvent* const Event = new (std::nothrow) Detail::FEvent();
-        if (Event != nullptr)
-        {
-            Event->bManualReset = ManualReset;
-            Event->bSet = InitiallySet;
-        }
-        return Event;
+        return Detail::OpenOrCreate<Detail::FEvent>(Name, [&]() -> Detail::FEvent* {
+            Detail::FEvent* const Event = new (std::nothrow) Detail::FEvent();
+            if (Event != nullptr)
+            {
+                Event->bManualReset = ManualReset;
+                Event->bSet = InitiallySet;
+            }
+            return Event;
+        });
     }
 
     // SetEvent / ResetEvent.
     inline bool EventSet(Handle Event)
     {
-        if (!Detail::Valid(Event))
+        Detail::FEvent* const Object = Detail::As<Detail::FEvent>(Event);
+        if (Object == nullptr)
             return false;
         {
             std::lock_guard<std::mutex> Lock(Detail::WaitLock());
-            static_cast<Detail::FEvent*>(Event)->bSet = true;
+            Object->bSet = true;
         }
         Detail::WaitSignal().notify_all();
         return true;
     }
     inline bool EventReset(Handle Event)
     {
-        if (!Detail::Valid(Event))
+        Detail::FEvent* const Object = Detail::As<Detail::FEvent>(Event);
+        if (Object == nullptr)
             return false;
         std::lock_guard<std::mutex> Lock(Detail::WaitLock());
-        static_cast<Detail::FEvent*>(Event)->bSet = false;
+        Object->bSet = false;
         return true;
     }
 
-    // CreateMutexA, not initially owned. nullptr on failure.
+    // CreateMutexA, not initially owned. A named mutex is shared within this process, as a named
+    // event. nullptr on failure.
     inline Handle MutexCreate(char const* Name = nullptr)
     {
-        (void)Name;
-        return new (std::nothrow) Detail::FMutex();
+        return Detail::OpenOrCreate<Detail::FMutex>(Name, [] { return new (std::nothrow) Detail::FMutex(); });
     }
 
     // ReleaseMutex: fails for a thread that does not own it.
     inline bool MutexRelease(Handle Mutex)
     {
-        if (!Detail::Valid(Mutex))
+        Detail::FMutex* const Object = Detail::As<Detail::FMutex>(Mutex);
+        if (Object == nullptr)
             return false;
         {
             std::lock_guard<std::mutex> Lock(Detail::WaitLock());
-            Detail::FMutex* const Object = static_cast<Detail::FMutex*>(Mutex);
             if (Object->Count == 0 || Object->Owner != Detail::ThisThreadId())
                 return false;
             if (--Object->Count == 0)
@@ -663,14 +854,15 @@ namespace Platform
             FlULong Id = 0;
             FlULong ExitCode = 0;
             bool bDone = false;
-            pthread_t Native{};
             bool Signalled() const override { return bDone; }
-            ~FThread() override { pthread_detach(Native); }
         };
 
+        // The thread detaches itself (its end is seen through bDone, never joined) and holds
+        // its own reference to the FThread until it is done, so CloseHandle may come first.
         inline void* RunThread(void* Argument)
         {
             FThread* const Thread = static_cast<FThread*>(Argument);
+            pthread_detach(pthread_self());
             {
                 std::unique_lock<std::mutex> Lock(WaitLock());
                 Thread->Id = ThisThreadId();
@@ -684,13 +876,13 @@ namespace Platform
                 Thread->bDone = true;
             }
             WaitSignal().notify_all();
+            Release(Thread);
             return nullptr;
         }
     }
 
     // CreateThread. StackSize 0 takes the default. Suspended starts it held until ThreadResume.
-    // ThreadId may be nullptr. nullptr on failure. The handle must outlive the thread (closing it
-    // while the thread runs is not supported here).
+    // ThreadId may be nullptr. nullptr on failure. Closing the handle does not stop the thread.
     inline Handle ThreadCreate(ThreadProc Proc, void* Parameter, FlULong StackSize = 0, bool Suspended = false,
                                FlULong* ThreadId = nullptr)
     {
@@ -700,11 +892,13 @@ namespace Platform
         Thread->Proc = Proc;
         Thread->Parameter = Parameter;
         Thread->Suspended = Suspended ? 1 : 0;
+        Thread->References = 2; // the handle's and the running thread's
+        pthread_t Native;
         pthread_attr_t Attributes;
         pthread_attr_init(&Attributes);
         if (StackSize != 0)
             pthread_attr_setstacksize(&Attributes, StackSize < PTHREAD_STACK_MIN ? PTHREAD_STACK_MIN : StackSize);
-        int const Result = pthread_create(&Thread->Native, &Attributes, &Detail::RunThread, Thread);
+        int const Result = pthread_create(&Native, &Attributes, &Detail::RunThread, Thread);
         pthread_attr_destroy(&Attributes);
         if (Result != 0)
         {
@@ -721,12 +915,12 @@ namespace Platform
     // ResumeThread: the previous suspend count, or 0xffffffff on failure.
     inline FlULong ThreadResume(Handle Thread)
     {
-        if (!Detail::Valid(Thread))
+        Detail::FThread* const Object = Detail::As<Detail::FThread>(Thread);
+        if (Object == nullptr)
             return 0xFFFFFFFFu;
         FlULong Previous = 0;
         {
             std::lock_guard<std::mutex> Lock(Detail::WaitLock());
-            Detail::FThread* const Object = static_cast<Detail::FThread*>(Thread);
             Previous = Object->Suspended;
             if (Object->Suspended > 0)
                 --Object->Suspended;
@@ -852,14 +1046,18 @@ namespace Platform
         std::string Resolved = Detail::ResolvePath(Path);
         if (Module const Loaded = dlopen(Resolved.c_str(), RTLD_NOW | RTLD_LOCAL))
             return Loaded;
-        if (Resolved.size() > 4 && strcasecmp(Resolved.c_str() + Resolved.size() - 4, ".dll") == 0)
+        std::size_t const Length = std::strlen(Path);
+        if (Length > 4 && strcasecmp(Path + Length - 4, ".dll") == 0)
         {
 #if defined(__APPLE__)
-            Resolved.replace(Resolved.size() - 4, 4, ".dylib");
+            std::string Native(Path);
+            Native.replace(Native.size() - 4, 4, ".dylib");
 #else
-            Resolved.replace(Resolved.size() - 4, 4, ".so");
+            std::string Native(Path);
+            Native.replace(Native.size() - 4, 4, ".so");
 #endif
-            return dlopen(Resolved.c_str(), RTLD_NOW | RTLD_LOCAL);
+            // Resolved again: the .dylib/.so may be spelled with another case than the .dll.
+            return dlopen(Detail::ResolvePath(Native.c_str()).c_str(), RTLD_NOW | RTLD_LOCAL);
         }
         return nullptr;
     }
@@ -874,12 +1072,15 @@ namespace Platform
     // FreeLibrary.
     inline bool ModuleFree(Module Library) { return Library != nullptr && dlclose(Library) == 0; }
 
-    // GetModuleHandleA: an already loaded module. nullptr names the executable.
+    // GetModuleHandleA: an already loaded module, nullptr naming the executable. Borrowed, as
+    // on Windows: the caller does not free it (the reference dlopen took is dropped here, and the
+    // module stays loaded by whoever loaded it).
     inline Module ModuleFind(char const* Name)
     {
-        if (Name == nullptr)
-            return dlopen(nullptr, RTLD_NOW);
-        return dlopen(Name, RTLD_NOW | RTLD_NOLOAD);
+        Module const Found = Name == nullptr ? dlopen(nullptr, RTLD_NOW) : dlopen(Name, RTLD_NOW | RTLD_NOLOAD);
+        if (Found != nullptr)
+            dlclose(Found);
+        return Found;
     }
 
     // GetProcAddress: nullptr when the module has no such export.
