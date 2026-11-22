@@ -31,9 +31,16 @@ fl_cl_options(luaprofile /wd4996)
 # The Lua 3.2 sources (every .c item): C, with their own warnings off.
 get_target_property(_lua luaprofile SOURCES)
 list(FILTER _lua INCLUDE REGEX "\\.c$")
-set_property(SOURCE ${_lua} APPEND PROPERTY COMPILE_OPTIONS
-  /wd4013 /wd4101 /wd4189 /wd4244 /wd4267
-  /wd4311 /wd4312 /wd4057 /wd4131 /wd4127 /wd4456 /wd4701 /wd4702 /wd4706 /wd4996)
+if(FL_WINDOWS)
+  set_property(SOURCE ${_lua} APPEND PROPERTY COMPILE_OPTIONS
+    /wd4013 /wd4101 /wd4189 /wd4244 /wd4267
+    /wd4311 /wd4312 /wd4057 /wd4131 /wd4127 /wd4456 /wd4701 /wd4702 /wd4706 /wd4996)
+else()
+  # Lua 3.2 hashes an object by its address cut to 32 bits (IntPoint, lobject.h): a hash only,
+  # never turned back into a pointer (C4311 above).
+  set_property(SOURCE ${_lua} APPEND PROPERTY COMPILE_OPTIONS
+    -Wno-pointer-to-int-cast $<$<C_COMPILER_ID:Clang,AppleClang>:-Wno-void-pointer-to-int-cast>)
+endif()
 fl_link(luaprofile
   LIBS dacom.lib
   REFERENCES dacom)

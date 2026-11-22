@@ -92,9 +92,10 @@ if(NOT FL_WINDOWS)
       # comment(lib, ...) and the like are MSVC's, with nothing to do here, and the retail code's
       # sprintf / vsprintf stay as they are (macOS's SDK marks them deprecated). Both after
       # -Wall, which turns the warnings on.
-      # The calling conventions are empty here too, also for a source that does not include
-      # <windows.h> (GCC knows none of them on x86-64 or arm64).
+      # The calling conventions are empty here too, and __int64 is long long, also for a source
+      # that does not include <windows.h> (the Lua 3.2 C files; GCC knows none of these).
       set(_posix_options "-D__declspec(x)=" -D__cdecl= -D__stdcall= -D__fastcall= -D__thiscall=
+          "-D__int64=long long"
           -Wno-unknown-pragmas -Wno-deprecated-declarations)
     endif()
     target_compile_definitions(${name} PRIVATE FREELANCER_ENABLE_TICK_PROFILE=0)
@@ -116,8 +117,33 @@ if(NOT FL_WINDOWS)
       target_link_libraries(${name} PRIVATE ${A_REFERENCES})
     endif()
   endfunction()
+  # fl_item(<files...> [<Key> <Value>]... [INCLUDE_DIRECTORIES <dirs...>]): only the include
+  # folders matter here; the MSVC code-generation keys are ignored.
+  function(fl_item)
+    set(_files)
+    set(_args ${ARGN})
+    while(_args)
+      list(GET _args 0 _a)
+      if(NOT _a MATCHES "\\.[A-Za-z]+$")
+        break()
+      endif()
+      list(APPEND _files "${_a}")
+      list(REMOVE_AT _args 0)
+    endwhile()
+    list(FIND _args INCLUDE_DIRECTORIES _at)
+    if(_at GREATER -1)
+      math(EXPR _at "${_at} + 1")
+      list(SUBLIST _args ${_at} -1 _dirs)
+      set(_absolute)
+      foreach(_dir IN LISTS _dirs)
+        get_filename_component(_dir "${_dir}" ABSOLUTE)
+        list(APPEND _absolute "${_dir}")
+      endforeach()
+      set_property(SOURCE ${_files} APPEND PROPERTY INCLUDE_DIRECTORIES ${_absolute})
+    endif()
+  endfunction()
   # MSVC-only settings: nothing to do here.
-  foreach(_fn fl_item fl_cl_options fl_rc fl_order_after fl_copy_dev_ini fl_copy_asan_runtime)
+  foreach(_fn fl_cl_options fl_rc fl_order_after fl_copy_dev_ini fl_copy_asan_runtime)
     cmake_language(EVAL CODE "function(${_fn})\nendfunction()")
   endforeach()
   return()

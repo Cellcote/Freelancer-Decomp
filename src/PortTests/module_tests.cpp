@@ -129,6 +129,12 @@ int main(int argc, char** argv)
     Check(Math != nullptr, "x86math.dll loads");
     Platform::Module const Files = Platform::ModuleLoad((Folder + "ReadFile.dll").c_str());
     Check(Files != nullptr, "ReadFile.dll loads");
+    Platform::Module const Zlib = Platform::ModuleLoad((Folder + "zlib.dll").c_str());
+    Check(Zlib != nullptr && Platform::ModuleSymbol(Zlib, "uncompress") != nullptr, "zlib.dll loads and exports uncompress");
+    Platform::Module const LuaProfile = Platform::ModuleLoad((Folder + "luaprofile.dll").c_str());
+    Check(LuaProfile != nullptr, "luaprofile.dll loads");
+    Platform::Module const Thorn = Platform::ModuleLoad((Folder + "Thorn.dll").c_str());
+    Check(Thorn != nullptr, "Thorn.dll loads");
 
     Platform::Module const Dacom = Platform::ModuleFind((Folder + "dacom.dylib").c_str()) != nullptr
                                        ? Platform::ModuleFind((Folder + "dacom.dylib").c_str())
@@ -146,6 +152,9 @@ int main(int argc, char** argv)
         Count = 0;
         Manager->EnumerateComponents("FileSystem", &CountComponent, &Count);
         Check(Count == 3, "ReadFile's DllMain registered its three file systems (DOS, UTF, MEM)");
+        Count = 0;
+        Manager->EnumerateComponents("IScriptEngine", &CountComponent, &Count);
+        Check(Count >= 1, "Thorn's DllMain registered its script engine");
         if (Files != nullptr)
             TestReadFile(Manager);
         Manager->Release();

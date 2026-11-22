@@ -167,7 +167,7 @@ inline void* AsOpaqueDword(float Value)
 {
     FlULong Bits = 0;
     std::memcpy(&Bits, &Value, sizeof(Bits));
-    return (void*)Bits;
+    return (void*)(std::uintptr_t)Bits;
 }
 
 inline void* AsOpaqueDword(int Value)
@@ -177,7 +177,7 @@ inline void* AsOpaqueDword(int Value)
 
 inline void* AsOpaqueDword(FlULong Value)
 {
-    return (void*)Value;
+    return (void*)(std::uintptr_t)Value;
 }
 
 // The other direction: a dword a caller is carrying as void* going into one of the slots

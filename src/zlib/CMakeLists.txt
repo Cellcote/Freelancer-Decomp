@@ -26,5 +26,9 @@ fl_add_module(zlib DLL RETAIL DEF zlib.def
 
 fl_includes(zlib vendor vendor/minizip)
 fl_defines(zlib ZLIB_WINAPI _CRT_NONSTDC_NO_DEPRECATE)
+if(NOT FL_WINDOWS)
+  # PORT(macOS): read / write / lseek / close come from <unistd.h> there (zconf.h).
+  fl_defines(zlib HAVE_UNISTD_H)
+endif()
 fl_cl_options(zlib /wd4244 /wd4267 /wd4996)
 fl_link(zlib)

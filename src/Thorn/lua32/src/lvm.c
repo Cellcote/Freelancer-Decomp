@@ -466,7 +466,7 @@ StkId luaV_execute (Closure *cl, TProtoFunc *tf, StkId base) {
         ttype(S->top-1) = res ? LUA_T_NUMBER : LUA_T_NIL;
         /* Retail 06f4d9be/06f4d9c4 stores integer words, without x87.
            A floating literal lets LTCG hoist waiting FLD1 into dispatch. */
-        const unsigned __int64 NumberOneBits = 0x3ff0000000000000ui64;
+        const unsigned __int64 NumberOneBits = 0x3ff0000000000000ULL;
         memcpy(&nvalue(S->top-1), &NumberOneBits, sizeof(NumberOneBits));
         break;
       }
@@ -595,7 +595,7 @@ StkId luaV_execute (Closure *cl, TProtoFunc *tf, StkId base) {
            (ttype(S->top-1) == LUA_T_NIL) ? LUA_T_NUMBER : LUA_T_NIL;
         /* Retail 06f4d9be/06f4d9c4 stores integer words, without x87.
            A floating literal lets LTCG hoist waiting FLD1 into dispatch. */
-        const unsigned __int64 NumberOneBits = 0x3ff0000000000000ui64;
+        const unsigned __int64 NumberOneBits = 0x3ff0000000000000ULL;
         memcpy(&nvalue(S->top-1), &NumberOneBits, sizeof(NumberOneBits));
         break;
       }
