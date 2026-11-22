@@ -983,7 +983,7 @@ endfunction()
 
 # Every output directory except bin\ (bin_debug\, binasan\, bin_x64\, bin_x64_debug\) gets the
 # dev *.ini and character files of bin\, with the absolute bin\ paths rewritten
-# (src/copy_dev_ini.py). A target of its own that runs on every build, as MSBuild's step after
+# (tools/copy_dev_ini.py). A target of its own that runs on every build, as MSBuild's step after
 # each build did, so an edit to a file in bin\ reaches the copies without relinking anything.
 function(fl_copy_dev_ini)
   find_package(Python3 COMPONENTS Interpreter)
@@ -997,7 +997,7 @@ function(fl_copy_dev_ini)
     set(_cond 1)
   endif()
   add_custom_target(dev_ini ALL
-    COMMAND "$<IF:${_cond},${Python3_EXECUTABLE};${FL_SRC_DIR}/copy_dev_ini.py;${FL_BIN_DIR},${CMAKE_COMMAND};-E;true>"
+    COMMAND "$<IF:${_cond},${Python3_EXECUTABLE};${PROJECT_SOURCE_DIR}/tools/copy_dev_ini.py;${FL_BIN_DIR},${CMAKE_COMMAND};-E;true>"
     COMMAND_EXPAND_LISTS VERBATIM)
   # Building one program (--target freelancer) refreshes the copies too.
   get_property(_exes GLOBAL PROPERTY FL_EXE_TARGETS)

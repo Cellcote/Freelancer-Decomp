@@ -39,7 +39,8 @@ installation of Freelancer (see [Local layout](#local-layout)).
 
 ```
 Freelancer\
-  src\        all source code, a CMakeLists.txt per module
+  src\        all source code, a CMakeLists.txt per module (map: src\README.md)
+  tools\      build and maintenance scripts
   bin\        Release output + the dev *.ini files (source of truth for the INI files)
   bin_debug\  Debug output       binasan\  DebugASan output
   EXE\        gundll.dll (in git, loaded); your retail binaries and Ghidra listings (not in git;
@@ -72,7 +73,7 @@ cmake --preset debug && cmake --build --preset debug
 
 Run `freelancer.exe` from the directory of the configuration you built. Every build into a
 directory other than `bin\` copies the dev `*.ini` from `bin\` with paths rewritten
-(`src/copy_dev_ini.py`) — edit the files in `bin\`, not the copies. The retail DLLs in `EXE\` are
+(`tools/copy_dev_ini.py`) — edit the files in `bin\`, not the copies. The retail DLLs in `EXE\` are
 not ASan-instrumented.
 
 Hunting memory leaks: [memory_diagnostics.md](memory_diagnostics.md).

@@ -55,7 +55,7 @@ presets; VS Code's CMake Tools does too.
 All output directories are siblings at the repo root, so every `..\DATA` / `..\EXE` path the game
 resolves from its exe directory works from each of them. Every build into a directory other than
 `bin\` copies the dev `*.ini` and character files from `bin\` with the absolute paths rewritten
-(`src/copy_dev_ini.py`): edit the files in `bin\`, not the copies.
+(`tools/copy_dev_ini.py`): edit the files in `bin\`, not the copies.
 
 Only the Ninja generator is supported: the Visual Studio generators would turn the options into
 MSBuild properties, and MSBuild adds its own defaults on top. The configure step stops with an

@@ -121,13 +121,14 @@ INI file the code reads.
 ## Repository layout
 
 ```
-src\          all source code, with a CMakeLists.txt per module (CMakeLists.txt and cmake\ at the root)
+src\          all source code, with a CMakeLists.txt per module; src\README.md maps the modules
 bin\          Win32 Release output and the runtime configuration files
 DATA_EXTRA\   the port's own data (shaders, volumetric.ini), next to the game's DATA
 EBUEula.dll   retail EULA dialog, loaded as ..\EBUEula.dll with ..\EULA.rtf (as the retail game does)
 EXE\          gundll.dll, the retail GUN client (multiplayer server list), loaded as ..\exe\gundll.dll
+cmake\        the build's CMake helpers (Freelancer.cmake); CMakeLists.txt and CMakePresets.json at the root
 docs\         documentation
-tools\        the RPGPU shader build script
+tools\        build and maintenance scripts (RPGPU shaders, the dev *.ini copy)
 ```
 
 `EBUEula.dll` and `gundll.dll` are the only retail binaries the port uses unchanged. They are
