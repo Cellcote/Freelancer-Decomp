@@ -155,8 +155,8 @@ long long MinUnit(BaseData const* Base, unsigned int GoodId)
     return Unit > 0 ? Unit : 0;
 }
 
-    // What the client's dealer offers: a market entry with stock (ClientMarket build,
-    // client_base_market.cpp: a minimum and a positive maximum).
+// What the client's dealer offers: a market entry with stock (ClientMarket build,
+// client_base_market.cpp: a minimum and a positive maximum).
 bool Sells(BaseData const* Base, unsigned int GoodId)
 {
     if (Base == nullptr)
@@ -188,7 +188,7 @@ void ResyncEquipment(PlayerSlot& Slot)
     g_pClientInterface->SendServerSetEquipment(Slot.client_id, Wire);
 }
 
-    // Purchases: charge what was bought and not paid for, and close the allowances.
+// Purchases: charge what was bought and not paid for, and close the allowances.
 void SettleBuys(PlayerSlot& Slot, FLedger& Ledger)
 {
     if (Ledger.Balance < 0)
@@ -199,7 +199,7 @@ void SettleBuys(PlayerSlot& Slot, FLedger& Ledger)
     Ledger.FreeAmmoLeft = 0;
 }
 
-    // A sale credit that no sale completed: never paid, and the client is told its real cash.
+// A sale credit that no sale completed: never paid, and the client is told its real cash.
 void DropCredit(PlayerSlot& Slot, FLedger& Ledger)
 {
     if (Ledger.bCredit)
@@ -252,8 +252,8 @@ long long ShipCeiling(PlayerSlot const& Slot, FLedger const& Ledger)
     return Ceiling;
 }
 
-    // A ship purchase that did not complete, or that the player could not pay for: the
-    // loadout and cash it changed go back to what they were.
+// A ship purchase that did not complete, or that the player could not pay for: the
+// loadout and cash it changed go back to what they were.
 void RollBackShip(PlayerSlot& Slot, FLedger& Ledger)
 {
     Ledger.bShip = false;
@@ -263,8 +263,8 @@ void RollBackShip(PlayerSlot& Slot, FLedger& Ledger)
         PlayerData_SetCash(Slot, Ledger.StartCash);
 }
 
-    // An open ship purchase is closed: complete when the hull arrived (cash held to the
-    // ceiling), otherwise undone.
+// An open ship purchase is closed: complete when the hull arrived (cash held to the
+// ceiling), otherwise undone.
 void FinishShip(PlayerSlot& Slot, FLedger& Ledger)
 {
     if (!Ledger.bShip)
@@ -280,8 +280,8 @@ void FinishShip(PlayerSlot& Slot, FLedger& Ledger)
         PlayerData_SetCash(Slot, ClampCash(Ceiling));
 }
 
-    // The lowest price paid for a good this dock: an honest client pays one price per good per
-    // dock, so a higher one can only raise the resale cap of the units bought earlier.
+// The lowest price paid for a good this dock: an honest client pays one price per good per
+// dock, so a higher one can only raise the resale cap of the units bought earlier.
 void NotePricePaid(FLedger& Ledger, unsigned int GoodId, long long Unit)
 {
     std::map<unsigned int, long long>::iterator It = Ledger.UnitPaid.find(GoodId);
