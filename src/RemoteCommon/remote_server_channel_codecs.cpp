@@ -428,7 +428,7 @@ static unsigned int RpcServerDecodeCreateObjectEquip(FPacketBase& Packet,
 #if defined(REMOTECLIENT_EXPORTS)
         // RC 06b51d95..06b51dca: the run is checked first (not committed); a failed
         // allocation returns 5.
-        if (Packet.MarshalCursor + Record->HardpointSize > Packet.MarshalLimit)
+        if (RpcRunExceedsLimit(Packet.MarshalCursor, Record->HardpointSize, Packet.MarshalLimit))
             Packet.MarshalError = 0x17u;
         if (Packet.MarshalError != 0) return Packet.MarshalError;
         Record->Hardpoint = static_cast<char*>(
@@ -484,7 +484,8 @@ unsigned int RpcServerCreateObjectDecode(FPacketBase& Packet, FRpcWireStream& St
 #if defined(REMOTECLIENT_EXPORTS)
         // RC 06b518bd..06b518ec: the run is checked first (not committed); a failed
         // allocation returns 5.
-        if (Packet.MarshalCursor + Bytes > Packet.MarshalLimit) Packet.MarshalError = 0x17u;
+        if (RpcRunExceedsLimit(Packet.MarshalCursor, Bytes, Packet.MarshalLimit))
+            Packet.MarshalError = 0x17u;
         if (Packet.MarshalError != 0) return Packet.MarshalError;
         Fields.Costume.Ids = static_cast<unsigned int*>(::operator new(Bytes, std::nothrow));
         if (Fields.Costume.Ids == nullptr) return 5u;
@@ -1246,7 +1247,8 @@ unsigned int RpcServerBlobDecode(FPacketBase& Packet, unsigned int& Size,
     FRpcWireStream Stream(Packet, const_cast<unsigned char*>(Buffer), InSize);
     if (!Stream.Get(&Size, 4u)) return Packet.MarshalError;
 #if defined(REMOTECLIENT_EXPORTS)
-    if (Packet.MarshalCursor + Size > Packet.MarshalLimit) Packet.MarshalError = 0x17u;
+    if (RpcRunExceedsLimit(Packet.MarshalCursor, Size, Packet.MarshalLimit))
+        Packet.MarshalError = 0x17u;
     if (Packet.MarshalError != 0) return Packet.MarshalError;
     Data = static_cast<unsigned char*>(::operator new(Size, std::nothrow));
     if (Data == nullptr) return 5u;
@@ -1364,7 +1366,8 @@ unsigned int FRpcServerCreateShipPacket::Decode(const unsigned char* Buffer,
 #if defined(REMOTECLIENT_EXPORTS)
             // RC 06b400fb..06b40129: the run is checked first (not committed); a failed
             // allocation returns 5.
-            if (MarshalCursor + Bytes > MarshalLimit) MarshalError = 0x17u;
+            if (RpcRunExceedsLimit(MarshalCursor, Bytes, MarshalLimit))
+                MarshalError = 0x17u;
             if (MarshalError != 0) return MarshalError;
             DisplayName = static_cast<wchar_t*>(::operator new(Bytes + 2u, std::nothrow));
             if (DisplayName == nullptr) return 5u;
@@ -1662,7 +1665,8 @@ unsigned int FRpcServerEquipListPacketBase::DecodeEquipment(FRpcWireStream& Stre
         if (!Stream.Get(&Record->Field_0x0f, 1u)) return MarshalError;
         if (!Stream.Get(&Record->HardpointSize, 2u)) return MarshalError;
 #if defined(REMOTECLIENT_EXPORTS)
-        if (MarshalCursor + Record->HardpointSize > MarshalLimit) MarshalError = 0x17u;
+        if (RpcRunExceedsLimit(MarshalCursor, Record->HardpointSize, MarshalLimit))
+            MarshalError = 0x17u;
         if (MarshalError != 0) return MarshalError;
         Record->Hardpoint = static_cast<char*>(::operator new(Record->HardpointSize, std::nothrow));
         if (Record->Hardpoint == nullptr) return 5u;
@@ -1670,6 +1674,15 @@ unsigned int FRpcServerEquipListPacketBase::DecodeEquipment(FRpcWireStream& Stre
         Record->Hardpoint = static_cast<char*>(::operator new(Record->HardpointSize, std::nothrow));
 #endif
         if (!Stream.Get(Record->Hardpoint, Record->HardpointSize)) return MarshalError;
+#if defined(REMOTECLIENT_EXPORTS)
+        // PORT(deviation) REMOTE-PACKET-HARDENING: the client sends strlen + 1 bytes for a
+        // named hardpoint and 0 for an internal item (RemoteServer IServerImpl::ReqEquipment);
+        // the dispatch hands a named one to StringAlloc, which reads to a terminator.
+        if (Record->HardpointSize != 0 && Record->Hardpoint[Record->HardpointSize - 1] != '\0') {
+            MarshalError = 0x17u;
+            return MarshalError;
+        }
+#endif
         Equipment->PushBack(Record);
     }
     return 0;
@@ -2013,7 +2026,8 @@ unsigned int FRpcServerSetAddItemPacket::Decode(const unsigned char* Buffer,
     if (!Stream.Get(&HardpointSize, 4u)) return MarshalError;
     if (HardpointSize != 0) {
 #if defined(REMOTECLIENT_EXPORTS)
-        if (MarshalCursor + HardpointSize > MarshalLimit) MarshalError = 0x17u;
+        if (RpcRunExceedsLimit(MarshalCursor, HardpointSize, MarshalLimit))
+            MarshalError = 0x17u;
         if (MarshalError != 0) return MarshalError;
         Hardpoint = static_cast<char*>(::operator new(HardpointSize, std::nothrow));
         if (Hardpoint == nullptr) return 5u;
@@ -2080,7 +2094,8 @@ unsigned int FRpcServerRequestSpaceScriptPacket::Decode(const unsigned char* Buf
     if (!Stream.Get(&NameSize, 4u)) return MarshalError;
     if (NameSize != 0) {
 #if defined(REMOTECLIENT_EXPORTS)
-        if (MarshalCursor + NameSize > MarshalLimit) MarshalError = 0x17u;
+        if (RpcRunExceedsLimit(MarshalCursor, NameSize, MarshalLimit))
+            MarshalError = 0x17u;
         if (MarshalError != 0) return MarshalError;
         if (Name != nullptr) ::operator delete(Name);
         Name = static_cast<char*>(::operator new(NameSize, std::nothrow));
@@ -2558,7 +2573,9 @@ unsigned int FRpcServerSetReputationPacket::Decode(const unsigned char* Buffer,
             if (!Stream.Get(&Length, 1u)) return MarshalError;
             DisplayNameLength = static_cast<int>(Length);
 #if defined(REMOTECLIENT_EXPORTS)
-            if (MarshalCursor + (static_cast<unsigned int>(DisplayNameLength) << 1) > MarshalLimit) {
+            if (RpcRunExceedsLimit(MarshalCursor,
+                                   (static_cast<unsigned int>(DisplayNameLength) << 1),
+                                   MarshalLimit)) {
                 MarshalError = 0x17u;
             }
             if (MarshalError != 0) return MarshalError;
@@ -2666,7 +2683,8 @@ unsigned int FRpcServerSetGroupFeelingsPacket::Decode(const unsigned char* Buffe
     if (!Stream.Get(&NameSize, 4u)) return MarshalError;
     if (NameSize > 0) {
 #if defined(REMOTECLIENT_EXPORTS)
-        if (MarshalCursor + NameSize > MarshalLimit) MarshalError = 0x17u;
+        if (RpcRunExceedsLimit(MarshalCursor, NameSize, MarshalLimit))
+            MarshalError = 0x17u;
         if (MarshalError != 0) return MarshalError;
         Name = static_cast<char*>(::operator new(NameSize, std::nothrow));
         if (Name == nullptr) return 5u;
@@ -3141,7 +3159,8 @@ unsigned int FRpcServerLoadHintPacket::Decode(const unsigned char* Buffer,
     if (!Stream.Get(&Size, 4u)) return MarshalError;
     if (!Stream.Get(&Kind, 4u)) return MarshalError;
 #if defined(REMOTECLIENT_EXPORTS)
-    if (MarshalCursor + Size > MarshalLimit) MarshalError = 0x17u;
+    if (RpcRunExceedsLimit(MarshalCursor, Size, MarshalLimit))
+        MarshalError = 0x17u;
     if (MarshalError != 0) return MarshalError;
     Data = static_cast<unsigned char*>(::operator new(Size, std::nothrow));
     if (Data == nullptr) return 5u;
@@ -3301,7 +3320,8 @@ unsigned int FRpcServerPlayerListPacket::Decode(const unsigned char* Buffer,
     if (Count != 0) {
         const unsigned int Bytes = static_cast<unsigned int>(Count) * 2u;
 #if defined(REMOTECLIENT_EXPORTS)
-        if (MarshalCursor + Bytes > MarshalLimit) MarshalError = 0x17u;
+        if (RpcRunExceedsLimit(MarshalCursor, Bytes, MarshalLimit))
+            MarshalError = 0x17u;
         if (MarshalError != 0) return MarshalError;
 #endif
         Name = static_cast<wchar_t*>(std::malloc(Bytes));
@@ -3472,6 +3492,13 @@ unsigned int FRpcServerSendCommPacket::Decode(const unsigned char* Buffer,
         Body.PartIds[3] = 0;
         unsigned char CountByte = 0;
         if (!Stream.Get(&CountByte, 1u)) return MarshalError;
+        // PORT(deviation) REMOTE-PACKET-HARDENING: retail does not check the count against
+        // AccessoryIds[8]; Ids[8] then overwrites AccessoryCount (the loop bound) and later
+        // ids reach the owned pointer Field_0x64. A costume holds at most 8 accessories.
+        if (CountByte > 8u) {
+            MarshalError = 0x17u;
+            return MarshalError;
+        }
         Body.AccessoryCount = CountByte;
         unsigned int* Ids = &Body.AccessoryIds[0];
         for (int Index = 0; Index < static_cast<int>(Body.AccessoryCount); ++Index) {
@@ -3488,7 +3515,8 @@ unsigned int FRpcServerSendCommPacket::Decode(const unsigned char* Buffer,
     if (!Stream.Get(&Field_0x68, 1u)) return MarshalError;
     const unsigned int ExtraBytes = static_cast<unsigned int>(static_cast<int>(Field_0x68)) * 4u;
 #if defined(REMOTECLIENT_EXPORTS)
-    if (MarshalCursor + ExtraBytes > MarshalLimit) MarshalError = 0x17u;
+    if (RpcRunExceedsLimit(MarshalCursor, ExtraBytes, MarshalLimit))
+        MarshalError = 0x17u;
     if (MarshalError != 0) return MarshalError;
 #endif
     if (Field_0x64 != nullptr) ::operator delete(Field_0x64);
@@ -3649,7 +3677,8 @@ unsigned int FRpcServerMiscObjUpdatePacket::Decode(const unsigned char* Buffer,
         unsigned short Length = 0;
         if (!Stream.Get(&Length, 2u)) return MarshalError;
 #if defined(REMOTECLIENT_EXPORTS)
-        if (MarshalCursor + Length > MarshalLimit) MarshalError = 0x17u;
+        if (RpcRunExceedsLimit(MarshalCursor, Length, MarshalLimit))
+            MarshalError = 0x17u;
         if (MarshalError != 0) return MarshalError;
         wchar_t* Chars = static_cast<wchar_t*>(std::malloc(static_cast<unsigned int>(Length) * 2u + 2u));
         if (Chars == nullptr) return 5u;
@@ -3931,7 +3960,8 @@ static unsigned int RpcServerGetIdBlock(FRpcWireStream& Stream, FPacketBase& Pac
     if (static_cast<unsigned int>(Block->Count) != 0) {                      // 06bdf43e JBE
         const unsigned int Bytes = static_cast<unsigned int>(Block->Count) << 2;
 #if defined(REMOTECLIENT_EXPORTS)
-        if (Packet.MarshalCursor + Bytes > Packet.MarshalLimit) Packet.MarshalError = 0x17u;
+        if (RpcRunExceedsLimit(Packet.MarshalCursor, Bytes, Packet.MarshalLimit))
+            Packet.MarshalError = 0x17u;
         if (Packet.MarshalError != 0) return Packet.MarshalError;
         Block->Ids = static_cast<unsigned int*>(::operator new(Bytes, std::nothrow));
         if (Block->Ids == nullptr) return 5u;
@@ -4015,7 +4045,8 @@ unsigned int FRpcServerCharacterInfoPacket::Decode(const unsigned char* Buffer,
             if (!Stream.Get(&E->HardpointSize, 2u)) return MarshalError;     // 06bdf85f
 #if defined(REMOTECLIENT_EXPORTS)
             // RC 06b411fc..06b41226: the run is checked first, a null block returns 5.
-            if (MarshalCursor + E->HardpointSize > MarshalLimit) MarshalError = 0x17u;
+            if (RpcRunExceedsLimit(MarshalCursor, E->HardpointSize, MarshalLimit))
+                MarshalError = 0x17u;
             if (MarshalError != 0) return MarshalError;
             E->Hardpoint = static_cast<char*>(::operator new(E->HardpointSize, std::nothrow));
             if (E->Hardpoint == nullptr) return 5u;

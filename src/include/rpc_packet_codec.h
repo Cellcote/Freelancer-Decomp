@@ -58,6 +58,15 @@ inline void RpcWireRecord(unsigned int PacketId, unsigned int Length, bool bEnco
     }
 }
 
+// PORT(deviation) REMOTE-PACKET-HARDENING: whether a run of Width bytes at Cursor ends past
+// Limit. Retail computes `Cursor + Width > Limit` in 32 bits, so a Width near 0xffffffff from
+// the wire wraps the sum and passes. This form gives the same answer whenever the sum does not
+// wrap, which is every legitimate packet, and rejects the wrapped ones.
+inline bool RpcRunExceedsLimit(unsigned int Cursor, unsigned int Width, unsigned int Limit)
+{
+    return Cursor > Limit || Width > Limit - Cursor;
+}
+
 class FRpcWireStream {
 public:
     FRpcWireStream(FPacketBase& InPacket, void* Buffer, unsigned int Capacity)
@@ -195,8 +204,10 @@ public:
 
 private:
     bool Advance(unsigned int Width, unsigned int Error) {
-        Packet.MarshalCursor += Width;
-        if (Packet.MarshalCursor > Packet.MarshalLimit) Packet.MarshalError = Error;
+        const unsigned int Before = Packet.MarshalCursor;
+        Packet.MarshalCursor = Before + Width;
+        if (RpcRunExceedsLimit(Before, Width, Packet.MarshalLimit))
+            Packet.MarshalError = Error;
         return Packet.MarshalError == 0;
     }
 

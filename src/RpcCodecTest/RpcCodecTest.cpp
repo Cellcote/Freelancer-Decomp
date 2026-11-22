@@ -140,48 +140,8 @@ namespace
         InterlockedIncrement(&GEngineMessages);
     }
 
-    // Inputs that corrupt the heap inside the codec, as they would in retail RemoteClient.dll.
-    // The process cannot survive them (the CRT ends it on heap corruption), so they are skipped
-    // and listed in the output. Each one is a retail bug a remote peer can trigger.
-    typedef bool (*FOverflowTest)(const std::vector<unsigned char>& Bytes);
-
-    unsigned int ReadDword(const std::vector<unsigned char>& Bytes, size_t Offset)
-    {
-        return (unsigned int)Bytes[Offset] | ((unsigned int)Bytes[Offset + 1] << 8)
-            | ((unsigned int)Bytes[Offset + 2] << 16) | ((unsigned int)Bytes[Offset + 3] << 24);
-    }
-
-    // FRpcCommonBufferPacketBase::Decode: size 0xffffffff passes the bounds preflight
-    // (4 + size wraps to 3), the terminator byte makes the allocation size wrap to 0, and the
-    // payload copy of 0xffffffff bytes then overruns the heap.
-    bool SetWeaponGroupOverflows(const std::vector<unsigned char>& Bytes)
-    {
-        return Bytes.size() >= 4 && ReadDword(Bytes, 0) == 0xffffffffu;
-    }
-
-    // FRpcServerSendCommPacket::Decode: with the costume flag (byte 12) set, the accessory
-    // count byte (byte 21) is not checked against Costume::AccessoryIds[8]; the loop writes
-    // past the array, the packet's later members and the 0x78-byte allocation.
-    bool SendCommOverflows(const std::vector<unsigned char>& Bytes)
-    {
-        return Bytes.size() >= 22 && Bytes[12] != 0 && Bytes[21] > 8;
-    }
-
-    // FRpcServerSetReputationPacket::Decode, single player only: with the display-name flag
-    // (4) set, the name's signed length byte (after the flags, the target and, with flag 1,
-    // the affiliation) is not checked for a negative value. At -1 the bounds preflight wraps,
-    // the allocation of length * 4 + 4 bytes is 0 bytes and succeeds, and the copy of
-    // 0xfffffffe bytes overruns the heap. Other negative lengths fault on a null pointer,
-    // which the guard would catch; every negative length is skipped to stay clear of both.
-    bool SetReputationOverflows(const std::vector<unsigned char>& Bytes)
-    {
-        if (!SinglePlayer() || Bytes.empty() || (Bytes[0] & 4) == 0)
-        {
-            return false;
-        }
-        const size_t LengthOffset = 5 + ((Bytes[0] & 1) != 0 ? 4 : 0);
-        return Bytes.size() > LengthOffset && Bytes[LengthOffset] >= 0x80;
-    }
+    // Each entry tests one input for a packet type.
+    typedef bool (*FInputTest)(const std::vector<unsigned char>& Bytes);
 
     // Inputs whose decoded packet cannot be encoded deterministically: the encoder would read
     // memory the decoder never wrote. The decode is still recorded; the encode is skipped.
@@ -210,44 +170,24 @@ namespace
         return true;
     }
 
-    struct FKnownOverflow
+    struct FKnownInput
     {
         unsigned int PacketId;
-        FOverflowTest Overflows;
+        FInputTest Matches;
         const char* Reason;
     };
 
-    const FKnownOverflow KnownOverflows[] = {
-        { 0x10011u, SetWeaponGroupOverflows,
-            "retail heap overflow: size 0xffffffff wraps the bounds check and the allocation" },
-        { 0x2004fu, SendCommOverflows,
-            "retail heap overflow: accessory count above 8 overruns Costume::AccessoryIds" },
-        { 0x20029u, SetReputationOverflows,
-            "retail heap overflow (single player): negative display-name length wraps the bounds check and the allocation" },
+    const FKnownInput KnownUnreadable[] = {
+        {0x20052u, PlayerListNameUnterminated,
+         "encode skipped: the decoded name has no terminator and Encode reads past it (retail)"},
     };
 
-    const FKnownOverflow KnownUnreadable[] = {
-        { 0x20052u, PlayerListNameUnterminated,
-            "encode skipped: the decoded name has no terminator and Encode reads past it (retail)" },
-    };
-
-    const FKnownOverflow* FindKnownUnreadable(unsigned int PacketId, const std::vector<unsigned char>& Bytes)
+    const FKnownInput* FindKnownUnreadable(unsigned int PacketId,
+                                           const std::vector<unsigned char>& Bytes)
     {
-        for (const FKnownOverflow& Entry : KnownUnreadable)
+        for (const FKnownInput& Entry : KnownUnreadable)
         {
-            if (Entry.PacketId == PacketId && Entry.Overflows(Bytes))
-            {
-                return &Entry;
-            }
-        }
-        return nullptr;
-    }
-
-    const FKnownOverflow* FindKnownOverflow(unsigned int PacketId, const std::vector<unsigned char>& Bytes)
-    {
-        for (const FKnownOverflow& Entry : KnownOverflows)
-        {
-            if (Entry.PacketId == PacketId && Entry.Overflows(Bytes))
+            if (Entry.PacketId == PacketId && Entry.Matches(Bytes))
             {
                 return &Entry;
             }
@@ -473,12 +413,6 @@ namespace
     {
         ++Counts.Cases;
         SetCase(Input.Name);
-        if (const FKnownOverflow* Overflow = FindKnownOverflow(PacketId, Input.Bytes))
-        {
-            ++Counts.Skipped;
-            fprintf(Out, "  %-10s skipped: %s\n", Input.Name, Overflow->Reason);
-            return;
-        }
         FCodecResult Allocation;
         FPacketBase* Packet = NewPacket(Info, Allocation);
         if (Packet == nullptr)
@@ -501,7 +435,7 @@ namespace
         }
         ++Counts.Decoded;
 
-        if (const FKnownOverflow* Unreadable = FindKnownUnreadable(PacketId, Input.Bytes))
+        if (const FKnownInput* Unreadable = FindKnownUnreadable(PacketId, Input.Bytes))
         {
             ++Counts.Skipped;
             fprintf(Out, "  %-10s dec=0 used=%u %s\n", Input.Name, Decode.Length, Unreadable->Reason);

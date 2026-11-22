@@ -72,32 +72,13 @@ loaded: the lookups return 0, and the misses they report through `FDUMP` are onl
   `wcslen` of it. When an input's name has no terminator, the decode is recorded but the encode
   is skipped.
 
-**Known retail overflows.** Some inputs corrupt the heap inside the codec, exactly as they
-would in retail `RemoteClient.dll`. The CRT then ends the process, so the test cannot survive
-them. They are listed in `KnownOverflows` and appear in the output as `skipped:` with the reason.
-Each is a retail bug a remote client can trigger, and is kept for fidelity:
-
-- `SET_WEAPON_GROUP` (0x10011) with size `0xffffffff`. The bounds preflight computes
-  `4 + size`, which wraps to 3 and passes. The allocation size `size + 1` (for the terminator)
-  wraps to 0. The payload copy of `0xffffffff` bytes then overruns the heap.
-- `SENDCOMM` (0x2004f) with the costume flag set and an accessory count above 8. The decoder
-  writes that many ids into `Costume::AccessoryIds[8]`, past the packet's other members and its
-  0x78-byte allocation.
-
-- `SETREPUTATION` (0x20029) in single-player mode, with the display-name flag set and a
-  negative length byte. At -1 the bounds preflight wraps, the `length * 4 + 4` allocation is
-  0 bytes, and the copy of `0xfffffffe` bytes overruns the heap. The test skips every negative
-  length. In single player, client and server share one process, so this packet never
-  crosses the network there.
-
-One more is known but not reached by the current inputs. `CREATESHIP` (0x20004) in
-multiplayer, with owner flag 4 and a display-name length byte of 0x80 or more: the signed
-length doubles to a size near `0xffffffff`, the bounds preflight wraps, the `+2` allocation
-wraps to 0, and the copy overruns the heap.
-
-`SET_WEAPON_GROUP` is a COMMON packet the server decodes from clients, so any client can
-crash a server with it. The others are SERVER packets, which a client decodes: a malicious
-server could crash its clients.
+**Overflows fixed in the port.** Retail `RemoteClient.dll` corrupts the heap on some of these
+inputs: `SET_WEAPON_GROUP` (0x10011) with size `0xffffffff`, `SENDCOMM` (0x2004f) with more
+than 8 costume accessories, and `SETREPUTATION` (0x20029) in single-player mode with a negative
+display-name length, plus `CREATESHIP` (0x20004) with a long display name, which no current
+input reaches. The test used to skip them. The port's codecs now reject them with `0x17`
+([re/deviations.md](re/deviations.md#remoteclient-hostile-packets-refused-remote-packet-hardening-2026-11-22)),
+so they are recorded like any other failed decode.
 
 Run it from `bin\`:
 

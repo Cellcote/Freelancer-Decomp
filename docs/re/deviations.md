@@ -303,3 +303,28 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 **Retail.** `CClientImpl::DisconnectClient` always decrements `NumClients`, disconnects the proxy it finds, calls `IServer::DisConnect` and clears slot `ClientId - 1`. A server-side kick (`PlayerDB::LockAccountAccess` and the account-delete path, IClient slot 17) runs it once directly and once more from `OnDisconnect` when DirectPlay's `DESTROY_PLAYER` is dispatched, so `NumClients` drifts below the real count, Server.dll gets a second `DisConnect`, and the second clear (and the proxy's destructor) can empty a slot a new client has taken in between. With every one of the 128 slots taken, `OnConnect` carries on with id 0. FLServer's `GClientStats[0x10]` is filled by `GetClientStats` with one record per connected proxy, guarded only by the drifting `GetNumClients() > 0x10` sampled on the UI thread.
 **Port.** Only a `DisconnectClient` that finds the live proxy decrements the count and releases the slot; the proxy is then marked released (it keeps its id for packets still in flight) and its `OnDisconnect` and destructor leave the slot alone. Every `IClient::DisconnectClient` call still reaches `IServer::DisConnect`. `OnConnect` with no free slot disconnects the proxy instead of using id 0 (unreachable while the DirectPlay session is no larger than the table). FLServer's two stats buffers hold 0x80 records; only the first 16 are logged, as in retail.
 **Why.** The double release breaks the client count and can detach a live client; both get worse as the player limit is raised.
+
+## RemoteClient: hostile packets refused (REMOTE-PACKET-HARDENING, 2026-11-22)
+
+> **Status:** OPEN (retail defects fixed; owner's decision 2026-11-22: input that a retail client cannot produce may be refused)
+> **Owner:** RemoteClient (`src/RemoteClient/RemoteClient_transport.cpp`, `CRemoteClientProxy::OnReceive`) and the packet codecs (`src/include/rpc_packet_codec.h`, `src/RemoteCommon/`); code tagged `PORT(deviation) REMOTE-PACKET-HARDENING`
+> **Removal condition:** none planned; retail lets any connected peer corrupt the server's heap.
+
+**Rule.** A change here may only refuse input that no retail client sends. Each item below names the client code that shows it never does. Legitimate traffic decodes to the same packets, and the same handlers are called in the same order.
+
+**Retail → port:**
+- **Receive loop (06b3932d).** Retail loops while bytes remain in a message, but moves the cursor by the 2-byte header only, and an odd remainder reaches `Decode` as `0xffffffff`. It decodes every registered type, the server-to-client (channel 2) ones included. The port decodes one packet per message. An empty message, one under 2 bytes, or one on a channel other than 1 or 3 disconnects the peer. The retail client sends one channel-1 or channel-3 packet per message (RemoteServer `PushToServer`, 06bd9ac0), and DALib answers 1-byte pings before `OnReceive`.
+- **Packets a multiplayer client never sends** are dropped before decoding:
+  - SET_MISSION_LOG, SAVEGAME, DOCK and COMMCOMPLETE: sent only in single player. See `nn_story_star.cpp`, the save page, `space_state.cpp` 0x0054a79a and `hud_comm.cpp`.
+  - The six DBG packets, which retail logs as "encountered in release mode".
+  - TRADERESPONSE, which has no client sender.
+- **Length checks.** `FRpcWireStream::Advance` and every `MarshalCursor + N > MarshalLimit` preflight computed the sum in 32 bits, so a size near `0xffffffff` wrapped and passed. `RpcRunExceedsLimit` gives the same answer whenever the sum does not wrap, and refuses the wrapped ones. This covers SET_WEAPON_GROUP, CREATESHIP and SETREPUTATION, and is in both DLLs' codecs.
+- **SENDCOMM.** The accessory count is refused above 8, the size of `Costume::AccessoryIds`. This applies in both DLLs.
+- **SAVEGAME.** `Description` and `DescriptionCount` start empty. Retail left them uninitialised, and the destructor freed `Description` after a count-0 decode.
+- **CREATENEWCHAR.** `Name` starts empty. RemoteClient also refuses an empty name, or one that starts with a NUL. The create page never sends either (0x005615c6), and it sends the length without a terminator.
+- **PLAYER_TRADE on a multiplayer server.** Retail read the uncounted target DWORD (actions 04/08/10) and wrote one (action 40) past the received message. The port touches it only when it is counted. Clients leave it out there, and the dispatch does not use it.
+- **Hardpoint names.** In REQEQUIPMENT, REQCARGO, REQADDITEM and REQMODIFYITEM, RemoteClient refuses a non-empty hardpoint whose last byte is not 0. The client always sends `strlen + 1` bytes, and `StringAlloc` reads to the terminator.
+
+**Not changed.** A packet that fails to decode is still not released, as in retail, because a failed `Decode` can leave owned pointers unset.
+
+**Tests.** RpcCodecTest used to skip the overflowing inputs. It now records them as failed decodes (`0x17`), so its output differs from the base: the PR carries `codecs: expected change`.
