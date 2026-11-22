@@ -17,10 +17,10 @@
 //   FindObject's query [3], and an IChannel bind map's [3];
 // - an IChannel key (CreateTyped / CreateFromObject / FindObject results, and the ChannelKey of
 //   IChannelOwner and IChannelSink calls): a typed channel;
-// - an IChannel bind map's [1] (the IChannelSink) and [2] (its context);
 // - an archetype handle passed as an int (IEngine::QueryEngineComponent's Id).
-// GetFirstInstanceField's cookie and the event keys a sink receives are HandleValue ids of
-// EngBase's (opaque outside it). A playback id is a counter, not an address.
+// An IChannel bind map's [1] (the IChannelSink) and [2] (its context) are HandleValue ids
+// (handle_value.h): callers pass any object there. GetFirstInstanceField's cookie and the event
+// keys a sink receives are HandleValue ids too. A playback id is a counter, not an address.
 
 #include "dacom.h"
 

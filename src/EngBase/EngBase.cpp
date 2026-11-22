@@ -688,6 +688,7 @@ FAnimTrack::~FAnimTrack()
 
 FAnimNameEntry::~FAnimNameEntry()
 {
+    HandleValue::Forget(Name); // GetFirstInstanceField's cookie names it
     std::free(Name);
     std::vector<FAnimTrack>().swap(Tracks);
     if (LongestChannel != nullptr)
@@ -1851,7 +1852,7 @@ FlULong TypedTick(FTypedChannel* This, float Dt)
         Result = TypedCollect(This, OldTime, This->Time, 3, &Keys[0][0], 0x40, &KeyCount);
         if (KeyCount == 0)                                       // 0661b4d6..d8
             return Result;
-        void* Sink = LowArena::Decode<void>((FlLong)This->Field0C);
+        void* Sink = const_cast<void*>(HandleValue::ObjectOf(This->Field0C));
         if (Sink == nullptr)                                     // 0661b4de..e3
             return Result;
         FChannelKeyBatch Batch;                                  // frame +0xA0
@@ -1860,7 +1861,7 @@ FlULong TypedTick(FTypedChannel* This, float Dt)
         std::memcpy(Batch.Keys, Keys, (KeyCount & 0x1FFFFFFFu) * 2 * sizeof(float));
         IChannelSink* KeySink = (IChannelSink*)Sink;
         KeySink->OnKeys((FlULong)LowArena::Encode(This),
-                        LowArena::Decode<void>((FlLong)This->Field10),
+                        const_cast<void*>(HandleValue::ObjectOf(This->Field10)),
                         &Batch); // 0661b50c..1c
         return Result;
     }
@@ -1911,12 +1912,12 @@ FlULong TypedTick(FTypedChannel* This, float Dt)
                 Math->QuaternionToMatrix(*(FMatrix*)(&Frame[12]),
                                          *(const FQuaternion*)(Pose->AppliedQuat));
                 std::memcpy(Frame, &Frame[12], 9 * sizeof(float)); // 0661b648..5d
-                void* Sink = LowArena::Decode<void>((FlLong)This->Field0C);
+                void* Sink = const_cast<void*>(HandleValue::ObjectOf(This->Field0C));
                 if (Sink != nullptr)                             // 0661b65b..6e
                 {
                     IChannelSink* LoopSink = (IChannelSink*)Sink;
                     LoopSink->OnLoop((FlULong)LowArena::Encode(This), Frame,
-                                     LowArena::Decode<void>((FlLong)This->Field10));
+                                     const_cast<void*>(HandleValue::ObjectOf(This->Field10)));
                 }
             }
             // 0661b673..0661b6d6: rebind at the start the channel wraps back to.
@@ -2579,8 +2580,8 @@ FPosQuatTypedChannel::FPosQuatTypedChannel(FChannelArchetypeObject* NewArchetype
 
 #if defined(FL_PTR64)
 static constexpr std::size_t kTypedChannelBlock =
-    std::max({sizeof(FTypedChannel), sizeof(FScalarTypedChannel), sizeof(FVectorTypedChannel),
-              sizeof(FQuatTypedChannel), sizeof(FPosQuatTypedChannel)});
+    (std::max)({sizeof(FTypedChannel), sizeof(FScalarTypedChannel), sizeof(FVectorTypedChannel),
+                sizeof(FQuatTypedChannel), sizeof(FPosQuatTypedChannel)});
 
 void* FTypedChannel::operator new(std::size_t Size)
 {
@@ -3030,7 +3031,13 @@ static void ChannelArchetypeInnerCtor(FChannelArchetypeObject* This)
 static void ChannelArchetypeTeardown(FChannelArchetypeObject* This)
 {
     if (This->Frames != nullptr)
+    {
+#if defined(FL_PTR64)
+        // The event keys ChannelRelocatedKey handed out point into the buffer.
+        HandleValue::ForgetRange(This->Frames, This->Frames + This->FramesBytes);
+#endif
         std::free(This->Frames);
+    }
     G_ChannelArchetypeLive -= 1;
     if (G_ChannelArchetypeLive == 0 && G_ChannelFramePool != nullptr)
     {
@@ -4128,6 +4135,9 @@ static GENRESULT DACOM_API ChannelArchetypeLoad(FChannelArchetypeObject* This, v
     else
     {
         This->Frames = (unsigned char*)(std::malloc(FileSize));
+#if defined(FL_PTR64)
+        This->FramesBytes = FileSize;
+#endif
     }
     if (This->Frames == nullptr)
         return GR_OUT_OF_MEMORY;
@@ -4396,12 +4406,12 @@ static unsigned char BindTrackTarget(FAnimBindOut* Out, FEngineInstance* Root, F
     if (Root == Invalid && ArgD == nullptr)
     {
         Out->Kind = 0;
-        Out->Extra = nullptr;
-        Out->Typed = nullptr;
-        Out->Instance = nullptr;
+        Out->SetExtra(nullptr);
+        Out->SetTyped(nullptr);
+        Out->SetInstance(nullptr);
         return 0;
     }
-    Out->Typed = ArgE;
+    Out->SetTyped(ArgE);
     if (Track->ChildCrc != 0)
     {
         const char* ChildName = Track->ChildName != nullptr ? Track->ChildName : "";
@@ -4419,8 +4429,8 @@ static unsigned char BindTrackTarget(FAnimBindOut* Out, FEngineInstance* Root, F
         if (Track->ParentCrc != G_AnimEngine->GetInstanceName(&NameOut, Parent)->Crc)
             return 0;
         Out->Kind = 0;
-        Out->Instance = Inst;
-        Out->Extra = ArgD;
+        Out->SetInstance(Inst);
+        Out->SetExtra(ArgD);
         return 1;
     }
     if (Track->ParentCrc != 0)
@@ -4433,14 +4443,14 @@ static unsigned char BindTrackTarget(FAnimBindOut* Out, FEngineInstance* Root, F
         *Already = bMapped ? 1 : 0;
         if (bMapped)
             return 0;
-        Out->Instance = Inst;
+        Out->SetInstance(Inst);
         Out->Kind = 1;
-        Out->Extra = ArgD;
+        Out->SetExtra(ArgD);
         return 1;
     }
-    Out->Instance = Root;
+    Out->SetInstance(Root);
     Out->Kind = 2;
-    Out->Extra = ArgD;
+    Out->SetExtra(ArgD);
     return ArgD != nullptr ? 1 : 0;
 }
 
@@ -4461,9 +4471,9 @@ static void BindPlaybackTracks(FAnimPlayback* Playback, FEngineInstance* Root, v
     {
         FAnimBindOut Bind;
         Bind.Kind = 2;
-        Bind.Extra = nullptr;
-        Bind.Typed = nullptr;
-        Bind.Instance = (FEngineInstance*)((ptrdiff_t)-1);
+        Bind.SetExtra(nullptr);
+        Bind.SetTyped(nullptr);
+        Bind.SetInstance((FEngineInstance*)((ptrdiff_t)-1));
         unsigned char bAlready = 0;
         unsigned char bBound = BindTrackTarget(&Bind, Root, Track, ArgD, ArgE, &bAlready);
         if (bBound != 0)
@@ -4640,12 +4650,12 @@ static FTypedChannel* PlaybackFindTypedByHeader(FAnimPlayback* Playback, const F
         {
             if (Desc->Kind == 0 || Desc->Kind == 1)              // 0661297e..84 -> 0661298e
             {
-                if (Desc->Instance == Header->Instance)
+                if (Desc->InstanceValue == Header->InstanceValue)
                     return Typed;
             }
             else if (Desc->Kind == 2)                            // 06612986..89
             {
-                if (Desc->Extra == Header->Extra)
+                if (Desc->ExtraValue == Header->ExtraValue)
                     return Typed;
             }
         }
@@ -4751,7 +4761,13 @@ static void LoadAnimScriptMaps(FAnimNameEntry* Entry, const char* Name, void* Fi
         {
             // 06611614..dc: resize(size + 1) with a zeroed track; 066116e1..fc: the new last
             // element (+0x18 end - 0x14) is the one filled below.
+#if defined(_MSC_VER)
             Entry->Tracks.resize(Entry->Tracks.size() + 1, FAnimTrack());
+#else
+            // PORT(macOS): the same zeroed track; libstdc++'s resize(n, value) needs the copy
+            // assignment FAnimTrack does not have.
+            Entry->Tracks.emplace_back();
+#endif
             FAnimTrack* Track = &Entry->Tracks.back();
             if (std::strncmp(FindData.cFileName, G_NameJointMap, G_JointMapLength) == 0)
             {
