@@ -21,6 +21,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <cwchar>
 #include <string>
 #include <vector>
@@ -477,4 +478,112 @@ inline unsigned int _control87(unsigned int, unsigned int)
 inline unsigned int _controlfp(unsigned int New, unsigned int Mask)
 {
     return _control87(New, Mask);
+}
+
+// _makepath_s: _makepath with the buffer's size. ERANGE (and an empty result) when the path
+// does not fit, as MSVC's does.
+inline errno_t _makepath_s(char* Path, std::size_t Size, char const* Drive, char const* Directory,
+                           char const* FileName, char const* Extension)
+{
+    if (Path == nullptr || Size == 0)
+        return EINVAL;
+    char Built[4096];
+    std::size_t Needed = 8; // drive, separators, '.', terminator
+    for (char const* Part : {Directory, FileName, Extension})
+        Needed += Part != nullptr ? std::strlen(Part) : 0;
+    if (Needed > sizeof(Built))
+    {
+        Path[0] = 0;
+        return ERANGE;
+    }
+    _makepath(Built, Drive, Directory, FileName, Extension);
+    if (std::strlen(Built) + 1 > Size)
+    {
+        Path[0] = 0;
+        return ERANGE;
+    }
+    std::memcpy(Path, Built, std::strlen(Built) + 1);
+    return 0;
+}
+template <std::size_t Size>
+errno_t _makepath_s(char (&Path)[Size], char const* Drive, char const* Directory,
+                    char const* FileName, char const* Extension)
+{
+    return _makepath_s(Path, Size, Drive, Directory, FileName, Extension);
+}
+
+// fopen and _unlink take Windows paths ('\' separating, any case): resolved as the platform
+// layer resolves them. fopen is a macro so that every fopen in a non-portable module resolves
+// its path; this is the C library's fopen underneath.
+namespace PosixMsvcCrt
+{
+inline FILE* OpenFile(char const* Path, char const* Mode)
+{
+    if (Path == nullptr || Mode == nullptr)
+        return nullptr;
+    return std::fopen(Platform::Detail::ResolvePath(Path).c_str(), Mode);
+}
+}
+#define fopen(Path, Mode) PosixMsvcCrt::OpenFile((Path), (Mode))
+inline errno_t fopen_s(FILE** File, char const* Path, char const* Mode)
+{
+    if (File == nullptr)
+        return EINVAL;
+    *File = PosixMsvcCrt::OpenFile(Path, Mode);
+    return *File != nullptr ? 0 : (errno != 0 ? errno : ENOENT);
+}
+inline int _unlink(char const* Path)
+{
+    return unlink(Platform::Detail::ResolvePath(Path).c_str());
+}
+
+// sscanf_s for formats with numeric conversions only, where it is sscanf. A %s, %c or %[
+// (which take a buffer size after the pointer in sscanf_s) is not supported and aborts.
+template <class... Args>
+int sscanf_s(char const* Text, char const* Format, Args... Arguments)
+{
+    for (char const* Cursor = Format; *Cursor != 0; ++Cursor)
+    {
+        if (*Cursor != '%')
+            continue;
+        ++Cursor;
+        while (*Cursor != 0 && std::strchr("*0123456789hlLjzt", *Cursor) != nullptr)
+            ++Cursor;
+        if (*Cursor == 's' || *Cursor == 'c' || *Cursor == '[')
+            std::abort();
+        if (*Cursor == 0)
+            break;
+    }
+    return std::sscanf(Text, Format, Arguments...);
+}
+
+// _vswprintf: MSVC's legacy vswprintf, with no buffer size and %s for a wide string (see
+// _swprintf).
+inline int _vswprintf(wchar_t* Buffer, wchar_t const* Format, va_list Args)
+{
+    std::wstring const CFormat = PosixMsvcCrt::WideFormat(Format);
+    return std::vswprintf(Buffer, 0x7FFFFFFF / sizeof(wchar_t), CFormat.c_str(), Args);
+}
+
+// _tzset, _strtime ("hh:mm:ss") and _strdate ("mm/dd/yy"): the local time, into a buffer of at
+// least 9 characters.
+inline void _tzset()
+{
+    tzset();
+}
+inline char* _strtime(char* Buffer)
+{
+    const std::time_t Now = std::time(nullptr);
+    struct tm Parts;
+    localtime_r(&Now, &Parts);
+    std::strftime(Buffer, 9, "%H:%M:%S", &Parts);
+    return Buffer;
+}
+inline char* _strdate(char* Buffer)
+{
+    const std::time_t Now = std::time(nullptr);
+    struct tm Parts;
+    localtime_r(&Now, &Parts);
+    std::strftime(Buffer, 9, "%m/%d/%y", &Parts);
+    return Buffer;
 }

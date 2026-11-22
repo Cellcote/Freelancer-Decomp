@@ -28,7 +28,7 @@ FRpcWireStats* RpcFindRemoteWireStats(unsigned int PacketId) {
 }
 
 void FPacketSerializer::DumpStats(const char* Name) const {
-    FILE* File = std::fopen(Name, "w");
+    FILE* File = fopen(Name, "w");
     if (File == nullptr) return;
     std::fprintf(File, "Packet Name,In Count,In Max Size,In Avg Size,In Total Bytes,Exec Time Total,Exec Time Avg,Out Count,Out Max Size,Out Avg Size,Out Total Bytes\n\n");
     for (std::map<unsigned int, FPacketTypeInfo*>::const_iterator It = Types.begin();

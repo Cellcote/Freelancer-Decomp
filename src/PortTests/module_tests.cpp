@@ -53,7 +53,7 @@ void TestReadFile(ICOManager* Manager)
     }
     std::string const Root = Template;
     mkdir((Root + "/Data").c_str(), 0755);
-    if (FILE* const File = std::fopen((Root + "/Data/Ships.INI").c_str(), "wb"))
+    if (FILE* const File = fopen((Root + "/Data/Ships.INI").c_str(), "wb"))
     {
         std::fputs("[Ship]\nnickname = li_elite\n", File);
         std::fclose(File);
@@ -432,6 +432,15 @@ int main(int argc, char** argv)
     Check(SphereVolume != nullptr && SphereVolume(10.0f, 1.0f, 1.0f) == 0.0f &&
               SphereVolume(0.0f, 1.0f, 5.0f) == 4.1887903f,
           "Common's GetSphereIntersectVol");
+
+    // Server loads (on dacom, DALib and Common) and runs: destroying a phantom it never made
+    // reports -2, as retail's does.
+    Platform::Module const Server = Platform::ModuleLoad((Folder + "Server.dll").c_str());
+    Check(Server != nullptr, "Server.dll loads");
+    auto const PhantomDestroy = reinterpret_cast<int (*)(void*)>(
+        Platform::ModuleSymbol(Server, "_ZN3pub7Phantom7DestroyEPv"));
+    Check(PhantomDestroy != nullptr && PhantomDestroy(nullptr) == -2,
+          "Server's pub::Phantom::Destroy");
 
     using FEventCreate = Platform::Handle (*)();
     using FEventSet = bool (*)(Platform::Handle);

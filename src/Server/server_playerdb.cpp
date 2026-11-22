@@ -2093,7 +2093,12 @@ static void PlayerDB_LeaveSystem(PlayerData& Slot, unsigned int SessionId) {
     // system id (from IBase::SystemId, the base's `system` key in universe.ini)
     // has no SysMap entry -- check universe.ini data. See THE MISS ARM above;
     // retail faults at .text:06d0874c. Do not fix: user decision 2026-09-24.
+#if defined(_WIN32)
     StarSystem& System = It._Ptr->_Myval.second; // KNOWN CRASH on SysMap miss, see above
+#else
+    // PORT(macOS): the same unchecked read of the head node through the public iterator.
+    StarSystem& System = (*It).second; // KNOWN CRASH on SysMap miss, see above
+#endif
 
     System.remove_player(SessionId);                               // FUN_06d08740
 

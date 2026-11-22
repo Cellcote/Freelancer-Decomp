@@ -76,7 +76,11 @@ if(NOT FL_WINDOWS)
   option(FL_SANITIZE "AddressSanitizer and UndefinedBehaviorSanitizer for the portable modules" OFF)
   if(FL_SANITIZE)
     # No recovery: undefined behaviour stops the test with a failure instead of a warning.
-    add_compile_options(-fsanitize=address,undefined -fno-sanitize-recover=all
+    # No vptr check: it needs the typeinfo of every class called through, and the modules call
+    # through interfaces whose typeinfo lives in a module loaded at run time, not linked
+    # (Server's IDLL is Content's). Nor is typeinfo one per process across modules loaded
+    # RTLD_LOCAL (platform_posix.h's kind tags).
+    add_compile_options(-fsanitize=address,undefined -fno-sanitize=vptr -fno-sanitize-recover=all
                         -fno-omit-frame-pointer)
     add_link_options(-fsanitize=address,undefined)
   endif()

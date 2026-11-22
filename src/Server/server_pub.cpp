@@ -37,6 +37,7 @@
 #include "common_casteroid.h"
 #include <windows.h>
 #include "../include/platform.h"
+#include "handle_value.h" // PhantomEnter / PhantomExit name the phantom in 32 bits
 #include <cstdint>
 #include <new>
 #include <cmath>
@@ -2259,7 +2260,7 @@ void Server_PumpPhantomEvents()
              Id != Ph->Entered.end(); ++Id) {
             unsigned int Event[3];
             Event[0] = *Id;                                              // .text:06cffdf7
-            Event[1] = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(Ph)); // .text:06cffdf3
+            Event[1] = HandleValue::Of(Ph); // .text:06cffdf3
             Event[2] = Ph->SystemId;                                     // .text:06cffe05
             Server_ControllerDispatch(0, pub::Controller::EMessage::PhantomEnter, Event); // .text:06cffe09
         }
@@ -2268,7 +2269,7 @@ void Server_PumpPhantomEvents()
              Id != Ph->Left.end(); ++Id) {
             unsigned int Event[3];
             Event[0] = *Id;                                              // .text:06cffe47
-            Event[1] = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(Ph)); // .text:06cffe43
+            Event[1] = HandleValue::Of(Ph); // .text:06cffe43
             Event[2] = Ph->SystemId;                                     // .text:06cffe55
             Server_ControllerDispatch(0, pub::Controller::EMessage::PhantomExit, Event); // .text:06cffe59
         }
@@ -7644,6 +7645,7 @@ SERVER_API int __cdecl Destroy(void* Handle) {
     std::list<ServerPhantom*>::iterator It = FindPhantom(Handle);
     if (It == GPhantoms.end()) return -2;                                // .text:06cfbcf0 / 06cfbd03
     PhySys::DestroyPhantom((*It)->PhyHandle);                            // .text:06cfbd0c
+    HandleValue::Forget(*It); // PORT(x64): the id PhantomEnter / PhantomExit carry
     delete *It;                                                          // .text:06cfbd1e / 06cfbd24
     GPhantoms.erase(It);                                                 // .text:06cfbd2c .. 06cfbd4a
     return 0;
