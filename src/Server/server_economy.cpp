@@ -262,7 +262,7 @@ void SettleAll(PlayerSlot& Slot, FLedger& Ledger)
     // that is the price it may resell for this dock.
     if (Ledger.PricedCount > 0)
         NotePricePaid(Ledger, Ledger.PricedGood,
-                      MinUnit(FindBaseData(Slot.current_base), Ledger.PricedGood) + 1);
+                      MinUnit(FindBaseData(Slot.current_base), Ledger.PricedGood));
     Ledger.PricedGood = 0;
     Ledger.PricedCount = 0;
     SettleBuys(Slot, Ledger);
@@ -554,9 +554,10 @@ bool Ledger_OnChangeCash(PlayerSlot& Slot, unsigned int SessionId, int Delta)
         Ledger.Balance -= Delta;   // a payment
         if (Ledger.PricedCount > 0)
         {
-            // The client paid package price x count (BuyFromDealer); one credit of slack.
+            // The client paid package price x count (BuyFromDealer), and sells this dock at that
+            // same unit price, so no slack.
             NotePricePaid(Ledger, Ledger.PricedGood,
-                          -static_cast<long long>(Delta) / Ledger.PricedCount + 1);
+                          -static_cast<long long>(Delta) / Ledger.PricedCount);
             Ledger.PricedGood = 0;
             Ledger.PricedCount = 0;
         }
