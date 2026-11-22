@@ -304,7 +304,7 @@ without the Windows API. Milestones:
   with MSVC's behaviour (`posix/msvc_crt.h`), and small Win32 calls with an obvious meaning here.
   Larger APIs go through `Platform::` at the call site. `FL_POSIX_DLLMAIN` runs a module's
   `DllMain` as it loads. So far: dacom, zlib, DALib, x86math, system, ReadFile, luaprofile, Thorn,
-  EngBase, ximage, Shading, flmaterials, RendComp, alchemy, Deformable2 and Common,
+  EngBase, ximage, Shading, flmaterials, RendComp, alchemy, Deformable2, Common and Server,
   loaded and checked by `src/PortTests/module_tests.cpp`. The POSIX handles are small numbers in a table, as Windows
   kernel handles are, so a file handle survives retail's 32-bit fields there too
   (`Platform::HandleToValue` / `HandleFromValue`, as HandleToULong / LongToHandle). The kernel32
@@ -345,7 +345,17 @@ without the Windows API. Milestones:
   GDI's text calls fail (no font backend before M3: text is not drawn), the registry has no
   keys, MSXML's SAX reader does not exist (RDL text cannot be parsed until the client brings an
   XML reader), and `SHGetFolderPathA` gives ~/Documents, ~/Pictures and the application-data
-  folder. Next: Server and RemoteClient, for a headless FLDedicated on macOS.
+  folder.
+  Server compiles against the same stand-ins, plus the CRT calls it makes on its account and
+  save files (`fopen`, `_unlink`, `_findfirst`: Windows paths, resolved as the platform layer
+  resolves them; `fopen` is a macro over the C library's for that reason). A phantom's
+  handle is a 32-bit id on 64-bit builds, as `PhantomEnter` / `PhantomExit` carry it in a
+  dword to Content. A loaded module stays
+  mapped until the process ends (`RTLD_NODELETE`): handles in the platform's table and what a
+  module registered with dacom outlive `FreeLibrary`. `wchar_t` is 4 bytes here; the wire and
+  file formats carry UTF-16, so the codecs convert at that boundary (RemoteClient, next).
+  Next: RemoteClient (with the UTF-16 boundary), then Content, for a headless FLDedicated on
+  macOS.
 - **M3:** an SDL window to the main menu, drawn by RPGPU through Metal, without sound.
 - **M4:** audio, input and gameplay.
 

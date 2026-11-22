@@ -22,6 +22,7 @@
 #include <cerrno>
 #include <cstdint>
 #include <cstdlib>
+#include <cwchar>
 #include <map>
 #include <mutex>
 #include <string>
@@ -624,4 +625,67 @@ inline BOOL QueryPerformanceFrequency(LARGE_INTEGER* Frequency)
 inline DWORD GetCurrentProcessId()
 {
     return static_cast<DWORD>(getpid());
+}
+
+// CompareFileTime: -1, 0 or 1 as the first time is earlier, the same or later.
+inline LONG CompareFileTime(const FILETIME* First, const FILETIME* Second)
+{
+    const std::uint64_t A = ((std::uint64_t)First->dwHighDateTime << 32) | First->dwLowDateTime;
+    const std::uint64_t B = ((std::uint64_t)Second->dwHighDateTime << 32) | Second->dwLowDateTime;
+    return A < B ? -1 : (A > B ? 1 : 0);
+}
+
+// SystemTimeToFileTime: the inverse of FileTimeToSystemTime (no time zone is applied; the
+// caller's SYSTEMTIME is taken as it is, as Windows does). FALSE for an invalid date.
+inline BOOL SystemTimeToFileTime(const SYSTEMTIME* Time, LPFILETIME Out)
+{
+    if (Time == nullptr || Out == nullptr || Time->wMonth < 1 || Time->wMonth > 12 ||
+        Time->wDay < 1 || Time->wDay > 31 || Time->wHour > 23 || Time->wMinute > 59 ||
+        Time->wSecond > 59 || Time->wMilliseconds > 999)
+        return FALSE;
+    // The day must exist in its month (February 29 only in a leap year).
+    static const unsigned char kDaysInMonth[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    const unsigned FullYear = Time->wYear;
+    const bool bLeap = (FullYear % 4 == 0 && FullYear % 100 != 0) || FullYear % 400 == 0;
+    if (Time->wDay > kDaysInMonth[Time->wMonth - 1] + (Time->wMonth == 2 && bLeap ? 1 : 0))
+        return FALSE;
+    // Days from 1970-01-01 to the civil date (Howard Hinnant's days_from_civil).
+    const int Year = (int)Time->wYear - (Time->wMonth <= 2 ? 1 : 0);
+    const int Era = (Year >= 0 ? Year : Year - 399) / 400;
+    const unsigned YearOfEra = (unsigned)(Year - Era * 400);
+    const unsigned Month = Time->wMonth;
+    const unsigned DayOfYear = (153 * (Month > 2 ? Month - 3 : Month + 9) + 2) / 5 + Time->wDay - 1;
+    const unsigned DayOfEra = YearOfEra * 365 + YearOfEra / 4 - YearOfEra / 100 + DayOfYear;
+    const long long Days = (long long)Era * 146097 + (long long)DayOfEra - 719468;
+    const long long Seconds =
+        Days * 86400 + Time->wHour * 3600LL + Time->wMinute * 60LL + Time->wSecond + 11644473600LL;
+    if (Seconds < 0)
+        return FALSE;
+    const std::uint64_t Ticks =
+        (std::uint64_t)Seconds * 10000000ULL + Time->wMilliseconds * 10000ULL;
+    Out->dwLowDateTime = (DWORD)(Ticks & 0xFFFFFFFFu);
+    Out->dwHighDateTime = (DWORD)(Ticks >> 32);
+    return TRUE;
+}
+
+// GetStringTypeW for CT_CTYPE1, C1_SPACE only: the characters Windows 10 classes as spaces
+// (0x09-0x0D, 0x20, 0x85, 0xA0, U+1680, U+180E, U+2000-U+200A, U+2028, U+2029, U+202F, U+205F,
+// U+3000). The code asks nothing else of it.
+#define CT_CTYPE1 0x0001
+#define C1_SPACE 0x0008
+inline BOOL GetStringTypeW(DWORD InfoType, const wchar_t* Text, int Count, WORD* Types)
+{
+    if (InfoType != CT_CTYPE1 || Text == nullptr || Types == nullptr)
+        return FALSE;
+    if (Count < 0)
+        Count = (int)std::wcslen(Text) + 1;
+    for (int Index = 0; Index < Count; ++Index)
+    {
+        const std::uint32_t C = (std::uint32_t)Text[Index];
+        const bool bSpace = (C >= 0x09 && C <= 0x0D) || C == 0x20 || C == 0x85 || C == 0xA0 ||
+                            C == 0x1680 || C == 0x180E || (C >= 0x2000 && C <= 0x200A) ||
+                            C == 0x2028 || C == 0x2029 || C == 0x202F || C == 0x205F || C == 0x3000;
+        Types[Index] = bSpace ? C1_SPACE : 0;
+    }
+    return TRUE;
 }

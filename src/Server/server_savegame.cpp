@@ -783,7 +783,12 @@ bool __cdecl PlayerData_AutoSave(PlayerData& Slot) {
         _tzset();
         _strtime(Time);
         _strdate(Date);
+#if defined(_WIN32)
         swprintf(Description, 0x200, L"%S %S", Date, Time);
+#else
+        // PORT(macOS): MSVC's wide %S is a narrow string; C's is %s.
+        swprintf(Description, 0x200, L"%s %s", Date, Time);
+#endif
         return PlayerData_SerializeToFile(Slot, It->second.FileName, Description, 0);
     }
 

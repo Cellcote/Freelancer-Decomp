@@ -24,11 +24,11 @@ public:
     }
 
     // FUN_06344cf0 (thiscall, RET 4): memsize = Size, n_elems = 0, elems =
-    // P_MALLOC(Size * 4) (FUN_06343f70) when Size != 0, else null.
+    // P_MALLOC(Size * 4) (FUN_06343f70) when Size != 0, else null. Size pointers, so
+    // pointer-sized on x64.
     explicit IVP_U_Vector(int Size)
-        : memsize((unsigned short)Size)
-        , n_elems(0)
-        , elems(Size != 0 ? (T**)malloc((size_t)Size * 4u) : nullptr)
+        : memsize((unsigned short)Size), n_elems(0),
+          elems(Size != 0 ? (T**)malloc((size_t)Size * sizeof(T*)) : nullptr)
     {
     }
 

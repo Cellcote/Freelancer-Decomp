@@ -25,6 +25,7 @@
 #include "server_controller.h" // pub::Controller::EMessage
 #include "common_tstring.h" // TString
 
+#include <cstdint>
 #include <list>
 #include <map>
 #include <vector>
@@ -1208,11 +1209,18 @@ public:
 };
 
 // Parms of message 0x2d as the dock hail handler reads them.
+// Server_PumpPhantomEvents's three dwords. The phantom is pub::Phantom's handle in 32 bits: the
+// address on Win32, the 32-bit id Server hands out as the handle on 64-bit builds.
 struct FGcsPhantomTouch
 {
     unsigned int Ship;                  // +0x00
-    void* Phantom;                      // +0x04
+    unsigned int Phantom; // +0x04
     unsigned int System;                // +0x08
+
+    void* PhantomHandle() const
+    {
+        return reinterpret_cast<void*>(static_cast<std::uintptr_t>(Phantom));
+    }
 };
 
 // Handler 0 (0x24 bytes, vtable 06fb7488: FUN_06ee99b0, LAB_06ee9c10, LAB_06ea1450):

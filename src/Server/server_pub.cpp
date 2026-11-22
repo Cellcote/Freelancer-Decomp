@@ -2212,7 +2212,28 @@ public:
     // FUN_06cfbd60 is the destructor: it empties Left (FUN_06d0f620 per node) and frees
     // its head, then does the same for Entered -- the reverse-declaration member
     // destruction order of the two lists above.
+#if defined(FL_PTR64)
+    // PORT(x64): the phantom's 32-bit value. Retail's handle is the record's address, and
+    // PhantomEnter / PhantomExit carry it in a dword; on 64-bit builds both are this id
+    // instead, the same in every module (Content compares it with the handle it was given).
+    unsigned int Value = 0;
+#endif
 };
+
+// The handle pub::Phantom::Create gives out and the dword PhantomEnter / PhantomExit carry:
+// the record's address on Win32, as retail; its Value on 64-bit builds.
+inline void* PhantomHandleOf(ServerPhantom* Ph)
+{
+#if defined(FL_PTR64)
+    return reinterpret_cast<void*>(static_cast<uintptr_t>(Ph->Value));
+#else
+    return Ph;
+#endif
+}
+inline unsigned int PhantomEventValue(ServerPhantom* Ph)
+{
+    return static_cast<unsigned int>(reinterpret_cast<uintptr_t>(PhantomHandleOf(Ph)));
+}
 
 void ServerPhantom::added(CObject* Obj)
 {
@@ -2238,10 +2259,35 @@ bool GbPhantomPumpBusy = false;        // .data:DAT_06d8d928
 std::list<ServerPhantom*>::iterator FindPhantom(void* Handle)
 {
     std::list<ServerPhantom*>::iterator It = GPhantoms.begin();
-    while (It != GPhantoms.end() && *It != Handle)
+    while (It != GPhantoms.end() && PhantomHandleOf(*It) != Handle)
         ++It;
     return It;
 }
+
+#if defined(FL_PTR64)
+// PORT(x64): a new phantom's Value: never 0 (no handle is null) and, once the counter has
+// wrapped, none a live phantom still holds.
+unsigned int GNextPhantomValue = 0;
+bool GbPhantomValueWrapped = false;
+unsigned int AllocPhantomValue()
+{
+    for (;;)
+    {
+        if (++GNextPhantomValue == 0)
+        {
+            GbPhantomValueWrapped = true;
+            ++GNextPhantomValue;
+        }
+        if (!GbPhantomValueWrapped)
+            return GNextPhantomValue;
+        bool bUsed = false;
+        for (ServerPhantom* const Live : GPhantoms)
+            bUsed = bUsed || Live->Value == GNextPhantomValue;
+        if (!bUsed)
+            return GNextPhantomValue;
+    }
+}
+#endif
 
 } // namespace
 
@@ -2259,7 +2305,7 @@ void Server_PumpPhantomEvents()
              Id != Ph->Entered.end(); ++Id) {
             unsigned int Event[3];
             Event[0] = *Id;                                              // .text:06cffdf7
-            Event[1] = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(Ph)); // .text:06cffdf3
+            Event[1] = PhantomEventValue(Ph); // .text:06cffdf3
             Event[2] = Ph->SystemId;                                     // .text:06cffe05
             Server_ControllerDispatch(0, pub::Controller::EMessage::PhantomEnter, Event); // .text:06cffe09
         }
@@ -2268,7 +2314,7 @@ void Server_PumpPhantomEvents()
              Id != Ph->Left.end(); ++Id) {
             unsigned int Event[3];
             Event[0] = *Id;                                              // .text:06cffe47
-            Event[1] = static_cast<unsigned int>(reinterpret_cast<uintptr_t>(Ph)); // .text:06cffe43
+            Event[1] = PhantomEventValue(Ph); // .text:06cffe43
             Event[2] = Ph->SystemId;                                     // .text:06cffe55
             Server_ControllerDispatch(0, pub::Controller::EMessage::PhantomExit, Event); // .text:06cffe59
         }
@@ -7582,6 +7628,9 @@ SERVER_API int __cdecl Create(unsigned int SystemId, const Vector& Size, const V
     if ((SystemId & 0x3fffffffu) == 0) return -4;                        // .text:06cfbe9a
 
     ServerPhantom* const Ph = new ServerPhantom();                       // .text:06cfbea5
+#if defined(FL_PTR64)
+    Ph->Value = AllocPhantomValue();
+#endif
     PhySys::PhantomParms Parms;
     memset(&Parms, 0, sizeof(Parms));
     Parms.SystemId = SystemId;                                           // .text:06cfbf2f
@@ -7593,8 +7642,8 @@ SERVER_API int __cdecl Create(unsigned int SystemId, const Vector& Size, const V
     Parms.Listener = Ph;                                                 // .text:06cfbf46
     Ph->TypeMask = TypeMask;                                             // .text:06cfbf4b
     Ph->SystemId = SystemId;                                             // .text:06cfbf5c
-    PhySys::CreatePhantom(Parms, Size, Ph->PhyHandle);                   // .text:06cfbf5f
-    OutHandle = Ph;                                                      // .text:06cfbf6c
+    PhySys::CreatePhantom(Parms, Size, Ph->PhyHandle); // .text:06cfbf5f
+    OutHandle = PhantomHandleOf(Ph); // .text:06cfbf6c
     GPhantoms.push_back(Ph);                                             // .text:06cfbf6e .. 06cfbfa6
     return 0;
 }
@@ -7615,6 +7664,9 @@ SERVER_API int __cdecl Create(unsigned int SystemId, float Radius, const Vector&
     if ((SystemId & 0x3fffffffu) == 0) return -4;                        // .text:06cfc073
 
     ServerPhantom* const Ph = new ServerPhantom();                       // .text:06cfc07d
+#if defined(FL_PTR64)
+    Ph->Value = AllocPhantomValue();
+#endif
     PhySys::PhantomParms Parms;
     memset(&Parms, 0, sizeof(Parms));
     Parms.SystemId = SystemId;                                           // .text:06cfc101
@@ -7628,8 +7680,8 @@ SERVER_API int __cdecl Create(unsigned int SystemId, float Radius, const Vector&
     Parms.Listener = Ph;                                                 // .text:06cfc152
     Ph->TypeMask = TypeMask;                                             // .text:06cfc157
     Ph->SystemId = SystemId;                                             // .text:06cfc168
-    PhySys::CreatePhantom(Parms, Radius, Ph->PhyHandle);                 // .text:06cfc16b
-    OutHandle = Ph;                                                      // .text:06cfc178
+    PhySys::CreatePhantom(Parms, Radius, Ph->PhyHandle); // .text:06cfc16b
+    OutHandle = PhantomHandleOf(Ph); // .text:06cfc178
     GPhantoms.push_back(Ph);                                             // .text:06cfc17a .. 06cfc1b2
     return 0;
 }
@@ -7643,7 +7695,7 @@ SERVER_API int __cdecl Destroy(void* Handle) {
     if (GbPhantomPumpBusy) return -5;                                    // .text:06cfbcdf
     std::list<ServerPhantom*>::iterator It = FindPhantom(Handle);
     if (It == GPhantoms.end()) return -2;                                // .text:06cfbcf0 / 06cfbd03
-    PhySys::DestroyPhantom((*It)->PhyHandle);                            // .text:06cfbd0c
+    PhySys::DestroyPhantom((*It)->PhyHandle); // .text:06cfbd0c
     delete *It;                                                          // .text:06cfbd1e / 06cfbd24
     GPhantoms.erase(It);                                                 // .text:06cfbd2c .. 06cfbd4a
     return 0;
