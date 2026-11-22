@@ -1012,7 +1012,7 @@ void IServerImpl::BaseEnter(unsigned int base_id, unsigned int session_id) {
         // PORT(deviation) SERVER-ECONOMY: a base the player landed on or was placed in.
         if (!Ledger_MayEnterBase(Slot, session_id, base_id))
             return;
-        Ledger_OnBaseEnter(session_id);
+        Ledger_OnBaseEnter(session_id, base_id);
 
         if (ExitedBase != 0 && base_id != 0 && ExitedBase != base_id) {
             unsigned int const OldSystem = Slot.system_id;

@@ -32,7 +32,7 @@ void Ledger_NoteLanded(unsigned int SessionId, unsigned int BaseId);
 // respawn: PlayerData::current_base).
 bool Ledger_MayEnterBase(PlayerSlot& Slot, unsigned int SessionId, unsigned int BaseId);
 // BaseEnter accepted: a fresh dock.
-void Ledger_OnBaseEnter(unsigned int SessionId);
+void Ledger_OnBaseEnter(unsigned int SessionId, unsigned int BaseId);
 // BaseExit, disconnect, logout: what was bought and not paid for is charged, a sale credit
 // that never matched a sale is dropped, and an unfinished ship purchase is closed.
 void Ledger_Settle(PlayerSlot& Slot, unsigned int SessionId);

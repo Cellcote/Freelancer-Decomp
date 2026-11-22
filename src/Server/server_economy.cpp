@@ -30,6 +30,7 @@ constexpr double kMaxClientPrice = 9999999.0;
 struct FLedger
 {
     unsigned int LandedBase = 0;           // the base the player's own ship last landed on
+    unsigned int DockBase = 0; // the base of this dock
     std::map<unsigned int, long long> Allowance; // archetype -> count ReqAddItem may add
     long long Balance = 0;                 // payments less the least the purchases cost
     unsigned int FreeAmmoGood = 0;         // a gun's ammo package, bought after the gun
@@ -298,9 +299,16 @@ bool Ledger_MayEnterBase(PlayerSlot& Slot, unsigned int SessionId, unsigned int 
     return Slot.ship_object_id == 0 && Slot.last_base_id != 0 && BaseId == Slot.last_base_id;
 }
 
-void Ledger_OnBaseEnter(unsigned int SessionId)
+void Ledger_OnBaseEnter(unsigned int SessionId, unsigned int BaseId)
 {
-    GLedgers[SessionId] = FLedger();
+    FLedger& Ledger = LedgerOf(SessionId);
+    FLedger Fresh;
+    Fresh.DockBase = BaseId;
+    // Back into the same base without landing there again (BaseExit and BaseEnter with no
+    // ship in space): the same dock as far as prices go, so the prices paid still cap resale.
+    if (Ledger.DockBase == BaseId && Ledger.LandedBase != BaseId)
+        Fresh.UnitPaid = Ledger.UnitPaid;
+    Ledger = Fresh;
 }
 
 void Ledger_Settle(PlayerSlot& Slot, unsigned int SessionId)
