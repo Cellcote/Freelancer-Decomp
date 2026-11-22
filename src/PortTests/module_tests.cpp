@@ -172,7 +172,7 @@ void TestFlMaterials(ICOManager* Manager, Platform::Module Dacom)
         std::free(const_cast<char*>(PayloadText(Dacom, Value->Payload0, true)));
         Value->Payload0 = 0;
     }
-    Check(Material->GetParameterDescriptor(0, &Record) != GR_OK || Record.Current.Type == 3,
+    Check(Material->GetParameterDescriptor(0, &Record) == GR_OK && Record.Current.Type == 3,
           "the ambient colour descriptor is a three-float value");
     Check(Material->GetParameterDescriptor(10, &Record) != GR_OK,
           "there is no eleventh Glass parameter");
