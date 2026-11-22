@@ -425,7 +425,7 @@ static const FRichFontCombination GFontCombinations[GSubEntriesPerFont] = {
 static float GRichTextScaleX = 1.0f;
 namespace CmnText
 {
-    float GRichTextScaleY = 1.0f; // declared in text/text_internal.h (ImageNode reads it)
+    float GRichTextScaleY = 1.0f; // declared in common_text_internal.h (ImageNode reads it)
 }
 static bool GRichTextInitialised = false;
 static bool GRichTextOsAboveNt4 = false;

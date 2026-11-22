@@ -93,7 +93,7 @@ class FLControllerGolem;
 
 namespace PhySys
 {
-    // ---- Constants (defined in Common/archetype/constants.cpp ReadConstants) ----
+    // ---- Constants (defined in common_constants.cpp ReadConstants) ----
     COMMON_API extern float PHYSICAL_SIM_RATE;                       // 0x18B318
     COMMON_API extern int MAX_SPAWNED_MINDIST_COUNT;                 // 0x18B31C
     COMMON_API extern float ANOM_LIMITS_MAX_VELOCITY;                // 0x18B320
@@ -150,7 +150,7 @@ namespace PhySys
         // then handed to PhySys::GetCurrentTime(unsigned) at .text:0627e261 as the key into
         // the systems map DAT_063fc098 -- the same unsigned key PhySys::Startup(unsigned) and
         // Update(unsigned,float) take, compared unsigned at .text:06289a8e (`CMP EDX,[EAX+0xc]`
-        // + JC). Common/object/cobject.cpp already fills it from IObjDB's get-system accessor.
+        // + JC). common_cobject.cpp already fills it from IObjDB's get-system accessor.
         // OPEN TODO: rename to SystemId across CreateParms, CAsteroid+0xf4 and CAsteroidCube.
         unsigned CollisionGroupId;   // +0x14
         int Type;                    // +0x18  CShip writes 2

@@ -16,7 +16,7 @@
 #include "common_systemmanager.h" // SystemManager
 #include "common_aisteer.h"       // FAiTarget, ClampedDot3, GetCachedRange, GetIfacePositionOrZero
 #include "aisteer_internal.h" // CmnAiSteer::InlineFastLength (retail's inlined x87 fast length)
-#include "iustategraph.h"  // BuildAiTargetList / GetAiTargetList / ResetAiTargetList
+#include "iustategraph.h" // BuildAiTargetList / GetAiTargetList / ResetAiTargetList
 #include "common_pathfind.h"      // PathfindManager user-zone probes (FUN_062ddcd0 / FUN_062db830)
 #include "common_cobject.h"       // CShip::get_targeted_enemy_count / get_formation_followers
 #include "common_cobjdb.h"        // IObjDB -- TargetManager::GetScanResponse's FindById call

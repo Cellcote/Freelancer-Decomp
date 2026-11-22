@@ -19,8 +19,8 @@
 #include "x86math.h"       // I3DMathEngine::TransposeTransform, FVector, FMatrix
 #include "common_goods.h"
 #include "iustategraph.h" // GetAiTargetList / GetClosestTrailingShipDistance --
-                                  // the SystemManager+0x34 AI target list that
-                                  // get_closest_trailing_ship tail-calls into
+// the SystemManager+0x34 AI target list that
+// get_closest_trailing_ship tail-calls into
 
 #include "common_misc.h" // SinglePlayer() -- UpdateBehaviorTick's docking-target probe
 #include "common_newchar.h"

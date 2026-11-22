@@ -79,7 +79,7 @@ GotoBehavior::GotoBehavior(int InTypeId)
     , Field378(0.0f)
     , Field37c(0.0f)
     // Field380/Flags384/SavedFlags388 are the recovered tail of the shared
-    // 0x1c-byte proximity-watcher struct (ai/gotobehavior.h). The shared
+    // 0x1c-byte proximity-watcher struct (common_gotobehavior.h). The shared
     // ctor FUN_062c29b0 zeroes only the FIRST FOUR DWORDS of it -- Watcher370's
     // two words plus Field378/Field37c -- and stops. Retail therefore leaves
     // these three uninitialized at construction, exactly as DockBehavior's own

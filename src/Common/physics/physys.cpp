@@ -54,7 +54,7 @@
 #include <utility>
 #include <vector>
 
-#include <mmsystem.h>  // timeGetTime (PhysicalSystem::Update, .text:0628ca84); winmm is linked by player/playeraccount.cpp
+#include <mmsystem.h> // timeGetTime (PhysicalSystem::Update, .text:0628ca84); winmm is linked by player/playeraccount.cpp
 
 
 // Win32 macro conflict: PhySys::GetCurrentTime vs windows.h GetCurrentTime()
@@ -135,7 +135,7 @@ namespace CmnPhySys
 namespace
 {
     // The engine's per-instance joint block (IEngine::GetInstanceRelative, +0xc4) as
-    // FUN_062883c0 reads it. equip/cattachment.cpp's file-local FRevoluteJoint is the same block.
+    // FUN_062883c0 reads it. common_cattachment.cpp's file-local FRevoluteJoint is the same block.
     struct FPhySysJointBlock
     {
         FlULong Type;  // +0x00  0, 1 or 2 (anything else: the pose is left as the parent's)

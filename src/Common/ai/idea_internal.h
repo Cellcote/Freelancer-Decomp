@@ -7,10 +7,10 @@
 #pragma once
 
 // Common.dll-internal helpers shared by the BaseIdea family TUs that were split out of
-// ai/idea.cpp (CMN-SPLIT stage 1, 2026-10-14): ai/idea.cpp, ai/moveidea.cpp,
-// ai/faceidea.cpp, ai/splinemoveidea.cpp, ai/dodgeidea.cpp,
-// ai/breakawayidea.cpp, ai/dodgemissileidea.cpp. None of these is a retail
-// function of its own; until the split they lived in ai/idea.cpp's anonymous
+// common_idea.cpp (CMN-SPLIT stage 1, 2026-10-14): common_idea.cpp, common_moveidea.cpp,
+// common_faceidea.cpp, common_splinemoveidea.cpp, common_dodgeidea.cpp,
+// common_breakawayidea.cpp, common_dodgemissileidea.cpp. None of these is a retail
+// function of its own; until the split they lived in common_idea.cpp's anonymous
 // namespace. Consumers write `using namespace CmnIdea;` after their includes.
 
 #include "common_ini.h"     // Vector
@@ -24,10 +24,10 @@
 namespace CmnIdea
 {
     // Shared by MoveIdea::SetPosition/SetWatchObject/Commit and (independently)
-    // by SplineMoveIdea's own SetContext/Commit (ai/splinemoveidea.cpp): retail reaches an
+    // by SplineMoveIdea's own SetContext/Commit (common_splinemoveidea.cpp): retail reaches an
     // external "owning slot array" through `*(BaseIdea::Context + 0xc)` and then
     // writes fixed offsets inside it (+0x64 for an object id, +0x200..+0x208 for
-    // a Vector). This is the same array ai/behavior.h models as
+    // a Vector). This is the same array common_behavior.h models as
     // FormationMoveFx::SlotOwner -- which independently confirms that class's
     // "SlotOwner" at +0x0c is nothing but BaseIdea::Context under another name.
     //

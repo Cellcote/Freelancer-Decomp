@@ -284,9 +284,9 @@ public:
     // FormationBehavior/DockBehavior are, since IdleWatcher's own true size
     // is not independently confirmed (see class comment).
     // ------------------------------------------------------------------
-    // +0x04..+0x29 is Behavior's own block, declared once on Behavior (ai/behavior.h).
+    // +0x04..+0x29 is Behavior's own block, declared once on Behavior (common_behavior.h).
 
-    IdleIdea Watcher2c;        // +0x2c. IDENTIFIED 2026-10-08: an IdleIdea (ai/idea.h;
+    IdleIdea Watcher2c;        // +0x2c. IDENTIFIED 2026-10-08: an IdleIdea (common_idea.h;
                                // ctor FUN_062d9b10, vtable 063a054c, RTTI COL 063a9bd0),
                                // 0x14 bytes. The notes below predate the identification.
                                // Confirmed vtable-having (SetContext()/

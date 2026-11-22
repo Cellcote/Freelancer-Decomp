@@ -296,14 +296,14 @@ public:
                                   // ComputeWeaponSlotStat's OutAverage out-parameter, when that
                                   // call reports success. No longer a documented gap.
     MoveIdea SubObjectA;             // +0x30, ends +0xa8. RTTI-identified as MoveIdea (ctor
-                                     // FUN_062d4e60, ai/idea.h) -- was an opaque
+                                     // FUN_062d4e60, common_idea.h) -- was an opaque
                                      // `unsigned char[0x78]` byte-blob prior to this pass.
                                      // sizeof(MoveIdea) == 0x78 confirmed exactly matches this
                                      // span. Real calls wired: SetContext()'s own vtbl[0] call,
                                      // Disengage()'s own vtbl[0x10] (Commit()) call, and
                                      // Update()'s own vtbl[0x4] (Update(float)) tick call.
     FaceIdea SubObjectB;             // +0xa8, ends +0x168. RTTI-identified as FaceIdea (ctor
-                                     // FUN_062d6750, ai/idea.h) -- was an opaque
+                                     // FUN_062d6750, common_idea.h) -- was an opaque
                                      // `unsigned char[0xc0]` byte-blob prior to this pass.
                                      // sizeof(FaceIdea) == 0xc0 confirmed exactly matches this
                                      // span. Same real calls wired as SubObjectA above.

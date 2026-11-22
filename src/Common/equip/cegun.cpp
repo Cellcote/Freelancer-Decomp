@@ -10,7 +10,7 @@
 #include "common_cequip.h"
 #include "x86math.h"
 
-#include "common_animdb.h"  // AnimDB::Add/Rem (archetype/animdb.cpp)
+#include "common_animdb.h" // AnimDB::Add/Rem (archetype/animdb.cpp)
 
 #include "common_cobject.h"
 #include "common_csys.h"     // Acquire3DMathEngine (MatrixToQuaternionViaMathEngine)

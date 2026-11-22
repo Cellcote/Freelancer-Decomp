@@ -131,7 +131,7 @@ CShip::CShip(CShip const& Other)
     // CSteering/CNudgeEngine/CStrafeEngine's copy ctors already replicate retail's field
     // set exactly, including NOT retargeting OwnerShip to `this` (matching
     // CSteering::CSteering(this+0x230, Other+0x230) etc. verbatim -- see those classes'
-    // own copy-ctor comments in equip/csteering.cpp). ActionDB has no user copy ctor, so its
+    // own copy-ctor comments in common_csteering.cpp). ActionDB has no user copy ctor, so its
     // implicit one is a plain Head/Tail copy, matching retail's raw two-dword copy exactly.
     //
     // FormationLeader, .text:06287d57..06287d86: both words zeroed, then the other ship's

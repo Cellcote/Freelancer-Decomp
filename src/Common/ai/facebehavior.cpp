@@ -12,7 +12,7 @@
                                    // BuildPerpendicularFrame, BuildOrientationBasis
 #include "common_iface.h"          // IObjInspect, ObjInspectOf
 #include "common_pub.h"            // pub::AI::Personality::EngineKillUseStruct
-#include "iustategraph.h"   // FindClosestHostileTarget
+#include "iustategraph.h" // FindClosestHostileTarget
 
 #include <cstdint>
 
