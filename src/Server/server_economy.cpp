@@ -502,7 +502,7 @@ void Ledger_RemoveItem(PlayerSlot& Slot, unsigned int SessionId, unsigned short 
     }
     // The client pays price * count, or health * count * (0.3 * price + 0.5) for a used item,
     // at its scaled price (SellSelected).
-    long long const Sold = std::min<long long>(std::min(Count, Held), Ledger.SaleCount);
+    long long const Sold = std::min<long long>((std::min)(Count, Held), Ledger.SaleCount);
     long long const Bound = Sold * MaxUnit(FindBaseData(Slot.current_base), Ledger.SaleGood);
     long long const Pay = std::min<long long>(Ledger.Credit, Bound);
     Ledger.bCredit = false;
