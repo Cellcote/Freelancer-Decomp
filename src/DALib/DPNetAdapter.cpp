@@ -545,8 +545,10 @@ namespace
             std::lock_guard<std::recursive_mutex> Guard(Lock);
             if (MessageHandler != nullptr)
                 return DPNERR_ALREADYINITIALIZED;
-            // A Close from a message handler that NetLoop has not finished yet.
-            if (Server != nullptr)
+            // A Close still under way: from a message handler, until NetLoop has torn down; from
+            // another thread, until that Close returns (its last step is a teardown, which would
+            // clear this session).
+            if (Server != nullptr || ClosesUnderWay != 0)
                 return DPNERR_ALREADYCLOSING;
             Winsock.emplace();
             if (!Winsock->bStarted)
@@ -713,6 +715,7 @@ namespace
                     bStop = true;
                     return S_OK;
                 }
+                ++ClosesUnderWay;
             }
             // The network thread carries the goodbyes out; wait for the last player to go.
             const DWORD Start = GetTickCount();
@@ -730,6 +733,7 @@ namespace
             StopThread();
             std::lock_guard<std::recursive_mutex> Guard(Lock);
             Teardown();
+            --ClosesUnderWay;
             return S_OK;
         }
         STDMETHOD(DestroyClient)(DPNID Player, const void* Data, DWORD Size, DWORD) override
@@ -1095,6 +1099,7 @@ namespace
         uint32_t LocalTriedAt = 0;
         std::thread NetThread;
         std::atomic<bool> bStop{false};
+        int ClosesUnderWay = 0;       // Closes from other threads that have not returned yet
         bool bTeardownOnExit = false; // a Close on the network thread left the teardown to NetLoop
         bool bDeleteOnExit = false;
         std::map<DPNHANDLE, DPNet::FBytes> ReceiveBuffers;
