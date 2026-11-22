@@ -11,6 +11,7 @@
 #include "dacom.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 
 
