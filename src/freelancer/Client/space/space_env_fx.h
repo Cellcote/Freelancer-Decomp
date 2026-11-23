@@ -142,7 +142,7 @@ struct StarGlowDesc
 // Port: LensGlowLoadFromIni / FSunEffectBody in space/star_sphere.cpp.
 struct LensGlowDesc
 {
-    // Embedded in FSunEffectBody Raw[0x30c]; not a standalone allocation.
+    // Embedded in FSunEffectBody (+0x288..+0x2f4); not a standalone allocation.
 };
 //
 // FUN_00510160 / FUN_0050da20 / FUN_0050e6f0 — Draw helpers; class live, draw still partial.

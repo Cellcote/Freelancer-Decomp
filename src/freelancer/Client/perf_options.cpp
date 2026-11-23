@@ -142,10 +142,9 @@ namespace
         FStarSphereListNode* const Sentinel = StarSphereList()->Sentinel;
         for (FStarSphereListNode* Node = Sentinel->Next; Node != Sentinel; Node = Node->Next)
         {
-            unsigned char* const Body = Node->Sphere->SunBody->Raw;
-            int const Full = *reinterpret_cast<int const*>(Body + 0x2b4);
-            *reinterpret_cast<int*>(Body + 0x2b8) =
-                static_cast<int>(static_cast<double>(Full) * Keep + 0.5);
+            FSunEffectBody* const Body = Node->Sphere->SunBody;
+            int const Full = Body->MaxLod;
+            Body->LodBias = static_cast<int>(static_cast<double>(Full) * Keep + 0.5);
         }
     }
 

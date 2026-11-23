@@ -24,6 +24,8 @@ void Win3DIdentityRotation3x3(float* Out9);
 // (DrawClouds 005518c6, the UI tables).
 void Win3DBindModelview(void* ObjectOrNull, float const* Matrix12);
 
+struct FTexShape;
+
 // Star-glow CacheString-ish record (0x50). Shape name: length@+0, chars@+4 (0x20).
 struct FStarGlowDesc
 {
@@ -34,25 +36,77 @@ struct FStarGlowDesc
     float OuterColor[3];     // +0x34
     float Alpha;             // +0x40
     unsigned Field44;        // +0x44
-    unsigned Field48;        // +0x48
+    // PORT(x64): the resolved shape, pointer-sized (a dword on Win32).
+    FTexShape const* Field48; // +0x48
     unsigned char Field4C;   // +0x4c
     unsigned char Pad4D[3];
 };
 FL_LAYOUT_ASSERT(sizeof(FStarGlowDesc) == 0x50, "star_glow desc 0x50");
 
 // SunEffect body at StarSphere+0x14 (operator_new 0x30c, FUN_0050d300).
+// Raw (+0x000..+0x257) is the corona's sample slots, 0x18 bytes each: +0/+4 the sample's
+// offset, +0x10 its alpha, +0x14 the touched flag; the main slot 0 and the inner ring 1..12 at
+// +0x000, the outer ring 0..11 at +0x138. Floats only, so the same on every build, and walked
+// by retail's offsets.
 struct FSunEffectBody
 {
-    unsigned char Raw[0x30c];
+    unsigned char Raw[0x258];     // +0x000
+    int EdgeFlags[12];            // +0x258  per outer slot, the quad diagonal drawn
+    float CenterColor[3];         // +0x288  inner_color
+    float MidColor[3];            // +0x294  between them at InteriorTween
+    float OuterColor[3];          // +0x2a0  outer_color
+    float RadiusScale;            // +0x2ac  radius_scale
+    int Lod;                      // +0x2b0
+    int MaxLod;                   // +0x2b4  max_LOD
+    int LodBias;                  // +0x2b8  subtracted from the LOD (the sun effect quality)
+    unsigned ShapeLen;            // +0x2bc
+    char ShapeName[0x20];         // +0x2c0  shape
+    FTexShape const* Shape;       // +0x2e0  ShapeDB record for ShapeName, null until resolved
+    unsigned char bShapeHasAlpha; // +0x2e4  the shape's texture format has alpha
+    unsigned char Pad2E5[3];
+    float FadeInTime;             // +0x2e8  glow_fade_in_seconds
+    float FadeOutTime;            // +0x2ec  glow_fade_out_seconds
+    float InteriorTween;          // +0x2f0  interior_tween
+    float InteriorRayTween;       // +0x2f4  interior_ray_tween: the outer ring's spread
+    int LodThresholds[5];         // +0x2f8  the pixel sizes below which LOD 0..4 apply
 };
+// Up to the shape there is no pointer, so these hold on every build (the slot walks rely on it).
+static_assert(offsetof(FSunEffectBody, EdgeFlags) == 0x258, "SunEffect edge flags +0x258");
+static_assert(offsetof(FSunEffectBody, CenterColor) == 0x288, "SunEffect colours +0x288");
+static_assert(offsetof(FSunEffectBody, RadiusScale) == 0x2ac, "SunEffect radius +0x2ac");
+static_assert(offsetof(FSunEffectBody, Lod) == 0x2b0, "SunEffect LOD +0x2b0");
+static_assert(offsetof(FSunEffectBody, ShapeLen) == 0x2bc, "SunEffect name length +0x2bc");
+static_assert(offsetof(FSunEffectBody, ShapeName) == 0x2c0, "SunEffect name +0x2c0");
+static_assert(offsetof(FSunEffectBody, Shape) == 0x2e0, "SunEffect shape +0x2e0");
+FL_LAYOUT_ASSERT(offsetof(FSunEffectBody, bShapeHasAlpha) == 0x2e4, "SunEffect alpha +0x2e4");
+FL_LAYOUT_ASSERT(offsetof(FSunEffectBody, FadeInTime) == 0x2e8, "SunEffect fade in +0x2e8");
+FL_LAYOUT_ASSERT(offsetof(FSunEffectBody, InteriorRayTween) == 0x2f4, "SunEffect ray tween +0x2f4");
+FL_LAYOUT_ASSERT(offsetof(FSunEffectBody, LodThresholds) == 0x2f8,
+                 "SunEffect LOD thresholds +0x2f8");
 FL_LAYOUT_ASSERT(sizeof(FSunEffectBody) == 0x30c, "SunEffect body 0x30c");
 
-// Lens-flare / spines child shell (0x40). Load parsers FUN_0050f3a0 / 0050fba0 fill
-// the element ranges; draw (FUN_0050f850 / 00510160) walks [Begin, End).
+// Lens-flare / spines child (0x40). Load parsers FUN_0050f3a0 / 0050fba0 fill the element
+// vector; draw (FUN_0050f850 / 00510160) walks [Begin, End). The lens flare's elements are
+// float* (one heap bead each), the spines' are inline 0x2c-byte records.
 struct FStarFxChild40
 {
-    unsigned char Raw[0x40];
+    unsigned char Allocator;    // +0x00  the vector's allocator byte
+    unsigned char Pad01[3];
+    unsigned char* Begin;       // +0x04
+    unsigned char* End;         // +0x08
+    unsigned char* Cap;         // +0x0c
+    unsigned ShapeLen;          // +0x10
+    char ShapeName[0x20];       // +0x14
+    FTexShape const* Shape;     // +0x34  ShapeDB record for ShapeName, null until resolved
+    float ScaleMin;             // +0x38  the drawn scale's clamp bounds
+    float ScaleMax;             // +0x3c
 };
+FL_LAYOUT_ASSERT(offsetof(FStarFxChild40, Begin) == 0x04, "child vector +0x04");
+FL_LAYOUT_ASSERT(offsetof(FStarFxChild40, ShapeLen) == 0x10, "child name length +0x10");
+FL_LAYOUT_ASSERT(offsetof(FStarFxChild40, ShapeName) == 0x14, "child name +0x14");
+FL_LAYOUT_ASSERT(offsetof(FStarFxChild40, Shape) == 0x34, "child shape +0x34");
+FL_LAYOUT_ASSERT(offsetof(FStarFxChild40, ScaleMin) == 0x38, "child clamp +0x38");
+FL_LAYOUT_ASSERT(sizeof(FStarFxChild40) == 0x40, "lens flare / spines child 0x40");
 
 struct IObjInspect;
 struct FStarSphere;
