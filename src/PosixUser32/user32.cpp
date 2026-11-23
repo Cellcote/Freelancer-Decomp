@@ -1833,14 +1833,6 @@ int wsprintfW(LPWSTR Buffer, LPCWSTR Format, ...)
     return Length;
 }
 
-// String tables are in the Windows resource DLLs, which are not read here yet.
-int LoadStringW(HINSTANCE, UINT, LPWSTR Buffer, int Size)
-{
-    if (Buffer != nullptr && Size > 0)
-        Buffer[0] = 0;
-    return 0;
-}
-
 int FillRect(HDC, const RECT*, HBRUSH)
 {
     return 0;

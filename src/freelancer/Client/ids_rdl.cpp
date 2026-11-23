@@ -8,6 +8,7 @@
 
 #include "ids_rdl.h"
 #include "ids_strings.h"
+#include "resource_text.h" // ResourceUnit / ResourceWide: the locked text is UTF-16LE
 
 #include <stdlib.h>
 
@@ -239,7 +240,7 @@ namespace
     const int kRdlResourceType = 23;
     const int kStringTableResourceType = 6;
 
-    const wchar_t* LockRdlResource(HMODULE Module, unsigned int LowId, unsigned int& OutCount)
+    const ResourceUnit* LockRdlResource(HMODULE Module, unsigned int LowId, unsigned int& OutCount)
     {
         HRSRC const Info = FindResourceExA(Module, MAKEINTRESOURCEA(kRdlResourceType),
                                            MAKEINTRESOURCEA(LowId), 0);
@@ -250,7 +251,7 @@ namespace
         HGLOBAL const Data = LoadResource(Module, Info);
         if (Data == nullptr)
             return nullptr;
-        const wchar_t* Cursor = static_cast<const wchar_t*>(LockResource(Data));
+        const ResourceUnit* Cursor = static_cast<const ResourceUnit*>(LockResource(Data));
         if (Cursor == nullptr)
             return nullptr;
 
@@ -264,8 +265,8 @@ namespace
         return Cursor;
     }
 
-    const wchar_t* LockStringTableEntry(HMODULE Module, unsigned int LowId,
-                                        unsigned int& OutCount)
+    const ResourceUnit* LockStringTableEntry(HMODULE Module, unsigned int LowId,
+                                             unsigned int& OutCount)
     {
         // 0x0057dac9: the same block/entry arithmetic GetIdsStringW uses.
         const unsigned int BlockIndex = (LowId >> 4) + 1;
@@ -286,7 +287,7 @@ namespace
             Cursor = Cursor + Cursor[0] + 1;
 
         OutCount = Cursor[0];
-        return reinterpret_cast<const wchar_t*>(Cursor + 1);
+        return reinterpret_cast<const ResourceUnit*>(Cursor + 1);
     }
 }
 
@@ -299,7 +300,7 @@ bool LoadIdsIntoRdl(unsigned int Ids, RenderDisplayList& Rdl)
     const unsigned int LowId = Ids & 0xffffu;
 
     unsigned int Count = 0;
-    const wchar_t* Text = LockRdlResource(Module, LowId, Count);
+    const ResourceUnit* Text = LockRdlResource(Module, LowId, Count);
     if (Text == nullptr)
         Text = LockStringTableEntry(Module, LowId, Count);
     if (Text == nullptr)
@@ -310,7 +311,16 @@ bool LoadIdsIntoRdl(unsigned int Ids, RenderDisplayList& Rdl)
     // path in retail too; RDLX / HTML infocard resources succeed on the XML branch.
     XMLReader Reader;
     if (!Reader.read_buffer(Rdl, reinterpret_cast<const char*>(Text), Count * 2u))
-        AppendTextAsRdl(Text, Count, Rdl, true);
+    {
+        // The split path keeps pointers into the text (TextPtrNode): the resource's own on
+        // Windows, its wchar_t copy elsewhere (resource_text.h), which lives as long.
+        const wchar_t* const Wide = ResourceWide(Text);
+#if !defined(_WIN32)
+        if (Wide == nullptr)
+            return false;
+#endif
+        AppendTextAsRdl(Wide, Count, Rdl, true);
+    }
     return true;
 }
 

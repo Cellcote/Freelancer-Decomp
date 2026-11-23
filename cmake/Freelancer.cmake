@@ -200,6 +200,24 @@ if(NOT FL_WINDOWS)
       set_property(SOURCE ${_files} APPEND PROPERTY INCLUDE_DIRECTORIES ${_absolute})
     endif()
   endfunction()
+  # fl_add_generated_resource_dll(<name> <script.rc>): outside Windows, the resource-only DLL
+  # <name>.dll that rc.exe and the linker make from the script on Windows, built by
+  # tools/build_resource_dll.py into the output directory (a PE32 image, as the Win32 build's) for
+  # the platform layer's resource reader (src/include/pe_resources.h). Rebuilt when the script, a
+  # file it names or the tool changes.
+  function(fl_add_generated_resource_dll name script)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+    set(_out "${FL_BIN_DIR}/${name}.dll")
+    set(_dep "${CMAKE_CURRENT_BINARY_DIR}/${name}.dll.d")
+    add_custom_command(OUTPUT "${_out}"
+      COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tools/build_resource_dll.py"
+              "${CMAKE_CURRENT_SOURCE_DIR}/${script}" "${_out}" --depfile "${_dep}"
+      DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/${script}" "${PROJECT_SOURCE_DIR}/tools/build_resource_dll.py"
+      DEPFILE "${_dep}"
+      COMMENT "Generating ${name}.dll"
+      VERBATIM)
+    add_custom_target(${name} ALL DEPENDS "${_out}")
+  endfunction()
   # MSVC-only settings: nothing to do here.
   foreach(_fn fl_cl_options fl_rc fl_order_after fl_copy_dev_ini fl_copy_asan_runtime)
     cmake_language(EVAL CODE "function(${_fn})\nendfunction()")

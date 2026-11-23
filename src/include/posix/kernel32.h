@@ -1121,25 +1121,30 @@ inline HMODULE GetModuleHandleA(LPCSTR Name)
     return Platform::ModuleFind(Name);
 }
 
-// Resources live in the Windows resource DLLs (Platform::ResourceModuleLoad), which are not
-// read here yet: FindResource finds nothing, as for a module without the resource.
+// Resources live in the Windows resource DLLs that Platform::ResourceModuleLoad maps
+// (pe_resources.h): HRSRC points at the resource's data entry in the mapping, as on Windows, and
+// LoadResource / LockResource give the data in place (read-only; text is UTF-16LE, which
+// resource_text.h turns into wchar_t). The executable (Module nullptr) and the modules
+// LoadLibraryA loads have no PE resources here: FindResource finds nothing in them, as in a
+// module without the resource.
 typedef struct HRSRC__* HRSRC;
 typedef HANDLE HGLOBAL;
-inline HRSRC FindResourceExA(HMODULE, LPCSTR, LPCSTR, WORD)
+inline HRSRC FindResourceExA(HMODULE Module, LPCSTR Type, LPCSTR Name, WORD Language)
 {
-    return nullptr;
+    return static_cast<HRSRC>(
+        const_cast<void*>(Platform::ResourceFind(Module, Type, Name, Language)));
 }
 inline HRSRC FindResourceA(HMODULE Module, LPCSTR Name, LPCSTR Type)
 {
     return FindResourceExA(Module, Type, Name, 0);
 }
-inline DWORD SizeofResource(HMODULE, HRSRC)
+inline DWORD SizeofResource(HMODULE Module, HRSRC Resource)
 {
-    return 0;
+    return Platform::ResourceSize(Module, Resource);
 }
-inline HGLOBAL LoadResource(HMODULE, HRSRC)
+inline HGLOBAL LoadResource(HMODULE Module, HRSRC Resource)
 {
-    return nullptr;
+    return const_cast<void*>(Platform::ResourceData(Module, Resource));
 }
 inline LPVOID LockResource(HGLOBAL Resource)
 {

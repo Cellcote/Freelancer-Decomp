@@ -273,7 +273,12 @@ def write_resource_cmakelists(project_dir, target_name, rc_filename):
     text = """# See cmake/Freelancer.cmake. The source list is the link order, and with it the order of
 # static initialisation.
 
-# Win32 only.
+# Win32: rc.exe and the linker. macOS and Linux: tools/build_resource_dll.py makes the same DLL.
+# x64 Windows builds neither.
+if(NOT FL_WINDOWS)
+  fl_add_generated_resource_dll(%s %s)
+  return()
+endif()
 if(NOT FL_WIN32)
   return()
 endif()
@@ -282,7 +287,7 @@ fl_add_module(%s RESOURCE_DLL RETAIL
   SOURCES
     %s
 )
-""" % (target_name, rc_filename)
+""" % (target_name, rc_filename, target_name, rc_filename)
     open(path, "w", encoding="utf-8", newline="\n").write(text)
 
 

@@ -378,8 +378,20 @@ without the Windows API. Milestones:
   window procedure (an `HWND` is a small number), the message queue, focus, the cursor and the
   US keyboard's scan codes and key names. It uses none of the platform layer's shared state,
   since dacom, which holds that, links it; `MsgWaitForMultipleObjects` waits in the header for
-  that reason. Dialog templates and string tables wait for the resource reader, so
-  `DialogBoxParamA` fails and `FindResourceExA` finds nothing. DirectInput 8 is a stand-in
+  that reason. Dialog templates wait for a dialog layer, so `DialogBoxParamA` fails. The
+  resource DLLs are read (M3, `src/include/pe_resources.h`): `Platform::ResourceModuleLoad` maps
+  a PE32 or PE32+ resource-only DLL read-only (retail's and mods' as they are), its handle the
+  mapping's address, which no dlopen handle can be; `FindResourceExA` (ids, `#n` and string
+  names, Windows' language fallback), `SizeofResource`, `LoadResource`, `LockResource`,
+  `FreeLibrary` and `LoadStringW` (an inline in `posix/winuser.h`, since the user32 module may
+  not use the platform's state) work on it. The text is UTF-16LE while `wchar_t` is 4 bytes
+  here: the client's readers (`ids_strings.cpp`, `ids_rdl.cpp`) take it through
+  `resource_text.h`, which is the original access on Windows and converts one unit per
+  `wchar_t` elsewhere (a converted copy that lives as long as the module where a `TextPtrNode`
+  keeps a pointer). A fresh build needs only the retail `DATA`: the build makes the 8 resource
+  DLLs from `src/Resources/*/*.rc` with `tools/build_resource_dll.py` (string tables, type 23
+  infocards, bitmaps; dialogs, menus, icons and version information are left out).
+  `resource_tests` checks the reader on them. DirectInput 8 is a stand-in
   with a working system mouse (`posix/dinput.h`): the client, as retail, does not survive a
   failed `DirectInput8Create`. There is no IME
   (`posix/imm.h`: no layout is an IME, no window has an input context) and no structured
