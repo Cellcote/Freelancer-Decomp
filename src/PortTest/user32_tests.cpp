@@ -413,10 +413,57 @@ void TestComAndMisc()
     }
     Check(bRan, "a __try body runs and its __except block does not");
 }
+// The screen (src/PosixUser32/user32_sdl, SDL3): run by ctest with SDL's dummy video driver,
+// which makes windows without a display. Skipped (passing) when the backend is not built.
+int TestScreen()
+{
+    WNDCLASSA Class = {};
+    Class.lpfnWndProc = &TestProc;
+    Class.lpszClassName = "ScreenClass";
+    RegisterClassA(&Class);
+    HWND const Window = CreateWindowExA(0, "ScreenClass", "Freelancer", 0x2CA0000, 10, 10, 640, 480,
+                                        nullptr, nullptr, nullptr, nullptr);
+    Check(Window != nullptr, "a top-level window is made");
+    if (reinterpret_cast<std::uintptr_t>(Window) >= 0x40000000)
+    {
+        std::printf("skip: no screen backend (user32_sdl) in this build\n");
+        DestroyWindow(Window);
+        return 0;
+    }
+    Check(reinterpret_cast<std::uintptr_t>(Window) < 0x40000000,
+          "a window with a screen is numbered by the backend (its SDL window id)");
+    Check(GetSystemMetrics(SM_CXSCREEN) > 0 && GetSystemMetrics(SM_CYSCREEN) > 0,
+          "the desktop has the display's size");
+    DEVMODEA Mode = {};
+    Mode.dmSize = sizeof(Mode);
+    Check(EnumDisplaySettingsA(nullptr, ENUM_CURRENT_SETTINGS, &Mode) && Mode.dmPelsWidth > 0,
+          "EnumDisplaySettingsA describes the display's mode");
+    SetWindowTextA(Window, "Freelancer (renamed)");
+    ShowWindow(Window, SW_SHOWNORMAL);
+    SetWindowPos(Window, nullptr, 0, 0, 800, 600, SWP_NOMOVE | SWP_NOZORDER);
+    MSG Message;
+    for (int Pass = 0; Pass < 10; ++Pass)
+        while (PeekMessageA(&Message, nullptr, 0, 0, PM_REMOVE))
+            DispatchMessageA(&Message);
+    RECT Rect = {};
+    Check(GetClientRect(Window, &Rect) && Rect.right == 800 && Rect.bottom == 600,
+          "SetWindowPos resizes the screen's window, and its events keep the size");
+    Check(ShowCursor(FALSE) == -1 && ShowCursor(TRUE) == 0, "ShowCursor counts on the screen");
+    GSeen.Messages.clear();
+    Check(DestroyWindow(Window) && Saw(WM_DESTROY) && !IsWindow(Window),
+          "DestroyWindow closes the screen's window");
+    return 0;
+}
 } // namespace
 
-int main()
+int main(int Argc, char** Argv)
 {
+    if (Argc > 1 && std::strcmp(Argv[1], "--screen") == 0)
+    {
+        TestScreen();
+        std::printf("%d failure(s)\n", GFailures);
+        return GFailures == 0 ? 0 : 1;
+    }
     TestWindows();
     TestKeyboardAndText();
     TestDirectInput();

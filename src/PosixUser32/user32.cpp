@@ -11,17 +11,28 @@
 // only its own. It uses nothing of the platform layer's shared state (dacom holds that, and dacom
 // links this module), only its own lock.
 //
-// A window here is a record: its class's window procedure, styles, rectangle, text and window
-// data. There is no screen behind it yet; SDL gives the top-level windows one with M3, and its
-// events become the messages below. Until then the "screen" is a 1024x768 desktop at 32 bits.
+// A window is a record: its class's window procedure, styles, rectangle, text and window data.
+// A top-level window also gets a screen from the backend module (user32_backend.h, SDL3), loaded
+// the first time one is made: its HWND is then the backend's window id, the calls below that
+// change it change the screen's window too, and the screen's events become messages (the
+// sink). Without the backend (FL_USER32_HEADLESS, or no user32_sdl module) windows stay records
+// and the desktop is 1024x768 at 32 bits.
+//
+// The DirectInput system mouse's queue (posix/dinput.h) is here too, one per process, so that
+// the backend's events reach the client's device.
 
 #include <windows.h>
+
+#include <dinput.h>
+
+#include "user32_backend.h"
 
 #include <algorithm>
 #include <chrono>
 #include <condition_variable>
 #include <cstdarg>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <cwchar>
 #include <cwctype>
@@ -32,6 +43,8 @@
 #include <strings.h>
 #include <thread>
 #include <vector>
+
+#include <dlfcn.h>
 
 namespace
 {
@@ -73,12 +86,13 @@ struct FThreadQueue
     std::uint64_t Seen = 0; // the newest sequence the thread has looked at
 };
 
-// The desktop until SDL brings the display's (M3).
-constexpr int kDesktopWidth = 1024;
-constexpr int kDesktopHeight = 768;
+// The desktop without a backend.
+constexpr int kHeadlessWidth = 1024;
+constexpr int kHeadlessHeight = 768;
 
-// The first window number: clear of HWND_TOP / HWND_BOTTOM (0, 1) and of small sentinels.
-constexpr std::uintptr_t kFirstWindow = 0x10;
+// The numbers of windows without a screen (child windows, and every window without a backend),
+// far above the backend's ids (SDL counts from 1); the desktop is the number below them.
+constexpr std::uintptr_t kFirstRecordWindow = 0x40000000;
 
 struct FState
 {
@@ -87,7 +101,7 @@ struct FState
     std::map<std::string, FClass> Classes; // by lower-case name
     ATOM NextAtom = 0xC000;                 // class atoms, never reused
     std::map<std::uintptr_t, FWindow> Windows;
-    std::uintptr_t NextWindow = kFirstWindow;
+    std::uintptr_t NextWindow = kFirstRecordWindow;
     std::map<std::uint64_t, FThreadQueue> Queues; // by ThreadSerial, while the thread lives
     std::uint64_t NextThread = 1;
     std::uint64_t NextSequence = 1;
@@ -97,8 +111,15 @@ struct FState
     std::uint64_t FocusChanges = 0; // SetFocus's transitions, to tell a stale one
     HCURSOR Cursor = nullptr;
     int CursorCount = 0; // ShowCursor's display count: shown at 0 and above
-    POINT CursorPos = {kDesktopWidth / 2, kDesktopHeight / 2};
+    POINT CursorPos = {kHeadlessWidth / 2, kHeadlessHeight / 2};
     SHORT Keys[256] = {};
+    // The backend, once looked for; the thread that made the first screen window, the only one
+    // that takes the screen's events (macOS has its windows on the main thread only).
+    const FUser32Backend* Backend = nullptr;
+    bool bBackendLookedFor = false;
+    std::thread::id ScreenThread;
+    bool bPumping = false;
+    PosixDirectInput::FMouseQueue Mouse;
 };
 
 FState& State()
@@ -310,6 +331,99 @@ DWORD Ticks()
         duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count());
 }
 
+// The backend module next to this one (user32_sdl.dylib / .so), loaded the first time the
+// screen is needed. nullptr without one, or with FL_USER32_HEADLESS set (to anything but "0").
+const FUser32Backend* Backend()
+{
+    FState& S = State();
+    std::lock_guard<std::recursive_mutex> Guard(S.Lock);
+    if (S.bBackendLookedFor)
+        return S.Backend;
+    S.bBackendLookedFor = true;
+    const char* const Headless = std::getenv("FL_USER32_HEADLESS");
+    if (Headless != nullptr && *Headless != 0 && std::strcmp(Headless, "0") != 0)
+        return nullptr;
+    Dl_info Info;
+    if (dladdr(reinterpret_cast<const void*>(&Backend), &Info) == 0 || Info.dli_fname == nullptr)
+        return nullptr;
+    std::string Path = Info.dli_fname;
+    Path.erase(Path.find_last_of('/') + 1);
+#if defined(__APPLE__)
+    Path += "user32_sdl.dylib";
+#else
+    Path += "user32_sdl.so";
+#endif
+    void* const Module = dlopen(Path.c_str(), RTLD_NOW | RTLD_LOCAL);
+    if (Module == nullptr)
+    {
+        std::fprintf(stderr, "[user32] no screen (windows stay records): %s\n", dlerror());
+        return nullptr;
+    }
+    auto const Entry =
+        reinterpret_cast<FUser32BackendEntry>(dlsym(Module, FL_USER32_BACKEND_ENTRY));
+    const FUser32Backend* const Found = Entry != nullptr ? Entry() : nullptr;
+    if (Found == nullptr || Found->Version != kUser32BackendVersion)
+    {
+        std::fprintf(stderr, "[user32] %s is not a backend of version %d\n", Path.c_str(),
+                     kUser32BackendVersion);
+        return nullptr;
+    }
+    S.Backend = Found;
+    return Found;
+}
+
+// The backend if it is loaded already (the calls that only follow a window's screen).
+const FUser32Backend* LoadedBackend()
+{
+    std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+    return State().Backend;
+}
+
+// Whether a window number is the backend's (a top-level window with a screen).
+bool IsScreenWindow(HWND Window)
+{
+    std::uintptr_t const Number = Key(Window);
+    return Number != 0 && Number < kFirstRecordWindow - 1 && LoadedBackend() != nullptr;
+}
+
+std::uint32_t ScreenId(HWND Window)
+{
+    return static_cast<std::uint32_t>(Key(Window));
+}
+
+HWND WindowOfId(std::uint32_t Id)
+{
+    return reinterpret_cast<HWND>(static_cast<std::uintptr_t>(Id));
+}
+
+// The desktop's size: the display's with a backend.
+POINT DesktopSize()
+{
+    int Width = 0;
+    int Height = 0;
+    int Bits = 0;
+    int Hz = 0;
+    if (const FUser32Backend* const Screen = Backend())
+        if (Screen->DisplayMode(-1, &Width, &Height, &Bits, &Hz))
+            return {Width, Height};
+    return {kHeadlessWidth, kHeadlessHeight};
+}
+
+// A frame (a caption), and fullscreen: a popup that covers the desktop, as the client lays out
+// its fullscreen window (ApplyGameWindowLayout).
+void ApplyFrame(HWND Window, DWORD Style, const RECT& Rect)
+{
+    const FUser32Backend* const Screen = LoadedBackend();
+    if (Screen == nullptr || !IsScreenWindow(Window))
+        return;
+    bool const bFramed = (Style & WS_CAPTION) == WS_CAPTION;
+    POINT const Desktop = DesktopSize();
+    bool const bFullscreen = !bFramed && (Style & WS_POPUP) != 0 && Rect.left <= 0 &&
+                             Rect.top <= 0 && Rect.right - Rect.left >= Desktop.x &&
+                             Rect.bottom - Rect.top >= Desktop.y;
+    Screen->SetFrame(ScreenId(Window), bFramed, bFullscreen);
+}
+
 // US-layout set-1 scan codes and key names, for MapVirtualKeyA and GetKeyNameTextW.
 struct FKeyName
 {
@@ -479,15 +593,29 @@ HWND CreateWindowExA(DWORD ExStyle, LPCSTR ClassName, LPCSTR Title, DWORD Style,
             X = Y = 0;
         if (Width == CW_USEDEFAULT)
         {
-            Width = kDesktopWidth;
-            Height = kDesktopHeight;
+            POINT const Desktop = DesktopSize();
+            Width = Desktop.x;
+            Height = Desktop.y;
         }
         // A child's rectangle is relative to its parent's client area, as Windows keeps it.
         Record.Rect = {X, Y, X + Width, Y + Height};
         if (Title != nullptr)
             for (const char* Cursor = Title; *Cursor != 0; ++Cursor)
                 Record.Text += static_cast<wchar_t>(static_cast<unsigned char>(*Cursor));
-        Window = reinterpret_cast<HWND>(State().NextWindow++);
+        // A top-level window gets a screen when there is a backend; its id is the HWND.
+        std::uint32_t ScreenWindow = 0;
+        const FUser32Backend* const Screen =
+            Parent == nullptr && (Style & WS_CHILD) == 0 ? Backend() : nullptr;
+        if (Screen != nullptr &&
+            Screen->CreateWindow(Title, X, Y, Width, Height, (Style & WS_CAPTION) == WS_CAPTION,
+                                 (Style & WS_VISIBLE) != 0, &ScreenWindow))
+        {
+            Window = WindowOfId(ScreenWindow);
+            if (State().ScreenThread == std::thread::id())
+                State().ScreenThread = std::this_thread::get_id();
+        }
+        else
+            Window = reinterpret_cast<HWND>(State().NextWindow++);
         State().Windows.emplace(Key(Window), Record);
     }
 
@@ -540,6 +668,8 @@ BOOL DestroyWindow(HWND Window)
     for (HWND Child : Children)
         DestroyWindow(Child);
     SendMessageA(Window, WM_NCDESTROY, 0, 0);
+    if (IsScreenWindow(Window))
+        LoadedBackend()->DestroyWindow(ScreenId(Window));
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
     FState& S = State();
     S.Windows.erase(Key(Window));
@@ -607,6 +737,8 @@ BOOL ShowWindow(HWND Window, int Command)
             Record->Style |= WS_MAXIMIZE;
         Procedure = Record->Procedure;
     }
+    if (IsScreenWindow(Window))
+        LoadedBackend()->Show(ScreenId(Window), Command);
     if (bWasVisible != bVisible)
         Procedure(Window, WM_SHOWWINDOW, bVisible ? TRUE : FALSE, 0);
     return bWasVisible ? TRUE : FALSE;
@@ -646,6 +778,7 @@ BOOL SetWindowPos(HWND Window, HWND, int X, int Y, int Width, int Height, UINT F
     if (Record == nullptr)
         return FALSE;
     RECT& Rect = Record->Rect;
+    RECT const Before = Rect;
     if ((Flags & SWP_NOMOVE) == 0)
     {
         int const W = Rect.right - Rect.left;
@@ -661,6 +794,20 @@ BOOL SetWindowPos(HWND Window, HWND, int X, int Y, int Width, int Height, UINT F
         Record->Style |= WS_VISIBLE;
     if ((Flags & SWP_HIDEWINDOW) != 0)
         Record->Style &= ~WS_VISIBLE;
+    if (IsScreenWindow(Window))
+    {
+        const FUser32Backend* const Screen = LoadedBackend();
+        if (std::memcmp(&Before, &Rect, sizeof(RECT)) != 0)
+            Screen->SetBounds(ScreenId(Window), Rect.left, Rect.top, Rect.right - Rect.left,
+                              Rect.bottom - Rect.top);
+        // SWP_FRAMECHANGED (a new style), or a size that may make a popup fullscreen.
+        if ((Flags & SWP_FRAMECHANGED) != 0 || (Flags & SWP_NOSIZE) == 0)
+            ApplyFrame(Window, Record->Style, Rect);
+        if ((Flags & SWP_SHOWWINDOW) != 0)
+            Screen->Show(ScreenId(Window), SW_SHOW);
+        if ((Flags & SWP_HIDEWINDOW) != 0)
+            Screen->Show(ScreenId(Window), SW_HIDE);
+    }
     return TRUE;
 }
 
@@ -676,7 +823,8 @@ BOOL GetWindowRect(HWND Window, LPRECT Rect)
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
     if (Window == GetDesktopWindow())
     {
-        *Rect = {0, 0, kDesktopWidth, kDesktopHeight};
+        POINT const Desktop = DesktopSize();
+        *Rect = {0, 0, Desktop.x, Desktop.y};
         return TRUE;
     }
     FWindow const* Record = Find(Window);
@@ -814,8 +962,10 @@ BOOL SetWindowTextA(HWND Window, LPCSTR Text)
         return FALSE;
     Record->Text.clear();
     if (Text != nullptr)
-        for (; *Text != 0; ++Text)
-            Record->Text += static_cast<wchar_t>(static_cast<unsigned char>(*Text));
+        for (const char* Cursor = Text; *Cursor != 0; ++Cursor)
+            Record->Text += static_cast<wchar_t>(static_cast<unsigned char>(*Cursor));
+    if (IsScreenWindow(Window))
+        LoadedBackend()->SetTitle(ScreenId(Window), Narrow(Record->Text.c_str()).c_str());
     return TRUE;
 }
 
@@ -826,13 +976,15 @@ BOOL SetWindowTextW(HWND Window, LPCWSTR Text)
     if (Record == nullptr)
         return FALSE;
     Record->Text = Text != nullptr ? Text : L"";
+    if (IsScreenWindow(Window))
+        LoadedBackend()->SetTitle(ScreenId(Window), Narrow(Record->Text.c_str()).c_str());
     return TRUE;
 }
 
 // The desktop: a window number of its own, not a record.
 HWND GetDesktopWindow()
 {
-    return reinterpret_cast<HWND>(static_cast<std::uintptr_t>(kFirstWindow - 1));
+    return reinterpret_cast<HWND>(static_cast<std::uintptr_t>(kFirstRecordWindow - 1));
 }
 
 HWND GetForegroundWindow()
@@ -923,37 +1075,49 @@ int GetSystemMetrics(int Index)
     switch (Index)
     {
     case SM_CXSCREEN:
-        return kDesktopWidth;
+        return DesktopSize().x;
     case SM_CYSCREEN:
-        return kDesktopHeight;
+        return DesktopSize().y;
     default:
         return 0;
     }
 }
 
 // The display's modes: the current one (ENUM_CURRENT_SETTINGS / ENUM_REGISTRY_SETTINGS), or by
-// index the common 32-bit modes up to the desktop's size.
+// index the display's fullscreen modes (the backend's), or without a backend the common 32-bit
+// modes up to the headless desktop's size.
 BOOL EnumDisplaySettingsA(LPCSTR, DWORD Mode, DEVMODEA* Settings)
 {
     static const POINT kModes[] = {{640, 480}, {800, 600}, {1024, 768}};
     if (Settings == nullptr)
         return FALSE;
-    POINT Size = {kDesktopWidth, kDesktopHeight};
-    if (Mode != ENUM_CURRENT_SETTINGS && Mode != ENUM_REGISTRY_SETTINGS)
+    int Width = kHeadlessWidth;
+    int Height = kHeadlessHeight;
+    int Bits = 32;
+    int Hz = 60;
+    bool const bCurrent = Mode == ENUM_CURRENT_SETTINGS || Mode == ENUM_REGISTRY_SETTINGS;
+    if (const FUser32Backend* const Screen = Backend())
+    {
+        if (!Screen->DisplayMode(bCurrent ? -1 : static_cast<int>(Mode), &Width, &Height, &Bits,
+                                 &Hz))
+            return FALSE;
+    }
+    else if (!bCurrent)
     {
         if (Mode >= sizeof(kModes) / sizeof(kModes[0]))
             return FALSE;
-        Size = kModes[Mode];
+        Width = kModes[Mode].x;
+        Height = kModes[Mode].y;
     }
+    // The caller's dmSize, and the fields up to dmDisplayFrequency, which every DEVMODEA has.
     WORD const StructSize = Settings->dmSize;
-    std::memset(Settings, 0,
-                StructSize >= sizeof(DEVMODEA) || StructSize == 0 ? sizeof(DEVMODEA) : StructSize);
+    std::memset(Settings, 0, sizeof(DEVMODEA));
     Settings->dmSize = StructSize;
     Settings->dmFields = DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFREQUENCY;
-    Settings->dmBitsPerPel = 32;
-    Settings->dmPelsWidth = static_cast<DWORD>(Size.x);
-    Settings->dmPelsHeight = static_cast<DWORD>(Size.y);
-    Settings->dmDisplayFrequency = 60;
+    Settings->dmBitsPerPel = static_cast<DWORD>(Bits);
+    Settings->dmPelsWidth = static_cast<DWORD>(Width);
+    Settings->dmPelsHeight = static_cast<DWORD>(Height);
+    Settings->dmDisplayFrequency = static_cast<DWORD>(Hz);
     return TRUE;
 }
 
@@ -1033,29 +1197,201 @@ void PostQuitMessage(int ExitCode)
             MSG{nullptr, WM_QUIT, static_cast<WPARAM>(ExitCode), 0, Ticks(), State().CursorPos});
 }
 
+namespace
+{
+// ---------------------------------------------------------------------------------------------
+// The screen's events (FUser32Sink)
+// ---------------------------------------------------------------------------------------------
+
+void SinkPost(std::uint32_t Window, unsigned Message, std::uintptr_t WParam, std::intptr_t LParam)
+{
+    PostMessageA(WindowOfId(Window), Message, WParam, LParam);
+}
+
+void SinkSend(std::uint32_t Window, unsigned Message, std::uintptr_t WParam, std::intptr_t LParam)
+{
+    SendMessageA(WindowOfId(Window), Message, WParam, LParam);
+}
+
+// The key's state (GetKeyState: 0x8000 down, 0x0001 toggled on each press) and its message, with
+// the lParam Windows builds: repeat count 1, scan code, extended bit, Alt held (context), the
+// previous state and the transition. Alt, F10 and keys with Alt held are system keys. Enter,
+// Backspace, Tab and Esc also give WM_CHAR, as TranslateMessage makes them (typed text comes as
+// its own events).
+void SinkKey(std::uint32_t Window, unsigned VirtualKey, bool bExtended, bool bDown, bool bRepeat)
+{
+    if (VirtualKey == 0 || VirtualKey > 0xFF)
+        return;
+    bool bWasDown = false;
+    bool bAlt = false;
+    {
+        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+        SHORT& Key = State().Keys[VirtualKey];
+        bWasDown = (Key & 0x8000) != 0;
+        SHORT const Toggle = static_cast<SHORT>(Key & 1);
+        if (bDown)
+            Key = static_cast<SHORT>(0x8000 | (bRepeat ? Toggle : Toggle ^ 1));
+        else
+            Key = Toggle;
+        bAlt = (State().Keys[VK_MENU] & 0x8000) != 0;
+    }
+    UINT const Scan = MapVirtualKeyA(VirtualKey, MAPVK_VK_TO_VSC);
+    std::uint32_t LParam = 1u | ((Scan & 0xFFu) << 16);
+    if (bExtended)
+        LParam |= 1u << 24;
+    if (bAlt)
+        LParam |= 1u << 29;
+    if (bWasDown)
+        LParam |= 1u << 30;
+    if (!bDown)
+        LParam |= 1u << 31;
+    bool const bSystem = VirtualKey == VK_MENU || VirtualKey == VK_F10 || bAlt;
+    UINT const Message =
+        bDown ? (bSystem ? WM_SYSKEYDOWN : WM_KEYDOWN) : (bSystem ? WM_SYSKEYUP : WM_KEYUP);
+    HWND const Target = WindowOfId(Window);
+    PostMessageA(Target, Message, VirtualKey, static_cast<LPARAM>(LParam));
+    if (bDown && !bSystem &&
+        (VirtualKey == VK_RETURN || VirtualKey == VK_BACK || VirtualKey == VK_TAB ||
+         VirtualKey == VK_ESCAPE))
+        PostMessageA(Target, WM_CHAR, VirtualKey, static_cast<LPARAM>(LParam));
+}
+
+// Typed text: WM_CHAR per UTF-16 unit, a surrogate pair for a character past U+FFFF.
+void SinkChar(std::uint32_t Window, std::uint32_t Character)
+{
+    HWND const Target = WindowOfId(Window);
+    if (Character < 0x20 || Character == 0x7F)
+        return; // control characters come from the key events
+    if (Character > 0xFFFF)
+    {
+        Character -= 0x10000;
+        PostMessageA(Target, WM_CHAR, 0xD800 + (Character >> 10), 1);
+        PostMessageA(Target, WM_CHAR, 0xDC00 + (Character & 0x3FF), 1);
+        return;
+    }
+    PostMessageA(Target, WM_CHAR, Character, 1);
+}
+
+void SinkMouseMove(std::uint32_t, int, int, int ScreenX, int ScreenY)
+{
+    std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+    State().CursorPos = {ScreenX, ScreenY};
+}
+
+void SinkMouseRaw(std::uint32_t Offset, std::uint32_t Data)
+{
+    PosixDirectInput::MouseEvent(Offset, Data);
+}
+
+// A move or resize from the screen: the window's rectangle, then WM_MOVE / WM_SIZE.
+void SinkBounds(std::uint32_t Window, int X, int Y, int Width, int Height)
+{
+    HWND const Target = WindowOfId(Window);
+    bool bMoved = false;
+    bool bResized = false;
+    {
+        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+        FWindow* const Record = Find(Target);
+        if (Record == nullptr)
+            return;
+        RECT& Rect = Record->Rect;
+        bMoved = Rect.left != X || Rect.top != Y;
+        bResized = Rect.right - Rect.left != Width || Rect.bottom - Rect.top != Height;
+        Rect = {X, Y, X + Width, Y + Height};
+    }
+    if (bMoved)
+        SendMessageA(Target, WM_MOVE, 0, MAKELONG(X, Y));
+    if (bResized)
+        SendMessageA(Target, WM_SIZE, SIZE_RESTORED, MAKELONG(Width, Height));
+}
+
+// The application's focus: WM_ACTIVATEAPP and WM_ACTIVATE, then the keyboard focus.
+void SinkActivate(std::uint32_t Window, bool bActive)
+{
+    HWND const Target = WindowOfId(Window);
+    {
+        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+        if (Find(Target) == nullptr)
+            return;
+        State().Active = bActive ? Target : nullptr;
+    }
+    SendMessageA(Target, WM_ACTIVATEAPP, bActive ? TRUE : FALSE, 0);
+    SendMessageA(Target, WM_ACTIVATE, bActive ? WA_ACTIVE : WA_INACTIVE, 0);
+    SetFocus(bActive ? Target : nullptr);
+}
+
+const FUser32Sink GSink = {&SinkPost,      &SinkSend,     &SinkKey,    &SinkChar,
+                           &SinkMouseMove, &SinkMouseRaw, &SinkBounds, &SinkActivate};
+
+// Takes the screen's events, on the thread that made the screen's windows, once at a time (a
+// window procedure the sink calls may pump again).
+void PumpScreen()
+{
+    const FUser32Backend* Screen = nullptr;
+    {
+        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+        FState& S = State();
+        if (S.Backend == nullptr || S.bPumping || S.ScreenThread != std::this_thread::get_id())
+            return;
+        S.bPumping = true;
+        Screen = S.Backend;
+    }
+    Screen->Pump(&GSink);
+    std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+    State().bPumping = false;
+}
+
+// Whether this thread takes the screen's events.
+bool OnScreenThread()
+{
+    std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+    return State().Backend != nullptr && State().ScreenThread == std::this_thread::get_id();
+}
+} // namespace
+
 BOOL PeekMessageA(LPMSG Message, HWND Window, UINT First, UINT Last, UINT Remove)
 {
+    PumpScreen();
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
     return TakeMessage(Message, Window, First, Last, (Remove & PM_REMOVE) != 0) ? TRUE : FALSE;
 }
 
 // Waits for a message of the calling thread; FALSE for WM_QUIT, -1 for a null output or a window
-// that does not exist (null and (HWND)-1 are filters, not windows).
+// that does not exist (null and (HWND)-1 are filters, not windows). On the screen's thread it
+// waits on the screen's events too, 10 ms at a time.
 BOOL GetMessageA(LPMSG Message, HWND Window, UINT First, UINT Last)
 {
     MSG Taken;
-    std::unique_lock<std::recursive_mutex> Guard(State().Lock);
-    if (Message == nullptr ||
-        (Window != nullptr && Window != reinterpret_cast<HWND>(static_cast<std::intptr_t>(-1)) &&
-         Find(Window) == nullptr))
-        return -1;
-    State().Posted.wait(Guard, [&] { return TakeMessage(&Taken, Window, First, Last, true); });
+    {
+        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+        if (Message == nullptr ||
+            (Window != nullptr && Window != reinterpret_cast<HWND>(static_cast<std::intptr_t>(-1)) &&
+             Find(Window) == nullptr))
+            return -1;
+    }
+    for (;;)
+    {
+        PumpScreen();
+        {
+            std::unique_lock<std::recursive_mutex> Guard(State().Lock);
+            if (TakeMessage(&Taken, Window, First, Last, true))
+                break;
+            if (!OnScreenThread())
+            {
+                State().Posted.wait(Guard,
+                                    [&] { return TakeMessage(&Taken, Window, First, Last, true); });
+                break;
+            }
+        }
+        LoadedBackend()->Wait(10);
+    }
     if (Message != nullptr)
         *Message = Taken;
     return Taken.message == WM_QUIT ? FALSE : TRUE;
 }
 
-// No character messages from key messages yet: the window layer posts WM_CHAR itself (M3).
+// Character messages come from the screen's text events and its key events (SinkKey), not from
+// here.
 BOOL TranslateMessage(const MSG*)
 {
     return FALSE;
@@ -1073,6 +1409,7 @@ LRESULT DispatchMessageA(const MSG* Message)
 // (posix/winuser.h). WM_QUIT always counts.
 bool PosixUser32HasInput(DWORD WakeMask)
 {
+    PumpScreen();
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
     FThreadQueue const& Queue = ThisQueue();
     for (const FQueued& Entry : Queue.Messages)
@@ -1080,6 +1417,12 @@ bool PosixUser32HasInput(DWORD WakeMask)
                                             (InputClass(Entry.Message.message) & WakeMask) != 0))
             return true;
     return false;
+}
+
+// The DirectInput system mouse's queue (posix/dinput.h), one per process.
+PosixDirectInput::FMouseQueue& PosixDirectInputMouse()
+{
+    return State().Mouse;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1155,11 +1498,21 @@ HCURSOR GetCursor()
     return State().Cursor;
 }
 
+// The count crossing 0 shows or hides the screen's cursor.
 int ShowCursor(BOOL Show)
 {
-    std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-    State().CursorCount += Show ? 1 : -1;
-    return State().CursorCount;
+    int Count = 0;
+    bool bCrossed = false;
+    {
+        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+        int const Before = State().CursorCount;
+        Count = State().CursorCount += Show ? 1 : -1;
+        bCrossed = (Before >= 0) != (Count >= 0);
+    }
+    if (bCrossed)
+        if (const FUser32Backend* const Screen = LoadedBackend())
+            Screen->ShowCursor(Count >= 0);
+    return Count;
 }
 
 BOOL GetCursorPos(LPPOINT Point)
@@ -1171,15 +1524,34 @@ BOOL GetCursorPos(LPPOINT Point)
     return TRUE;
 }
 
+// The cursor moves within the active window on the screen (desktop coordinates, made the
+// window's).
 BOOL SetCursorPos(int X, int Y)
 {
-    std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-    State().CursorPos = {std::clamp(X, 0, kDesktopWidth - 1), std::clamp(Y, 0, kDesktopHeight - 1)};
+    POINT const Desktop = DesktopSize();
+    HWND Active = nullptr;
+    {
+        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+        State().CursorPos = {std::clamp(X, 0, Desktop.x - 1), std::clamp(Y, 0, Desktop.y - 1)};
+        Active = State().Active;
+    }
+    POINT Client = {X, Y};
+    if (Active != nullptr && IsScreenWindow(Active) && ScreenToClient(Active, &Client))
+        LoadedBackend()->WarpMouse(ScreenId(Active), Client.x, Client.y);
     return TRUE;
 }
 
-BOOL ClipCursor(const RECT*)
+// A rectangle keeps the cursor in the active window (the screen has no finer clip); nullptr
+// frees it.
+BOOL ClipCursor(const RECT* Rect)
 {
+    HWND Active = nullptr;
+    {
+        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+        Active = State().Active;
+    }
+    if (Active != nullptr && IsScreenWindow(Active))
+        LoadedBackend()->ClipCursor(ScreenId(Active), Rect != nullptr);
     return TRUE;
 }
 

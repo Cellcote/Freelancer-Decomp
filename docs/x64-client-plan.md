@@ -386,13 +386,25 @@ without the Windows API. Milestones:
   (`posix/imm.h`: no layout is an IME, no window has an input context) and no structured
   exception handling (a `__try` body runs, its `__except` never does). `user32_tests` checks
   these stand-ins.
+  The top-level windows get a screen from SDL3 (M3): user32 loads its backend, `user32_sdl`
+  (`src/PosixUser32/user32_backend.h`), the first time one is made, so the dedicated server
+  never loads SDL, and a build without SDL3 (or `FL_USER32_HEADLESS=1`) keeps windows as
+  records. Such a window's `HWND` is its SDL window id, which RPGPU looks up. Its calls follow
+  the screen (bounds, frame, title, show; a popup that covers the desktop is fullscreen, as the
+  client lays out its fullscreen window), and the screen's events become messages inside
+  `PeekMessageA` / `GetMessageA` on the thread that made the window: keys as
+  `WM_(SYS)KEYDOWN/UP` with Windows' lParam and key state, typed text as `WM_CHAR`, the mouse
+  as its window messages and as DirectInput's records (the mouse queue lives in user32, one
+  per process), moves and resizes as `WM_MOVE` / `WM_SIZE`, focus as `WM_ACTIVATEAPP` /
+  `WM_ACTIVATE`, the close button as `WM_SYSCOMMAND` `SC_CLOSE`. `user32_screen_tests` checks
+  it with SDL's dummy video driver.
 - **M3:** an SDL window to the main menu, drawn by RPGPU through Metal, without sound. RPGPU
   builds on Linux and macOS against the system's SDL3, shared (Homebrew's on macOS; on CI's
   Ubuntu, a cached build from source), when SDL3 is found (`FreelancerRpGpu`). The client's
   window there is an SDL window whose id is its `HWND`; RPGPU claims it and never destroys it
   ([re/rpgpu.md](re/rpgpu.md), "The window"). module_tests loads RPGPU and checks a clear,
   present and read-back on the Null backend, and on macOS through Metal on a hidden SDL window.
-  Next: the client's SDL window layer, which hands RPGPU that window.
+  The client's window layer (user32_sdl, above) hands RPGPU that window.
 - **M4:** audio, input and gameplay.
 
 - An SDL3 implementation of `platform.h` (window, timers, threads, files, modules).
