@@ -1,6 +1,10 @@
 # Source layout
 
-One folder per module: a folder with a `CMakeLists.txt` builds one binary, named as the folder.
+One folder per module: a folder with a `CMakeLists.txt` is a module, and builds the binary named
+as the folder (`Common` → `Common.dll`). Two folders build several targets instead: `DPNet` (the
+`DPNet` library and its `dpnet_tests`; on Windows its sources are compiled into `DALib`) and
+`PortTests` (the ctest programs `port_tests` and `module_tests`, and the `arena_probe_a` / `_b`
+modules `module_tests` loads).
 Its role, its retail counterpart and its document are in
 [docs/re/dll_inventory.md](../docs/re/dll_inventory.md); the naming rules for files and folders are
 in [docs/re/refactoring.md](../docs/re/refactoring.md#files-and-folders). The root
