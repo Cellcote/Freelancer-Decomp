@@ -80,7 +80,8 @@ wchar_t* FUiPageDesc::TrackedWiden(char const* Src)
     // 005925ed..00592634: operator_new(len*2+2); each byte MOVSX DX,DL (sign-extended) into a
     // 16-bit unit; terminating 0 unit.
     unsigned Length = static_cast<unsigned>(strlen(Src));
-    wchar_t* Wide = static_cast<wchar_t*>(TrackedNew(Length * 2 + 2));
+    // (Length + 1) wchar_t: Length * 2 + 2 bytes on Windows, where wchar_t is 2 bytes.
+    wchar_t* Wide = static_cast<wchar_t*>(TrackedNew((Length + 1) * sizeof(wchar_t)));
     unsigned Index = 0;
     while (Src[Index] != '\0')
     {

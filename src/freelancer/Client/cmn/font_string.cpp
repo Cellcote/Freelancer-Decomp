@@ -168,11 +168,11 @@ int FontStringWordWrap(IFont* Font, wchar_t const* Text, float MaxWidth,
             {
                 if (LinePtrs[LineCount] != nullptr)
                 {
-                    LinePtrs[LineCount] = ReallocWide(LinePtrs[LineCount], Need * 2u);
+                    LinePtrs[LineCount] = ReallocWide(LinePtrs[LineCount], Need * sizeof(wchar_t));
                 }
                 else
                 {
-                    LinePtrs[LineCount] = AllocWideBytes(Need * 2u);
+                    LinePtrs[LineCount] = AllocWideBytes(Need * sizeof(wchar_t));
                     LinePtrs[LineCount][0] = L'\0';
                 }
                 LineCaps[LineCount] = Need;
@@ -313,12 +313,12 @@ void WideTextReserve(FHudWideText* Self, unsigned Need)
     if (Self->Text != nullptr)
     {
         // 0x004142b5..0x004142c7: realloc(Text, Need * 2); the result is stored unchecked.
-        Self->Text = static_cast<wchar_t*>(realloc(Self->Text, Need * 2));
+        Self->Text = static_cast<wchar_t*>(realloc(Self->Text, Need * sizeof(wchar_t)));
         Self->Capacity = Need;
         return;
     }
     // 0x004142cd..0x004142e1: malloc(Need * 2), first char 0.
-    Self->Text = static_cast<wchar_t*>(malloc(Need * 2));
+    Self->Text = static_cast<wchar_t*>(malloc(Need * sizeof(wchar_t)));
     Self->Text[0] = 0;
     Self->Capacity = Need;
 }
@@ -1322,11 +1322,11 @@ void AssignWideCount(wchar_t*& Text, unsigned& Capacity, wchar_t const* Source, 
     {
         if (Text != nullptr)
         {
-            Text = ReallocWide(Text, Need * 2u);
+            Text = ReallocWide(Text, Need * sizeof(wchar_t));
         }
         else
         {
-            Text = AllocWideBytes(Need * 2u);
+            Text = AllocWideBytes(Need * sizeof(wchar_t));
             Text[0] = L'\0';
         }
         Capacity = Need;
