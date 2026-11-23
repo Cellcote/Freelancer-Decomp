@@ -1141,7 +1141,9 @@ inline LPVOID LockResource(HGLOBAL Resource)
 
 // Structured exception handling has no equivalent here: a __try body runs as plain code and
 // its __except block never does (a fault ends the process, or reaches a signal handler).
-// SetUnhandledExceptionFilter keeps nothing.
+// SetUnhandledExceptionFilter keeps nothing. __try is C++'s try, which is also what libstdc++
+// defines it as for its own use (an identical definition), and __except catches a type nothing
+// throws.
 typedef struct _EXCEPTION_RECORD
 {
     DWORD ExceptionCode;
@@ -1159,9 +1161,14 @@ typedef struct _EXCEPTION_POINTERS
 #define EXCEPTION_EXECUTE_HANDLER 1
 #define EXCEPTION_CONTINUE_SEARCH 0
 #define EXCEPTION_CONTINUE_EXECUTION (-1)
-#define __try if (true)
-#define __except(Filter) else if (false)
-#define __finally
+namespace PosixSeh
+{
+struct FNeverThrown
+{
+};
+} // namespace PosixSeh
+#define __try try
+#define __except(Filter) catch (const PosixSeh::FNeverThrown&)
 typedef LONG(WINAPI* PTOP_LEVEL_EXCEPTION_FILTER)(EXCEPTION_POINTERS*);
 typedef PTOP_LEVEL_EXCEPTION_FILTER LPTOP_LEVEL_EXCEPTION_FILTER;
 inline PTOP_LEVEL_EXCEPTION_FILTER SetUnhandledExceptionFilter(PTOP_LEVEL_EXCEPTION_FILTER)
