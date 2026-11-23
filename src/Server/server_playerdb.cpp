@@ -17,6 +17,7 @@
 #include "common_id.h"
 #include "server_playerdata.h"
 #include "server_savegame.h" // PlayerData_CreateNewCharacter (retail FUN_06d4b790)
+#include "server_economy.h" // Ledger_Settle (PORT(deviation) SERVER-ECONOMY)
 #include "server_savefile.h" // Server_AccountDirName / Server_GetAccountsRoot (FUN_06d49f60)
 #include "common_ini.h"
 #include "common_misc.h"
@@ -2668,6 +2669,10 @@ void __cdecl PlayerData_BuildCharacterSet(PlayerData& Slot, CCharacterSet& Out) 
     // .text:06d499eb .. .text:06d49a05 -- IsMPServer() twice: an MP server with
     // a selected character (the byte test on +0x64) leaves the world first.
     if (IsMPServer() && (!IsMPServer() || Slot.selected_character.Buffer[0] != '\0')) {
+        // PORT(deviation) SERVER-ECONOMY: unpaid purchases are charged before the save, as
+        // at BaseExit; the slot leaves its base below, so no BaseExit follows.
+        Ledger_Settle(Slot, Slot.client_id);
+        Ledger_Forget(Slot.client_id);
         // .text:06d49a09 -- FUN_06d4c430, the autosave.
         PlayerData_AutoSave(Slot);
 
