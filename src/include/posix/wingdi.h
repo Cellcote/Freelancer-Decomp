@@ -100,10 +100,11 @@ typedef struct tagTEXTMETRICW
     LONG tmOverhang;
     LONG tmDigitizedAspectX;
     LONG tmDigitizedAspectY;
-    WCHAR tmFirstChar;
-    WCHAR tmLastChar;
-    WCHAR tmDefaultChar;
-    WCHAR tmBreakChar;
+    // 16-bit, as Windows' WCHAR (WCHAR is a 32-bit wchar_t here): Windows' layout.
+    WORD tmFirstChar;
+    WORD tmLastChar;
+    WORD tmDefaultChar;
+    WORD tmBreakChar;
     BYTE tmItalic;
     BYTE tmUnderlined;
     BYTE tmStruckOut;
@@ -210,6 +211,7 @@ FL_GDI32_API int SetBkMode(HDC Dc, int Mode);
 FL_GDI32_API UINT SetTextAlign(HDC Dc, UINT Align);
 FL_GDI32_API HFONT CreateFontIndirectA(const LOGFONTA* Font);
 FL_GDI32_API BOOL GetTextMetricsA(HDC Dc, TEXTMETRICA* Metrics);
+FL_GDI32_API int GetTextFaceA(HDC Dc, int Count, LPSTR Name);
 FL_GDI32_API BOOL GetTextMetricsW(HDC Dc, TEXTMETRICW* Metrics);
 FL_GDI32_API BOOL GetCharWidthW(HDC Dc, UINT First, UINT Last, int* Widths);
 FL_GDI32_API BOOL GetTextExtentPoint32W(HDC Dc, const wchar_t* Text, int Count, LPSIZE Size);

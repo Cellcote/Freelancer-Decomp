@@ -1316,6 +1316,20 @@ static stbtt_uint32 stbtt__find_table(stbtt_uint8 *data, stbtt_uint32 fontstart,
    return 0;
 }
 
+// Freelancer Decomp: a table's length from the directory, for the CFF buffer's bounds.
+static stbtt_uint32 stbtt__find_table_length(stbtt_uint8 *data, stbtt_uint32 fontstart, const char *tag)
+{
+   stbtt_int32 num_tables = ttUSHORT(data+fontstart+4);
+   stbtt_uint32 tabledir = fontstart + 12;
+   stbtt_int32 i;
+   for (i=0; i < num_tables; ++i) {
+      stbtt_uint32 loc = tabledir + 16*i;
+      if (stbtt_tag(data+loc+0, tag))
+         return ttULONG(data+loc+12);
+   }
+   return 0;
+}
+
 static int stbtt_GetFontOffsetForIndex_internal(unsigned char *font_collection, int index)
 {
    // if it's just a font, there's only one valid index
@@ -1415,8 +1429,8 @@ static int stbtt_InitFont_internal(stbtt_fontinfo *info, unsigned char *data, in
       info->fontdicts = stbtt__new_buf(NULL, 0);
       info->fdselect = stbtt__new_buf(NULL, 0);
 
-      // @TODO this should use size from table (not 512MB)
-      info->cff = stbtt__new_buf(data+cff, 512*1024*1024);
+      // Freelancer Decomp: the buffer ends where the table does (upstream: 512MB).
+      info->cff = stbtt__new_buf(data+cff, stbtt__find_table_length(data, fontstart, "CFF "));
       b = info->cff;
 
       // read the header
@@ -1482,7 +1496,9 @@ static int stbtt_InitFont_internal(stbtt_fontinfo *info, unsigned char *data, in
         case STBTT_PLATFORM_ID_UNICODE:
             // Mac/iOS has these
             // all the encodingIDs are unicode, so we don't bother to check it
-            info->index_map = cmap + ttULONG(data+encoding_record+4);
+            // Freelancer Decomp: but a format 14 subtable (variation sequences) is no base map.
+            if (ttUSHORT(data + cmap + ttULONG(data+encoding_record+4)) != 14)
+               info->index_map = cmap + ttULONG(data+encoding_record+4);
             break;
       }
    }
@@ -1556,7 +1572,13 @@ STBTT_DEF int stbtt_FindGlyphIndex(const stbtt_fontinfo *info, int unicode_codep
          if (offset == 0)
             return (stbtt_uint16) (unicode_codepoint + ttSHORT(data + index_map + 14 + segcount*4 + 2 + 2*item));
 
-         return ttUSHORT(data + offset + (unicode_codepoint-start)*2 + index_map + 14 + segcount*6 + 2 + 2*item);
+         // Freelancer Decomp: a nonzero glyph-array entry takes idDelta too (modulo 65536).
+         {
+            stbtt_uint16 glyph = ttUSHORT(data + offset + (unicode_codepoint-start)*2 + index_map + 14 + segcount*6 + 2 + 2*item);
+            if (glyph == 0)
+               return 0;
+            return (stbtt_uint16) (glyph + ttSHORT(data + index_map + 14 + segcount*4 + 2 + 2*item));
+         }
       }
    } else if (format == 12 || format == 13) {
       stbtt_uint32 ngroups = ttULONG(data+index_map+12);
@@ -2273,11 +2295,15 @@ static int stbtt__GetGlyphShapeT2(const stbtt_fontinfo *info, int glyph_index, s
    stbtt__csctx output_ctx = STBTT__CSCTX_INIT(0);
    if (stbtt__run_charstring(info, glyph_index, &count_ctx)) {
       *pvertices = (stbtt_vertex*)STBTT_malloc(count_ctx.num_vertices*sizeof(stbtt_vertex), info->userdata);
+      // Freelancer Decomp: a failed allocation draws nothing; a failed output pass frees it.
+      if (*pvertices == NULL)
+         return 0;
       output_ctx.pvertices = *pvertices;
       if (stbtt__run_charstring(info, glyph_index, &output_ctx)) {
          STBTT_assert(output_ctx.num_vertices == count_ctx.num_vertices);
          return output_ctx.num_vertices;
       }
+      STBTT_free(*pvertices, info->userdata);
    }
    *pvertices = NULL;
    return 0;
@@ -3307,6 +3333,8 @@ static void stbtt__rasterize_sorted_edges(stbtt__bitmap *result, stbtt__edge *e,
       scanline = (float *) STBTT_malloc((result->w*2+1) * sizeof(float), userdata);
    else
       scanline = scanline_data;
+   if (scanline == NULL) // Freelancer Decomp: a failed allocation draws nothing
+      return;
 
    scanline2 = scanline + result->w;
 

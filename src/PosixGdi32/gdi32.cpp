@@ -30,9 +30,13 @@
 #include <windows.h>
 
 // stb_truetype's implementation, private to this file (STBTT_STATIC): its helpers this file does
-// not call are unused here.
+// not call are unused here. Font files are outside input: their structure is checked before
+// stb_truetype reads them (ValidFont, GlyphReadable), and what is left to stb_truetype's asserts
+// (a CFF font's indexes) it reads through bounded buffers, so a bad file draws nothing rather than
+// stopping the program.
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC
+#define STBTT_assert(Condition) ((void)0)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-function"
 #include "vendor/stb_truetype.h"
@@ -40,6 +44,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -125,6 +130,10 @@ struct FFace
     bool bItalic = false;
     bool bFixedPitch = false;
     std::uint32_t Vdmx = 0; // the VDMX table's offset, 0 without one
+    std::uint32_t VdmxLength = 0;
+    std::uint32_t GlyfLength = 0;
+    std::string Family;               // nameID 1, as GetTextFace answers it
+    std::vector<std::int8_t> Readable; // per glyph: 0 unchecked, 1 readable, -1 not (TrueType)
 };
 
 struct FFont : FObject
@@ -229,6 +238,305 @@ int ReadS16(const unsigned char* Data)
     return static_cast<std::int16_t>(ReadU16(Data));
 }
 
+std::uint32_t ReadU32(const unsigned char* Data)
+{
+    return (static_cast<std::uint32_t>(Data[0]) << 24) |
+           (static_cast<std::uint32_t>(Data[1]) << 16) |
+           (static_cast<std::uint32_t>(Data[2]) << 8) | Data[3];
+}
+
+// ---------------------------------------------------------------------------------------------
+// Font files: what stb_truetype reads, checked against the file's size first. stb_truetype
+// takes only a pointer, so a table, record or outline that runs past the file would be read
+// past the mapping.
+// ---------------------------------------------------------------------------------------------
+
+// A table's place in the file, from the font's directory; Offset 0 when the font has none.
+struct FTable
+{
+    std::uint32_t Offset = 0;
+    std::uint32_t Length = 0;
+};
+
+// The first entry of a tag, as stbtt__find_table takes it (the directory is checked).
+FTable FindTable(const unsigned char* Data, std::uint32_t FontStart, const char* Tag)
+{
+    int const Count = ReadU16(Data + FontStart + 4);
+    for (int Index = 0; Index < Count; ++Index)
+    {
+        const unsigned char* const Record = Data + FontStart + 12 + Index * 16;
+        if (std::memcmp(Record, Tag, 4) == 0)
+            return FTable{ReadU32(Record + 8), ReadU32(Record + 12)};
+    }
+    return FTable{};
+}
+
+// The number of faces in a font file (1, or a collection's count), 0 when its header is not
+// one stb_truetype reads or runs past the file.
+int FacesInFile(const unsigned char* Data, std::size_t Size)
+{
+    if (Size < 12)
+        return 0;
+    if (std::memcmp(Data, "ttcf", 4) != 0)
+        return stbtt_GetNumberOfFonts(Data) == 1 ? 1 : 0;
+    std::uint32_t const Version = ReadU32(Data + 4);
+    if (Version != 0x00010000 && Version != 0x00020000)
+        return 0;
+    auto const Count = static_cast<std::int32_t>(ReadU32(Data + 8));
+    if (Count <= 0 || 12 + 4 * static_cast<std::uint64_t>(Count) > Size)
+        return 0;
+    return Count;
+}
+
+// Whether the cmap subtable stb_truetype chose (Map) can be read for any character: its format
+// one stb_truetype maps, its arrays, format 4's binary search and glyph arrays inside the cmap.
+bool ValidCharacterMap(const unsigned char* Data, FTable Cmap, std::uint32_t Map)
+{
+    std::uint64_t const End = static_cast<std::uint64_t>(Cmap.Offset) + Cmap.Length;
+    if (Map < Cmap.Offset || static_cast<std::uint64_t>(Map) + 2 > End)
+        return false;
+    std::uint64_t const Available = End - Map;
+    const unsigned char* const Table = Data + Map;
+    switch (ReadU16(Table))
+    {
+    case 0:
+        return Available >= 6 && static_cast<std::uint64_t>(ReadU16(Table + 2)) <= Available;
+    case 6:
+        return Available >= 10 &&
+               10 + 2 * static_cast<std::uint64_t>(ReadU16(Table + 8)) <= Available;
+    case 12:
+    case 13:
+        return Available >= 16 &&
+               16 + 12 * static_cast<std::uint64_t>(ReadU32(Table + 12)) <= Available;
+    case 4:
+    {
+        if (Available < 14)
+            return false;
+        int const Segments = ReadU16(Table + 6) >> 1;
+        if (Segments == 0 || 16 + 8 * static_cast<std::uint64_t>(Segments) > Available)
+            return false;
+        // The furthest segment stbtt_FindGlyphIndex's binary search can land on, from the
+        // header's searchRange / entrySelector / rangeShift as it uses them.
+        std::int64_t Search = 2 * static_cast<std::int64_t>(ReadU16(Table + 12) >> 1) - 2;
+        int Range = ReadU16(Table + 8) >> 1;
+        for (int Step = ReadU16(Table + 10); Step > 0 && Range > 0; --Step)
+        {
+            Range >>= 1;
+            Search += 2 * Range;
+        }
+        if ((Search + 2) / 2 >= Segments)
+            return false;
+        // A segment with an idRangeOffset reads its glyph array, from that offset's own place.
+        for (int Segment = 0; Segment < Segments; ++Segment)
+        {
+            std::uint64_t const RangeOffsetAt =
+                16 + 6 * static_cast<std::uint64_t>(Segments) + 2 * Segment;
+            int const Last = ReadU16(Table + 14 + 2 * Segment);
+            int const First = ReadU16(Table + 16 + 2 * Segments + 2 * Segment);
+            int const RangeOffset = ReadU16(Table + RangeOffsetAt);
+            if (RangeOffset != 0 && First <= Last &&
+                RangeOffsetAt + RangeOffset + 2 * static_cast<std::uint64_t>(Last - First) + 2 >
+                    Available)
+                return false;
+        }
+        return true;
+    }
+    default:
+        return false; // format 2 and others: stb_truetype maps nothing with them
+    }
+}
+
+// Whether stb_truetype may read the face at FontStart: the directory and every table inside the
+// file, the tables it and this file read long enough, the name records and cmap records inside
+// their tables, hmtx and loca as long as the glyph count needs.
+bool ValidFont(const unsigned char* Data, std::size_t Size, std::uint32_t FontStart)
+{
+    if (static_cast<std::uint64_t>(FontStart) + 12 > Size)
+        return false;
+    int const Tables = ReadU16(Data + FontStart + 4);
+    if (FontStart + 12 + 16 * static_cast<std::uint64_t>(Tables) > Size)
+        return false;
+    for (int Index = 0; Index < Tables; ++Index)
+    {
+        const unsigned char* const Record = Data + FontStart + 12 + Index * 16;
+        if (static_cast<std::uint64_t>(ReadU32(Record + 8)) + ReadU32(Record + 12) > Size)
+            return false;
+    }
+    FTable const Head = FindTable(Data, FontStart, "head");
+    FTable const Hhea = FindTable(Data, FontStart, "hhea");
+    FTable const Maxp = FindTable(Data, FontStart, "maxp");
+    FTable const Hmtx = FindTable(Data, FontStart, "hmtx");
+    FTable const Cmap = FindTable(Data, FontStart, "cmap");
+    if (Head.Offset == 0 || Head.Length < 54 || Hhea.Offset == 0 || Hhea.Length < 36 ||
+        Maxp.Offset == 0 || Maxp.Length < 6 || Hmtx.Offset == 0 || Cmap.Offset == 0 ||
+        Cmap.Length < 4)
+        return false;
+    int const Glyphs = ReadU16(Data + Maxp.Offset + 4);
+    int const LongMetrics = ReadU16(Data + Hhea.Offset + 34);
+    if (LongMetrics == 0 ||
+        4 * static_cast<std::uint64_t>(LongMetrics) + 2 * std::max(0, Glyphs - LongMetrics) >
+            Hmtx.Length)
+        return false;
+    FTable const Glyf = FindTable(Data, FontStart, "glyf");
+    if (Glyf.Offset != 0)
+    {
+        FTable const Loca = FindTable(Data, FontStart, "loca");
+        int const LocaFormat = ReadU16(Data + Head.Offset + 50);
+        if (Loca.Offset == 0 || LocaFormat > 1 ||
+            (static_cast<std::uint64_t>(Glyphs) + 1) * (LocaFormat == 0 ? 2 : 4) > Loca.Length)
+            return false;
+    }
+    int const Encodings = ReadU16(Data + Cmap.Offset + 2);
+    if (4 + 8 * static_cast<std::uint64_t>(Encodings) > Cmap.Length)
+        return false;
+    for (int Index = 0; Index < Encodings; ++Index)
+        if (static_cast<std::uint64_t>(ReadU32(Data + Cmap.Offset + 4 + 8 * Index + 4)) + 2 >
+            Cmap.Length)
+            return false;
+    if (FTable const Name = FindTable(Data, FontStart, "name"); Name.Offset != 0)
+    {
+        if (Name.Length < 6)
+            return false;
+        int const Records = ReadU16(Data + Name.Offset + 2);
+        std::uint64_t const Strings = ReadU16(Data + Name.Offset + 4);
+        if (6 + 12 * static_cast<std::uint64_t>(Records) > Name.Length)
+            return false;
+        for (int Index = 0; Index < Records; ++Index)
+        {
+            const unsigned char* const Record = Data + Name.Offset + 6 + 12 * Index;
+            if (Strings + ReadU16(Record + 10) + ReadU16(Record + 8) > Name.Length)
+                return false;
+        }
+    }
+    return true;
+}
+
+// Opens the face at Index of a font file for stb_truetype, its structure checked first; false
+// for a face it cannot read safely.
+bool InitFace(stbtt_fontinfo& Info, const unsigned char* Data, std::size_t Size, int Index)
+{
+    if (Index >= FacesInFile(Data, Size))
+        return false;
+    int const Offset = stbtt_GetFontOffsetForIndex(Data, Index);
+    return Offset >= 0 && ValidFont(Data, Size, static_cast<std::uint32_t>(Offset)) &&
+           stbtt_InitFont(&Info, Data, Offset) &&
+           ValidCharacterMap(Data, FindTable(Data, static_cast<std::uint32_t>(Offset), "cmap"),
+                             static_cast<std::uint32_t>(Info.index_map));
+}
+
+// A character's glyph: the cmap may name a glyph past the face's count, which reads as glyph 0.
+int GlyphOf(const FFace& Face, std::uint32_t Character)
+{
+    int const Glyph = stbtt_FindGlyphIndex(&Face.Info, static_cast<int>(Character));
+    return Glyph > 0 && Glyph < Face.Info.numGlyphs ? Glyph : 0;
+}
+
+bool GlyphReadable(FFace& Face, int Glyph, int Depth = 0);
+
+// Whether a TrueType outline lies inside its loca span, walked as stbtt__GetGlyphShapeTT reads
+// it: a simple glyph's end points (rising), instructions, flags and coordinates; a composite's
+// records, each with an x/y offset (stb_truetype does not read point matching), and their glyphs.
+bool CheckOutline(FFace& Face, int Glyph, int Depth)
+{
+    const stbtt_fontinfo& Info = Face.Info;
+    const unsigned char* const Loca = Info.data + Info.loca;
+    std::uint64_t const From =
+        Info.indexToLocFormat == 0 ? 2u * ReadU16(Loca + Glyph * 2) : ReadU32(Loca + Glyph * 4);
+    std::uint64_t const To = Info.indexToLocFormat == 0 ? 2u * ReadU16(Loca + Glyph * 2 + 2)
+                                                        : ReadU32(Loca + Glyph * 4 + 4);
+    if (From == To)
+        return true; // an empty glyph, which stb_truetype does not read
+    if (From > To || To > Face.GlyfLength || To - From < 10)
+        return false;
+    std::uint64_t const Span = To - From;
+    const unsigned char* const Outline = Info.data + Info.glyf + From;
+    int const Contours = ReadS16(Outline);
+    if (Contours > 0)
+    {
+        std::uint64_t Position = 12 + 2 * static_cast<std::uint64_t>(Contours);
+        if (Position > Span)
+            return false;
+        int Last = -1;
+        for (int Contour = 0; Contour < Contours; ++Contour)
+        {
+            int const End = ReadU16(Outline + 10 + 2 * Contour);
+            if (End <= Last)
+                return false;
+            Last = End;
+        }
+        Position += ReadU16(Outline + 10 + 2 * Contours);
+        std::uint64_t Coordinates = 0;
+        int Flags = 0;
+        int Repeat = 0;
+        for (int Point = 0; Point <= Last; ++Point)
+        {
+            if (Repeat == 0)
+            {
+                if (Position >= Span)
+                    return false;
+                Flags = Outline[Position++];
+                if ((Flags & 8) != 0)
+                {
+                    if (Position >= Span)
+                        return false;
+                    Repeat = Outline[Position++];
+                }
+            }
+            else
+                --Repeat;
+            Coordinates += (Flags & 2) != 0 ? 1 : (Flags & 16) != 0 ? 0 : 2;
+            Coordinates += (Flags & 4) != 0 ? 1 : (Flags & 32) != 0 ? 0 : 2;
+        }
+        return Position + Coordinates <= Span;
+    }
+    if (Contours < 0)
+    {
+        std::uint64_t Position = 10;
+        for (bool bMore = true; bMore;)
+        {
+            if (Position + 4 > Span)
+                return false;
+            int const Flags = ReadU16(Outline + Position);
+            int const Component = ReadU16(Outline + Position + 2);
+            if ((Flags & 2) == 0)
+                return false;
+            Position += 4 + ((Flags & 1) != 0 ? 4 : 2);
+            if ((Flags & 8) != 0)
+                Position += 2;
+            else if ((Flags & 0x40) != 0)
+                Position += 4;
+            else if ((Flags & 0x80) != 0)
+                Position += 8;
+            if (Position > Span)
+                return false;
+            // stb_truetype draws nothing for a component past the glyph count.
+            if (Component < Info.numGlyphs &&
+                (Depth >= 8 || !GlyphReadable(Face, Component, Depth + 1)))
+                return false;
+            bMore = (Flags & 0x20) != 0;
+        }
+    }
+    return true;
+}
+
+// Whether stb_truetype may read a glyph's outline: a CFF font's it reads through bounded buffers,
+// a TrueType one's is checked (once, from the top). Components nest at most 8 deep, which also
+// ends a composite that contains itself.
+bool GlyphReadable(FFace& Face, int Glyph, int Depth)
+{
+    if (Glyph < 0 || Glyph >= Face.Info.numGlyphs)
+        return false;
+    if (Face.Info.cff.size != 0)
+        return true;
+    std::int8_t& Known = Face.Readable[static_cast<std::size_t>(Glyph)];
+    if (Depth == 0 && Known != 0)
+        return Known > 0;
+    bool const bReadable = CheckOutline(Face, Glyph, Depth);
+    if (Depth == 0)
+        Known = bReadable ? 1 : -1;
+    return bReadable;
+}
+
 // A name-table string (UTF-16BE for the Windows platform, Mac Roman for the Macintosh one) as
 // UTF-8 (Latin-1 range only: face names are ASCII).
 std::string NameString(const stbtt_fontinfo& Info, int NameId)
@@ -258,14 +566,16 @@ struct FMapped
     std::size_t Size = 0;
 };
 
+// A regular file mapped whole. Opened without blocking (a FIFO named like a font must not hold
+// the lock), and checked as a regular file on the descriptor, which is what gets mapped.
 FMapped MapFile(const std::string& Path)
 {
     FMapped Out;
-    int const File = open(Path.c_str(), O_RDONLY | O_CLOEXEC);
+    int const File = open(Path.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
     if (File < 0)
         return Out;
     struct stat Info;
-    if (fstat(File, &Info) == 0 && Info.st_size > 0)
+    if (fstat(File, &Info) == 0 && S_ISREG(Info.st_mode) && Info.st_size > 0)
     {
         void* const Data =
             mmap(nullptr, static_cast<std::size_t>(Info.st_size), PROT_READ, MAP_PRIVATE, File, 0);
@@ -300,14 +610,11 @@ void CatalogFile(const std::string& Path)
     if (File.Data == nullptr)
         return;
     const unsigned char* const Data = static_cast<const unsigned char*>(File.Data);
-    int Count = stbtt_GetNumberOfFonts(Data);
-    if (Count <= 0)
-        Count = 0;
+    int const Count = FacesInFile(Data, File.Size);
     for (int Index = 0; Index < Count; ++Index)
     {
-        int const Offset = stbtt_GetFontOffsetForIndex(Data, Index);
         stbtt_fontinfo Info;
-        if (Offset < 0 || !stbtt_InitFont(&Info, Data, Offset))
+        if (!InitFace(Info, Data, File.Size, Index))
             continue;
         std::string const Style = Lower(NameString(Info, 2));
         bool const bBold = Style.find("bold") != std::string::npos ||
@@ -347,10 +654,33 @@ void CatalogFolder(const std::string& Folder, int Depth)
             if (Depth > 0)
                 CatalogFolder(Path, Depth - 1);
         }
-        else if (HasFontExtension(Name))
+        else if (S_ISREG(Info.st_mode) && HasFontExtension(Name))
             CatalogFile(Path);
     }
     closedir(Directory);
+}
+
+// A folder's child named Name in any case (DATA\FONTS may be Data/Fonts on a case-sensitive
+// volume): the exact name when it exists, else the first entry that matches it.
+std::string ChildNoCase(const std::string& Folder, const std::string& Name)
+{
+    std::string const Exact = Folder + "/" + Name;
+    struct stat Info;
+    if (stat(Exact.c_str(), &Info) == 0)
+        return Exact;
+    std::string Found = Exact;
+    if (DIR* const Directory = opendir(Folder.c_str()))
+    {
+        std::string const Wanted = Lower(Name);
+        while (dirent* const Entry = readdir(Directory))
+            if (Lower(Entry->d_name) == Wanted)
+            {
+                Found = Folder + "/" + Entry->d_name;
+                break;
+            }
+        closedir(Directory);
+    }
+    return Found;
 }
 
 // The folders searched, in order: FL_GDI32_FONT_PATH (':'-separated), the program's folder and
@@ -383,7 +713,7 @@ void BuildCatalog()
         std::string Folder = Self.dli_fname;
         Folder.erase(Folder.find_last_of('/'));
         Folders.push_back(Folder);
-        Folders.push_back(Folder + "/../DATA/FONTS");
+        Folders.push_back(ChildNoCase(ChildNoCase(Folder + "/..", "DATA"), "FONTS"));
     }
     std::string const Home = std::getenv("HOME") != nullptr ? std::getenv("HOME") : "";
 #if defined(__APPLE__)
@@ -423,13 +753,13 @@ std::shared_ptr<FFace> OpenFace(const std::string& Path, int Index)
     Face->Mapping = File.Data;
     Face->Size = File.Size;
     const unsigned char* const Data = static_cast<const unsigned char*>(File.Data);
-    int const Offset = stbtt_GetFontOffsetForIndex(Data, Index);
-    if (Offset < 0 || !stbtt_InitFont(&Face->Info, Data, Offset))
+    if (!InitFace(Face->Info, Data, File.Size, Index))
         return nullptr;
     stbtt_fontinfo& Info = Face->Info;
-    if (std::uint32_t const Head = stbtt__find_table(Info.data, Info.fontstart, "head"))
-        Face->UnitsPerEm = ReadU16(Info.data + Head + 18);
-    if (std::uint32_t const Hhea = stbtt__find_table(Info.data, Info.fontstart, "hhea"))
+    auto const Start = static_cast<std::uint32_t>(Info.fontstart);
+    // ValidFont saw head and hhea long enough; OS/2 and post are read only when they are.
+    Face->UnitsPerEm = std::max(1, ReadU16(Info.data + FindTable(Data, Start, "head").Offset + 18));
+    if (std::uint32_t const Hhea = FindTable(Data, Start, "hhea").Offset)
     {
         Face->HheaAscent = ReadS16(Info.data + Hhea + 4);
         Face->HheaDescent = -ReadS16(Info.data + Hhea + 6);
@@ -438,8 +768,9 @@ std::shared_ptr<FFace> OpenFace(const std::string& Path, int Index)
     }
     Face->WinAscent = Face->HheaAscent;
     Face->WinDescent = Face->HheaDescent;
-    if (std::uint32_t const Os2 = stbtt__find_table(Info.data, Info.fontstart, "OS/2"))
+    if (FTable const Os2Table = FindTable(Data, Start, "OS/2"); Os2Table.Length >= 78)
     {
+        std::uint32_t const Os2 = Os2Table.Offset;
         Face->AverageWidth = ReadS16(Info.data + Os2 + 2);
         int const WeightClass = ReadU16(Info.data + Os2 + 4);
         int const Selection = ReadU16(Info.data + Os2 + 62);
@@ -448,41 +779,46 @@ std::shared_ptr<FFace> OpenFace(const std::string& Path, int Index)
         Face->bBold = WeightClass >= 600 || (Selection & 0x20) != 0;
         Face->bItalic = (Selection & 0x01) != 0;
     }
-    Face->Vdmx = stbtt__find_table(Info.data, Info.fontstart, "VDMX");
-    if (std::uint32_t const Post = stbtt__find_table(Info.data, Info.fontstart, "post"))
-        Face->bFixedPitch =
-            ReadU16(Info.data + Post + 12) != 0 || ReadU16(Info.data + Post + 14) != 0;
+    FTable const Vdmx = FindTable(Data, Start, "VDMX");
+    Face->Vdmx = Vdmx.Offset;
+    Face->VdmxLength = Vdmx.Length;
+    Face->GlyfLength = FindTable(Data, Start, "glyf").Length;
+    if (FTable const Post = FindTable(Data, Start, "post"); Post.Length >= 16)
+        Face->bFixedPitch = ReadU16(Info.data + Post.Offset + 12) != 0 ||
+                            ReadU16(Info.data + Post.Offset + 14) != 0;
+    Face->Family = NameString(Info, 1);
+    Face->Readable.assign(static_cast<std::size_t>(Info.numGlyphs), 0);
     if (Face->AverageWidth <= 0)
     {
         int Advance = 0;
         int Bearing = 0;
-        stbtt_GetGlyphHMetrics(&Info, stbtt_FindGlyphIndex(&Info, 'x'), &Advance, &Bearing);
+        stbtt_GetGlyphHMetrics(&Info, GlyphOf(*Face, 'x'), &Advance, &Bearing);
         Face->AverageWidth = Advance;
     }
     S.Faces[Key] = Face;
     return Face;
 }
 
-// The best face of a family for the style asked: the exact style, then the regular face.
-const FState::FCatalogEntry* FindInFamily(const std::string& Family, bool bBold, bool bItalic)
+// A family's faces, best first for the style asked: the exact style, then the weight asked;
+// faces that match as well keep the catalogue's order (the folders' order).
+void FindInFamily(const std::string& Family, bool bBold, bool bItalic,
+                  std::vector<const FState::FCatalogEntry*>& Out)
 {
     auto const Range = State().Catalog.equal_range(Family);
-    const FState::FCatalogEntry* Best = nullptr;
-    int BestScore = -1;
+    std::vector<std::pair<int, const FState::FCatalogEntry*>> Ranked;
     for (auto It = Range.first; It != Range.second; ++It)
-    {
-        int const Score =
-            (It->second.bBold == bBold ? 2 : 0) + (It->second.bItalic == bItalic ? 1 : 0);
-        if (Score > BestScore)
-        {
-            Best = &It->second;
-            BestScore = Score;
-        }
-    }
-    return Best;
+        Ranked.emplace_back((It->second.bBold == bBold ? 2 : 0) +
+                                (It->second.bItalic == bItalic ? 1 : 0),
+                            &It->second);
+    std::stable_sort(Ranked.begin(), Ranked.end(),
+                     [](const auto& A, const auto& B) { return A.first > B.first; });
+    for (const auto& Entry : Ranked)
+        Out.push_back(Entry.second);
 }
 
-const FState::FCatalogEntry* FindFace(const char* FaceName, bool bBold, bool bItalic)
+// The faces to try for a LOGFONT, best first: the family asked, its lookalikes, the common
+// fallbacks, then every face catalogued.
+std::vector<const FState::FCatalogEntry*> FindFaces(const char* FaceName, bool bBold, bool bItalic)
 {
     BuildCatalog();
     std::vector<std::string> Families;
@@ -501,21 +837,28 @@ const FState::FCatalogEntry* FindFace(const char* FaceName, bool bBold, bool bIt
     for (const char* Fallback :
          {"arial", "helvetica", "liberation sans", "dejavu sans", "noto sans", "freesans"})
         Families.push_back(Fallback);
+    std::vector<const FState::FCatalogEntry*> Out;
     for (const std::string& Family : Families)
-        if (const FState::FCatalogEntry* const Found = FindInFamily(Family, bBold, bItalic))
-            return Found;
-    return State().Catalog.empty() ? nullptr : &State().Catalog.begin()->second;
+        FindInFamily(Family, bBold, bItalic, Out);
+    for (const auto& Entry : State().Catalog)
+        Out.push_back(&Entry.second);
+    return Out;
 }
 
 // The VDMX table's yMax / yMin (pixels) for a pixel height, as GDI takes a face's ascent and
 // descent from it when the face has one: by em height (bCell false) or the tallest entry whose
-// yMax - yMin fits a cell height. Uses the 1:1 aspect ratio group (or the "any" one).
-bool VdmxExtent(const FFace& Face, int Pixels, bool bCell, int* Ascent, int* Descent)
+// yMax - yMin fits a cell height, whose em height (Ppem) is then the font's. A cell taller than
+// the group's last entry is past what the table covers: false, and the sizes are scaled. Uses the
+// 1:1 aspect ratio group (or the "any" one); false for a table that runs past its length.
+bool VdmxExtent(const FFace& Face, int Pixels, bool bCell, int* Ascent, int* Descent, int* Ppem)
 {
-    if (Face.Vdmx == 0)
+    if (Face.Vdmx == 0 || Face.VdmxLength < 6)
         return false;
+    std::uint64_t const Length = Face.VdmxLength;
     const unsigned char* const Table = Face.Info.data + Face.Vdmx;
     int const Ratios = ReadU16(Table + 4);
+    if (6 + 6 * static_cast<std::uint64_t>(Ratios) > Length)
+        return false;
     for (int Ratio = 0; Ratio < Ratios; ++Ratio)
     {
         const unsigned char* const Range = Table + 6 + Ratio * 4;
@@ -524,9 +867,14 @@ bool VdmxExtent(const FFace& Face, int Pixels, bool bCell, int* Ascent, int* Des
         int const YEnd = Range[3];
         if (!(XRatio == 0 || (YStart <= XRatio && XRatio <= YEnd)))
             continue;
-        const unsigned char* const Group = Table + ReadU16(Table + 6 + Ratios * 4 + Ratio * 2);
+        std::uint64_t const GroupAt = ReadU16(Table + 6 + Ratios * 4 + Ratio * 2);
+        if (GroupAt + 4 > Length)
+            return false;
+        const unsigned char* const Group = Table + GroupAt;
         int const Records = ReadU16(Group);
-        bool bFound = false;
+        if (GroupAt + 4 + 6 * static_cast<std::uint64_t>(Records) > Length)
+            return false;
+        int Found = -1;
         for (int Record = 0; Record < Records; ++Record)
         {
             const unsigned char* const Entry = Group + 4 + Record * 6;
@@ -537,12 +885,15 @@ bool VdmxExtent(const FFace& Face, int Pixels, bool bCell, int* Ascent, int* Des
             {
                 *Ascent = YMax;
                 *Descent = -YMin;
-                bFound = true;
+                *Ppem = Height;
+                Found = Record;
                 if (!bCell)
                     break;
             }
         }
-        return bFound;
+        if (Found < 0 || (bCell && Found == Records - 1 && *Ascent + *Descent < Pixels))
+            return false;
+        return true;
     }
     return false;
 }
@@ -559,18 +910,23 @@ void SizeFont(FFont& Font)
         Font.Scale = static_cast<float>(-Height) / static_cast<float>(Face.UnitsPerEm);
     else
         Font.Scale = static_cast<float>(Height) / static_cast<float>(Cell);
-    Font.ScaleX = Font.Scale;
-    if (Font.Log.lfWidth > 0 && Face.AverageWidth > 0)
-        Font.ScaleX = static_cast<float>(Font.Log.lfWidth) / static_cast<float>(Face.AverageWidth);
     Font.Ascent = static_cast<LONG>(std::lround(Face.WinAscent * Font.Scale));
     Font.Descent = static_cast<LONG>(std::lround(Face.WinDescent * Font.Scale));
     int VdmxAscent = 0;
     int VdmxDescent = 0;
-    if (VdmxExtent(Face, Height < 0 ? -Height : Height, Height > 0, &VdmxAscent, &VdmxDescent))
+    int VdmxPpem = 0;
+    if (VdmxExtent(Face, Height < 0 ? -Height : Height, Height > 0, &VdmxAscent, &VdmxDescent,
+                   &VdmxPpem))
     {
         Font.Ascent = VdmxAscent;
         Font.Descent = VdmxDescent;
+        // A cell height realizes the entry's em height: glyphs are drawn at that size too.
+        if (Height > 0 && VdmxPpem > 0)
+            Font.Scale = static_cast<float>(VdmxPpem) / static_cast<float>(Face.UnitsPerEm);
     }
+    Font.ScaleX = Font.Scale;
+    if (Font.Log.lfWidth > 0 && Face.AverageWidth > 0)
+        Font.ScaleX = static_cast<float>(Font.Log.lfWidth) / static_cast<float>(Face.AverageWidth);
     Font.Height = Font.Ascent + Font.Descent;
     Font.InternalLeading = std::max<LONG>(
         0, Font.Height - static_cast<LONG>(std::lround(Face.UnitsPerEm * Font.Scale)));
@@ -592,8 +948,11 @@ FFont* MakeFont(const LOGFONTA& Log)
 {
     bool const bBold = Log.lfWeight >= 600;
     bool const bItalic = Log.lfItalic != 0;
-    const FState::FCatalogEntry* const Entry = FindFace(Log.lfFaceName, bBold, bItalic);
-    std::shared_ptr<FFace> Face = Entry != nullptr ? OpenFace(Entry->Path, Entry->Index) : nullptr;
+    // A catalogued file may since have gone (or not be readable): the next candidate then.
+    std::shared_ptr<FFace> Face;
+    for (const FState::FCatalogEntry* const Entry : FindFaces(Log.lfFaceName, bBold, bItalic))
+        if ((Face = OpenFace(Entry->Path, Entry->Index)) != nullptr)
+            break;
     if (Face == nullptr)
         return nullptr;
     FFont* const Font = new FFont();
@@ -628,17 +987,23 @@ int AdvanceOf(const FFont& Font, std::uint32_t Character)
 {
     int Advance = 0;
     int Bearing = 0;
-    stbtt_GetGlyphHMetrics(&Font.Face->Info,
-                           stbtt_FindGlyphIndex(&Font.Face->Info, static_cast<int>(Character)),
-                           &Advance, &Bearing);
+    stbtt_GetGlyphHMetrics(&Font.Face->Info, GlyphOf(*Font.Face, Character), &Advance, &Bearing);
     return static_cast<int>(std::lround(Advance * Font.ScaleX)) + (Font.bEmbolden ? 1 : 0);
 }
 
+// A character of a string and the string units it takes: 2 for a UTF-16 surrogate pair. GDI
+// counts in units (Count, Dx, the fit count and the extents), so a pair takes two of each.
+struct FCharacter
+{
+    std::uint32_t Code;
+    int Units;
+};
+
 // The characters of a wide string: wchar_t is UTF-32 here, and a UTF-16 surrogate pair (text
 // from the wire or a resource) is one character.
-std::vector<std::uint32_t> Characters(const wchar_t* Text, int Count)
+std::vector<FCharacter> Characters(const wchar_t* Text, int Count)
 {
-    std::vector<std::uint32_t> Out;
+    std::vector<FCharacter> Out;
     if (Text == nullptr)
         return Out;
     if (Count < 0)
@@ -646,29 +1011,31 @@ std::vector<std::uint32_t> Characters(const wchar_t* Text, int Count)
     for (int Index = 0; Index < Count; ++Index)
     {
         std::uint32_t Code = static_cast<std::uint32_t>(Text[Index]);
+        int Units = 1;
         if (Code >= 0xD800 && Code <= 0xDBFF && Index + 1 < Count)
         {
             std::uint32_t const Low = static_cast<std::uint32_t>(Text[Index + 1]);
             if (Low >= 0xDC00 && Low <= 0xDFFF)
             {
                 Code = 0x10000 + ((Code - 0xD800) << 10) + (Low - 0xDC00);
+                Units = 2;
                 ++Index;
             }
         }
-        Out.push_back(Code);
+        Out.push_back(FCharacter{Code, Units});
     }
     return Out;
 }
 
-std::vector<std::uint32_t> Characters(LPCSTR Text, int Count)
+std::vector<FCharacter> Characters(LPCSTR Text, int Count)
 {
-    std::vector<std::uint32_t> Out;
+    std::vector<FCharacter> Out;
     if (Text == nullptr)
         return Out;
     if (Count < 0)
         Count = static_cast<int>(std::strlen(Text));
     for (int Index = 0; Index < Count; ++Index)
-        Out.push_back(static_cast<unsigned char>(Text[Index]));
+        Out.push_back(FCharacter{static_cast<unsigned char>(Text[Index]), 1});
     return Out;
 }
 
@@ -725,6 +1092,8 @@ RECT DrawableOf(const FDc& Dc)
 
 void FillPixels(FBitmap& Bitmap, const RECT& Area, std::uint32_t Pixel)
 {
+    if (Area.right <= Area.left || Area.bottom <= Area.top)
+        return; // nothing to fill, and no iterator past the pixels formed
     for (LONG Y = Area.top; Y < Area.bottom; ++Y)
         std::fill(Bitmap.Pixels.begin() + Y * Bitmap.Width + Area.left,
                   Bitmap.Pixels.begin() + Y * Bitmap.Width + Area.right, Pixel);
@@ -747,7 +1116,9 @@ void DrawGlyph(FBitmap& Bitmap, const FFont& Font, std::uint32_t Character, int 
                std::uint32_t Pixel, const RECT& Area)
 {
     const stbtt_fontinfo& Info = Font.Face->Info;
-    int const Glyph = stbtt_FindGlyphIndex(&Info, static_cast<int>(Character));
+    int const Glyph = GlyphOf(*Font.Face, Character);
+    if (!GlyphReadable(*Font.Face, Glyph))
+        return; // an outline that runs past its glyph's data: nothing drawn
     int X0 = 0;
     int Y0 = 0;
     int X1 = 0;
@@ -786,7 +1157,7 @@ void DrawGlyph(FBitmap& Bitmap, const FFont& Font, std::uint32_t Character, int 
 }
 
 BOOL DrawText(FDc& Dc, int X, int Y, UINT Options, const RECT* Rect,
-              const std::vector<std::uint32_t>& Text, const int* Dx)
+              const std::vector<FCharacter>& Text, const int* Dx)
 {
     FFont* const Font = FontOf(Dc);
     if (Font == nullptr || Dc.Bitmap == nullptr)
@@ -798,11 +1169,17 @@ BOOL DrawText(FDc& Dc, int X, int Y, UINT Options, const RECT* Rect,
     if (Rect != nullptr && (Options & ETO_CLIPPED) != 0)
         Area = Intersect(Area, *Rect);
 
+    // Dx has an advance per string unit: a surrogate pair's character moves by both.
     std::vector<int> Advances(Text.size());
     int Extent = 0;
+    std::size_t Unit = 0;
     for (std::size_t Index = 0; Index < Text.size(); ++Index)
     {
-        Advances[Index] = Dx != nullptr ? Dx[Index] : AdvanceOf(*Font, Text[Index]);
+        if (Dx != nullptr)
+            Advances[Index] = Dx[Unit] + (Text[Index].Units == 2 ? Dx[Unit + 1] : 0);
+        else
+            Advances[Index] = AdvanceOf(*Font, Text[Index].Code);
+        Unit += static_cast<std::size_t>(Text[Index].Units);
         Extent += Advances[Index];
     }
     switch (Dc.Align & TA_CENTER)
@@ -829,13 +1206,15 @@ BOOL DrawText(FDc& Dc, int X, int Y, UINT Options, const RECT* Rect,
     int Pen = X;
     for (std::size_t Index = 0; Index < Text.size(); ++Index)
     {
-        DrawGlyph(Bitmap, *Font, Text[Index], Pen, Baseline, Pixel, Area);
+        DrawGlyph(Bitmap, *Font, Text[Index].Code, Pen, Baseline, Pixel, Area);
         Pen += Advances[Index];
     }
     return TRUE;
 }
 
-BOOL Extent(FDc& Dc, const std::vector<std::uint32_t>& Text, int MaxExtent, int* Fit, int* Extents,
+// The text's size; with Fit, the string units whose characters fit MaxExtent; with Extents, the
+// extent after each unit (both units of a surrogate pair have the extent after its character).
+BOOL Extent(FDc& Dc, const std::vector<FCharacter>& Text, int MaxExtent, int* Fit, int* Extents,
             LPSIZE Size)
 {
     FFont* const Font = FontOf(Dc);
@@ -843,13 +1222,16 @@ BOOL Extent(FDc& Dc, const std::vector<std::uint32_t>& Text, int MaxExtent, int*
         return FALSE;
     int Total = 0;
     int Fitted = 0;
-    for (std::size_t Index = 0; Index < Text.size(); ++Index)
+    int Units = 0;
+    for (const FCharacter& Character : Text)
     {
-        Total += AdvanceOf(*Font, Text[Index]);
-        if (Extents != nullptr)
-            Extents[Index] = Total;
+        Total += AdvanceOf(*Font, Character.Code);
+        for (int Unit = 0; Unit < Character.Units; ++Unit)
+            if (Extents != nullptr)
+                Extents[Units + Unit] = Total;
+        Units += Character.Units;
         if (MaxExtent < 0 || Total <= MaxExtent)
-            Fitted = static_cast<int>(Index) + 1;
+            Fitted = Units;
     }
     if (Fit != nullptr)
         *Fit = Fitted;
@@ -933,24 +1315,39 @@ BOOL Blit(FDc& Target, int X, int Y, int Width, int Height, FDc& Source, int Sou
     RECT const Area = DrawableOf(Target);
     const FBitmap& From = *Source.Bitmap;
     FBitmap& To = *Target.Bitmap;
-    for (int Row = 0; Row < std::abs(Height); ++Row)
+    // A copy within one bitmap reads the pixels as they were before it, however the two
+    // rectangles overlap.
+    std::vector<std::uint32_t> Snapshot;
+    if (&From == &To)
+        Snapshot = From.Pixels;
+    const std::vector<std::uint32_t>& FromPixels = &From == &To ? Snapshot : From.Pixels;
+    // A negative extent runs its rectangle left (or up) from its origin. The destination's n-th
+    // column from its origin samples the source's n-th scaled column from the source's origin,
+    // inside the source rectangle; signs that differ mirror the image.
+    std::int64_t const Columns = std::abs(Width);
+    std::int64_t const Rows = std::abs(Height);
+    std::int64_t const SourceColumns = std::abs(SourceWidth);
+    std::int64_t const SourceRows = std::abs(SourceHeight);
+    for (std::int64_t Row = 0; Row < Rows; ++Row)
     {
-        int const ToY = Y + (Height > 0 ? Row : -Row);
+        std::int64_t const ToY = Y + (Height > 0 ? Row : -Row);
         if (ToY < Area.top || ToY >= Area.bottom)
             continue;
-        int const FromY = SourceY + Row * SourceHeight / Height;
+        std::int64_t const RowOffset = Row * SourceRows / Rows;
+        std::int64_t const FromY = SourceY + (SourceHeight > 0 ? RowOffset : -RowOffset);
         if (FromY < 0 || FromY >= From.Height)
             continue;
-        for (int Column = 0; Column < std::abs(Width); ++Column)
+        for (std::int64_t Column = 0; Column < Columns; ++Column)
         {
-            int const ToX = X + (Width > 0 ? Column : -Column);
+            std::int64_t const ToX = X + (Width > 0 ? Column : -Column);
             if (ToX < Area.left || ToX >= Area.right)
                 continue;
-            int const FromX = SourceX + Column * SourceWidth / Width;
+            std::int64_t const ColumnOffset = Column * SourceColumns / Columns;
+            std::int64_t const FromX = SourceX + (SourceWidth > 0 ? ColumnOffset : -ColumnOffset);
             if (FromX < 0 || FromX >= From.Width)
                 continue;
-            To.Pixels[static_cast<std::size_t>(ToY) * To.Width + ToX] =
-                From.Pixels[static_cast<std::size_t>(FromY) * From.Width + FromX];
+            To.Pixels[static_cast<std::size_t>(ToY * To.Width + ToX)] =
+                FromPixels[static_cast<std::size_t>(FromY * From.Width + FromX)];
         }
     }
     return TRUE;
@@ -1001,6 +1398,9 @@ HGDIOBJ SelectObject(HDC Handle, HGDIOBJ Object)
     {
     case EKind::Bitmap:
     {
+        // A bitmap is selected into one DC at a time (the stock 1x1 one into any).
+        if (!Selected->bStock && Selected != Dc->Bitmap && IsSelected(Selected))
+            return nullptr;
         FBitmap* const Previous = Dc->Bitmap;
         Dc->Bitmap = static_cast<FBitmap*>(Selected);
         return Previous;
@@ -1018,8 +1418,12 @@ HGDIOBJ SelectObject(HDC Handle, HGDIOBJ Object)
         return Previous;
     }
     case EKind::Region:
-        SelectClipRgn(Handle, static_cast<HRGN>(Object));
-        return reinterpret_cast<HGDIOBJ>(static_cast<std::uintptr_t>(SIMPLEREGION));
+    {
+        int const Type = SelectClipRgn(Handle, static_cast<HRGN>(Object));
+        if (Type == ERROR)
+            return nullptr;
+        return reinterpret_cast<HGDIOBJ>(static_cast<std::uintptr_t>(Type));
+    }
     default:
         return nullptr;
     }
@@ -1146,6 +1550,26 @@ BOOL GetTextMetricsW(HDC Handle, TEXTMETRICW* Metrics)
     return TRUE;
 }
 
+// The DC's font's face name, as realized (a fallback's when the face asked is not installed):
+// the characters copied, with the null; the length the name needs when Name is null.
+int GetTextFaceA(HDC Handle, int Count, LPSTR Name)
+{
+    std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+    FDc* const Dc = As<FDc>(Handle, EKind::Dc);
+    FFont* const Font = Dc != nullptr ? FontOf(*Dc) : nullptr;
+    if (Font == nullptr)
+        return 0;
+    const std::string& Family = Font->Face->Family;
+    if (Name == nullptr)
+        return static_cast<int>(Family.size()) + 1;
+    if (Count <= 0)
+        return 0;
+    std::size_t const Copied = std::min(Family.size(), static_cast<std::size_t>(Count) - 1);
+    std::memcpy(Name, Family.data(), Copied);
+    Name[Copied] = '\0';
+    return static_cast<int>(Copied) + 1;
+}
+
 BOOL GetTextMetricsA(HDC Handle, TEXTMETRICA* Metrics)
 {
     TEXTMETRICW Wide;
@@ -1169,10 +1593,15 @@ BOOL GetCharWidthW(HDC Handle, UINT First, UINT Last, int* Widths)
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
     FDc* const Dc = As<FDc>(Handle, EKind::Dc);
     FFont* const Font = Dc != nullptr ? FontOf(*Dc) : nullptr;
-    if (Font == nullptr || Widths == nullptr || Last < First)
+    // Characters are Unicode code points; the loop ends on Last, so it never wraps.
+    if (Font == nullptr || Widths == nullptr || Last < First || Last > 0x10FFFF)
         return FALSE;
-    for (UINT Character = First; Character <= Last; ++Character)
+    for (UINT Character = First;; ++Character)
+    {
         Widths[Character - First] = AdvanceOf(*Font, Character);
+        if (Character == Last)
+            break;
+    }
     return TRUE;
 }
 
@@ -1267,6 +1696,10 @@ int GetDIBits(HDC, HBITMAP Handle, UINT Start, UINT Lines, LPVOID Bits, BITMAPIN
         return 0;
     int const Width = std::min<int>(Bitmap->Width, std::abs(Header.biWidth));
     int const Rows = std::abs(Header.biHeight);
+    // Scan lines past the DIB's rows are none: Start is checked before it becomes an index.
+    if (Start >= static_cast<UINT>(Rows))
+        return 0;
+    Lines = std::min<UINT>(Lines, static_cast<UINT>(Rows) - Start);
     bool const bTopDown = Header.biHeight < 0;
     std::size_t const Stride =
         ((static_cast<std::size_t>(std::abs(Header.biWidth)) * BitCount + 31) / 32) * 4;
@@ -1282,8 +1715,6 @@ int GetDIBits(HDC, HBITMAP Handle, UINT Start, UINT Lines, LPVOID Bits, BITMAPIN
     for (UINT Line = 0; Line < Lines; ++Line)
     {
         int const DibRow = static_cast<int>(Start + Line);
-        if (DibRow >= Rows)
-            break;
         // The DIB's row DibRow is the bitmap's row from the top (top-down) or bottom.
         int const SourceRow = bTopDown ? DibRow : Rows - 1 - DibRow;
         unsigned char* const Row = Out + static_cast<std::size_t>(Line) * Stride;
