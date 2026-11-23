@@ -44,6 +44,7 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <climits>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -52,6 +53,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <new>
 #include <set>
 #include <string>
 #include <vector>
@@ -184,6 +186,7 @@ struct FState
         int Index;
         bool bBold;
         bool bItalic;
+        std::string Family; // the catalogue's key: a nameID 1 or 16 name, lower case
     };
     bool bCatalogued = false;
     std::multimap<std::string, FCatalogEntry> Catalog;
@@ -292,12 +295,23 @@ int FacesInFile(const unsigned char* Data, std::size_t Size)
 
 // Whether the cmap subtable stb_truetype chose (Map) can be read for any character: its format
 // one stb_truetype maps, its declared length inside the cmap table, and every array a lookup
-// reads (format 4's binary search and glyph arrays too) inside that length. Format 4's 16-bit
-// length wraps for a subtable of 64 KiB or more: it is taken as the length plus the multiple of
-// 65536 the arrays need, when that much of the cmap table follows.
+// reads (format 4's binary search and glyph arrays too) inside that length, and none reaching
+// into the next subtable. Format 4's 16-bit length wraps for a subtable of 64 KiB or more: it is
+// taken as the length plus the multiple of 65536 the arrays need, when that much follows before
+// the cmap's end or the next subtable.
 bool ValidCharacterMap(const unsigned char* Data, FTable Cmap, std::uint32_t Map)
 {
-    std::uint64_t const End = static_cast<std::uint64_t>(Cmap.Offset) + Cmap.Length;
+    // The subtable ends at the cmap's end or where the next subtable after it starts, whatever
+    // its length says (ValidFont checked the encoding records).
+    std::uint64_t End = static_cast<std::uint64_t>(Cmap.Offset) + Cmap.Length;
+    int const Encodings = ReadU16(Data + Cmap.Offset + 2);
+    for (int Index = 0; Index < Encodings; ++Index)
+    {
+        std::uint64_t const Start =
+            static_cast<std::uint64_t>(Cmap.Offset) + ReadU32(Data + Cmap.Offset + 8 + 8 * Index);
+        if (Start > Map && Start < End)
+            End = Start;
+    }
     if (Map < Cmap.Offset || static_cast<std::uint64_t>(Map) + 8 > End)
         return false;
     std::uint64_t const Available = End - Map;
@@ -432,10 +446,37 @@ bool InitFace(stbtt_fontinfo& Info, const unsigned char* Data, std::size_t Size,
     if (Index >= FacesInFile(Data, Size))
         return false;
     int const Offset = stbtt_GetFontOffsetForIndex(Data, Index);
-    return Offset >= 0 && ValidFont(Data, Size, static_cast<std::uint32_t>(Offset)) &&
-           stbtt_InitFont(&Info, Data, Offset) &&
-           ValidCharacterMap(Data, FindTable(Data, static_cast<std::uint32_t>(Offset), "cmap"),
-                             static_cast<std::uint32_t>(Info.index_map));
+    if (Offset < 0 || !ValidFont(Data, Size, static_cast<std::uint32_t>(Offset)) ||
+        !stbtt_InitFont(&Info, Data, Offset))
+        return false;
+    FTable const Cmap = FindTable(Data, static_cast<std::uint32_t>(Offset), "cmap");
+    if (ValidCharacterMap(Data, Cmap, static_cast<std::uint32_t>(Info.index_map)))
+        return true;
+    // The map stb_truetype chose cannot be read: the best one that can, ranked as it ranks them
+    // (format 12 / 13, then 4, then the others), of the records it reads.
+    int BestRank = 0;
+    std::uint32_t Best = 0;
+    int const Encodings = ReadU16(Data + Cmap.Offset + 2);
+    for (int Encoding = 0; Encoding < Encodings; ++Encoding)
+    {
+        const unsigned char* const Record = Data + Cmap.Offset + 4 + 8 * Encoding;
+        int const Platform = ReadU16(Record);
+        int const Specific = ReadU16(Record + 2);
+        if (!(Platform == STBTT_PLATFORM_ID_UNICODE ||
+              (Platform == STBTT_PLATFORM_ID_MICROSOFT &&
+               (Specific == STBTT_MS_EID_UNICODE_BMP || Specific == STBTT_MS_EID_UNICODE_FULL))))
+            continue;
+        std::uint32_t const Map = Cmap.Offset + ReadU32(Record + 4);
+        int const Format = ReadU16(Data + Map);
+        int const Rank = Format == 12 || Format == 13 ? 3 : Format == 4 ? 2 : Format == 14 ? 0 : 1;
+        if (Rank > 0 && Rank >= BestRank && ValidCharacterMap(Data, Cmap, Map))
+        {
+            Best = Map;
+            BestRank = Rank;
+        }
+    }
+    Info.index_map = static_cast<int>(Best);
+    return Best != 0;
 }
 
 // A character's glyph: the cmap may name a glyph past the face's count, which reads as glyph 0.
@@ -537,7 +578,10 @@ bool CheckOutline(FFace& Face, int Glyph, int Depth, FOutlineBudget& Budget)
                 Position += 8;
             if (Position > Span)
                 return false;
-            // stb_truetype draws nothing for a component past the glyph count.
+            // stb_truetype draws nothing for a component past the glyph count, but reads its
+            // record: it counts as a visit.
+            if (Component >= Info.numGlyphs && --Budget.Components < 0)
+                return false;
             if (Component < Info.numGlyphs &&
                 (Depth >= 8 || !CheckOutline(Face, Component, Depth + 1, Budget)))
                 return false;
@@ -616,22 +660,49 @@ FMapped MapFile(const std::string& Path)
     return Out;
 }
 
-// A regular file read whole into memory, opened as MapFile opens it; false when it cannot be read
-// or does not read to the size it had when opened.
+// A file descriptor, closed when it goes.
+struct FDescriptor
+{
+    explicit FDescriptor(int InValue) : Value(InValue) {}
+    FDescriptor(const FDescriptor&) = delete;
+    FDescriptor& operator=(const FDescriptor&) = delete;
+    ~FDescriptor()
+    {
+        if (Value >= 0)
+            close(Value);
+    }
+    int Value;
+};
+
+// The largest font file a face reads (the largest system fonts are a few hundred MB).
+constexpr std::uint64_t kMaxFontFile = 512ull << 20;
+
+// A regular file read whole into memory, opened as MapFile opens it; false when it cannot be
+// read, is larger than kMaxFontFile or than memory allows, or does not read to the size it had
+// when opened.
 bool ReadWhole(const std::string& Path, std::vector<unsigned char>& Out)
 {
-    int const File = open(Path.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
-    if (File < 0)
+    FDescriptor const File(open(Path.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK));
+    if (File.Value < 0)
         return false;
     struct stat Info;
     bool bRead = false;
-    if (fstat(File, &Info) == 0 && S_ISREG(Info.st_mode) && Info.st_size > 0)
+    if (fstat(File.Value, &Info) == 0 && S_ISREG(Info.st_mode) && Info.st_size > 0 &&
+        static_cast<std::uint64_t>(Info.st_size) <= kMaxFontFile)
     {
-        Out.resize(static_cast<std::size_t>(Info.st_size));
+        try
+        {
+            Out.resize(static_cast<std::size_t>(Info.st_size));
+        }
+        catch (const std::bad_alloc&)
+        {
+            Out.clear();
+            return false;
+        }
         std::size_t Done = 0;
         while (Done < Out.size())
         {
-            ssize_t const Got = read(File, Out.data() + Done, Out.size() - Done);
+            ssize_t const Got = read(File.Value, Out.data() + Done, Out.size() - Done);
             if (Got < 0 && errno == EINTR)
                 continue;
             if (Got <= 0)
@@ -640,7 +711,6 @@ bool ReadWhole(const std::string& Path, std::vector<unsigned char>& Out)
         }
         bRead = Done == Out.size();
     }
-    close(File);
     return bRead;
 }
 
@@ -685,7 +755,8 @@ void CatalogFile(const std::string& Path)
                 Families.insert(Family);
         }
         for (const std::string& Family : Families)
-            State().Catalog.emplace(Family, FState::FCatalogEntry{Path, Index, bBold, bItalic});
+            State().Catalog.emplace(Family,
+                                    FState::FCatalogEntry{Path, Index, bBold, bItalic, Family});
     }
     munmap(File.Data, File.Size);
 }
@@ -789,7 +860,9 @@ void BuildCatalog()
         CatalogFolder(Folder, 3);
 }
 
-std::shared_ptr<FFace> OpenFace(const std::string& Path, int Index)
+// The face at Index of a font file, if it is still of the family the catalogue listed it under
+// (the file may have been replaced since).
+std::shared_ptr<FFace> OpenFace(const std::string& Path, int Index, const std::string& Family)
 {
     FState& S = State();
     auto const Key = std::make_pair(Path, Index);
@@ -801,7 +874,8 @@ std::shared_ptr<FFace> OpenFace(const std::string& Path, int Index)
     if (!ReadWhole(Path, Face->Bytes))
         return nullptr;
     const unsigned char* const Data = Face->Bytes.data();
-    if (!InitFace(Face->Info, Data, Face->Bytes.size(), Index))
+    if (!InitFace(Face->Info, Data, Face->Bytes.size(), Index) ||
+        (Lower(NameString(Face->Info, 1)) != Family && Lower(NameString(Face->Info, 16)) != Family))
         return nullptr;
     stbtt_fontinfo& Info = Face->Info;
     auto const Start = static_cast<std::uint32_t>(Info.fontstart);
@@ -999,7 +1073,7 @@ FFont* MakeFont(const LOGFONTA& Log)
     // A catalogued file may since have gone (or not be readable): the next candidate then.
     std::shared_ptr<FFace> Face;
     for (const FState::FCatalogEntry* const Entry : FindFaces(Log.lfFaceName, bBold, bItalic))
-        if ((Face = OpenFace(Entry->Path, Entry->Index)) != nullptr)
+        if ((Face = OpenFace(Entry->Path, Entry->Index, Entry->Family)) != nullptr)
             break;
     if (Face == nullptr)
         return nullptr;
@@ -1159,6 +1233,9 @@ std::uint32_t Blend(std::uint32_t Under, std::uint32_t Over, unsigned Alpha)
     return Out;
 }
 
+// The most coverage one glyph rasterizes: a 4096-pixel square, far past any text the game draws.
+constexpr double kMaxGlyphCoverage = 4096.0 * 4096.0;
+
 // One glyph with its pen at (PenX, BaselineY), coverage blended in Pixel, inside Area.
 void DrawGlyph(FBitmap& Bitmap, const FFont& Font, std::uint32_t Character, int PenX, int BaselineY,
                std::uint32_t Pixel, const RECT& Area)
@@ -1167,6 +1244,28 @@ void DrawGlyph(FBitmap& Bitmap, const FFont& Font, std::uint32_t Character, int 
     int const Glyph = GlyphOf(*Font.Face, Character);
     if (!GlyphReadable(*Font.Face, Glyph))
         return; // an outline that runs past its glyph's data: nothing drawn
+    // The glyph's box, scaled in floating point first: a box too far out for an int, outside the
+    // area drawn, or of more coverage than kMaxGlyphCoverage is not rasterized.
+    int BoxX0 = 0;
+    int BoxY0 = 0;
+    int BoxX1 = 0;
+    int BoxY1 = 0;
+    if (stbtt_GetGlyphBox(&Info, Glyph, &BoxX0, &BoxY0, &BoxX1, &BoxY1) == 0)
+        return;
+    double const Left = std::floor(BoxX0 * static_cast<double>(Font.ScaleX));
+    double const Right = std::ceil(BoxX1 * static_cast<double>(Font.ScaleX));
+    double const Top = std::floor(-BoxY1 * static_cast<double>(Font.Scale));
+    double const Bottom = std::ceil(-BoxY0 * static_cast<double>(Font.Scale));
+    double const kFar = 1 << 24;
+    if (!(std::fabs(Left) < kFar && std::fabs(Right) < kFar && std::fabs(Top) < kFar &&
+          std::fabs(Bottom) < kFar) ||
+        (Right - Left + 2) * (Bottom - Top + 2) > kMaxGlyphCoverage)
+        return;
+    // Its pixels, with a pixel's rounding, the emboldening pass and a synthetic slant's shift.
+    double const Reach = 2 + (Bottom - Top) / 4;
+    if (PenX + Right + Reach < Area.left || PenX + Left - Reach >= Area.right ||
+        BaselineY + Bottom + 2 < Area.top || BaselineY + Top - 2 >= Area.bottom)
+        return;
     int X0 = 0;
     int Y0 = 0;
     int X1 = 0;
@@ -1207,13 +1306,18 @@ void DrawGlyph(FBitmap& Bitmap, const FFont& Font, std::uint32_t Character, int 
 BOOL DrawText(FDc& Dc, int X, int Y, UINT Options, const RECT* Rect,
               const std::vector<FCharacter>& Text, const int* Dx)
 {
-    FFont* const Font = FontOf(Dc);
-    if (Font == nullptr || Dc.Bitmap == nullptr)
-        return Dc.Bitmap != nullptr ? FALSE : TRUE; // a DC without a bitmap draws nowhere
+    if (Dc.Bitmap == nullptr)
+        return TRUE; // a DC without a bitmap draws nowhere
     FBitmap& Bitmap = *Dc.Bitmap;
     RECT Area = DrawableOf(Dc);
     if (Rect != nullptr && (Options & ETO_OPAQUE) != 0)
         FillPixels(Bitmap, Intersect(Area, *Rect), PixelOf(Dc.BkColor));
+    // No text needs no font: the rectangle is all there is to draw.
+    if (Text.empty())
+        return TRUE;
+    FFont* const Font = FontOf(Dc);
+    if (Font == nullptr)
+        return FALSE;
     if (Rect != nullptr && (Options & ETO_CLIPPED) != 0)
         Area = Intersect(Area, *Rect);
 
@@ -1783,7 +1887,9 @@ int GetDIBits(HDC, HBITMAP Handle, UINT Start, UINT Lines, LPVOID Bits, BITMAPIN
     // Scan lines past the DIB's rows are none: Start is checked before it becomes an index.
     if (Start >= static_cast<UINT>(Rows))
         return 0;
-    Lines = std::min<UINT>(Lines, static_cast<UINT>(Rows) - Start);
+    // The lines copied are answered as an int: at most INT_MAX of them (only an INT_MIN height
+    // has more rows).
+    Lines = std::min<UINT>({Lines, static_cast<UINT>(Rows) - Start, static_cast<UINT>(INT_MAX)});
     bool const bTopDown = Header.biHeight < 0;
     std::size_t const Stride = ((static_cast<std::size_t>(DibWidth) * BitCount + 31) / 32) * 4;
     DWORD Masks[3] = {0x7C00, 0x03E0, 0x001F};

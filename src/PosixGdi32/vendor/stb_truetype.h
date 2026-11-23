@@ -1809,8 +1809,9 @@ static int stbtt__GetGlyphShapeTT(const stbtt_fontinfo *info, int glyph_index, s
                // where we can start, and we need to save some state for when we wraparound.
                scx = x;
                scy = y;
-               // Freelancer Decomp: an off-curve point that is the glyph's last has no next point.
-               if (i + 1 >= n) {
+               // Freelancer Decomp: an off-curve point that ends its contour (the glyph's last point
+               // or not) has no next point of its own: the contour starts there.
+               if (i + 1 >= n || i + 1 >= 1 + ttUSHORT(endPtsOfContours+j*2)) {
                   sx = x;
                   sy = y;
                } else if (!(vertices[off+i+1].type & 1)) {
@@ -2053,12 +2054,17 @@ static int stbtt__run_charstring(const stbtt_fontinfo *info, int glyph_index, st
    float s[48];
    stbtt__buf subr_stack[10], subrs = info->subrs, b;
    float f;
+   int steps = 0;
 
 #define STBTT__CSERR(s) (0)
 
    // this currently ignores the initial width value, which isn't needed if we have hmtx
    b = stbtt__cff_index_get(info->charstrings, glyph_index);
    while (b.cursor < b.size) {
+      // Freelancer Decomp: at most 65536 operators a glyph, its subroutines' included (each pass
+      // of the bounds, count and output ends there; real glyphs take a few hundred).
+      if (++steps > 65536)
+         return STBTT__CSERR("too much work");
       i = 0;
       clear_stack = 1;
       b0 = stbtt__buf_get8(&b);

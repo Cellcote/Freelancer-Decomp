@@ -63,7 +63,12 @@ std::vector<unsigned> Pixels(HDC Dc, HBITMAP Bitmap, int Width, int Height)
     Info.bmiHeader.biBitCount = 32;
     Info.bmiHeader.biCompression = BI_RGB;
     std::vector<unsigned> Out(static_cast<std::size_t>(Width) * Height);
-    GetDIBits(Dc, Bitmap, 0, static_cast<UINT>(Height), Out.data(), &Info, DIB_RGB_COLORS);
+    if (GetDIBits(Dc, Bitmap, 0, static_cast<UINT>(Height), Out.data(), &Info, DIB_RGB_COLORS) !=
+        Height)
+    {
+        std::printf("FAIL: GetDIBits reads back every row\n");
+        ++GFailures;
+    }
     return Out;
 }
 
@@ -88,17 +93,28 @@ void Put32(std::vector<char>& Out, unsigned Value)
     Put16(Out, Value & 0xFFFF);
 }
 
-// A minimal TrueType font: 1000 units per em; 'A' maps to glyph 1, U+1D49C (with FullMap) to
-// glyph 2, a 500 x 700 square with an advance of 800 units.
+// A minimal TrueType font: 1000 units per em; 'A' maps to glyph 1 (or, with Ascii, every
+// printable ASCII character to glyph 2), and glyph 2 is a 500 x 700 square with an advance of 800
+// units.
 struct FFontSpec
 {
     const char* Family;
     unsigned Advance = 600; // glyph 1's
     // Glyph 1: 0 the square; -1 a single off-curve point (its contour starts on the glyph's last
-    // point); n > 0 a composite of n references to glyph 2.
+    // point); -2 that point as a contour of its own, then the square; n > 0 a composite of
+    // OutOfRange references past the glyph count, then n references to glyph 2.
     int Glyph = 0;
-    bool bShortCmap = false; // the format 4 subtable's length 2 bytes short of its arrays
-    bool bFullMap = false; // a format 12 subtable recorded before the format 4 one
+    int OutOfRange = 0;
+    enum ECmap
+    {
+        Plain, // format 4: 'A'
+        Ascii, // format 4: ' ' to '~' through a glyph array
+        Short, // format 4 whose length is 2 bytes short of its arrays
+        Neighbour, // format 4 whose glyph array reaches 2 bytes into the next subtable, with
+            // 64 KiB of the cmap after that
+        Full, // a format 12 map (U+1D49C too) recorded before the format 4 one
+        BadFull, // a format 12 map whose groups run past the cmap, before the format 4 one
+    } Cmap = Plain;
 };
 
 void PutSquare(std::vector<char>& Glyf)
@@ -111,6 +127,50 @@ void PutSquare(std::vector<char>& Glyf)
         Put16(Glyf, Delta);
     for (unsigned Delta : {0u, 0u, 700u, 0u})
         Put16(Glyf, Delta);
+}
+
+// A format 4 subtable of two segments, First..Last and the closing 0xFFFF one. A zero RangeOffset
+// maps First to glyph 1 by idDelta; otherwise the glyph array (Array) is read from that offset.
+std::vector<char> Format4(unsigned First, unsigned Last, unsigned RangeOffset,
+                          const std::vector<unsigned>& Array, unsigned LengthLess = 0)
+{
+    std::vector<char> Out;
+    unsigned const Length = 32 + 2 * static_cast<unsigned>(Array.size()) - LengthLess;
+    for (unsigned Value : {4u, Length, 0u, 4u, 4u, 1u, 0u, Last, 0xFFFFu, 0u, First, 0xFFFFu,
+                           RangeOffset != 0 ? 0u : (1u - First) & 0xFFFFu, 1u, RangeOffset, 0u})
+        Put16(Out, Value);
+    for (unsigned Glyph : Array)
+        Put16(Out, Glyph);
+    return Out;
+}
+
+std::vector<char> Format12(unsigned Groups)
+{
+    std::vector<char> Out;
+    Put16(Out, 12), Put16(Out, 0), Put32(Out, 40), Put32(Out, 0), Put32(Out, Groups);
+    for (unsigned Value : {0x41u, 0x41u, 1u, 0x1D49Cu, 0x1D49Cu, 2u})
+        Put32(Out, Value);
+    return Out;
+}
+
+// A cmap of subtables ((platform, encoding), bytes), then Trailing zero bytes.
+using FSubtable = std::pair<std::pair<unsigned, unsigned>, std::vector<char>>;
+
+std::vector<char> BuildCmap(const std::vector<FSubtable>& Maps, std::size_t Trailing = 0)
+{
+    std::vector<char> Out;
+    Put16(Out, 0), Put16(Out, static_cast<unsigned>(Maps.size()));
+    std::size_t Offset = 4 + 8 * Maps.size();
+    for (const FSubtable& Map : Maps)
+    {
+        Put16(Out, Map.first.first), Put16(Out, Map.first.second);
+        Put32(Out, static_cast<unsigned>(Offset));
+        Offset += Map.second.size();
+    }
+    for (const FSubtable& Map : Maps)
+        Out.insert(Out.end(), Map.second.begin(), Map.second.end());
+    Out.resize(Out.size() + Trailing, 0);
+    return Out;
 }
 
 std::vector<char> BuildFont(const FFontSpec& Spec)
@@ -133,29 +193,34 @@ std::vector<char> BuildFont(const FFontSpec& Spec)
     std::vector<char> Hmtx;
     for (unsigned Advance : {500u, Spec.Advance, 800u})
         Put16(Hmtx, Advance), Put16(Hmtx, 0);
-    std::vector<char> Format4;
-    for (unsigned Value : {4u, Spec.bShortCmap ? 30u : 32u, 0u, 4u, 4u, 1u, 0u, 0x41u, 0xFFFFu, 0u,
-                           0x41u, 0xFFFFu, (1u - 0x41u) & 0xFFFFu, 1u, 0u, 0u})
-        Put16(Format4, Value);
     std::vector<char> Cmap;
-    Put16(Cmap, 0);
-    if (Spec.bFullMap)
+    switch (Spec.Cmap)
     {
-        Put16(Cmap, 2);
-        Put16(Cmap, 0), Put16(Cmap, 4), Put32(Cmap, 20); // Unicode full: format 12, first
-        Put16(Cmap, 3), Put16(Cmap, 1), Put32(Cmap, 60); // Windows BMP: format 4, last
-        Put16(Cmap, 12), Put16(Cmap, 0), Put32(Cmap, 40), Put32(Cmap, 0), Put32(Cmap, 2);
-        for (unsigned Value : {0x41u, 0x41u, 1u, 0x1D49Cu, 0x1D49Cu, 2u})
-            Put32(Cmap, Value);
-    }
-    else
+    case FFontSpec::Plain:
+        Cmap = BuildCmap({{{3, 1}, Format4(0x41, 0x41, 0, {})}});
+        break;
+    case FFontSpec::Ascii:
+        Cmap = BuildCmap({{{3, 1}, Format4(0x20, 0x7E, 4, std::vector<unsigned>(0x5F, 2))}});
+        break;
+    case FFontSpec::Short:
+        Cmap = BuildCmap({{{3, 1}, Format4(0x41, 0x41, 0, {}, 2)}});
+        break;
+    case FFontSpec::Neighbour:
     {
-        Put16(Cmap, 1);
-        Put16(Cmap, 3), Put16(Cmap, 1), Put32(Cmap, 12);
+        std::vector<char> Format6;
+        for (unsigned Value : {6u, 12u, 0u, 0u, 1u, 1u})
+            Put16(Format6, Value);
+        Cmap = BuildCmap({{{3, 1}, Format4(0x41, 0x41, 4, {})}, {{1, 0}, Format6}}, 0x10040);
+        break;
     }
-    Cmap.insert(Cmap.end(), Format4.begin(), Format4.end());
+    case FFontSpec::Full:
+    case FFontSpec::BadFull:
+        Cmap = BuildCmap({{{0, 4}, Format12(Spec.Cmap == FFontSpec::Full ? 2 : 0x10000)},
+                          {{3, 1}, Format4(0x41, 0x41, 0, {})}});
+        break;
+    }
     std::vector<char> Glyf;
-    if (Spec.Glyph < 0)
+    if (Spec.Glyph == -1)
     {
         Put16(Glyf, 1), Put16(Glyf, 0), Put16(Glyf, 0), Put16(Glyf, 500), Put16(Glyf, 700);
         Put16(Glyf, 0), Put16(Glyf, 0); // one point; no instructions
@@ -163,13 +228,27 @@ std::vector<char> BuildFont(const FFontSpec& Spec)
         Put16(Glyf, 250), Put16(Glyf, 350);
         Glyf.push_back(0);
     }
+    else if (Spec.Glyph == -2)
+    {
+        Put16(Glyf, 2), Put16(Glyf, 0), Put16(Glyf, 0), Put16(Glyf, 500), Put16(Glyf, 700);
+        Put16(Glyf, 0), Put16(Glyf, 4), Put16(Glyf, 0); // contours end at points 0 and 4
+        Glyf.push_back(0); // off-curve
+        for (int Point = 0; Point < 4; ++Point)
+            Glyf.push_back(1); // on-curve
+        for (unsigned Delta : {250u, 0x10000u - 250u, 500u, 0u, 0x10000u - 500u})
+            Put16(Glyf, Delta);
+        for (unsigned Delta : {350u, 0x10000u - 350u, 0u, 700u, 0u})
+            Put16(Glyf, Delta);
+        Glyf.push_back(0);
+    }
     else if (Spec.Glyph > 0)
     {
         Put16(Glyf, 0xFFFF), Put16(Glyf, 0), Put16(Glyf, 0), Put16(Glyf, 500), Put16(Glyf, 700);
-        for (int Component = 0; Component < Spec.Glyph; ++Component)
+        int const Components = Spec.OutOfRange + Spec.Glyph;
+        for (int Component = 0; Component < Components; ++Component)
         {
-            Put16(Glyf, 0x0002 | (Component + 1 < Spec.Glyph ? 0x0020 : 0)); // x/y bytes, more
-            Put16(Glyf, 2);
+            Put16(Glyf, 0x0002 | (Component + 1 < Components ? 0x0020 : 0)); // x/y bytes, more
+            Put16(Glyf, Component < Spec.OutOfRange ? 1000 : 2);
             Put16(Glyf, 0);
         }
     }
@@ -245,33 +324,54 @@ LONG AdvanceOfA(HFONT Font)
     return ExtentIn(Font, L"A", 1);
 }
 
-// Whether drawing 'A' in a font lights any pixel.
-bool DrawsA(HFONT Font)
+// 'A' drawn in white in a font on a black 128 x 128 bitmap: whether ExtTextOutW succeeded, the
+// face realized, and the pixels.
+struct FDrawn
 {
+    bool bDrawn = false;
+    std::string Face;
+    std::vector<unsigned> Image;
+
+    bool Lit() const
+    {
+        for (unsigned Pixel : Image)
+            if ((Pixel & 0xFFFFFF) != 0)
+                return true;
+        return false;
+    }
+};
+
+FDrawn DrawA(HFONT Font)
+{
+    FDrawn Out;
     HDC const Probe = CreateCompatibleDC(nullptr);
     HBITMAP const Target = CreateCompatibleBitmap(nullptr, 128, 128);
     HGDIOBJ const PreviousBitmap = SelectObject(Probe, Target);
     HGDIOBJ const PreviousFont = SelectObject(Probe, Font);
+    char Name[LF_FACESIZE] = {};
+    if (GetTextFaceA(Probe, LF_FACESIZE, Name) > 0)
+        Out.Face = Name;
     SetBkMode(Probe, TRANSPARENT);
     SetTextColor(Probe, RGB(255, 255, 255));
-    ExtTextOutW(Probe, 0, 0, 0, nullptr, L"A", 1, nullptr);
-    bool bLit = false;
-    BITMAPINFO Info = {};
-    Info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    Info.bmiHeader.biWidth = 128;
-    Info.bmiHeader.biHeight = -128;
-    Info.bmiHeader.biPlanes = 1;
-    Info.bmiHeader.biBitCount = 32;
-    Info.bmiHeader.biCompression = BI_RGB;
-    std::vector<unsigned> Image(128 * 128);
-    GetDIBits(Probe, Target, 0, 128, Image.data(), &Info, DIB_RGB_COLORS);
-    for (unsigned Pixel : Image)
-        bLit = bLit || (Pixel & 0xFFFFFF) != 0;
+    Out.bDrawn = ExtTextOutW(Probe, 0, 0, 0, nullptr, L"A", 1, nullptr) != FALSE;
+    Out.Image = Pixels(Probe, Target, 128, 128);
     SelectObject(Probe, PreviousFont);
     SelectObject(Probe, PreviousBitmap);
     DeleteObject(Target);
     DeleteDC(Probe);
-    return bLit;
+    return Out;
+}
+
+// The face a font realizes.
+std::string FaceOf(HFONT Font)
+{
+    HDC const Probe = CreateCompatibleDC(nullptr);
+    HGDIOBJ const Previous = SelectObject(Probe, Font);
+    char Name[LF_FACESIZE] = {};
+    GetTextFaceA(Probe, LF_FACESIZE, Name);
+    SelectObject(Probe, Previous);
+    DeleteDC(Probe);
+    return Name;
 }
 
 // Whether any pixel inside / outside a rectangle is lit.
@@ -307,9 +407,13 @@ int main()
     std::string const Second = Folder + "/second";
     std::string const Third = Folder + "/third";
     std::vector<std::string> const Files = {
-        First + "/Pipe.ttf",  First + "/Broken.ttf", First + "/Gone.ttf", Second + "/Kept.ttf",
-        Second + "/Bad.ttf",  Second + "/Many.ttf",  Second + "/Few.ttf", Second + "/Short.ttf",
-        Second + "/Wide.ttf", Second + "/Full.ttf",  Third + "/Arial.ttf"};
+        First + "/Pipe.ttf",     First + "/Broken.ttf", First + "/Gone.ttf",
+        Second + "/Kept.ttf",    Second + "/Bad.ttf",   Second + "/Many.ttf",
+        Second + "/Few.ttf",     Second + "/Short.ttf", Second + "/Wide.ttf",
+        Second + "/Full.ttf",    Third + "/Arial.ttf",  First + "/Swap.ttf",
+        Second + "/Swap.ttf",    Second + "/Split.ttf", Second + "/Square.ttf",
+        Second + "/Range.ttf",   Second + "/Near.ttf",  Second + "/Neighbour.ttf",
+        Second + "/BadFull.ttf", Second + "/Text.ttf"};
     // Each step of the setup must hold, or what the checks below find is not what they test.
     bool bSetUp =
         mkdir(First.c_str(), 0700) == 0 && mkdir(Second.c_str(), 0700) == 0 &&
@@ -323,9 +427,18 @@ int main()
         {Files[4], {"Gdi Test Bad", 500, -1}},
         {Files[5], {"Gdi Test Many", 500, 300}},
         {Files[6], {"Gdi Test Few", 500, 4}},
-        {Files[7], {"Gdi Test Short", 500, 0, true}},
+        {Files[7], {"Gdi Test Short", 500, 0, 0, FFontSpec::Short}},
         {Files[8], {"Gdi Test Wide", 40000}},
-        {Files[9], {"Gdi Test Full", 500, 0, false, true}}};
+        {Files[9], {"Gdi Test Full", 500, 0, 0, FFontSpec::Full}},
+        {Files[11], {"Gdi Test Swap", 600}},
+        {Files[12], {"Gdi Test Swap", 700}},
+        {Files[13], {"Gdi Test Split", 500, -2}},
+        {Files[14], {"Gdi Test Square", 500}},
+        {Files[15], {"Gdi Test Range", 500, 1, 300}},
+        {Files[16], {"Gdi Test Near", 500, 1, 10}},
+        {Files[17], {"Gdi Test Neighbour", 500, 0, 0, FFontSpec::Neighbour}},
+        {Files[18], {"Gdi Test Bad Full", 500, 0, 0, FFontSpec::BadFull}},
+        {Files[19], {"Gdi Test Text", 800, 0, 0, FFontSpec::Ascii}}};
     for (const auto& Fixture : Fixtures)
     {
         std::vector<char> const Data = BuildFont(Fixture.second);
@@ -337,13 +450,16 @@ int main()
     std::vector<char> const Arial = ReadFile("/System/Library/Fonts/Supplemental/Arial.ttf");
     bSetUp = bSetUp && WriteFile(Files[10], Arial, Arial.size());
 #endif
+    // A file catalogued under one family that is replaced by a face of another: checked below.
+    std::vector<char> const Other = BuildFont({"Gdi Test Other", 900});
     Check(bSetUp, "the font folders are set up (folders, FL_GDI32_FONT_PATH, FIFO, font files)");
 
     HFONT const Before = MakeFont("Gdi Test Face", -100);
     Check(Before != nullptr && AdvanceOfA(Before) == 60,
           "the catalogue skips a FIFO and a cut-short font, and takes the first folder's face");
     DeleteObject(Before);
-    Check(std::remove(Files[2].c_str()) == 0, "the first folder's face is removed");
+    Check(std::remove(Files[2].c_str()) == 0 && WriteFile(Files[11], Other, Other.size()),
+          "the first folder's face is removed, and its Gdi Test Swap replaced by another family");
     {
         HDC const Probe = CreateCompatibleDC(nullptr);
         HFONT const After = MakeFont("Gdi Test Face", -100);
@@ -357,28 +473,52 @@ int main()
         DeleteDC(Probe);
     }
     {
+        HFONT const Swap = MakeFont("Gdi Test Swap", -100);
+        Check(FaceOf(Swap) == "Gdi Test Swap" && AdvanceOfA(Swap) == 70,
+              "a catalogued file now of another family gives way to the family's next file");
+        DeleteObject(Swap);
+    }
+    {
         // Drawn, the glyph is read to its last point and no further (ASan checks).
         HFONT const Odd = MakeFont("Gdi Test Bad", -100);
-        DrawsA(Odd);
-        Check(Odd != nullptr,
+        FDrawn const OddA = DrawA(Odd);
+        Check(OddA.bDrawn && OddA.Face == "Gdi Test Bad",
               "a contour that starts on the glyph's last, off-curve point is drawn");
         DeleteObject(Odd);
+        // A one-point off-curve contour before a square: the square is drawn as it is alone.
+        HFONT const Split = MakeFont("Gdi Test Split", -100);
+        HFONT const Square = MakeFont("Gdi Test Square", -100);
+        FDrawn const SplitA = DrawA(Split);
+        FDrawn const SquareA = DrawA(Square);
+        Check(SplitA.Face == "Gdi Test Split" && SquareA.Face == "Gdi Test Square" &&
+                  SquareA.Lit() && SplitA.Image == SquareA.Image,
+              "an off-curve point that ends its contour does not take the next contour's start");
+        DeleteObject(Split);
+        DeleteObject(Square);
         HFONT const Many = MakeFont("Gdi Test Many", -100);
         HFONT const Few = MakeFont("Gdi Test Few", -100);
-        Check(!DrawsA(Many) && DrawsA(Few),
+        HFONT const Range = MakeFont("Gdi Test Range", -100);
+        HFONT const Near = MakeFont("Gdi Test Near", -100);
+        FDrawn const ManyA = DrawA(Many);
+        FDrawn const FewA = DrawA(Few);
+        FDrawn const RangeA = DrawA(Range);
+        FDrawn const NearA = DrawA(Near);
+        Check(ManyA.Face == "Gdi Test Many" && ManyA.bDrawn && !ManyA.Lit() && FewA.Lit(),
               "a composite past the outline budget draws nothing; a small one draws");
+        Check(RangeA.Face == "Gdi Test Range" && RangeA.bDrawn && !RangeA.Lit() && NearA.Lit(),
+              "components past the glyph count count against the budget");
         DeleteObject(Many);
         DeleteObject(Few);
-        HDC const Probe = CreateCompatibleDC(nullptr);
+        DeleteObject(Range);
+        DeleteObject(Near);
         HFONT const Short = MakeFont("Gdi Test Short", -100);
-        HGDIOBJ const Previous = SelectObject(Probe, Short);
-        char Name[LF_FACESIZE] = {};
-        GetTextFaceA(Probe, LF_FACESIZE, Name);
-        Check(std::strcmp(Name, "Gdi Test Short") != 0,
+        HFONT const Neighbour = MakeFont("Gdi Test Neighbour", -100);
+        Check(FaceOf(Short) != "Gdi Test Short",
               "a face whose cmap arrays run past the subtable's length is not used");
-        SelectObject(Probe, Previous);
+        Check(FaceOf(Neighbour) != "Gdi Test Neighbour",
+              "a face whose glyph array reaches into the next subtable is not used");
         DeleteObject(Short);
-        DeleteDC(Probe);
+        DeleteObject(Neighbour);
         HFONT const Wide = MakeFont("Gdi Test Wide", -100);
         Check(AdvanceOfA(Wide) == 4000, "an advance past 32767 units is unsigned");
         DeleteObject(Wide);
@@ -387,6 +527,10 @@ int main()
         Check(ExtentIn(Full, Script, 2) == 80 && AdvanceOfA(Full) == 50,
               "a full Unicode map is used before a BMP one recorded after it");
         DeleteObject(Full);
+        HFONT const BadFull = MakeFont("Gdi Test Bad Full", -100);
+        Check(FaceOf(BadFull) == "Gdi Test Bad Full" && AdvanceOfA(BadFull) == 50,
+              "a full map that cannot be read gives way to the face's BMP one");
+        DeleteObject(BadFull);
     }
 
     HDC const Screen = GetDC(nullptr);
@@ -404,44 +548,66 @@ int main()
               Header.bmiHeader.biBitCount == 32,
           "GetDIBits with no bits and no bit count describes the bitmap");
 
-    HFONT const Font = MakeFont("Arial", -16);
-    Check(Font != nullptr, "CreateFontIndirectA finds a face for Arial (or a fallback)");
+    // The general checks use a face of the test's own (printable ASCII, every glyph a square), so
+    // they hold whatever fonts the system has.
+    HFONT const Font = MakeFont("Gdi Test Text", -16);
+    Check(Font != nullptr, "CreateFontIndirectA finds the test's text face");
     HGDIOBJ const SystemFont = SelectObject(Dc, Font);
     Check(SystemFont != nullptr && SystemFont != Font, "SelectObject answers the system font");
     TEXTMETRICA Metrics = {};
-    Check(GetTextMetricsA(Dc, &Metrics) && Metrics.tmHeight > 12 &&
-              Metrics.tmHeight == Metrics.tmAscent + Metrics.tmDescent &&
-              Metrics.tmAveCharWidth > 0 && Metrics.tmMaxCharWidth >= Metrics.tmAveCharWidth,
-          "GetTextMetricsA: the cell is ascent + descent, with widths");
+    Check(GetTextMetricsA(Dc, &Metrics) && Metrics.tmHeight == 16 && Metrics.tmAscent == 13 &&
+              Metrics.tmDescent == 3 && Metrics.tmAveCharWidth > 0 &&
+              Metrics.tmMaxCharWidth >= Metrics.tmAveCharWidth,
+          "GetTextMetricsA: the cell is ascent + descent (13 + 3 at -16), with widths");
     char FaceName[LF_FACESIZE] = {};
-    Check(GetTextFaceA(Dc, LF_FACESIZE, FaceName) > 1, "GetTextFaceA names the realized face");
-#if defined(__APPLE__)
-    // The copy of macOS's Arial in the third folder.
-    Check(std::strcmp(FaceName, "Arial") == 0, "Arial is found by name on macOS");
-    Check(Metrics.tmHeight == 18 && Metrics.tmAscent == 15 && Metrics.tmDescent == 3 &&
-              Metrics.tmInternalLeading == 2,
-          "Arial at -16: Windows' 18 / 15 / 3 (VDMX)");
-#endif
+    Check(GetTextFaceA(Dc, LF_FACESIZE, FaceName) > 1 &&
+              std::strcmp(FaceName, "Gdi Test Text") == 0,
+          "GetTextFaceA names the realized face");
     {
-        // A cell height past the VDMX entries is scaled, not the last entry's cell.
+        // A positive lfHeight is the cell: without VDMX it is scaled.
         HDC const Big = CreateCompatibleDC(nullptr);
-        HFONT const Tall = MakeFont("Arial", 600);
+        HFONT const Tall = MakeFont("Gdi Test Text", 600);
         HGDIOBJ const Previous = SelectObject(Big, Tall);
         TEXTMETRICA TallMetrics = {};
         Check(GetTextMetricsA(Big, &TallMetrics) && TallMetrics.tmHeight >= 599 &&
                   TallMetrics.tmHeight <= 601,
               "a positive lfHeight of 600 is a 600-pixel cell");
-        HFONT const Small = MakeFont("Arial", 20);
-        SelectObject(Big, Small);
-        TEXTMETRICA SmallMetrics = {};
-        Check(GetTextMetricsA(Big, &SmallMetrics) && SmallMetrics.tmHeight <= 20 &&
-                  SmallMetrics.tmHeight > 15,
-              "a positive lfHeight of 20 is a cell of at most 20 pixels");
         SelectObject(Big, Previous);
         DeleteObject(Tall);
-        DeleteObject(Small);
         DeleteDC(Big);
     }
+#if defined(__APPLE__)
+    {
+        // The copy of macOS's Arial in the third folder: Windows' exact metrics (VDMX).
+        HDC const Probe = CreateCompatibleDC(nullptr);
+        HFONT const Arial = MakeFont("Arial", -16);
+        HGDIOBJ const Previous = SelectObject(Probe, Arial);
+        TEXTMETRICA ArialMetrics = {};
+        char ArialName[LF_FACESIZE] = {};
+        GetTextFaceA(Probe, LF_FACESIZE, ArialName);
+        Check(std::strcmp(ArialName, "Arial") == 0, "Arial is found by name on macOS");
+        Check(GetTextMetricsA(Probe, &ArialMetrics) && ArialMetrics.tmHeight == 18 &&
+                  ArialMetrics.tmAscent == 15 && ArialMetrics.tmDescent == 3 &&
+                  ArialMetrics.tmInternalLeading == 2,
+              "Arial at -16: Windows' 18 / 15 / 3 (VDMX)");
+        // A cell height past the VDMX entries is scaled, not the last entry's cell.
+        HFONT const Tall = MakeFont("Arial", 600);
+        SelectObject(Probe, Tall);
+        Check(GetTextMetricsA(Probe, &ArialMetrics) && ArialMetrics.tmHeight >= 599 &&
+                  ArialMetrics.tmHeight <= 601,
+              "Arial at a positive 600 is a 600-pixel cell, past its VDMX");
+        HFONT const Small = MakeFont("Arial", 20);
+        SelectObject(Probe, Small);
+        Check(GetTextMetricsA(Probe, &ArialMetrics) && ArialMetrics.tmHeight <= 20 &&
+                  ArialMetrics.tmHeight > 15,
+              "Arial at a positive 20 is a cell of at most 20 pixels (VDMX)");
+        SelectObject(Probe, Previous);
+        DeleteObject(Arial);
+        DeleteObject(Tall);
+        DeleteObject(Small);
+        DeleteDC(Probe);
+    }
+#endif
 
     int Widths[3] = {};
     Check(GetCharWidthW(Dc, 'A', 'C', Widths) && Widths[0] > 0 && Widths[1] > 0 && Widths[2] > 0,
