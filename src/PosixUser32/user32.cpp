@@ -624,17 +624,21 @@ BOOL InvalidateRect(HWND Window, const RECT*, BOOL)
 
 BOOL EnableWindow(HWND Window, BOOL Enable)
 {
-    std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-    FWindow* const Record = Find(Window);
-    if (Record == nullptr)
-        return FALSE;
-    bool const bWasDisabled = !Record->bEnabled;
+    bool bWasDisabled = false;
     bool const bEnabled = Enable != FALSE;
-    if (bEnabled == Record->bEnabled)
-        return bWasDisabled ? TRUE : FALSE;
-    // The state, WS_DISABLED in the style, then WM_ENABLE, before returning.
-    Record->bEnabled = bEnabled;
-    Record->Style = bEnabled ? (Record->Style & ~WS_DISABLED) : (Record->Style | WS_DISABLED);
+    {
+        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+        FWindow* const Record = Find(Window);
+        if (Record == nullptr)
+            return FALSE;
+        bWasDisabled = !Record->bEnabled;
+        if (bEnabled == Record->bEnabled)
+            return bWasDisabled ? TRUE : FALSE;
+        // The state and WS_DISABLED in the style, then WM_ENABLE, before returning. The message
+        // is sent with the lock released, as every message here is.
+        Record->bEnabled = bEnabled;
+        Record->Style = bEnabled ? (Record->Style & ~WS_DISABLED) : (Record->Style | WS_DISABLED);
+    }
     SendMessageA(Window, WM_ENABLE, bEnabled ? TRUE : FALSE, 0);
     return bWasDisabled ? TRUE : FALSE;
 }
