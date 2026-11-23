@@ -356,13 +356,13 @@ bool FUiPageDesc::LoadFromFile(char const* FullPath)
 
         if (bOk)
         {
-            // 00594474..005944d1: aspect magic, a tracked (count+1)*4 array, list copied in
-            // order, null terminator.
+            // 00594474..005944d1: aspect magic, a tracked array of count + 1 pointers (retail's
+            // (count+1)*4 bytes), list copied in order, null terminator.
             unsigned MagicBits = kUiPageLoadMagicBits;
             memcpy(&Data.Aspect, &MagicBits, sizeof(float));
             unsigned Count = static_cast<unsigned>(EntryList.size());
             FUiWidgetEntry** Array =
-                static_cast<FUiWidgetEntry**>(TrackedNew(Count * 4 + 4));
+                static_cast<FUiWidgetEntry**>(TrackedNew((Count + 1) * sizeof(FUiWidgetEntry*)));
             Data.Entries = Array;
             unsigned Index = 0;
             for (std::list<FUiWidgetEntry*>::iterator It = EntryList.begin(); It != EntryList.end();
