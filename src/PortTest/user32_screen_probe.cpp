@@ -90,6 +90,11 @@ bool CursorVisible()
     return SDL_CursorVisible();
 }
 
+bool ActivateHintSet()
+{
+    return SDL_GetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN) != nullptr;
+}
+
 void PushModifier(std::uint32_t Id, EModifier Key, bool bDown)
 {
     bool const bLeft = Key == EModifier::LeftShift;
@@ -153,6 +158,14 @@ void PushFocus(std::uint32_t Id, bool bGained)
 {
     PushWindowEvent(bGained ? SDL_EVENT_WINDOW_FOCUS_GAINED : SDL_EVENT_WINDOW_FOCUS_LOST, Id, 0,
                     0);
+}
+
+void PushShowState(std::uint32_t Id, int State)
+{
+    PushWindowEvent(State == 1   ? SDL_EVENT_WINDOW_MINIMIZED
+                    : State == 2 ? SDL_EVENT_WINDOW_MAXIMIZED
+                                 : SDL_EVENT_WINDOW_RESTORED,
+                    Id, 0, 0);
 }
 
 void PushCloseRequest(std::uint32_t Id)

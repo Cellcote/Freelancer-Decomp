@@ -42,8 +42,15 @@ struct FUser32Sink
     void (*Bounds)(std::uint32_t Window, int X, int Y, int Width, int Height);
     // The application's windows got or lost the focus.
     void (*Activate)(std::uint32_t Window, bool bActive);
+    // The window was minimized (1), maximized (2) or restored (0) on screen: its own buttons,
+    // or the system.
+    void (*ShowState)(std::uint32_t Window, int State);
 };
 
+// The backend's calls may come from any thread: SDL's windows belong to the main thread, so
+// the backend runs them there (forwarded from another thread, done when the main thread next
+// takes its events). A window is made on the main thread only (CreateWindow fails elsewhere),
+// and Pump and Wait do something there only.
 struct FUser32Backend
 {
     // kUser32BackendVersion: user32 refuses a backend of another version.
@@ -80,7 +87,7 @@ struct FUser32Backend
     bool (*DisplayMode)(int Index, int* Width, int* Height, int* Bits, int* RefreshHz);
 };
 
-inline constexpr int kUser32BackendVersion = 1;
+inline constexpr int kUser32BackendVersion = 2;
 
 // The backend module's one export.
 extern "C" typedef const FUser32Backend* (*FUser32BackendEntry)();

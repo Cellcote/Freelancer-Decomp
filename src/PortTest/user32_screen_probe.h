@@ -21,6 +21,8 @@ bool IsFullscreen(std::uint32_t Id);
 bool IsResizable(std::uint32_t Id);
 bool IsMouseGrabbed(std::uint32_t Id);
 bool CursorVisible();
+// Whether SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN is set at all.
+bool ActivateHintSet();
 
 enum class EModifier
 {
@@ -36,6 +38,8 @@ void PushWheel(std::uint32_t Id, float Amount, float X, float Y);
 void PushMoved(std::uint32_t Id, int X, int Y);
 void PushResized(std::uint32_t Id, int Width, int Height);
 void PushFocus(std::uint32_t Id, bool bGained);
+// The window's own minimize (1) / maximize (2) buttons, or a restore (0).
+void PushShowState(std::uint32_t Id, int State);
 void PushCloseRequest(std::uint32_t Id);
 void PushQuit();
 } // namespace ScreenProbe
