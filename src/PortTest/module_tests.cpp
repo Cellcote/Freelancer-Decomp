@@ -543,6 +543,139 @@ bool ClearPresentReadBack(IRenderPipeline* Pipeline, RpWindow Window, int Width,
     return true;
 }
 
+// RP8's vertex copy (render/rp8_vertex_copy.h) through RPGPU's IRPVertexBuffer::CopyVertices
+// and IVertexBufferManager::CopyVertexData: a sphere's separate position / normal / texture
+// streams, an indexed source into a format with a diffuse colour it does not have, and a
+// pre-transformed format, which RP8's jump table copies nothing for.
+void TestRpGpuVertexCopy(IRenderPipeline* Pipeline)
+{
+    IRPVertexBuffer* Buffers = nullptr;
+    IVertexBufferManager* Manager = nullptr;
+    Pipeline->QueryInterface(Iids::RPVertexBuffer, (void**)(&Buffers));
+    Pipeline->QueryInterface(Iids::VertexBufferManager, (void**)(&Manager));
+    Check(Buffers != nullptr && Manager != nullptr,
+          "RPGPU has IRPVertexBuffer and IVertexBufferManager");
+    if (Buffers == nullptr || Manager == nullptr)
+    {
+        if (Buffers != nullptr)
+            Buffers->Release();
+        if (Manager != nullptr)
+            Manager->Release();
+        return;
+    }
+
+    float const Positions[2][3] = {{1.0f, 2.0f, 3.0f}, {4.0f, 5.0f, 6.0f}};
+    float const Normals[2][3] = {{0.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}};
+    float const Texels[2][2] = {{0.25f, 0.5f}, {0.75f, 1.0f}};
+    FlULong const Order[2] = {1, 0};
+    auto const Stream = [](const void* Base, unsigned int Size, const FlULong* Indices)
+    {
+        FRpVertexStream Out = {};
+        Out.Base = static_cast<const unsigned char*>(Base);
+        Out.ByteSize = Size;
+        Out.Stride = Size;
+        Out.IndexArray = Indices;
+        Out.Count = 2;
+        return Out;
+    };
+    FRpVertexSrcDesc Sphere = {};
+    Sphere.SrcFvf = 0x112; // XYZ | NORMAL | TEX1, as SphereMesh hands it over
+    Sphere.SrcCount = 2;
+    Sphere.Position = Stream(Positions, 0xC, nullptr);
+    Sphere.Normal = Stream(Normals, 0xC, nullptr);
+    Sphere.Tex[0] = Stream(Texels, 8, nullptr);
+    // One vertex of a 0x112 buffer: position, normal, texture set 0.
+    auto const Matches = [&](const unsigned char* Vertex, int Source)
+    {
+        return std::memcmp(Vertex, Positions[Source], 0xC) == 0 &&
+               std::memcmp(Vertex + 0xC, Normals[Source], 0xC) == 0 &&
+               std::memcmp(Vertex + 0x18, Texels[Source], 8) == 0;
+    };
+    auto const Zero = [](const unsigned char* Bytes, std::size_t Size)
+    {
+        for (std::size_t Index = 0; Index < Size; ++Index)
+            if (Bytes[Index] != 0)
+                return false;
+        return true;
+    };
+
+    // A static buffer: copied unlocked at a byte offset, then in place into a lock.
+    unsigned int* Handle = nullptr;
+    Check(Buffers->CreateVb(0x112, 6, &Handle, 0) == GR_OK && Handle != nullptr,
+          "RPGPU makes a vertex buffer");
+    unsigned int Offset = 0x20; // bytes in, the vertex index out
+    Check(Buffers->CopyVertices(Handle, &Offset, &Sphere, 0, 2) == GR_OK && Offset == 1,
+          "CopyVertices locks at the byte offset and hands back the vertex index");
+    void* Bits = nullptr;
+    unsigned int LockAt = 0x80; // vertex 4
+    Check(Buffers->LockVb(Handle, &LockAt, &Bits, 2) == GR_OK && LockAt == 4,
+          "the buffer locks two vertices at vertex 4");
+    unsigned int InLock = 1;
+    Check(Buffers->CopyVertices(Handle, &InLock, &Sphere, 1, 1) == GR_OK && InLock == 1,
+          "CopyVertices writes into a lock in place, at a vertex of the lock");
+    Buffers->UnlockVb(Handle);
+    unsigned int Whole = 0;
+    if (Buffers->LockVb(Handle, &Whole, &Bits, 6) == GR_OK && Bits != nullptr)
+    {
+        const unsigned char* const Data = static_cast<const unsigned char*>(Bits);
+        Check(Zero(Data, 0x20) && Matches(Data + 0x20, 0) && Matches(Data + 0x40, 1) &&
+                  Zero(Data + 0x60, 0x40) && Matches(Data + 0xA0, 1),
+              "the copies are RP8's: position, normal and texture at the vertices asked for, "
+              "the rest left as it was");
+        Buffers->UnlockVb(Handle);
+    }
+    else
+        Check(false, "the vertex buffer locks whole");
+    Buffers->DestroyVb((void**)(&Handle));
+
+    // The pool through the manager, as SphereMesh draws: LockVertexMemory, CopyVertexData.
+    FVertexMemoryLock Lock = {};
+    if (Manager->LockVertexMemory(0x112, 2, &Lock) == GR_OK && Lock.Vertices != nullptr)
+    {
+        Manager->CopyVertexData(Lock.Vertices, Lock.Listing.Fvf, &Sphere, 0, 2);
+        const unsigned char* const Data = static_cast<const unsigned char*>(Lock.Vertices);
+        Check(Lock.Listing.Fvf == 0x112 && Matches(Data, 0) && Matches(Data + 0x20, 1),
+              "CopyVertexData converts a sphere's streams into the vertex memory");
+        Manager->UnlockVertexMemory(&Lock);
+    }
+    else
+        Check(false, "RPGPU locks vertex memory");
+
+    // Indexed (Flags 4) into XYZ | NORMAL | DIFFUSE | TEX1 (0x152): the diffuse bytes the
+    // source has no stream for are left alone.
+    FRpVertexSrcDesc Indexed = Sphere;
+    Indexed.Flags = 4;
+    Indexed.Position = Stream(Positions, 0xC, Order);
+    Indexed.Normal = Stream(Normals, 0xC, Order);
+    Indexed.Tex[0] = Stream(Texels, 8, Order);
+    unsigned char Out[2][0x24];
+    std::memset(Out, 0xAB, sizeof(Out));
+    Manager->CopyVertexData(Out, 0x152, &Indexed, 0, 2);
+    unsigned char const Untouched[4] = {0xAB, 0xAB, 0xAB, 0xAB};
+    Check(std::memcmp(Out[0], Positions[1], 0xC) == 0 &&
+              std::memcmp(Out[0] + 0xC, Normals[1], 0xC) == 0 &&
+              std::memcmp(Out[0] + 0x18, Untouched, 4) == 0 &&
+              std::memcmp(Out[0] + 0x1C, Texels[1], 8) == 0 &&
+              std::memcmp(Out[1], Positions[0], 0xC) == 0,
+          "an indexed copy follows each stream's indices and skips the diffuse colour");
+
+    // XYZRHW | TEX1 (0x104) from separate streams of the same format: RP8's jump table has
+    // the empty converter there.
+    FRpVertexSrcDesc Transformed = {};
+    Transformed.SrcFvf = 0x104;
+    Transformed.Position = Stream(Positions, 0xC, nullptr);
+    Transformed.Tex[0] = Stream(Texels, 8, nullptr);
+    std::memset(Out, 0xAB, sizeof(Out));
+    Manager->CopyVertexData(Out, 0x104, &Transformed, 0, 2);
+    bool bUntouched = true;
+    for (std::size_t Index = 0; Index < sizeof(Out); ++Index)
+        bUntouched = bUntouched && Out[Index / 0x24][Index % 0x24] == 0xAB;
+    Check(bUntouched, "a pre-transformed format from separate streams copies nothing, as RP8");
+
+    Buffers->Release();
+    Manager->Release();
+}
+
 // RPGPU without a device (NULL_DEVICE = 1), and, where SDL_GPU has a device that takes RPGPU's
 // shaders, its SDL backend on a hidden SDL window whose id is the HWND (the client's window
 // contract off Windows): a clear presents and reads back. Without a GPU (a headless Linux run,
@@ -582,6 +715,7 @@ void TestRpGpu(ICOManager* Manager, const std::string& Folder)
         Check(ClearPresentReadBack(Null, reinterpret_cast<RpWindow>(std::uintptr_t(1)), 64, 32,
                                    0xFF336699u, Root + "/null.bmp", &W, &H),
               "RPGPU's Null backend presents a clear and reads it back");
+        TestRpGpuVertexCopy(Null);
         Null->ShutdownPipeline();
         Null->Release();
     }
