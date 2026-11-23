@@ -512,11 +512,12 @@ void CliExplosionAttachLocalXform(void* ExplosionFx, int EngineIndex, FTransform
     // FUN_005377c0 (thiscall on the game light, RET 8). No null test inside: all eight retail
     // call sites (0x0050314a, 0x005042c8, 0x0050442b, 0x005045e4, 0x0053f575, 0x005441c2,
     // 0x00545961, 0x005480fa) test the light (TEST/CMP ECX + JZ) before the CALL.
-    unsigned char* const Base = static_cast<unsigned char*>(ExplosionFx);
+    FGameLight* const Light = static_cast<FGameLight*>(ExplosionFx);
 
     // 0x005377d1: +0xec = the engine index; 0x005377d7..0x005377e4: REP MOVSD 0xc -> +0xf0.
-    *reinterpret_cast<int*>(Base + 0xec) = EngineIndex;
-    std::memcpy(Base + 0xf0, LocalXform, sizeof(FTransform));
+    Light->EngineIndex = static_cast<unsigned>(EngineIndex);
+    static_assert(sizeof(Light->LocalXform) == sizeof(FTransform), "LocalXform is an FTransform");
+    std::memcpy(Light->LocalXform, LocalXform, sizeof(FTransform));
 
     // 0x005377e6..0x005377f1: DALib::Engine vt+0xa0 (GetInstanceTransform) on the index.
     float* const InstRaw =
@@ -529,7 +530,7 @@ void CliExplosionAttachLocalXform(void* ExplosionFx, int EngineIndex, FTransform
     // 0x0053780c..0x00537816: vt+0x1c MulTransform(temp, instance, +0xf0).
     FTransform World;
     G_GameLightMath->MulTransform(World, *reinterpret_cast<FTransform const*>(InstRaw),
-                                  *reinterpret_cast<FTransform const*>(Base + 0xf0));
+                                  *reinterpret_cast<FTransform const*>(Light->LocalXform));
 
     // 0x00537819..0x0053782f: the result copied to a second local, FUN_00410fe0(this, &copy)
     // -- the {Orient[9], Pos[3]} block is the FTransform's own layout.
@@ -538,9 +539,9 @@ void CliExplosionAttachLocalXform(void* ExplosionFx, int EngineIndex, FTransform
                             &Copy.Translation.X);
 
     // 0x00537835..0x00537845: +0x120/+0x124/+0x128 = 0.
-    *reinterpret_cast<float*>(Base + 0x120) = 0.0f;
-    *reinterpret_cast<float*>(Base + 0x124) = 0.0f;
-    *reinterpret_cast<float*>(Base + 0x128) = 0.0f;
+    Light->Field120 = 0.0f;
+    Light->Field124 = 0.0f;
+    Light->Field128 = 0.0f;
 }
 
 void CliBeamActivateEffects(FClientBeamGameobj* This, Vector const* LookDir,

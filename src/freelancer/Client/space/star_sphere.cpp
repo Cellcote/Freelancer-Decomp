@@ -142,7 +142,7 @@ static void InitGlowDescDefaults(FStarGlowDesc* Desc, unsigned char OwnerTag)
 // +0x38 / +0x3c. The rest of the inline name (+0x15..+0x33) is not written.
 static FStarFxChild40* AllocChild40(float Field38, float Field3C)
     {
-        FStarFxChild40* Child = static_cast<FStarFxChild40*>(operator new(0x40));
+        FStarFxChild40* Child = static_cast<FStarFxChild40*>(operator new(sizeof(FStarFxChild40)));
         if (Child == nullptr)
             return nullptr;
         Child->Allocator = 0;
