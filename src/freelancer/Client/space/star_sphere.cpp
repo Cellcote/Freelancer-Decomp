@@ -1612,7 +1612,8 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
                         // whatever +0x0c holds; a non-zero result frees it and zeroes +0x0c.
                         if (this->StarCenter != nullptr)
                             operator delete(this->StarCenter);
-                        FStarGlowDesc* Center = static_cast<FStarGlowDesc*>(operator new(0x50));
+                        FStarGlowDesc* Center =
+                            static_cast<FStarGlowDesc*>(operator new(sizeof(FStarGlowDesc)));
                         if (Center != nullptr)
                             InitGlowDescDefaults(Center, 0);
                         this->StarCenter = Center;
@@ -2813,7 +2814,7 @@ FStarSphere::FStarSphere(IObjInspect* InOwner)
     ZoneOcclusionFadeOut = 2.0f;
     Field30 = kPi;
 
-    FStarGlowDesc* Glow = static_cast<FStarGlowDesc*>(operator new(0x50));
+    FStarGlowDesc* Glow = static_cast<FStarGlowDesc*>(operator new(sizeof(FStarGlowDesc)));
     if (Glow != nullptr)
         InitGlowDescDefaults(Glow, 0);
     // 0x00510e99..0x00510ea8: +0x10, then +0x0c = 0, +0x38 = 0, +0x34 = 0, +0x64 = 1.0f.

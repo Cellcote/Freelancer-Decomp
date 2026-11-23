@@ -114,8 +114,9 @@ int FAnimScriptSet::Load(FlULong NewScript)
         Count = 0;
         DALib::Anim->EnumScriptNames(reinterpret_cast<void*>(&CountScriptName),
                                      AnimScriptFromId(NewScript), this);
-        // 0x00555c1d..0x00555c39: one pointer and one float per name.
-        Names = static_cast<char**>(operator new(static_cast<size_t>(Count) * 4));
+        // 0x00555c1d..0x00555c39: one pointer and one float per name (a pointer is 4 bytes on
+        // Win32, 8 on 64-bit builds).
+        Names = static_cast<char**>(operator new(static_cast<size_t>(Count) * sizeof(*Names)));
         Durations = static_cast<float*>(operator new(static_cast<size_t>(Count) * 4));
         FillCursor = 0;
         // 0x00555c40..0x00555c58: fill them.
