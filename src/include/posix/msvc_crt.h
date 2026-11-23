@@ -634,7 +634,9 @@ inline int _vsnwprintf(wchar_t* Buffer, std::size_t Count, wchar_t const* Format
         std::wmemcpy(Buffer, Text.data(), Size + 1);
         return Length;
     }
-    std::wmemcpy(Buffer, Text.data(), Count);
+    // A zero count (a size query with a null buffer) copies nothing.
+    if (Count != 0)
+        std::wmemcpy(Buffer, Text.data(), Count);
     return Size == Count ? Length : -1;
 }
 inline int _snwprintf(wchar_t* Buffer, std::size_t Count, wchar_t const* Format, ...)

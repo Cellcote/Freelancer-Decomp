@@ -301,6 +301,8 @@ void TestKeyboardAndText()
           "wsprintfW takes %s as wide and %S as narrow");
     Check(_snwprintf(Out, 4, L"%s", L"abcdef") == -1 && std::wmemcmp(Out, L"abcd", 4) == 0,
           "_snwprintf cuts without a terminator and returns -1");
+    Check(_snwprintf(nullptr, 0, L"%s", L"abc") == -1 && _snwprintf(nullptr, 0, L"") == 0,
+          "_snwprintf with a zero count writes nothing");
     Check(_snwprintf(Out, 8, L"%s", L"abc") == 3 && std::wcscmp(Out, L"abc") == 0,
           "_snwprintf writes a short text with its terminator");
     Check(std::wcscmp(_itow(-42, Out, 10), L"-42") == 0 &&
