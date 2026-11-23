@@ -643,7 +643,9 @@ jobs:
   portable:
     name: Portable modules (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    # The whole client is in the non-Windows build now, built twice (ASan + UBSan, then Release):
+    # 14-18 minutes on Linux, so 20 cancelled some runs on the limit.
+    timeout-minutes: 35
     env:
       # RPGPU's SDL3 on Linux (built below); macOS takes Homebrew's.
       SDL3_VERSION: 3.4.20
