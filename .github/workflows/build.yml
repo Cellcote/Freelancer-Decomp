@@ -842,8 +842,6 @@ jobs:
             New-ItemProperty -Path $key -Name DumpCount -PropertyType DWord -Value 10 -Force | Out-Null
           }
 
-      # The x64 server hosts through DPNet (docs/dpnet.md); DPNetCheck joins it with Microsoft's
-
       # The x64 server hosts through DPNet (docs/dpnet.md); DPNetInteropTest joins it with Microsoft's
       # DirectPlay 8 client, as a retail Freelancer client does.
       - name: FLDedicated x64 (DPNet), start, join with Microsoft's client, run and stop
@@ -880,9 +878,6 @@ jobs:
           # only: a clean shutdown (docs/x64.md: engine handles held in 32-bit fields).
           $log = Get-Content -Raw dedicated_out.txt
           if (-not $log.Contains('Server running, ready for log in.')) { throw ('the x64 server did not come up (exit code 0x{0:x8})' -f $proc.ExitCode) }
-          if ($check -ne 0) { throw "DPNetCheck failed (exit code $check)" }
-
-          if (-not $log.Contains('Server running, ready for log in.')) { throw 'the x64 server did not come up' }
           if ($check -ne 0) { throw "DPNetInteropTest failed (exit code $check)" }
           if ($proc.ExitCode -ne 0 -or -not $log.Contains('Server stopped.')) {
             Write-Host ("::warning::x64 FLDedicated did not shut down cleanly (exit code 0x{0:x8})" -f $proc.ExitCode)
@@ -965,7 +960,6 @@ jobs:
               Select-Object -First 80 | ForEach-Object { Write-Host $_.Line }
           }
           exit 0
-
 
   format:
     name: clang-format (changed lines)
