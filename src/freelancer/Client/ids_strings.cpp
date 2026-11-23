@@ -177,8 +177,10 @@ unsigned int GetIdsStringWWithRawFallback(unsigned int Ids, wchar_t* Dest, int D
         return 0;
 #if !defined(_WIN32)
     // PORT(macOS, Linux): a resource without even the leading word would make words - 1 wrap
-    // below and the copy read past it. Retail reads on; here such a resource gives nothing.
-    if (RawWordCount == 0)
+    // below and the copy read past it, and a destination without room (an append that filled
+    // its buffer, AppendIdsStringOrWarn) would make count - 1 wrap and the copy write past it.
+    // Retail reads and writes on; here either gives nothing.
+    if (RawWordCount == 0 || DestChars < 1)
         return 0;
 #endif
 

@@ -24,9 +24,23 @@ LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
   1, 	"Eins"
 }
 
+// An unquoted file name of a skipped type, followed by a resource that must not be lost.
+1 ICON resource_test_icon.ico
+
+STRINGTABLE
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+{
+  48, 	L"\xD83D\xDE00"
+  49, 	"😀"
+  50, 	"Hello \
+world"
+}
+
 5 23 "resource_test_card.txt"
 
 CardName CARDTYPE "resource_test_card.txt"
+
+Café CARDTYPE "resource_test_card.txt"
 
 LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
 7 23 "resource_test_card.txt"

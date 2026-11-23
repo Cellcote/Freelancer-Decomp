@@ -587,7 +587,8 @@ FL_USER32_API int wsprintfW(LPWSTR Buffer, LPCWSTR Format, ...);
 
 // LoadStringW: string Id of the module's string tables (a resource module's,
 // Platform::ResourceModuleLoad), as Windows' user32: at most Size - 1 characters and a
-// terminator, the count copied; 0 when the string is missing (Buffer untouched) or empty. Size 0
+// terminator (also when nothing fits), the count copied; 0 when the string is missing (Buffer
+// untouched) or empty. Size 0
 // stores a pointer to the string (not terminated) in *(LPWSTR*)Buffer and returns its length.
 // Inline over posix/kernel32.h's resource calls rather than in the user32 module: those keep
 // the resource modules in the platform layer's state, which dacom holds, and dacom links user32.
@@ -615,19 +616,14 @@ inline int LoadStringW(HINSTANCE Instance, UINT Id, LPWSTR Buffer, int Size)
     int const Length = Cursor[Offset];
     if (Size == 0)
     {
-        wchar_t const* const Text = Platform::ResourceWideText(Cursor + Offset + 1);
+        wchar_t const* const Text =
+            Platform::ResourceWideText(Cursor + Offset + 1, static_cast<std::size_t>(Length));
         if (Text == nullptr)
             return 0;
         *reinterpret_cast<LPWSTR*>(Buffer) = const_cast<LPWSTR>(Text);
         return Length;
     }
     int const Count = Length < Size - 1 ? Length : Size - 1;
-    if (Count == 0)
-    {
-        if (Size > 1)
-            Buffer[0] = 0;
-        return 0;
-    }
     for (int Index = 0; Index < Count; ++Index)
         Buffer[Index] = Cursor[Offset + 1 + Index];
     Buffer[Count] = 0;

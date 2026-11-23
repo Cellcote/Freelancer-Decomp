@@ -314,7 +314,7 @@ bool LoadIdsIntoRdl(unsigned int Ids, RenderDisplayList& Rdl)
     {
         // The split path keeps pointers into the text (TextPtrNode): the resource's own on
         // Windows, its wchar_t copy elsewhere (resource_text.h), which lives as long.
-        const wchar_t* const Wide = ResourceWide(Text);
+        const wchar_t* const Wide = ResourceWide(Text, Count);
 #if !defined(_WIN32)
         if (Wide == nullptr)
             return false;

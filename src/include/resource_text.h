@@ -24,15 +24,17 @@ using ResourceUnit = wchar_t;
 using ResourceUnit = char16_t;
 #endif
 
-// Resource text that is kept as wchar_t (a TextPtrNode points into it): Text itself on Windows;
-// otherwise the converted copy, which lives as long as the resource module
-// (Platform::ResourceWideText), or nullptr when that copy cannot be made.
-inline wchar_t const* ResourceWide(ResourceUnit const* Text)
+// Resource text that is kept as wchar_t (a TextPtrNode points into it), Count characters of it:
+// Text itself on Windows; otherwise the converted copy, which lives as long as the resource
+// module (Platform::ResourceWideText), or nullptr when that copy cannot be made or the resource
+// holds fewer than Count units from Text.
+inline wchar_t const* ResourceWide(ResourceUnit const* Text, std::size_t Count)
 {
 #if defined(_WIN32)
+    (void)Count;
     return Text;
 #else
-    return Platform::ResourceWideText(Text);
+    return Platform::ResourceWideText(Text, Count);
 #endif
 }
 

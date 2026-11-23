@@ -1296,7 +1296,8 @@ namespace Platform
         PeResources::FImage Image;
         std::vector<std::pair<std::uint32_t, std::uint32_t>> Resources; // (offset, size)
         bool bIndexed = false;
-        std::map<std::uint32_t, std::unique_ptr<wchar_t[]>> Wide; // by data offset
+        std::map<std::pair<std::uint32_t, std::uint32_t>, std::unique_ptr<wchar_t[]>>
+            Wide; // by (offset, size)
         ~FResourceModule()
         {
             if (Base != nullptr)
@@ -1635,8 +1636,10 @@ namespace Platform
     // module (wchar_t is 4 bytes here). The whole resource is converted on first use, one
     // wchar_t per unit as the wire's text (rpc_wire_wide.h), so counts in units stay counts in
     // characters, and followed by a terminator; the result lives as long as the module, as the
-    // mapped text does. nullptr when Text is not in a resource or falls between two units.
-    inline wchar_t const* ResourceWideText(void const* Text)
+    // mapped text does. At least Units units follow Text in the resource the copy is made of (a
+    // damaged image's resources may overlap: one that holds them is taken). nullptr when Text is
+    // not in a resource, falls between two units or has fewer than Units after it.
+    inline wchar_t const* ResourceWideText(void const* Text, std::size_t Units = 0)
     {
         std::lock_guard<std::mutex> Lock(Detail::Shared().ResourceModulesLock);
         Detail::FResourceModule* const Resources = Detail::ResourceModuleHolding(Text);
@@ -1653,25 +1656,30 @@ namespace Platform
             }
             std::uint32_t const Into = static_cast<std::uint32_t>(
                 static_cast<unsigned char const*>(Text) - Resources->Base);
+            // The nearest resource that starts at or before Text and holds Units units after it.
             auto Found = std::upper_bound(Resources->Resources.begin(), Resources->Resources.end(),
                                           std::make_pair(Into, ~std::uint32_t(0)));
-            if (Found == Resources->Resources.begin())
-                return nullptr;
-            --Found;
-            std::uint32_t const Start = Found->first;
-            std::uint32_t const Units = Found->second / 2;
-            if ((Into - Start) % 2 != 0 || (Into - Start) / 2 > Units)
-                return nullptr;
-            std::unique_ptr<wchar_t[]>& Wide = Resources->Wide[Start];
-            if (Wide == nullptr)
+            while (Found != Resources->Resources.begin())
             {
-                Wide.reset(new wchar_t[Units + 1]);
-                unsigned char const* const In = Resources->Base + Start;
-                for (std::uint32_t Index = 0; Index < Units; ++Index)
-                    Wide[Index] = static_cast<wchar_t>(In[Index * 2] | (In[Index * 2 + 1] << 8));
-                Wide[Units] = 0;
+                --Found;
+                std::uint32_t const Start = Found->first;
+                std::uint32_t const Count = Found->second / 2;
+                if ((Into - Start) % 2 != 0 || (Into - Start) / 2 > Count ||
+                    Count - (Into - Start) / 2 < Units)
+                    continue;
+                std::unique_ptr<wchar_t[]>& Wide = Resources->Wide[*Found];
+                if (Wide == nullptr)
+                {
+                    Wide.reset(new wchar_t[Count + 1]);
+                    unsigned char const* const In = Resources->Base + Start;
+                    for (std::uint32_t Index = 0; Index < Count; ++Index)
+                        Wide[Index] =
+                            static_cast<wchar_t>(In[Index * 2] | (In[Index * 2 + 1] << 8));
+                    Wide[Count] = 0;
+                }
+                return Wide.get() + (Into - Start) / 2;
             }
-            return Wide.get() + (Into - Start) / 2;
+            return nullptr;
         }
         catch (std::bad_alloc const&)
         {

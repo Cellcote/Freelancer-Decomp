@@ -138,6 +138,7 @@ inline std::uint32_t NextCodePoint(unsigned char const*& Text)
     int Extra = Lead >= 0xF0 && Lead < 0xF5 ? 3 : Lead >= 0xE0 ? 2 : Lead >= 0xC2 ? 1 : -1;
     if (Lead >= 0xF5 || Extra < 0)
         return 0xFFFD;
+    std::uint32_t const Minimum = Extra == 1 ? 0x80 : Extra == 2 ? 0x800 : 0x10000;
     std::uint32_t Code = Lead & (0x3Fu >> Extra);
     for (; Extra > 0; --Extra)
     {
@@ -145,15 +146,46 @@ inline std::uint32_t NextCodePoint(unsigned char const*& Text)
             return 0xFFFD;
         Code = (Code << 6) | (*Text++ & 0x3Fu);
     }
+    // Overlong forms, surrogates and values past U+10FFFF are not characters.
+    if (Code < Minimum || (Code >= 0xD800 && Code <= 0xDFFF) || Code > 0x10FFFF)
+        return 0xFFFD;
     return Code;
 }
 
-inline std::uint32_t UpperAscii(std::uint32_t Code)
+// The upper case of a UTF-16 unit, as the loader compares names (RtlUpcaseUnicodeChar's simple
+// mappings) for ASCII, Latin-1, Latin Extended-A, Greek and Cyrillic; other units are compared
+// as they are.
+inline std::uint32_t Upper(std::uint32_t Code)
 {
-    return Code >= 'a' && Code <= 'z' ? Code - 32 : Code;
+    if (Code >= 'a' && Code <= 'z')
+        return Code - 32;
+    if (Code < 0xE0)
+        return Code;
+    if (Code <= 0xFE)
+        return Code == 0xF7 ? Code : Code - 32; // a-grave..thorn, not the division sign
+    if (Code == 0xFF)
+        return 0x178;
+    if (Code >= 0x100 && Code <= 0x17F)
+    {
+        // Pairs of upper and lower case, upper first, with the dotless i and the runs whose
+        // pairs start at an odd unit (U+0139..U+0148, U+0179..U+017E) as exceptions.
+        if (Code == 0x131 || Code == 0x138 || Code == 0x149 || Code == 0x17F)
+            return Code;
+        bool const bOddPairs = (Code >= 0x139 && Code <= 0x148) || (Code >= 0x179 && Code <= 0x17E);
+        bool const bLower = bOddPairs ? (Code % 2 == 0) : (Code % 2 == 1);
+        return bLower ? Code - 1 : Code;
+    }
+    if (Code >= 0x3B1 && Code <= 0x3CB && Code != 0x3C2) // alpha..upsilon with dialytika
+        return Code - 32;
+    if (Code >= 0x430 && Code <= 0x44F)
+        return Code - 32;
+    if (Code >= 0x450 && Code <= 0x45F)
+        return Code - 80;
+    return Code;
 }
 
-// Whether the directory string at Relative (from the root) is Text, without regard to ASCII case.
+// Whether the directory string at Relative (from the root) is Text, without regard to case
+// (Upper).
 inline bool NameIs(FImage const& Image, std::uint32_t Relative, char const* Text)
 {
     if (Relative > Image.RootSize || Image.RootSize - Relative < 2)
@@ -179,7 +211,7 @@ inline bool NameIs(FImage const& Image, std::uint32_t Relative, char const* Text
             Unit = Read16(Image, Offset + 2 + Index * 2);
             Code = 0xDC00 + (Code & 0x3FF);
         }
-        if (UpperAscii(Code) != UpperAscii(Unit))
+        if (Upper(Code) != Upper(Unit))
             return false;
     }
     return *Cursor == 0;

@@ -87,6 +87,8 @@ TYPES = {
 # Resource statements whose body is skipped (see the top of the file).
 SKIPPED = {"DIALOG", "DIALOGEX", "MENU", "MENUEX", "ACCELERATORS", "ICON", "CURSOR",
            "VERSIONINFO", "TOOLBAR", "DLGINIT", "TEXTINCLUDE", "DESIGNINFO"}
+# Of those, the ones that name a file rather than hold a block.
+FILE_SKIPPED = {"ICON", "CURSOR"}
 # Options that may follow a resource's type, with their argument counts.
 OPTIONS = {"LANGUAGE": 2, "CHARACTERISTICS": 1, "VERSION": 1}
 MEMORY_FLAGS = {"PRELOAD", "LOADONCALL", "FIXED", "MOVEABLE", "DISCARDABLE", "PURE", "IMPURE",
@@ -154,6 +156,8 @@ def tokenize(text, path):
                     i += 1
                     break
                 if text[i] == "\\" and i + 1 < n:
+                    if text[i + 1] == "\n":
+                        line += 1  # a line continuation (unquote drops it)
                     i += 2
                     continue
                 i += 1
@@ -193,6 +197,8 @@ def unquote(token, path, line):
             continue
         e = body[i + 1]
         i += 2
+        if e == "\n":
+            continue  # a line continuation: the string goes on on the next line
         simple = {"n": "\n", "t": "\t", "r": "\r", "a": "\x08", "\\": "\\", '"': '"'}
         if e in simple:
             out.append(simple[e])
@@ -255,7 +261,8 @@ class Script:
             text = data[3:].decode("utf-8")
         else:
             text = data.decode("utf-8")
-        self.tokens = tokenize(text, path)
+        # CRLF scripts read as LF ones (a line continuation is then always a backslash and LF).
+        self.tokens = tokenize(text.replace("\r\n", "\n"), path)
         self.pos = 0
         # rc.exe's /l0x0409 (cmake/Freelancer.cmake's CMAKE_RC_FLAGS), until a LANGUAGE.
         self.language = 0x0409
@@ -408,8 +415,8 @@ class Script:
             type_upper = type_word.upper()
             language = self.options(self.language)
             if type_upper in SKIPPED:
-                if self.peek()[0] == "str":
-                    self.take()  # ICON / CURSOR "file"
+                if type_upper in FILE_SKIPPED:
+                    self.take()  # the file name, quoted or not
                 else:
                     self.skip_block()
                 continue
@@ -436,7 +443,7 @@ class Script:
         for (block, language), table in sorted(self.strings.items()):
             data = bytearray()
             for index in range(16):
-                units = table.get(index, "").encode("utf-16-le")
+                units = table.get(index, "").encode("utf-16-le", "surrogatepass")
                 data += struct.pack("<H", len(units) // 2) + units
             self.add(TYPES["STRINGTABLE"], block, language, bytes(data), 0)
 
@@ -485,7 +492,7 @@ def resource_section(resources):
     string_offsets = {}
     for s in strings:
         string_offsets[s] = offset
-        offset += 2 + len(s.encode("utf-16-le"))
+        offset += 2 + len(s.encode("utf-16-le", "surrogatepass"))
     offset = align(offset, 4)
 
     leaves = []
@@ -522,7 +529,7 @@ def resource_section(resources):
                 target = entry_offsets[child]
             struct.pack_into("<II", out, base + 16 + 8 * index, name_field, target)
     for s, at in string_offsets.items():
-        units = s.encode("utf-16-le")
+        units = s.encode("utf-16-le", "surrogatepass")
         struct.pack_into("<H", out, at, len(units) // 2)
         out[at + 2:at + 2 + len(units)] = units
     for leaf in leaves:

@@ -15,6 +15,7 @@
 #include "resource_text.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <cwchar>
 #include <fstream>
@@ -47,7 +48,8 @@ bool WriteAll(std::string const& Path, unsigned char const* Data, std::size_t Si
 {
     std::ofstream Out(Path, std::ios::binary | std::ios::trunc);
     Out.write(reinterpret_cast<char const*>(Data), static_cast<std::streamsize>(Size));
-    return static_cast<bool>(Out);
+    Out.close();
+    return !Out.fail();
 }
 
     // The resource's bytes, or empty.
@@ -129,10 +131,13 @@ void TestInfocards(std::string const& Bin, std::string const& Sources)
     Check(Units != nullptr && Units[0] == 0xFEFF, "infocard 3 starts with a byte order mark");
     if (Units != nullptr)
     {
-        wchar_t const* const Wide = ResourceWide(Units + 1);
+        std::size_t const Count = SizeofResource(Module, Info) / 2 - 1;
+        wchar_t const* const Wide = ResourceWide(Units + 1, Count);
         Check(Wide != nullptr && std::wcsncmp(Wide, L"<RDL><PUSH/>", 12) == 0,
               "infocard 3 as wchar_t is \"<RDL><PUSH/>...\"");
-        Check(ResourceWide(Units + 1) == Wide, "the wchar_t copy is made once");
+        Check(ResourceWide(Units + 1, Count) == Wide, "the wchar_t copy is made once");
+        Check(ResourceWide(Units + 1, Count + 1) == nullptr,
+              "no copy holds more units than the resource");
         Check(Wide != nullptr && Wide[SizeofResource(Module, Info) / 2 - 1] == 0,
               "the wchar_t copy is terminated");
         Check(Platform::ResourceWideText(reinterpret_cast<unsigned char const*>(Units) + 1) ==
@@ -166,14 +171,21 @@ void TestFixture(std::string const& Fixture)
           "\\x takes two digits in a narrow string");
     Check(LoadStringW(Module, 33, Text, 64) == 3 && std::wcscmp(Text, L"Sum") == 0,
           "an id 32+1 is 33");
+    static wchar_t const kSmile[] = {0xD83D, 0xDE00, 0};
+    Check(LoadStringW(Module, 48, Text, 64) == 2 && std::wcscmp(Text, kSmile) == 0,
+          "an escaped surrogate pair is kept");
+    Check(LoadStringW(Module, 49, Text, 64) == 2 && std::wcscmp(Text, kSmile) == 0,
+          "a supplementary character is the same surrogate pair");
+    Check(LoadStringW(Module, 50, Text, 64) == 11 && std::wcscmp(Text, L"Hello world") == 0,
+          "a line continuation joins the lines");
 
     // The buffer: at most Size - 1 characters and a terminator.
     std::wmemset(Text, L'x', 64);
     Check(LoadStringW(Module, 1, Text, 3) == 2 && std::wcscmp(Text, L"On") == 0 && Text[3] == L'x',
           "a short buffer takes Size - 1 characters, terminated");
     std::wmemset(Text, L'x', 64);
-    Check(LoadStringW(Module, 1, Text, 1) == 0 && Text[0] == L'x',
-          "a one-character buffer is not written");
+    Check(LoadStringW(Module, 1, Text, 1) == 0 && Text[0] == 0 && Text[1] == L'x',
+          "a one-character buffer takes only the terminator");
     Check(LoadStringW(Module, 1, nullptr, 64) == 0, "no buffer gives 0");
     Check(LoadStringW(Module, 1, Text, -1) == 0, "a negative size gives 0");
     wchar_t const* Pointer = nullptr;
@@ -204,6 +216,11 @@ void TestFixture(std::string const& Fixture)
     Check(!Resource(Module, "CARDTYPE", "CARDNAME").empty(), "a named type and name");
     Check(!Resource(Module, "cardtype", "CardName").empty(), "names match without regard to case");
     Check(FindResourceA(Module, "CardName", "CardType") != nullptr, "FindResourceA (name, type)");
+    Check(!Resource(Module, "CARDTYPE", "caf\u00e9").empty() &&
+              !Resource(Module, "CARDTYPE", "CAF\u00c9").empty(),
+          "non-ASCII names match without regard to case");
+    Check(Resource(Module, "CARDTYPE", "\xc1\x81").empty(),
+          "an overlong UTF-8 form is no character (not 'A')");
     Check(Resource(Module, "CARDTYPE", "CARDNAMEX").empty(), "a longer name is another name");
     Check(Resource(Module, "CARDTYPE", "CARD").empty(), "a shorter name is another name");
     Check(Resource(Module, MAKEINTRESOURCEA(23), MAKEINTRESOURCEA(6)).empty(), "a missing id");
@@ -228,10 +245,14 @@ void TestFixture(std::string const& Fixture)
 void TestDamaged(std::string const& Fixture, std::string const& Scratch)
 {
     std::vector<unsigned char> const Image = ReadAll(Fixture);
+    int WriteFailures = 0;
     auto Probe = [&](std::vector<unsigned char> const& Bytes)
     {
         if (!WriteAll(Scratch, Bytes.data(), Bytes.size()))
+        {
+            ++WriteFailures;
             return;
+        }
         HMODULE const Module = Platform::ResourceModuleLoad(Scratch.c_str());
         if (Module == nullptr)
             return;
@@ -247,7 +268,7 @@ void TestDamaged(std::string const& Fixture, std::string const& Scratch)
         Resource(Module, "CARDTYPE", "CARDNAME");
         HRSRC const Info = FindResourceExA(Module, RT_STRING, MAKEINTRESOURCEA(1), 0);
         if (Info != nullptr && LoadResource(Module, Info) != nullptr)
-            ResourceWide(static_cast<ResourceUnit const*>(LoadResource(Module, Info)));
+            ResourceWide(static_cast<ResourceUnit const*>(LoadResource(Module, Info)), 1);
         FreeLibrary(Module);
     };
     for (std::size_t Length = 0; Length <= Image.size(); ++Length)
@@ -262,6 +283,7 @@ void TestDamaged(std::string const& Fixture, std::string const& Scratch)
             Probe(Bytes);
         }
     }
+    Check(WriteFailures == 0, "every damaged image was written for its probe");
     unlink(Scratch.c_str());
 
     // A string table block whose first length runs past the block: FindResource refuses it,
@@ -321,7 +343,21 @@ int main(int Count, char** Arguments)
     TestGameStrings(Bin);
     TestInfocards(Bin, Sources);
     TestFixture(Fixture);
-    TestDamaged(Fixture, Fixture + ".damaged");
+    // The damaged images go into a directory of this run's own (two runs may share a fixture).
+    char const* const Temporary = std::getenv("TMPDIR");
+    std::string Pattern =
+        std::string(Temporary != nullptr && *Temporary != 0 ? Temporary : "/tmp") +
+        "/resource_tests.XXXXXX";
+    if (mkdtemp(Pattern.data()) == nullptr)
+    {
+        std::printf("FAIL: no scratch directory\n");
+        ++G_Failures;
+    }
+    else
+    {
+        TestDamaged(Fixture, Pattern + "/damaged.dll");
+        rmdir(Pattern.c_str());
+    }
 
     if (G_Failures == 0)
         std::printf("resource_tests: all passed\n");
