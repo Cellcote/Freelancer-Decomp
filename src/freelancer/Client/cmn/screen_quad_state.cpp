@@ -192,7 +192,8 @@ namespace
         FScreenQuadBatchNode* Node = Pool->FreeHead;
         if (Node == nullptr)
         {
-            Node = static_cast<FScreenQuadBatchNode*>(operator new(0x28u, std::nothrow));
+            Node = static_cast<FScreenQuadBatchNode*>(operator new(sizeof(FScreenQuadBatchNode),
+                                                                   std::nothrow));
             if (Node == nullptr)
                 return nullptr;
             InitBatchNode(Node);

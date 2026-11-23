@@ -396,7 +396,7 @@ namespace
             }
             else if (Reader.is_header("LightSource"))
             {
-                void* const Mem = GameLightHeapAlloc(0x12c); // FUN_00537a90
+                void* const Mem = GameLightHeapAlloc(sizeof(FGameLight)); // FUN_00537a90
                 FGameLight* Light = nullptr;
                 if (Mem != nullptr)
                     Light = GameLightConstruct(static_cast<FGameLight*>(Mem)); // FUN_005374e0

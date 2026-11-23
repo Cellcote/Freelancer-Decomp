@@ -792,7 +792,7 @@ FParticleEffect* ParticleEffectCreate()
 {
     // LAB_004f6e70: FUN_004f79a0(0x84) -- the Heap pool -- then FUN_004f8060(0) when it
     // returned memory.
-    void* const Mem = EffectAlloc(0x84u);
+    void* const Mem = EffectAlloc(sizeof(FParticleEffect));
     if (Mem == nullptr)
         return nullptr;
     FParticleEffect* const Effect = static_cast<FParticleEffect*>(Mem);
@@ -804,7 +804,7 @@ FParticleEffect* ParticleEffectCreateCruise()
 {
     // FUN_00528980, 0x00528bd1..0x00528bf7: FUN_004f79a0(0x90) (malloc), FUN_004f8060(0),
     // +0x84 = 1.0f, vptr PTR_FUN_005dd144.
-    void* const Mem = EffectAlloc(0x90u);
+    void* const Mem = EffectAlloc(sizeof(FParticleEffectCruise));
     if (Mem == nullptr)
         return nullptr;
     FParticleEffectCruise* Effect = static_cast<FParticleEffectCruise*>(Mem);
@@ -816,7 +816,7 @@ FParticleEffect* ParticleEffectCreateJump()
 {
     // LAB_005033a0: FUN_004f79a0(0x84) (the Heap pool); null returns null. 0x005033c0..
     // 0x005033ca: FUN_004f8060(0x25), then the vptr PTR_FUN_005daac4.
-    void* const Mem = EffectAlloc(0x84u);
+    void* const Mem = EffectAlloc(sizeof(FJumpParticleEffect));
     if (Mem == nullptr)
         return nullptr;
     FParticleEffect* const Effect = static_cast<FParticleEffect*>(Mem);
@@ -828,7 +828,7 @@ FParticleEffect* ParticleTunnelCreate()
 {
     // LAB_00513440: FUN_004f79a0(0x84) (the Heap pool); null returns null, else JMP LAB_005134a0:
     // FUN_004f8060(0), then the vptr PTR_FUN_005db770 (ParticleTunnel).
-    void* const Mem = EffectAlloc(0x84u);
+    void* const Mem = EffectAlloc(sizeof(FParticleTunnel));
     if (Mem == nullptr)
         return nullptr;
     FParticleEffect* const Effect = static_cast<FParticleEffect*>(Mem);
@@ -974,7 +974,7 @@ namespace
     {
         // LAB_00513480 (slot 2 of every factory): FUN_00537a90(0x12c), then FUN_005374e0 on the
         // memory when there is some.
-        void* const Mem = GameLightHeapAlloc(0x12c);
+        void* const Mem = GameLightHeapAlloc(sizeof(FGameLight));
         if (Mem == nullptr)
             return nullptr;
         return GameLightConstruct(static_cast<FGameLight*>(Mem));

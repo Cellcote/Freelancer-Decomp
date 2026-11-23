@@ -694,7 +694,7 @@ namespace
     {
         // FUN_00531cf0. 0x00531d0e..0x00531d3a: FUN_004f79a0(0x9c), then FUN_004fd9d0 with
         // "the host is the player" (FUN_0054baf0, a raw pointer compare).
-        void* const Mem = EffectAlloc(0x9c);
+        void* const Mem = EffectAlloc(sizeof(FCliEquipLight));
         FCliEquipLight* Light = nullptr;
         if (Mem != nullptr)
         {

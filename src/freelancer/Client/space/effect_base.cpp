@@ -36,12 +36,15 @@ namespace
     // FreeList 0, MaxFreeCount -1, CurrentFreeCount 0}, stored by the static initializer
     // LAB_004f6fc0 (Heap ctor inlined there). FUN_004f79a0 / FUN_004f79c0 allocate and free
     // through it, FUN_004f7140 / FUN_004f8030 shrink and free into it.
-    Heap G_EffectHeap(0x84u, -1);
+    // Callers pass EffectAlloc / EffectFree their effect's sizeof, retail's size on Win32 (the
+    // layout asserts). On 64-bit the effects are larger, so none is 0x84 and they all take
+    // malloc; alloc and free still agree, as both go by that size.
+Heap G_EffectHeap(0x84u, -1);
 
     // DAT_00674cbc — a second {0x84, 0, -1, 0} Heap set up by the static initializer
     // LAB_004f6ff0. Nothing in the exe allocates from it (its only other reference is the Shrink
     // at 0x004f721c); kept because FUN_004f7140 shrinks it.
-    Heap G_EffectHeapSecond(0x84u, -1);
+Heap G_EffectHeapSecond(0x84u, -1);
 }
 
 void EffectSystemShutdown()
