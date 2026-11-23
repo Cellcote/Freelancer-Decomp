@@ -11,22 +11,28 @@
 // their state. Nothing here exists in RP8.dll or retail; see docs/re/rp9.md, "Ex extensions".
 
 #include "RP9.h"
+#include "readfile.h"
 
+#include <memory>
 #include <string>
 #include <vector>
+
+// COM references: Release on destruction (DACOM interfaces such as IFileSystem too; ComPtr only
+// calls AddRef/Release).
+#include <wrl/client.h>
 
 // A shader program: the source location for reloads, the last bytecode that compiled, and the
 // shader objects made from it (null while no device, or when the source never compiled).
 struct FRPExProgram
 {
-    IFileSystem* FileSystem; // AddRef'd
+    Microsoft::WRL::ComPtr<IFileSystem> FileSystem;
     std::string Path;
     std::string VsEntry;
     std::string PsEntry;
     std::vector<unsigned char> VsBytecode;
     std::vector<unsigned char> PsBytecode;
-    IDirect3DVertexShader9* Vs;
-    IDirect3DPixelShader9* Ps;
+    Microsoft::WRL::ComPtr<IDirect3DVertexShader9> Vs;
+    Microsoft::WRL::ComPtr<IDirect3DPixelShader9> Ps;
 };
 
 enum ERp9ExTextureKind : unsigned int
@@ -47,9 +53,9 @@ struct FRPExTexture
     unsigned long Height;
     unsigned long Depth;
     // IDirect3DTexture9 (render target, scene depth) or IDirect3DVolumeTexture9.
-    IDirect3DBaseTexture9* Texture;
+    Microsoft::WRL::ComPtr<IDirect3DBaseTexture9> Texture;
     // Level 0 of a render target / the scene depth surface; null for volumes.
-    IDirect3DSurface9* Surface;
+    Microsoft::WRL::ComPtr<IDirect3DSurface9> Surface;
     // Volumes: the creation texels, for a device re-creation after ShutdownPipeline.
     std::vector<unsigned char> VolumeData;
 };
@@ -58,22 +64,22 @@ struct FRp9ExState
 {
     FRp9ExState();
 
-    std::vector<FRPExProgram*> Programs;
+    std::vector<std::unique_ptr<FRPExProgram>> Programs;
     // Render targets and volume textures created through the interface.
-    std::vector<FRPExTexture*> Textures;
+    std::vector<std::unique_ptr<FRPExTexture>> Textures;
     // The INTZ depth buffer; Texture/Surface null when the device has no INTZ depth.
     FRPExTexture SceneDepth;
     // A plain depth surface made when the INTZ texture could not be created after the device
     // was already made without an auto depth-stencil.
-    IDirect3DSurface9* FallbackDepth;
+    Microsoft::WRL::ComPtr<IDirect3DSurface9> FallbackDepth;
     unsigned long BackBufferWidth;
     unsigned long BackBufferHeight;
 
     // The open pass (BeginExPass .. EndExPass).
     bool bInPass;
     bool bDepthBound;
-    IDirect3DSurface9* SavedColor;
-    IDirect3DSurface9* SavedDepth;
+    Microsoft::WRL::ComPtr<IDirect3DSurface9> SavedColor;
+    Microsoft::WRL::ComPtr<IDirect3DSurface9> SavedDepth;
     D3DVIEWPORT9 SavedViewport;
     unsigned char bSavedViewportRectValid;
     unsigned char bSavedDepthRangeValid;
