@@ -21,6 +21,7 @@
 #include <cstring>
 #include <cwchar>
 #include <new>
+#include <random>
 
 namespace
 {
@@ -129,9 +130,20 @@ bool CClientImpl::Startup(unsigned int MaxPlayers, unsigned int Port)
 {
     NumClients = 0;
     Host = CreateRemoteClientHost();
+    // PORT(deviation) SERVER-STARTUP-PASSWORD: retail hosts with no password here, and the
+    // server's own password is set only once startup finishes (PublishServerSession, after
+    // IServerImpl::Startup returns). A client could join in between and stay. Until the
+    // session is published, a random password nobody knows keeps everyone out. It goes in
+    // before BeginHosting, whose Host call takes the session description as it stands.
+    {
+        std::random_device Random;
+        wchar_t Placeholder[33];
+        for (int i = 0; i < 32; i += 8)
+            swprintf(Placeholder + i, 9, L"%08x", static_cast<unsigned int>(Random()));
+        Host->SetPassword(Placeholder);
+    }
     Host->BeginHosting(Port);
     Host->SetSessionName(L"Freelancer Default Session Name");
-    Host->SetPassword(L"");
     Host->SetMaxPlayers(static_cast<int>(MaxPlayers));
     Serializer = RpcGetRemotePacketSerializer();
 
@@ -397,10 +409,16 @@ void CRemoteClientProxy::OnReceive(unsigned char* Data, FlULong Size)
     FPacketBase* Packet = nullptr;
     unsigned int DecodedSize = 0;
     Client.Serializer->Allocate(Channel, Opcode, &Packet);
-    if (Packet == nullptr ||
-        Packet->Decode(Data + 2, static_cast<unsigned int>(Size) - 2u, &DecodedSize) != 0) {
-        // As in retail, a packet that failed to decode is not released: a failed Decode can
-        // leave owned pointers unset, which the destructor would free.
+    if (Packet == nullptr) {
+        Disconnect();
+        return;
+    }
+    if (Packet->Decode(Data + 2, static_cast<unsigned int>(Size) - 2u, &DecodedSize) != 0) {
+        // Retail does not release a packet that failed to decode, so every rejected message
+        // leaked its packet. PORT(deviation) REMOTE-PACKET-HARDENING: every client-to-server packet
+        // that owns memory starts with its pointers null (SAVEGAME since this deviation), and
+        // a decoder only ever stores its own allocation in them, so releasing is safe.
+        Packet->Release();
         Disconnect();
         return;
     }
