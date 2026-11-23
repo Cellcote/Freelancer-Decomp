@@ -1256,13 +1256,13 @@ FL_LAYOUT_ASSERT(offsetof(CDeadReckonedVector, MaxCorrectiveTime) == 0xc8, "CDea
 // SubObjectID (the three id makers and the id classifiers) MOVED 2026-09-24 to
 // common_archetype.h, next to CollisionGroupDesc and for the same reason: PlayerData
 // holds a SubObjectID::EquipIdMaker by value at retail slot+0x3C8 (Server.dll imports
-// ?Reset@EquipIdMaker@SubObjectID@@QAEXXZ for it), and common_server_playerdb.h must
+// ?Reset@EquipIdMaker@SubObjectID@@QAEXXZ for it), and server_playerdata.h must
 // not include this whole header. This header still sees the classes through its own
 // #include "common_archetype.h".
 
 // CollisionGroupDesc itself now lives in common_archetype.h (included above). It was moved
 // there 2026-09-17 so PlayerData -- whose retail slot+0x26c is a std::list<CollisionGroupDesc>
-// -- can hold one by value without common_server_playerdb.h having to drag the whole object
+// -- can hold one by value without server_playerdata.h having to drag the whole object
 // layer into fourteen translation units. Nothing else changed: this header still sees the
 // complete type, because common_archetype.h is one of its own includes.
 

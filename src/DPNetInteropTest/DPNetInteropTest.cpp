@@ -1,7 +1,7 @@
 // Freelancer Decomp: a reimplementation of the Freelancer (2003) game client and engine,
 // faithful to the behaviour of the original game.
 
-// DPNetCheck.exe (PORT(dpnet), docs/dpnet.md): joins a running Freelancer server through
+// DPNetInteropTest.exe (PORT(dpnet), docs/dpnet.md): joins a running Freelancer server through
 // Microsoft's DirectPlay 8 client, dpnet.dll, which is what a retail Freelancer client uses, and
 // checks the three steps a client takes:
 //
@@ -15,7 +15,7 @@
 // FLDedicated on Microsoft's DirectPlay (Win32) and on DPNet (x64), it shows whether a retail
 // client's DirectPlay can join both.
 //
-//     DPNetCheck.exe [--host 127.0.0.1] [--port 2302] [--timeout 10000]
+//     DPNetInteropTest.exe [--host 127.0.0.1] [--port 2302] [--timeout 10000]
 //
 // Exit code 0 when every step passes.
 
@@ -126,7 +126,8 @@ int main(int argc, char** argv)
             TimeoutMs = (DWORD)std::strtoul(argv[Index + 1], nullptr, 10);
     }
     std::setvbuf(stdout, nullptr, _IONBF, 0);
-    std::printf("DPNetCheck: %s:%lu, Microsoft DirectPlay 8 client\n", Host, (unsigned long)Port);
+    std::printf("DPNetInteropTest: %s:%lu, Microsoft DirectPlay 8 client\n", Host,
+                (unsigned long)Port);
 
     InitializeCriticalSection(&GLock);
     GEnumDone = CreateEventW(nullptr, TRUE, FALSE, nullptr);
@@ -196,6 +197,6 @@ int main(int argc, char** argv)
     DeviceAddress->Release();
     Client->Release();
     CoUninitialize();
-    std::printf("DPNetCheck: all passed\n");
+    std::printf("DPNetInteropTest: all passed\n");
     return 0;
 }

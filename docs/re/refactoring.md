@@ -58,6 +58,36 @@ Renaming an exported symbol changes the export: check the export surface
 Building and improving names do not raise a status to `ready_verified`: that requires a full comparison
 of behaviour against the listing.
 
+## Files and folders
+
+Where a file lives and what it is called. A move or rename keeps the module's source list in the
+same order (the list is the link order and the order of static initialisation), and updates the
+documents that name the old path and the tracker's `ported_file`.
+
+- **Modules.** A folder under `src/` with a `CMakeLists.txt` is a module, named after the binary it
+  builds: the retail name and casing for a retail module (`alchemy`, `Common`, `RemoteClient`),
+  PascalCase for a port-only one (`FLDedicated`, `RPGPU`). Retail names stay, even misleading ones
+  (`RemoteClient.dll` runs in the server); [dll_inventory.md](dll_inventory.md) explains them. A
+  folder without a `CMakeLists.txt` is a shared source folder, compiled into the modules that
+  dll_inventory.md lists for it.
+- **One style per module.** The engine modules name their files in PascalCase (`MaterialBatcher.cpp`,
+  `RpGpuDraw.cpp`), the game modules (Common, Server, the client) in snake_case
+  (`dock_behavior.cpp`). A new file follows its module; a module is not converted to the other style.
+- **No module prefix inside the module.** The folder already names the module: `Common/ai/dock_behavior.cpp`,
+  not `Common/common_dockbehavior.cpp`. The prefix is only for the shared namespace of
+  `src/include`.
+- **Subfolders by subsystem.** A module with more than about a hundred files groups them in
+  subfolders, one per subsystem (`Common/ai`, `freelancer/Client/hud`). A file's subsystem is what
+  it implements, not who calls it.
+- **Headers.** `src/include` holds only the cross-module ABI: a header there is included by more
+  than one module and is named after its module (`common_`, `server_`, `rpc_`), or is a platform
+  header (`platform.h`, `posix/`). A header only its own module includes lives in that module.
+  A header private to one subsystem is `<name>_internal.h` (`<Name>Internal.h` in a PascalCase
+  module).
+- **Tests.** A test program that is its own module is `<Subject>Test` (`RpcCodecTest`,
+  `TexConvertTest`); the unit tests of a library live in its `tests/` folder (`DPNet/tests`).
+- **Scripts.** Build and maintenance scripts live in `tools/`; CMake helpers in `cmake/`.
+
 ## Port-only code
 
 Code with no retail counterpart carries one tag, so that a single grep finds it:
@@ -88,7 +118,7 @@ Code with no retail counterpart carries one tag, so that a single grep finds it:
 | `diag` | The owner's diagnostics: Beta label, tick profiler, FDUMP debugger echo |
 | `perf-index` | Side indexes that answer a retail walk without changing its result (docs/scaling.md) |
 | `x64` | The x64 build (`_WIN64` / not `_M_IX86`) |
-| `dpnet` | DPNet, the port's DirectPlay 8 (`FREELANCER_DPNET`), and DPNetCheck |
+| `dpnet` | DPNet, the port's DirectPlay 8 (`FREELANCER_DPNET`), and DPNetInteropTest |
 | `flregress` | FLRegress.exe and its hooks |
 | `dedicated` | FLDedicated.exe |
 | `tools` | Other port-only programs (RpcCodecTest, MemoryDiagnostics, TexConvertTest) |

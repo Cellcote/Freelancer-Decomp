@@ -44,11 +44,11 @@ changes the behaviour of a retail module:
 | Module | What it is |
 |---|---|
 | [DPNet](docs/dpnet.md) (`src/DPNet`) | Our own implementation of the DirectPlay 8 network protocol, written from Microsoft's published specifications. It is portable C++20 with no OS headers. An adapter in DALib puts it behind `IDirectPlay8Server`, so the x64 server hosts without Microsoft's deprecated `dpnet.dll`. Its tests reproduce the specification's byte dumps exactly and run a simulated lossy network and 30,000 malformed datagrams, under sanitizers on Linux and Windows |
-| DPNetCheck (`src/DPNetCheck`) | Joins a running server through Microsoft's DirectPlay 8 client, as a retail client does. CI runs it against the server on Microsoft's DirectPlay (Win32) and on DPNet (x64), and both must give the same result |
+| DPNetInteropTest (`src/DPNetInteropTest`) | Joins a running server through Microsoft's DirectPlay 8 client, as a retail client does. CI runs it against the server on Microsoft's DirectPlay (Win32) and on DPNet (x64), and both must give the same result |
 | [RPGPU](docs/x64-client-plan.md#phase-5-rpgpu-the-sdl3--sdl_gpu-renderer) (`src/RPGPU`) | The SDL3 + SDL_GPU renderer. It implements RP8's interfaces and emulates Direct3D 8's fixed-function pipeline in HLSL, compiled offline to DXIL, SPIR-V and MSL |
 | TexConvert (`src/TexConvert`) | A texture loader that replaces D3DX 8.1 (DDS with DXT, TGA, BMP, cube maps). CI checks its output against D3DX byte for byte |
 | [FLDedicated](docs/dedicated_server.md) (`src/FLDedicated`) | A console dedicated server with no MFC, windows or dialogs, built for Win32 and x64. It shares its host code with `FLServer.exe`, so retail clients see the same server |
-| [Platform layer](docs/platform.md) (`src/include/platform.h`) | One interface for files, threads, synchronisation, time and modules. On Windows each call is the same Win32 call retail made. The POSIX backend for macOS and Linux is checked by `src/PortTests` |
+| [Platform layer](docs/platform.md) (`src/include/platform.h`) | One interface for files, threads, synchronisation, time and modules. On Windows each call is the same Win32 call retail made. The POSIX backend for macOS and Linux is checked by `src/PortTest` |
 | [x64 support](docs/x64.md) | Layout checks that apply only to the retail Win32 layout, 32-bit handle ids for addresses, portable versions of the x87 assembly, and a mode that puts every allocation above 4 GB so truncated pointers fail immediately |
 | [FLRegress](docs/flregress.md) and [RpcCodecTest](docs/testing.md) | A headless harness that dumps the server's game state, and a test of the packet codecs' wire bytes. CI requires both outputs to stay identical across runs and to the PR's base commit, and the x64 codec bytes to match Win32 |
 | [CMake build](docs/building.md) | Replaces the Visual Studio solution with a single build for Win32, x64 and the portable modules on Linux and macOS |
@@ -121,13 +121,14 @@ INI file the code reads.
 ## Repository layout
 
 ```
-src\          all source code, with a CMakeLists.txt per module (CMakeLists.txt and cmake\ at the root)
+src\          all source code, with a CMakeLists.txt per module; src\README.md maps the modules
 bin\          Win32 Release output and the runtime configuration files
 DATA_EXTRA\   the port's own data (shaders, volumetric.ini), next to the game's DATA
 EBUEula.dll   retail EULA dialog, loaded as ..\EBUEula.dll with ..\EULA.rtf (as the retail game does)
 EXE\          gundll.dll, the retail GUN client (multiplayer server list), loaded as ..\exe\gundll.dll
+cmake\        the build's CMake helpers (Freelancer.cmake); CMakeLists.txt and CMakePresets.json at the root
 docs\         documentation
-tools\        the RPGPU shader build script
+tools\        build and maintenance scripts (RPGPU shaders, the dev *.ini copy)
 ```
 
 `EBUEula.dll` and `gundll.dll` are the only retail binaries the port uses unchanged. They are

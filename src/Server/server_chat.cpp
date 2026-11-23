@@ -23,7 +23,7 @@
 //      a red "<message too big>"), re-encodes;
 //   5. routes on the target CHAT_ID: private, universe, system, local, group.
 #include "server_pub.h"
-#include "common_server_playerdb.h"
+#include "server_playerdata.h"
 #include "common_text.h"
 #include "common_reputation.h"   // Reputation::Vibe::GetName
 #include "common_net.h"          // IsMPServer

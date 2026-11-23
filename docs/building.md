@@ -55,7 +55,7 @@ presets; VS Code's CMake Tools does too.
 All output directories are siblings at the repo root, so every `..\DATA` / `..\EXE` path the game
 resolves from its exe directory works from each of them. Every build into a directory other than
 `bin\` copies the dev `*.ini` and character files from `bin\` with the absolute paths rewritten
-(`src/copy_dev_ini.py`): edit the files in `bin\`, not the copies.
+(`tools/copy_dev_ini.py`): edit the files in `bin\`, not the copies.
 
 Only the Ninja generator is supported: the Visual Studio generators would turn the options into
 MSBuild properties, and MSBuild adds its own defaults on top. The configure step stops with an
@@ -92,7 +92,7 @@ vcpkg a module that is on is skipped with a warning, or fails the configure step
 
 Every module says what it is in its `fl_add_module()`: `RETAIL` (a rebuild of a retail module or
 resource DLL), `PORT` (port-only: RP9, RPGPU, FLDedicated, TexConvert) or `TOOL` (FLRegress,
-RpcCodecTest, TexConvertTest, DPNetCheck, MemoryDiagnostics). A retail module that asks for a
+RpcCodecTest, TexConvertTest, DPNetInteropTest, MemoryDiagnostics). A retail module that asks for a
 vcpkg package stops the configure step.
 
 ## The options, and why they are what they are

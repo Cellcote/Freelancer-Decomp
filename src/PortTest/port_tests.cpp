@@ -1,7 +1,7 @@
 // Freelancer Decomp: a reimplementation of the Freelancer (2003) game client and engine,
 // faithful to the behaviour of the original game.
 
-// PORT(macOS): checks of the port's platform headers outside Windows (src/PortTests/CMakeLists.txt).
+// PORT(macOS): checks of the port's platform headers outside Windows (src/PortTest/CMakeLists.txt).
 // Each check prints what failed; the exit code is the number of failures.
 
 #include "handle_value.h"
@@ -215,16 +215,17 @@ namespace
         Platform::CloseHandle(Events[0]);
         Platform::CloseHandle(Events[1]);
 
-        Platform::Handle const NamedA = Platform::EventCreate(true, false, "PortTestsEvent");
-        Platform::Handle const NamedB = Platform::EventCreate(false, true, "PortTestsEvent");
+        Platform::Handle const NamedA = Platform::EventCreate(true, false, "PortTestEvent");
+        Platform::Handle const NamedB = Platform::EventCreate(false, true, "PortTestEvent");
         Check(NamedA != nullptr && NamedB != nullptr && NamedA != NamedB,
               "a named event opens the existing one, with a handle of its own");
-        Check(Platform::MutexCreate("PortTestsEvent") == nullptr, "a name taken by an event is no mutex");
+        Check(Platform::MutexCreate("PortTestEvent") == nullptr,
+              "a name taken by an event is no mutex");
         Platform::EventSet(NamedB);
         Platform::CloseHandle(NamedB);
         Check(Platform::WaitOne(NamedA, 0) == Platform::kWaitSignaled, "a named event lives until its last handle closes");
         Platform::CloseHandle(NamedA);
-        Platform::Handle const Fresh = Platform::EventCreate(false, false, "PortTestsEvent");
+        Platform::Handle const Fresh = Platform::EventCreate(false, false, "PortTestEvent");
         Check(Platform::WaitOne(Fresh, 0) == Platform::kWaitTimeout, "closing the last handle frees the name");
         Platform::CloseHandle(Fresh);
 

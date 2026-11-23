@@ -22,7 +22,7 @@
 // ---------------------------------------------------------------------------
 
 #include "server_pub.h"
-#include "common_server_playerdb.h"
+#include "server_playerdata.h"
 #include "common_misc.h"       // DamageList / DamageEntry, SUBOBJ_ID_NONE
 #include "common_physys.h"     // Quaternion
 #include "common_csys.h"       // Matrix
@@ -269,7 +269,7 @@ void SystemPlayerView_Update(Observer* View, double Dt)
     //   .text:06cf5491  8d8408e8f...  LEA  EAX,[EAX + ECX*1 + 0xfffffbe8]
     //   .text:06cf54a2  05e4030000    ADD  EAX,0x3e4
     // -0x418 + 0x3e4 == -0x34, i.e. PlayerData::ship_object_id, which is the
-    // same slot arithmetic common_server_playerdb.h documents. It then resolves
+    // same slot arithmetic server_playerdata.h documents. It then resolves
     // that id, calls the wrapper's get_position() (vtable slot 0,
     // .text:06cf54c6 `CALL dword ptr [EDX]`) and copies the three floats into
     // View+0x3c. No PlayerDB::is_valid: the slot is indexed straight off
