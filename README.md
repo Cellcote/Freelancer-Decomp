@@ -87,9 +87,10 @@ All presets and further details: [docs/building.md](docs/building.md).
 
 ### Requirements
 
-- Visual Studio 2022 (platform toolset v143) with the *Desktop development with C++* workload,
-  *C++ MFC for latest v143 build tools (x86 & x64)* (used by `FLServer`), *C++ CMake tools for
-  Windows* (CMake 3.27 or later, and Ninja) and a Windows 10/11 SDK.
+- Visual Studio 2022 17.13 or later (platform toolset v143; C++23's `/std:c++23preview` first
+  shipped in 17.13) with the *Desktop development with C++* workload, *C++ MFC for latest v143
+  build tools (x86 & x64)* (used by `FLServer`), *C++ CMake tools for Windows* (CMake 3.27 or
+  later, and Ninja) and a Windows 10/11 SDK.
 - vcpkg for RPGPU and SDL3. Visual Studio includes it; elsewhere, set `VCPKG_ROOT`.
 - Python 3 on `PATH` for every output directory except `bin\`. A post-build step copies the
   runtime configuration from `bin\`.

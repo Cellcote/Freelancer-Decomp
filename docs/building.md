@@ -12,9 +12,10 @@ resource-compiler and linker options they share.
 
 ## Requirements (Windows)
 
-- Visual Studio 2022 with the *Desktop development with C++* workload, *C++ MFC for latest v143
-  build tools (x86 & x64)* (FLServer) and *C++ CMake tools for Windows* (CMake 3.27 or later and
-  Ninja).
+- Visual Studio 2022 17.13 or later (the first with `/std:c++23preview`; configuring with an
+  older one stops with an error) with the *Desktop development with C++* workload, *C++ MFC for
+  latest v143 build tools (x86 & x64)* (FLServer) and *C++ CMake tools for Windows* (CMake 3.27
+  or later and Ninja).
 - The DirectX 8.1 SDK in `dx8\` (README.md), or `-DDx8SdkDir=<path>`.
 - Python 3 on `PATH` for every output directory except `bin\` (a post-build step copies the dev
   `*.ini` files, see below).
@@ -146,8 +147,9 @@ cmake --preset portable && cmake --build --preset portable && ctest --preset por
 ```
 
 `portable-asan` builds the same in Debug with AddressSanitizer and UndefinedBehaviorSanitizer.
-Needs CMake 3.27 or later, Ninja and a C++23 compiler (GCC 13+, Clang 18+, or Apple Clang 17+ from
-Xcode 16.3). CI builds both presets on Linux (GCC, Clang) and macOS.
+Needs CMake 3.27 or later, Ninja and a C++23 compiler: GCC 13+, Clang 18+ with libstdc++ 13+
+(with libc++ instead, libc++ 19+), or Apple Clang 17+ from Xcode 16.3. CI builds both presets on
+Linux (GCC, Clang) and macOS.
 
 A module is portable when it uses no Windows API: `PORTABLE` in its `fl_add_module()`, and its
 folder in the non-Windows `FL_PROJECTS` of the root `CMakeLists.txt`. On these compilers
@@ -166,12 +168,13 @@ The code is C++23, but use only what every compiler CI builds with supports: MSV
 GitHub's `macos-latest` image (Xcode 16, libc++ 19). Older Xcode versions (Apple Clang 15 and 16)
 do not build it.
 
-- **Available**: `std::expected`, `std::to_underlying`, `std::byteswap`, `std::unreachable`,
+- **Available**: `std::to_underlying`, `std::byteswap`, `std::unreachable`,
   `string::contains`, `if consteval`, and C++20's `std::bit_cast`, `<bit>`, `std::span`,
-  `std::numbers`, `contains()` on associative containers, `std::erase`/`std::erase_if`, the
+  `std::numbers`, `contains()` on associative containers, `std::erase`/`std::erase_if`, the C++20
   `std::ranges` algorithms, C++23's `std::ranges::contains` (in place of a hand-written search
   loop or `std::find(...) != end()`) and the C++20 views (`filter`, `transform`, `reverse`, `iota`).
-- **Not yet**: `std::print`, `std::ranges::to` and `ranges::find_last` (libstdc++ 14),
+- **Not yet**: `std::expected` (Clang 18 with libstdc++ 13 rejects its header), `std::print`,
+  `std::ranges::to`, `ranges::find_last` and `ranges::starts_with` / `ends_with` (libstdc++ 14),
   `std::flat_map`, `[[assume]]` (MSVC). Check the rest of C++23 ranges (`fold_left`,
   `views::zip`, `views::enumerate`) against libstdc++ 13 and libc++ 19 before using it; CI builds
   with both.

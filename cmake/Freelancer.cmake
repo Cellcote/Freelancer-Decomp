@@ -240,6 +240,11 @@ if(CMAKE_GENERATOR MATCHES "^Visual Studio")
   message(FATAL_ERROR "Use the Ninja generator (see CMakePresets.json): the Visual Studio "
                       "generators hand the flags back to MSBuild, which adds its own defaults.")
 endif()
+# /std:c++23preview (below) first shipped in Visual Studio 2022 17.13, whose toolset is 19.43.
+if(MSVC_VERSION LESS 1943)
+  message(FATAL_ERROR "Freelancer builds as C++23, which needs Visual Studio 2022 17.13 or later "
+                      "(MSVC 19.43, for /std:c++23preview); this toolset is ${CMAKE_CXX_COMPILER_VERSION}.")
+endif()
 
 get_property(_fl_multi GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(_fl_multi)
