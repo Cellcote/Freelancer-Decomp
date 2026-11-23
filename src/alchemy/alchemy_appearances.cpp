@@ -2395,7 +2395,7 @@ namespace AlchemyImpl
             static_cast<double>(Six[4]) * Six[4] <= Epsilon &&
             static_cast<double>(Six[5]) * Six[5] <= Epsilon;
         FVector* const Axis = reinterpret_cast<FVector*>(
-            reinterpret_cast<unsigned char*>(InstanceListTail_) + 0x30);
+            reinterpret_cast<unsigned char*>(InstanceListTail_) + kPoolTailOffset);
         if (bParallel)
         {
             Axis->X = 0.0f;
@@ -3398,8 +3398,8 @@ namespace AlchemyImpl
         }
         AppendParticleNode(&InstanceListHead_, &InstanceListTail_, Particle);
 
-        float* LastViewPos =
-            reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(InstanceListTail_) + 0x30);
+        float* LastViewPos = reinterpret_cast<float*>(
+            reinterpret_cast<unsigned char*>(InstanceListTail_) + kPoolTailOffset);
         CameraSpacePoint(ViewXform_, Six, LastViewPos);
         return GR_OK;
     }
