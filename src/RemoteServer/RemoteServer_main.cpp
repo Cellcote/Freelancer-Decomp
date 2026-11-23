@@ -33,8 +33,23 @@
 
 namespace
 {
+#if defined(_WIN32)
     IClient* GGameClient = static_cast<IClient*>(&Client);
     IChatClient* GGameChatClient = static_cast<IChatClient*>(&Client);
+#else
+    // PORT(macOS): the executable's Client (freelancer_client.h), looked up in the program at load
+    // time. A link-time reference cannot name it off Windows: on macOS the linker binds it to the
+    // module that defines a Client at link time, which is rpclocal's FLocalClientProxy, not the
+    // game's facade. The program's own symbols come first in the lookup (the executable exports
+    // Client, ENABLE_EXPORTS); a program without one (a test) leaves both null.
+    IClientImpl* ProgramClient()
+    {
+        return static_cast<IClientImpl*>(
+            Platform::ModuleSymbol(Platform::ModuleFind(nullptr), "Client"));
+    }
+    IClient* GGameClient = ProgramClient();
+    IChatClient* GGameChatClient = ProgramClient();
+#endif
 
     HMODULE GClientModule = nullptr;
     IClient* GLoadedClient = nullptr;

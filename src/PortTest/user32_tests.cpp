@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <cstring>
 #include <cwchar>
+#include <thread>
 #include <vector>
 
 namespace
@@ -117,15 +118,46 @@ void TestWindows()
           "PeekMessageA takes the oldest message first");
     Check(DispatchMessageA(&Message) == 14 && GSeen.LastWParam == 7,
           "DispatchMessageA hands the message to its window procedure");
+    // WM_USER + 2 is still queued, but this thread has looked at it: it is not new input.
+    Check(MsgWaitForMultipleObjects(0, nullptr, FALSE, 0, QS_ALLINPUT) == WAIT_TIMEOUT,
+          "MsgWaitForMultipleObjects does not wake for a message already looked at");
+    PostMessageA(Window, WM_USER + 3, 9, 0);
     Check(MsgWaitForMultipleObjects(0, nullptr, FALSE, 0, QS_ALLINPUT) == WAIT_OBJECT_0,
-          "MsgWaitForMultipleObjects ends on a queued message");
-    PeekMessageA(&Message, nullptr, 0, 0, PM_REMOVE);
+          "MsgWaitForMultipleObjects wakes for new input");
+    Check(MsgWaitForMultipleObjects(0, nullptr, FALSE, 0, QS_KEY) == WAIT_TIMEOUT,
+          "a posted message is not keyboard input (the wake mask)");
+    while (PeekMessageA(&Message, nullptr, 0, 0, PM_REMOVE))
+    {
+    }
     Check(MsgWaitForMultipleObjects(0, nullptr, FALSE, 20, QS_ALLINPUT) == WAIT_TIMEOUT,
           "MsgWaitForMultipleObjects times out on an empty queue");
     PostQuitMessage(3);
-    Check(!GetMessageA(&Message, nullptr, 0, 0) && Message.message == WM_QUIT &&
-              Message.wParam == 3,
+    // WM_QUIT passes a message range; checked without blocking first.
+    bool const bQuitQueued =
+        PeekMessageA(&Message, nullptr, WM_KEYFIRST, WM_KEYLAST, PM_NOREMOVE) &&
+        Message.message == WM_QUIT;
+    Check(bQuitQueued, "WM_QUIT passes a message range filter");
+    Check(bQuitQueued && !GetMessageA(&Message, nullptr, WM_KEYFIRST, WM_KEYLAST) &&
+              Message.message == WM_QUIT && Message.wParam == 3,
           "GetMessageA returns FALSE for WM_QUIT, with the exit code");
+    Check(GetMessageA(nullptr, nullptr, 0, 0) == -1, "GetMessageA refuses a null message");
+
+    // Each thread has its own queue: another thread's PostQuitMessage stays on its queue, and
+    // a window's posted messages go to the thread that made it.
+    std::thread Other(
+        [Window]()
+        {
+            PostQuitMessage(5);
+            PostMessageA(Window, WM_USER + 4, 0, 0);
+            MSG Theirs = {};
+            Check(PeekMessageA(&Theirs, nullptr, 0, 0, PM_REMOVE) && Theirs.message == WM_QUIT &&
+                      Theirs.wParam == 5,
+                  "PostQuitMessage goes to the posting thread's queue");
+        });
+    Other.join();
+    Check(PeekMessageA(&Message, nullptr, 0, 0, PM_REMOVE) && Message.message == WM_USER + 4 &&
+              !PeekMessageA(&Message, nullptr, 0, 0, PM_NOREMOVE),
+          "a window's message from another thread reaches the window's thread, without its quit");
 
     // Focus.
     Check(SetFocus(Window) == nullptr && GetFocus() == Window && Saw(WM_SETFOCUS),
@@ -137,6 +169,30 @@ void TestWindows()
     Check(Saw(WM_DESTROY) && Saw(WM_NCDESTROY) && !IsWindow(Window) && GetFocus() == nullptr,
           "DefWindowProcA's WM_CLOSE destroys the window");
     Check(!DestroyWindow(Window), "DestroyWindow fails for a window that is gone");
+
+    // Atoms, a disabled start, children.
+    WNDCLASSA Second = Class;
+    Second.lpszClassName = "SecondClass";
+    ATOM const SecondAtom = RegisterClassA(&Second);
+    Check(SecondAtom != 0, "a second class is registered");
+    HWND const Parent = CreateWindowExA(0, MAKEINTRESOURCEA(SecondAtom), "", WS_POPUP, 100, 100,
+                                        300, 200, nullptr, nullptr, nullptr, nullptr);
+    Check(Parent != nullptr, "CreateWindowExA takes a class atom");
+    HWND const Child = CreateWindowExA(0, "SecondClass", "", WS_CHILD | WS_VISIBLE | WS_DISABLED,
+                                       10, 20, 50, 40, Parent, nullptr, nullptr, nullptr);
+    Check(Child != nullptr && EnableWindow(Child, TRUE) == TRUE,
+          "a window made WS_DISABLED reports it was disabled");
+    POINT Origin = {0, 0};
+    Check(ClientToScreen(Child, &Origin) && Origin.x == 110 && Origin.y == 120,
+          "a child's position is relative to its parent");
+    Check(!IsWindowVisible(Child), "a visible child of a hidden parent is not visible");
+    ShowWindow(Parent, SW_SHOW);
+    Check(IsWindowVisible(Child), "and is once the parent is shown");
+    Check(DestroyWindow(Parent) && !IsWindow(Child), "destroying a parent destroys its children");
+    Check(UnregisterClassA(MAKEINTRESOURCEA(SecondAtom), nullptr) &&
+              CreateWindowExA(0, "SecondClass", "", 0, 0, 0, 1, 1, nullptr, nullptr, nullptr,
+                              nullptr) == nullptr,
+          "UnregisterClassA takes an atom");
     Check(DialogBoxParamA(nullptr, MAKEINTRESOURCEA(0x82), nullptr, nullptr, 0) == -1,
           "DialogBoxParamA fails without dialog templates");
 }
@@ -145,6 +201,10 @@ void TestKeyboardAndText()
 {
     Check(MapVirtualKeyA('A', MAPVK_VK_TO_VSC) == 0x1E, "MapVirtualKeyA('A') is scan code 0x1E");
     Check(MapVirtualKeyA(0x1E, MAPVK_VSC_TO_VK) == 'A', "MapVirtualKeyA(0x1E) is 'A'");
+    Check(MapVirtualKeyA(0xE01D, MAPVK_VSC_TO_VK_EX) == VK_RCONTROL &&
+              MapVirtualKeyA(0xE01D, MAPVK_VSC_TO_VK) == VK_CONTROL &&
+              MapVirtualKeyA(0x2A, MAPVK_VSC_TO_VK_EX) == VK_LSHIFT,
+          "MapVirtualKeyA decodes extended scan codes and names the modifiers' sides");
     wchar_t Name[32];
     Check(GetKeyNameTextW(0x1E << 16, Name, 32) == 1 && std::wcscmp(Name, L"A") == 0,
           "GetKeyNameTextW names scan code 0x1E 'A'");
@@ -177,6 +237,9 @@ void TestKeyboardAndText()
     Check(MultiByteToWideChar(CP_ACP, 0, "\xC3\xA9\xE2\x82\xAC\xFF", 6, Out, 64) == 3 &&
               Out[0] == 0xE9 && Out[1] == 0x20AC && Out[2] == 0xFF,
           "MultiByteToWideChar decodes UTF-8, an invalid byte as Latin-1");
+    Check(MultiByteToWideChar(CP_ACP, 0, "\xC0\x80", 2, Out, 64) == 2 && Out[0] == 0xC0 &&
+              Out[1] == 0x80,
+          "MultiByteToWideChar refuses an overlong sequence (Latin-1 instead)");
     Check(MultiByteToWideChar(CP_ACP, 0, "abc", -1, nullptr, 0) == 4,
           "MultiByteToWideChar asks for the size with the terminator");
     WORD Types[3] = {};
@@ -237,7 +300,8 @@ void TestDirectInput()
         Count = 4;
         Check(Mouse->GetDeviceData(sizeof(DIDEVICEOBJECTDATA), Records, &Count, 0) ==
                       DI_BUFFEROVERFLOW &&
-                  Count == 2 && Records[0].dwData == 2,
+                  Count == 2 && Records[0].dwOfs == DIMOFS_Y && Records[0].dwData == 2 &&
+                  Records[1].dwOfs == DIMOFS_Y && Records[1].dwData == 3,
               "an overflow drops the oldest record and reports DI_BUFFEROVERFLOW");
         Mouse->Unacquire();
         Mouse->Release();

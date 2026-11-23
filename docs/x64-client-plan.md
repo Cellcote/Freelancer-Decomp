@@ -305,7 +305,7 @@ without the Windows API. Milestones:
   Larger APIs go through `Platform::` at the call site. `FL_POSIX_DLLMAIN` runs a module's
   `DllMain` as it loads. So far: dacom, zlib, DALib, x86math, system, ReadFile, luaprofile, Thorn,
   EngBase, ximage, Shading, flmaterials, RendComp, alchemy, Deformable2, Common, Server,
-  rpclocal, RemoteClient, Content, imeui, RemoteServer and the client (freelancer),
+  rpclocal, RemoteClient, Content, imeui and RemoteServer (the client, freelancer, builds and links),
   loaded and checked by `src/PortTest/module_tests.cpp`. The POSIX handles are small numbers in a table, as Windows
   kernel handles are, so a file handle survives retail's 32-bit fields there too
   (`Platform::HandleToValue` / `HandleFromValue`, as HandleToULong / LongToHandle). The kernel32

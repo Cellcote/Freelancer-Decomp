@@ -5,9 +5,11 @@
 // part of retail; built only off Windows, where every module that uses the stand-in <windows.h>
 // links it (cmake/Freelancer.cmake), as user32.lib is among MSVC's default libraries.
 //
-// One instance per process holds the window classes, the windows and the message queue. It
-// uses nothing of the platform layer's shared state (dacom holds that, and dacom links this
-// module), only its own lock.
+// One instance per process holds the window classes and the windows, and each thread's message
+// queue, as Windows keeps them: a window's posted messages go to the queue of the thread that
+// made it, PostQuitMessage and a post with no window to the calling thread's, and a thread reads
+// only its own. It uses nothing of the platform layer's shared state (dacom holds that, and dacom
+// links this module), only its own lock.
 //
 // A window here is a record: its class's window procedure, styles, rectangle, text and window
 // data. There is no screen behind it yet; SDL gives the top-level windows one with M3, and its
@@ -28,6 +30,8 @@
 #include <mutex>
 #include <string>
 #include <strings.h>
+#include <thread>
+#include <vector>
 
 namespace
 {
@@ -35,6 +39,7 @@ struct FClass
 {
     WNDCLASSA Class;
     std::string Name;
+    ATOM Atom = 0;
 };
 
 struct FWindow
@@ -50,6 +55,22 @@ struct FWindow
     std::wstring Text;
     LONG_PTR UserData = 0;
     bool bEnabled = true;
+    bool bDestroying = false; // DestroyWindow under way: a nested call does nothing
+    std::thread::id Owner;    // the thread whose queue takes the window's posted messages
+};
+
+// A posted message, numbered so that a wait can tell input that arrived since the thread last
+// looked (PeekMessageA / GetMessageA) from input it has seen.
+struct FQueued
+{
+    MSG Message;
+    std::uint64_t Sequence;
+};
+
+struct FThreadQueue
+{
+    std::deque<FQueued> Messages;
+    std::uint64_t Seen = 0; // the newest sequence the thread has looked at
 };
 
 // The desktop until SDL brings the display's (M3).
@@ -64,12 +85,15 @@ struct FState
     std::recursive_mutex Lock;
     std::condition_variable_any Posted;
     std::map<std::string, FClass> Classes; // by lower-case name
+    ATOM NextAtom = 0xC000;                 // class atoms, never reused
     std::map<std::uintptr_t, FWindow> Windows;
     std::uintptr_t NextWindow = kFirstWindow;
-    std::deque<MSG> Queue;
+    std::map<std::thread::id, FThreadQueue> Queues;
+    std::uint64_t NextSequence = 1;
     HWND Focus = nullptr;
     HWND Active = nullptr;
     HWND Capture = nullptr;
+    std::uint64_t FocusChanges = 0; // SetFocus's transitions, to tell a stale one
     HCURSOR Cursor = nullptr;
     int CursorCount = 0; // ShowCursor's display count: shown at 0 and above
     POINT CursorPos = {kDesktopWidth / 2, kDesktopHeight / 2};
@@ -101,6 +125,29 @@ FWindow* Find(HWND Window)
 {
     auto const Found = State().Windows.find(Key(Window));
     return Found != State().Windows.end() ? &Found->second : nullptr;
+}
+
+// A class by name (without regard to case) or by the atom RegisterClassA returned, in a name
+// pointer's low word; the caller holds the lock.
+FClass* FindClass(LPCSTR Name)
+{
+    FState& S = State();
+    if (IS_INTRESOURCE(Name))
+    {
+        ATOM const Atom = static_cast<ATOM>(reinterpret_cast<std::uintptr_t>(Name));
+        for (auto& Entry : S.Classes)
+            if (Entry.second.Atom == Atom)
+                return &Entry.second;
+        return nullptr;
+    }
+    auto const Found = S.Classes.find(Lower(Name));
+    return Found != S.Classes.end() ? &Found->second : nullptr;
+}
+
+// The calling thread's queue; the caller holds the lock.
+FThreadQueue& ThisQueue()
+{
+    return State().Queues[std::this_thread::get_id()];
 }
 
 std::string Narrow(LPCWSTR Text)
@@ -151,34 +198,59 @@ int MessageBoxAnswer(UINT Type)
 
 bool Matches(const MSG& Message, HWND Window, UINT First, UINT Last)
 {
-    // A null window takes every message of the thread; (HWND)-1 only those posted with no window.
+    // WM_QUIT passes every filter. A null window takes every message of the thread; (HWND)-1
+    // only those posted with no window.
+    if (Message.message == WM_QUIT)
+        return true;
     if (Window == reinterpret_cast<HWND>(static_cast<std::intptr_t>(-1)))
     {
         if (Message.hwnd != nullptr)
             return false;
     }
-    else if (Window != nullptr && Message.hwnd != Window && Message.message != WM_QUIT)
+    else if (Window != nullptr && Message.hwnd != Window)
         return false;
     if (First == 0 && Last == 0)
         return true;
     return Message.message >= First && Message.message <= Last;
 }
 
-// The first queued message that matches, taken out with Remove; the caller holds the lock.
+// The first message of the calling thread's queue that matches, taken out with Remove. Looking
+// marks everything queued so far as seen; the caller holds the lock.
 bool TakeMessage(LPMSG Out, HWND Window, UINT First, UINT Last, bool bRemove)
 {
-    FState& S = State();
-    for (auto It = S.Queue.begin(); It != S.Queue.end(); ++It)
+    FThreadQueue& Queue = ThisQueue();
+    Queue.Seen = State().NextSequence - 1;
+    for (auto It = Queue.Messages.begin(); It != Queue.Messages.end(); ++It)
     {
-        if (!Matches(*It, Window, First, Last))
+        if (!Matches(It->Message, Window, First, Last))
             continue;
         if (Out != nullptr)
-            *Out = *It;
+            *Out = It->Message;
         if (bRemove)
-            S.Queue.erase(It);
+            Queue.Messages.erase(It);
         return true;
     }
     return false;
+}
+
+// The QS_ class of a queued message, for MsgWaitForMultipleObjects' wake mask.
+DWORD InputClass(UINT Message)
+{
+    if (Message >= WM_KEYFIRST && Message <= WM_KEYLAST)
+        return QS_KEY;
+    if (Message == WM_MOUSEMOVE)
+        return QS_MOUSEMOVE;
+    if (Message >= WM_MOUSEFIRST && Message <= WM_MOUSELAST)
+        return QS_MOUSEBUTTON;
+    return QS_POSTMESSAGE | QS_ALLPOSTMESSAGE;
+}
+
+// Queues a message on a thread's queue; the caller holds the lock.
+void Enqueue(std::thread::id Thread, const MSG& Message)
+{
+    FState& S = State();
+    S.Queues[Thread].Messages.push_back(FQueued{Message, S.NextSequence++});
+    S.Posted.notify_all();
 }
 
 DWORD Ticks()
@@ -306,24 +378,30 @@ const FKeyName kKeys[] = {
 // Classes and windows
 // ---------------------------------------------------------------------------------------------
 
+// The class's atom: a number of its own, never one a live class has (atoms are not reused).
 ATOM RegisterClassA(const WNDCLASSA* Class)
 {
     if (Class == nullptr || Class->lpszClassName == nullptr || Class->lpfnWndProc == nullptr)
         return 0;
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+    FState& S = State();
     std::string const Name = Lower(Class->lpszClassName);
-    if (State().Classes.count(Name) != 0)
+    if (S.Classes.count(Name) != 0 || S.NextAtom == 0xFFFF)
         return 0; // ERROR_CLASS_ALREADY_EXISTS
-    FClass Entry{*Class, Class->lpszClassName};
+    FClass Entry{*Class, Class->lpszClassName, S.NextAtom++};
     Entry.Class.lpszClassName = nullptr;
-    State().Classes.emplace(Name, Entry);
-    return static_cast<ATOM>(0xC000 + State().Classes.size());
+    S.Classes.emplace(Name, Entry);
+    return Entry.Atom;
 }
 
 BOOL UnregisterClassA(LPCSTR Name, HINSTANCE)
 {
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-    return State().Classes.erase(Lower(Name)) != 0 ? TRUE : FALSE;
+    FClass* const Class = FindClass(Name);
+    if (Class == nullptr)
+        return FALSE;
+    State().Classes.erase(Lower(Class->Name.c_str()));
+    return TRUE;
 }
 
 HWND CreateWindowExA(DWORD ExStyle, LPCSTR ClassName, LPCSTR Title, DWORD Style, int X, int Y,
@@ -334,17 +412,19 @@ HWND CreateWindowExA(DWORD ExStyle, LPCSTR ClassName, LPCSTR Title, DWORD Style,
     WNDPROC Procedure = nullptr;
     {
         std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-        auto const Class = State().Classes.find(Lower(ClassName));
-        if (Class == State().Classes.end())
-            return nullptr; // ERROR_CANNOT_FIND_WND_CLASS
+        FClass* const Class = FindClass(ClassName);
+        if (Class == nullptr || (Parent != nullptr && Find(Parent) == nullptr))
+            return nullptr; // ERROR_CANNOT_FIND_WND_CLASS / ERROR_INVALID_WINDOW_HANDLE
         FWindow Record;
-        Record.ClassName = Class->second.Name;
-        Record.Procedure = Procedure = Class->second.Class.lpfnWndProc;
+        Record.ClassName = Class->Name;
+        Record.Procedure = Procedure = Class->Class.lpfnWndProc;
         Record.Instance = Instance;
         Record.Parent = Parent;
         Record.Menu = Menu;
         Record.Style = Style;
         Record.ExStyle = ExStyle;
+        Record.bEnabled = (Style & WS_DISABLED) == 0;
+        Record.Owner = std::this_thread::get_id();
         if (X == CW_USEDEFAULT)
             X = Y = 0;
         if (Width == CW_USEDEFAULT)
@@ -352,6 +432,7 @@ HWND CreateWindowExA(DWORD ExStyle, LPCSTR ClassName, LPCSTR Title, DWORD Style,
             Width = kDesktopWidth;
             Height = kDesktopHeight;
         }
+        // A child's rectangle is relative to its parent's client area, as Windows keeps it.
         Record.Rect = {X, Y, X + Width, Y + Height};
         if (Title != nullptr)
             for (const char* Cursor = Title; *Cursor != 0; ++Cursor)
@@ -360,32 +441,51 @@ HWND CreateWindowExA(DWORD ExStyle, LPCSTR ClassName, LPCSTR Title, DWORD Style,
         State().Windows.emplace(Key(Window), Record);
     }
 
+    // The class name as the caller passed it (a string or an atom), as CREATESTRUCT carries it.
     CREATESTRUCTA Create = {
         Param, Instance,  Menu,   Parent, Height, Width, Y, X, static_cast<LONG>(Style),
         Title, ClassName, ExStyle};
     LPARAM const CreateParam = reinterpret_cast<LPARAM>(&Create);
-    if (Procedure(Window, WM_NCCREATE, 0, CreateParam) == 0 ||
-        Procedure(Window, WM_CREATE, 0, CreateParam) == -1)
+    if (Procedure(Window, WM_NCCREATE, 0, CreateParam) == 0 || !IsWindow(Window) ||
+        Procedure(Window, WM_CREATE, 0, CreateParam) == -1 || !IsWindow(Window))
     {
         DestroyWindow(Window);
         return nullptr;
     }
     if ((Style & WS_VISIBLE) != 0)
+    {
         Procedure(Window, WM_SHOWWINDOW, TRUE, 0);
+        if (!IsWindow(Window))
+            return nullptr;
+    }
     return Window;
 }
 
+// WM_DESTROY, the children's destruction, WM_NCDESTROY, then the record and the messages queued
+// for it go. A call for a window already being destroyed (from its own WM_DESTROY) does nothing.
 BOOL DestroyWindow(HWND Window)
 {
     WNDPROC Procedure = nullptr;
+    std::thread::id Owner;
     {
         std::lock_guard<std::recursive_mutex> Guard(State().Lock);
         FWindow* const Record = Find(Window);
-        if (Record == nullptr)
+        if (Record == nullptr || Record->bDestroying)
             return FALSE;
+        Record->bDestroying = true;
         Procedure = Record->Procedure;
+        Owner = Record->Owner;
     }
     Procedure(Window, WM_DESTROY, 0, 0);
+    std::vector<HWND> Children;
+    {
+        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+        for (const auto& Entry : State().Windows)
+            if (Entry.second.Parent == Window)
+                Children.push_back(reinterpret_cast<HWND>(Entry.first));
+    }
+    for (HWND Child : Children)
+        DestroyWindow(Child);
     Procedure(Window, WM_NCDESTROY, 0, 0);
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
     FState& S = State();
@@ -396,9 +496,15 @@ BOOL DestroyWindow(HWND Window)
         S.Active = nullptr;
     if (S.Capture == Window)
         S.Capture = nullptr;
-    S.Queue.erase(std::remove_if(S.Queue.begin(), S.Queue.end(),
-                                 [Window](const MSG& Message) { return Message.hwnd == Window; }),
-                  S.Queue.end());
+    auto const Queue = S.Queues.find(Owner);
+    if (Queue != S.Queues.end())
+    {
+        std::deque<FQueued>& Messages = Queue->second.Messages;
+        Messages.erase(std::remove_if(Messages.begin(), Messages.end(),
+                                      [Window](const FQueued& Entry)
+                                      { return Entry.Message.hwnd == Window; }),
+                       Messages.end());
+    }
     return TRUE;
 }
 
@@ -414,11 +520,17 @@ BOOL IsWindowUnicode(HWND)
     return FALSE;
 }
 
+// Visible when it and every parent up to its top-level window have WS_VISIBLE.
 BOOL IsWindowVisible(HWND Window)
 {
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-    FWindow const* const Record = Find(Window);
-    return Record != nullptr && (Record->Style & WS_VISIBLE) != 0 ? TRUE : FALSE;
+    FWindow const* Record = Find(Window);
+    if (Record == nullptr)
+        return FALSE;
+    for (; Record != nullptr; Record = Find(Record->Parent))
+        if ((Record->Style & WS_VISIBLE) == 0)
+            return FALSE;
+    return TRUE;
 }
 
 // The previous visibility, as Windows answers.
@@ -508,10 +620,15 @@ BOOL GetWindowRect(HWND Window, LPRECT Rect)
         *Rect = {0, 0, kDesktopWidth, kDesktopHeight};
         return TRUE;
     }
-    FWindow const* const Record = Find(Window);
+    FWindow const* Record = Find(Window);
     if (Record == nullptr)
         return FALSE;
+    // A child's rectangle is kept relative to its parent's client area: the desktop's
+    // coordinates add up the parents' origins (there are no frames, so the client area's
+    // origin is the window's).
     *Rect = Record->Rect;
+    for (Record = Find(Record->Parent); Record != nullptr; Record = Find(Record->Parent))
+        OffsetRect(Rect, Record->Rect.left, Record->Rect.top);
     return TRUE;
 }
 
@@ -685,6 +802,7 @@ HWND SetFocus(HWND Window)
     HWND Previous = nullptr;
     WNDPROC OldProcedure = nullptr;
     WNDPROC NewProcedure = nullptr;
+    std::uint64_t Change = 0;
     {
         std::lock_guard<std::recursive_mutex> Guard(State().Lock);
         FWindow const* const Record = Find(Window);
@@ -697,9 +815,17 @@ HWND SetFocus(HWND Window)
             OldProcedure = Old->Procedure;
         NewProcedure = Record != nullptr ? Record->Procedure : nullptr;
         State().Focus = Window;
+        Change = ++State().FocusChanges;
     }
     if (OldProcedure != nullptr)
         OldProcedure(Previous, WM_KILLFOCUS, reinterpret_cast<WPARAM>(Window), 0);
+    // A WM_KILLFOCUS handler that moved the focus elsewhere made this transition stale: the
+    // window it was meant for no longer has the focus, and gets no WM_SETFOCUS.
+    {
+        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+        if (State().FocusChanges != Change || Find(Window) == nullptr)
+            NewProcedure = nullptr;
+    }
     if (NewProcedure != nullptr)
         NewProcedure(Window, WM_SETFOCUS, reinterpret_cast<WPARAM>(Previous), 0);
     return Previous;
@@ -817,23 +943,28 @@ LRESULT SendMessageW(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
     return SendMessageA(Window, Message, WParam, LParam);
 }
 
+// To the queue of the thread that made the window; with no window, to the calling thread's.
 BOOL PostMessageA(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
 {
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-    if (Window != nullptr && Find(Window) == nullptr)
-        return FALSE;
-    MSG Entry = {Window, Message, WParam, LParam, Ticks(), State().CursorPos};
-    State().Queue.push_back(Entry);
-    State().Posted.notify_all();
+    std::thread::id Thread = std::this_thread::get_id();
+    if (Window != nullptr)
+    {
+        FWindow const* const Record = Find(Window);
+        if (Record == nullptr)
+            return FALSE;
+        Thread = Record->Owner;
+    }
+    Enqueue(Thread, MSG{Window, Message, WParam, LParam, Ticks(), State().CursorPos});
     return TRUE;
 }
 
+// To the calling thread's queue.
 void PostQuitMessage(int ExitCode)
 {
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-    MSG Entry = {nullptr, WM_QUIT, static_cast<WPARAM>(ExitCode), 0, Ticks(), State().CursorPos};
-    State().Queue.push_back(Entry);
-    State().Posted.notify_all();
+    Enqueue(std::this_thread::get_id(),
+            MSG{nullptr, WM_QUIT, static_cast<WPARAM>(ExitCode), 0, Ticks(), State().CursorPos});
 }
 
 BOOL PeekMessageA(LPMSG Message, HWND Window, UINT First, UINT Last, UINT Remove)
@@ -842,11 +973,16 @@ BOOL PeekMessageA(LPMSG Message, HWND Window, UINT First, UINT Last, UINT Remove
     return TakeMessage(Message, Window, First, Last, (Remove & PM_REMOVE) != 0) ? TRUE : FALSE;
 }
 
-// Waits for a message; FALSE for WM_QUIT.
+// Waits for a message of the calling thread; FALSE for WM_QUIT, -1 for a null output or a window
+// that does not exist (null and (HWND)-1 are filters, not windows).
 BOOL GetMessageA(LPMSG Message, HWND Window, UINT First, UINT Last)
 {
     MSG Taken;
     std::unique_lock<std::recursive_mutex> Guard(State().Lock);
+    if (Message == nullptr ||
+        (Window != nullptr && Window != reinterpret_cast<HWND>(static_cast<std::intptr_t>(-1)) &&
+         Find(Window) == nullptr))
+        return -1;
     State().Posted.wait(Guard, [&] { return TakeMessage(&Taken, Window, First, Last, true); });
     if (Message != nullptr)
         *Message = Taken;
@@ -866,11 +1002,18 @@ LRESULT DispatchMessageA(const MSG* Message)
     return SendMessageA(Message->hwnd, Message->message, Message->wParam, Message->lParam);
 }
 
-// Whether a message is queued (MsgWaitForMultipleObjects, posix/winuser.h).
-bool PosixUser32HasMessage()
+// Whether the calling thread's queue holds input of the wake mask's classes that arrived since
+// the thread last looked (PeekMessageA / GetMessageA), as MsgWaitForMultipleObjects wakes for it
+// (posix/winuser.h). WM_QUIT always counts.
+bool PosixUser32HasInput(DWORD WakeMask)
 {
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-    return !State().Queue.empty();
+    FThreadQueue const& Queue = ThisQueue();
+    for (const FQueued& Entry : Queue.Messages)
+        if (Entry.Sequence > Queue.Seen && (Entry.Message.message == WM_QUIT ||
+                                            (InputClass(Entry.Message.message) & WakeMask) != 0))
+            return true;
+    return false;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1001,24 +1144,63 @@ SHORT GetAsyncKeyState(int Key)
     return static_cast<SHORT>(GetKeyState(Key) & 0x8000);
 }
 
+// MAPVK_VK_TO_VSC: a key's scan code (left and right modifiers by side, a generic one as its
+// left key's). MAPVK_VSC_TO_VK(_EX): the key for a scan code, an extended one with its 0xE0 /
+// 0xE1 prefix in the high byte; _EX names the modifiers' sides, the plain form the generic
+// VK_SHIFT / VK_CONTROL / VK_MENU. MAPVK_VK_TO_CHAR: digits and letters.
 UINT MapVirtualKeyA(UINT Code, UINT Type)
 {
     switch (Type)
     {
     case MAPVK_VK_TO_VSC:
+    {
+        UINT Key = Code;
+        if (Key == VK_LSHIFT)
+            Key = VK_SHIFT;
+        else if (Key == VK_LCONTROL)
+            Key = VK_CONTROL;
+        else if (Key == VK_LMENU)
+            Key = VK_MENU;
         for (const FKeyName& Entry : kKeys)
-            if (Entry.Vk == Code && !Entry.bExtended)
+            if (Entry.Vk == Key && !Entry.bExtended)
                 return Entry.Scan;
         for (const FKeyName& Entry : kKeys)
-            if (Entry.Vk == Code)
+            if (Entry.Vk == Key)
                 return Entry.Scan;
         return 0;
+    }
     case MAPVK_VSC_TO_VK:
     case MAPVK_VSC_TO_VK_EX:
+    {
+        UINT const Prefix = Code & 0xFF00;
+        bool const bExtended = Prefix == 0xE000 || Prefix == 0xE100;
+        if (Prefix != 0 && !bExtended)
+            return 0;
+        UINT Key = 0;
         for (const FKeyName& Entry : kKeys)
-            if (Entry.Scan == Code && !Entry.bExtended)
-                return Entry.Vk;
-        return 0;
+            if (Entry.Scan == (Code & 0xFF) && Entry.bExtended == bExtended)
+            {
+                Key = Entry.Vk;
+                break;
+            }
+        if (Type == MAPVK_VSC_TO_VK_EX)
+        {
+            if (Key == VK_SHIFT)
+                return VK_LSHIFT;
+            if (Key == VK_CONTROL)
+                return VK_LCONTROL;
+            if (Key == VK_MENU)
+                return VK_LMENU;
+            return Key;
+        }
+        if (Key == VK_RSHIFT)
+            return VK_SHIFT;
+        if (Key == VK_RCONTROL)
+            return VK_CONTROL;
+        if (Key == VK_RMENU)
+            return VK_MENU;
+        return Key;
+    }
     case MAPVK_VK_TO_CHAR:
         if ((Code >= '0' && Code <= '9') || (Code >= 'A' && Code <= 'Z'))
             return Code;

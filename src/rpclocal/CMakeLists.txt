@@ -30,3 +30,12 @@ fl_defines(rpclocal _WINDOWS _USRDLL RPCLOCAL_EXPORTS)
 fl_link(rpclocal
   LIBS kernel32.lib user32.lib Common.lib
   REFERENCES dacom Common)
+
+# PORT(macOS): on Linux the client executable exports its own Client (ENABLE_EXPORTS), and ELF
+# lets a symbol the program defines win over a loaded module's, data included
+# (-Bsymbolic-functions, cmake/Freelancer.cmake, binds functions only). rpclocal's references to
+# its own Client (the FLocalClientProxy) must stay its own: -Bsymbolic binds its data too. Nothing
+# links rpclocal's data from an executable, so no copy relocation splits the object.
+if(NOT FL_WINDOWS AND NOT APPLE)
+  target_link_options(rpclocal PRIVATE -Wl,-Bsymbolic)
+endif()

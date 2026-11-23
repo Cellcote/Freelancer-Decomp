@@ -857,8 +857,9 @@ inline BOOL GetStringTypeExW(DWORD, DWORD InfoType, const wchar_t* Text, int Cou
     return GetStringTypeW(InfoType, Text, Count, Types);
 }
 
-// MultiByteToWideChar from UTF-8 for any code page (CP_ACP is UTF-8 on these systems); an
-// invalid byte becomes its Latin-1 character. As Windows: Count -1 includes the terminator, and a
+// MultiByteToWideChar from UTF-8 for any code page (CP_ACP is UTF-8 on these systems); a byte
+// that does not start a valid sequence (a stray continuation, an overlong form, a surrogate, a
+// value past U+10FFFF) becomes its Latin-1 character. As Windows: Count -1 includes the terminator, and a
 // zero OutSize asks for the size.
 inline int MultiByteToWideChar(UINT, DWORD, LPCSTR Text, int Count, wchar_t* Out, int OutSize)
 {
@@ -885,6 +886,12 @@ inline int MultiByteToWideChar(UINT, DWORD, LPCSTR Text, int Count, wchar_t* Out
             bValid = (Byte & 0xC0) == 0x80;
             Code = (Code << 6) | (Byte & 0x3Fu);
         }
+        // A scalar value in its shortest form only: no overlong sequence (C0 80 for U+0000), no
+        // surrogate, nothing past U+10FFFF.
+        static const std::uint32_t kMinimum[] = {0, 0x80, 0x800, 0x10000};
+        if (bValid && Extra > 0 &&
+            (Code < kMinimum[Extra] || (Code >= 0xD800 && Code <= 0xDFFF) || Code > 0x10FFFF))
+            bValid = false;
         if (!bValid)
         {
             Wide += static_cast<wchar_t>(Lead);

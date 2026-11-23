@@ -138,6 +138,19 @@ typedef WORD ATOM;
 #define PM_NOREMOVE 0x0000
 #define PM_REMOVE 0x0001
 #define PM_NOYIELD 0x0002
+#define QS_KEY 0x0001
+#define QS_MOUSEMOVE 0x0002
+#define QS_MOUSEBUTTON 0x0004
+#define QS_POSTMESSAGE 0x0008
+#define QS_TIMER 0x0010
+#define QS_PAINT 0x0020
+#define QS_SENDMESSAGE 0x0040
+#define QS_HOTKEY 0x0080
+#define QS_ALLPOSTMESSAGE 0x0100
+#define QS_RAWINPUT 0x0400
+#define QS_MOUSE (QS_MOUSEMOVE | QS_MOUSEBUTTON)
+#define QS_INPUT (QS_MOUSE | QS_KEY | QS_RAWINPUT)
+#define QS_ALLEVENTS (QS_INPUT | QS_POSTMESSAGE | QS_TIMER | QS_PAINT | QS_HOTKEY)
 #define QS_ALLINPUT 0x04FF
 
 #define BM_GETCHECK 0x00F0
@@ -469,36 +482,53 @@ FL_USER32_API BOOL GetMessageA(LPMSG Message, HWND Window, UINT First, UINT Last
 FL_USER32_API BOOL TranslateMessage(const MSG* Message);
 FL_USER32_API LRESULT DispatchMessageA(const MSG* Message);
 
-// Whether a message is queued.
-FL_USER32_API bool PosixUser32HasMessage();
+// Whether the calling thread's queue holds input of the wake mask's classes (QS_) that arrived
+// since the thread last looked with PeekMessageA / GetMessageA; WM_QUIT always counts.
+FL_USER32_API bool PosixUser32HasInput(DWORD WakeMask);
 
 // MsgWaitForMultipleObjects: the handles are the platform layer's, which user32 does not use (it
-// would link dacom, which links it), so the wait is here: WAIT_OBJECT_0 + Count as soon as a
-// message is queued, otherwise the handles' wait, looked at again every 10 ms for messages.
+// would link dacom, which links it), so the wait is here, looking for input every 10 ms. Wait
+// any: WAIT_OBJECT_0 + Count for new input of the wake mask, or the handles' wait. Wait all:
+// WAIT_OBJECT_0 once the input is there and every handle is signalled (the handles are only
+// waited on, and an auto-reset event only consumed, when the input is there). At the deadline
+// the queue is looked at once more.
 inline DWORD MsgWaitForMultipleObjects(DWORD Count, const HANDLE* Handles, BOOL WaitAll,
-                                       DWORD Milliseconds, DWORD)
+                                       DWORD Milliseconds, DWORD WakeMask)
 {
     DWORD const Start = GetTickCount();
     for (;;)
     {
-        if (PosixUser32HasMessage())
-            return WAIT_OBJECT_0 + Count;
+        bool const bInput = PosixUser32HasInput(WakeMask);
+        if (bInput && (WaitAll == FALSE || Count == 0))
+            return WAIT_OBJECT_0 + (WaitAll == FALSE ? Count : 0);
+        if (bInput && Platform::WaitMany(Count, Handles, true, 0) != WAIT_TIMEOUT)
+            return WAIT_OBJECT_0;
         DWORD Slice = 10;
+        bool bLast = false;
         if (Milliseconds != INFINITE)
         {
             DWORD const Elapsed = GetTickCount() - Start;
             if (Elapsed >= Milliseconds)
-                return Count == 0 ? WAIT_TIMEOUT
-                                  : Platform::WaitMany(Count, Handles, WaitAll != FALSE, 0);
-            Slice = Milliseconds - Elapsed < Slice ? Milliseconds - Elapsed : Slice;
+            {
+                Slice = 0;
+                bLast = true;
+            }
+            else if (Milliseconds - Elapsed < Slice)
+                Slice = Milliseconds - Elapsed;
         }
-        if (Count == 0)
-            Platform::SleepMs(Slice);
-        else
+        if (WaitAll == FALSE && Count != 0)
         {
-            DWORD const Result = Platform::WaitMany(Count, Handles, WaitAll != FALSE, Slice);
+            DWORD const Result = Platform::WaitMany(Count, Handles, false, Slice);
             if (Result != WAIT_TIMEOUT)
                 return Result;
+        }
+        else if (Slice != 0)
+            Platform::SleepMs(Slice);
+        if (bLast)
+        {
+            if (PosixUser32HasInput(WakeMask) && (WaitAll == FALSE || Count == 0))
+                return WAIT_OBJECT_0 + (WaitAll == FALSE ? Count : 0);
+            return WAIT_TIMEOUT;
         }
     }
 }
