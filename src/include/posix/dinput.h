@@ -5,9 +5,10 @@
 // (src/include/posix, non-Windows only). The client reads the mouse through DirectInput 8
 // (input_manager.cpp) and, as retail, does not survive a failed DirectInput8Create: so here
 // DirectInput8Create succeeds and hands out a system mouse with the SDK's interfaces, vtable
-// order, values and record layouts. The mouse reports no movement and no buttons until the
-// window layer feeds it (M3, SDL events): PosixDirectInput::MouseEvent queues a record for
-// GetDeviceData and updates the state GetDeviceState reads.
+// order, values and record layouts. The screen's mouse events feed it (src/PosixUser32, SDL):
+// PosixDirectInput::MouseEvent queues a record for GetDeviceData and updates the state
+// GetDeviceState reads. The queue is the user32 module's, one per process, so the events reach
+// the device whichever module made it.
 
 #pragma once
 
@@ -209,10 +210,16 @@ struct FMouseQueue
     bool bOverflow = false;
     bool bAcquired = false;
 };
+} // namespace PosixDirectInput
+
+// The process's mouse queue (src/PosixUser32).
+FL_USER32_API PosixDirectInput::FMouseQueue& PosixDirectInputMouse();
+
+namespace PosixDirectInput
+{
 inline FMouseQueue& Mouse()
 {
-    static FMouseQueue Queue;
-    return Queue;
+    return PosixDirectInputMouse();
 }
 
 // One mouse event: Offset is a DIMOFS_ value; Data is the relative motion for an axis, or 0x80
