@@ -22,11 +22,16 @@
 #define INITGUID
 #include <windows.h>
 #include <dplay8.h>
+#include <wrl/client.h>
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <cwchar>
+
+#include "port_scope.h" // TScopeExit, FComInit
+
+using Microsoft::WRL::ComPtr;
 
 namespace
 {
@@ -94,11 +99,12 @@ namespace
         return S_OK;
     }
 
-    IDirectPlay8Address* NewAddress()
+    ComPtr<IDirectPlay8Address> NewAddress()
     {
-        IDirectPlay8Address* Address = nullptr;
-        if (FAILED(CoCreateInstance(CLSID_DirectPlay8Address, nullptr, CLSCTX_INPROC_SERVER, IID_IDirectPlay8Address,
-                                    reinterpret_cast<void**>(&Address))))
+        ComPtr<IDirectPlay8Address> Address;
+        if (FAILED(CoCreateInstance(CLSID_DirectPlay8Address, nullptr, CLSCTX_INPROC_SERVER,
+                                    IID_IDirectPlay8Address,
+                                    reinterpret_cast<void**>(Address.GetAddressOf()))))
             return nullptr;
         Address->SetSP(&CLSID_DP8SP_TCPIP);
         return Address;
@@ -132,19 +138,34 @@ int main(int argc, char** argv)
     InitializeCriticalSection(&GLock);
     GEnumDone = CreateEventW(nullptr, TRUE, FALSE, nullptr);
     GReplyReceived = CreateEventW(nullptr, TRUE, FALSE, nullptr);
-    CoInitializeEx(nullptr, COINIT_MULTITHREADED);
 
-    IDirectPlay8Client* Client = nullptr;
-    HRESULT Result = CoCreateInstance(CLSID_DirectPlay8Client, nullptr, CLSCTX_INPROC_SERVER, IID_IDirectPlay8Client,
-                                      reinterpret_cast<void**>(&Client));
+    // Torn down in reverse order on every path, failures included: Close, the addresses, the
+    // client, the address the enumeration answer came from, COM.
+    const FComInit Com(COINIT_MULTITHREADED);
+    const TScopeExit ReleaseAnsweredAddress(
+        []
+        {
+            if (GHostAddress != nullptr)
+                GHostAddress->Release();
+        });
+
+    ComPtr<IDirectPlay8Client> Client;
+    ComPtr<IDirectPlay8Address> HostAddress;
+    ComPtr<IDirectPlay8Address> DeviceAddress;
+    HRESULT Result =
+        CoCreateInstance(CLSID_DirectPlay8Client, nullptr, CLSCTX_INPROC_SERVER,
+                         IID_IDirectPlay8Client, reinterpret_cast<void**>(Client.GetAddressOf()));
     if (FAILED(Result))
         return Fail("create the DirectPlay 8 client (is DirectPlay installed?)", Result);
     Result = Client->Initialize(nullptr, HandleMessage, 0);
     if (FAILED(Result))
         return Fail("initialize", Result);
+    // Close stops DirectPlay's worker threads, which an initialised client otherwise leaves
+    // running into process exit.
+    const TScopeExit CloseClient([&Client] { Client->Close(0); });
 
-    IDirectPlay8Address* HostAddress = NewAddress();
-    IDirectPlay8Address* DeviceAddress = NewAddress();
+    HostAddress = NewAddress();
+    DeviceAddress = NewAddress();
     if (HostAddress == nullptr || DeviceAddress == nullptr)
         return Fail("create addresses", E_FAIL);
     wchar_t WideHost[256];
@@ -157,8 +178,8 @@ int main(int argc, char** argv)
     DPN_APPLICATION_DESC EnumDesc{};
     EnumDesc.dwSize = sizeof(EnumDesc);
     DPNHANDLE EnumHandle = 0;
-    Result = Client->EnumHosts(&EnumDesc, HostAddress, DeviceAddress, nullptr, 0, 5, 500, 3000, nullptr,
-                               &EnumHandle, 0);
+    Result = Client->EnumHosts(&EnumDesc, HostAddress.Get(), DeviceAddress.Get(), nullptr, 0, 5,
+                               500, 3000, nullptr, &EnumHandle, 0);
     if (FAILED(Result))
         return Fail("EnumHosts", Result);
     if (WaitForSingleObject(GEnumDone, TimeoutMs) != WAIT_OBJECT_0)
@@ -172,8 +193,9 @@ int main(int argc, char** argv)
     ConnectDesc.dwSize = sizeof(ConnectDesc);
     ConnectDesc.guidApplication = GApplication;
     ConnectDesc.guidInstance = GInstance;
-    Result = Client->Connect(&ConnectDesc, GHostAddress != nullptr ? GHostAddress : HostAddress, DeviceAddress,
-                             nullptr, nullptr, nullptr, 0, nullptr, nullptr, DPNCONNECT_SYNC);
+    Result = Client->Connect(
+        &ConnectDesc, GHostAddress != nullptr ? GHostAddress : HostAddress.Get(),
+        DeviceAddress.Get(), nullptr, nullptr, nullptr, 0, nullptr, nullptr, DPNCONNECT_SYNC);
     if (FAILED(Result))
         return Fail("connect", Result);
     std::printf("PASS connect\n");
@@ -190,13 +212,6 @@ int main(int argc, char** argv)
     std::printf("PASS message round trip: reply 0x%02x, %lu message(s) received\n", GReply,
                 (unsigned long)GMessagesReceived);
 
-    Client->Close(0);
-    if (GHostAddress != nullptr)
-        GHostAddress->Release();
-    HostAddress->Release();
-    DeviceAddress->Release();
-    Client->Release();
-    CoUninitialize();
     std::printf("DPNetInteropTest: all passed\n");
     return 0;
 }
