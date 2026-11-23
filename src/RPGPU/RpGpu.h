@@ -24,7 +24,6 @@
 #include <cstdint>
 #include <map>
 #include <memory>
-#include <set>
 #include <vector>
 
 static constexpr char kRpGpuComponentName[] = "SDLGPU";
@@ -346,9 +345,10 @@ private:
     std::vector<std::uint64_t> RetiredBlocks_;
     std::uint64_t FrameNumber_ = 0; // SwapBuffers counts frames
 
-    std::set<FRpGpuTexture*> Textures_;
-    std::set<FRpGpuBuffer*> VertexBuffers_;
-    std::set<FRpGpuBuffer*> IndexBuffers_;
-    std::map<unsigned int, FRpGpuBuffer*> VbPools_; // FVF -> pool ring
+    // The live objects by the handle the game holds, which they own.
+    std::map<FRpGpuTexture*, std::unique_ptr<FRpGpuTexture>> Textures_;
+    std::map<FRpGpuBuffer*, std::unique_ptr<FRpGpuBuffer>> VertexBuffers_;
+    std::map<FRpGpuBuffer*, std::unique_ptr<FRpGpuBuffer>> IndexBuffers_;
+    std::map<unsigned int, std::unique_ptr<FRpGpuBuffer>> VbPools_; // FVF -> pool ring
     FRpGpuBuffer ScratchIb_;                        // handle -1
 };

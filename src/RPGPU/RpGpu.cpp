@@ -200,15 +200,7 @@ FRpGpu::FRpGpu()
 
 FRpGpu::~FRpGpu()
 {
-    Backend_.reset();
-    for (FRpGpuTexture* Texture : Textures_)
-        delete Texture;
-    for (FRpGpuBuffer* Buffer : VertexBuffers_)
-        delete Buffer;
-    for (FRpGpuBuffer* Buffer : IndexBuffers_)
-        delete Buffer;
-    for (auto& Pool : VbPools_)
-        delete Pool.second;
+    Backend_.reset(); // before the textures and buffers it was given
 }
 
 GENRESULT FRpGpu::QueryLocal(const char* Iid, void** Out)
@@ -457,16 +449,16 @@ GENRESULT DACOM_API FRpGpu::CreateBuffers(RpWindow Hwnd, int* Mode, int* OutMode
     // up again when it is next drawn, and the old copies are let go (a kept device keeps them
     // otherwise). Nothing recorded refers to them any more.
     Frame_.Clear();
-    for (FRpGpuTexture* Texture : Textures_)
+    for (const auto& [Texture, Owned] : Textures_)
     {
         Texture->bGpuStale = true;
         if (Texture->GpuVersion != 0)
             RetiredVersions_.push_back(Texture->GpuVersion);
         Texture->GpuVersion = 0;
     }
-    for (FRpGpuBuffer* Buffer : VertexBuffers_)
+    for (const auto& [Buffer, Owned] : VertexBuffers_)
         RetireBlocks(Buffer);
-    for (FRpGpuBuffer* Buffer : IndexBuffers_)
+    for (const auto& [Buffer, Owned] : IndexBuffers_)
         RetireBlocks(Buffer);
     for (std::uint64_t Version : RetiredVersions_)
         Backend().ForgetTexture(Version);

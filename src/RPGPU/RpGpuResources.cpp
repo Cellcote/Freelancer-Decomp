@@ -133,9 +133,10 @@ GENRESULT DACOM_API FRpGpu::CreateTexture(int Width, int Height, unsigned int* F
         return GR_GENERIC;
     const unsigned int Count = Levels == 0 ? MaxLevels : Levels;
 
-    FRpGpuTexture* const Texture = new (std::nothrow) FRpGpuTexture();
+    std::unique_ptr<FRpGpuTexture> Texture(new (std::nothrow) FRpGpuTexture());
     if (Texture == nullptr)
         return GR_OUT_OF_MEMORY;
+    FRpGpuTexture* const Handle = Texture.get();
     Texture->Width = static_cast<unsigned int>(Width);
     Texture->Height = static_cast<unsigned int>(Height);
     Texture->Format = Concrete;
@@ -143,22 +144,19 @@ GENRESULT DACOM_API FRpGpu::CreateTexture(int Width, int Height, unsigned int* F
     try
     {
         Texture->Images.resize(Count);
+        for (unsigned int Level = 0; Level < Count; ++Level)
+        {
+            if (!MakeImage(Concrete, Texture->Width >> Level, Texture->Height >> Level,
+                           &Texture->Images[Level]))
+                return GR_OUT_OF_MEMORY;
+        }
+        Textures_.emplace(Handle, std::move(Texture));
     }
     catch (const std::bad_alloc&)
     {
-        delete Texture;
         return GR_OUT_OF_MEMORY;
     }
-    for (unsigned int Level = 0; Level < Count; ++Level)
-    {
-        if (!MakeImage(Concrete, Texture->Width >> Level, Texture->Height >> Level, &Texture->Images[Level]))
-        {
-            delete Texture;
-            return GR_OUT_OF_MEMORY;
-        }
-    }
-    Textures_.insert(Texture);
-    *OutHandle = Texture;
+    *OutHandle = Handle;
     return GR_OK;
 }
 
@@ -167,7 +165,6 @@ GENRESULT DACOM_API FRpGpu::DestroyTexture(void* Handle)
     FRpGpuTexture* const Texture = LiveTexture(Handle);
     if (Texture != nullptr)
     {
-        Textures_.erase(Texture);
         // Draws recorded this frame may still use its image: released after SwapBuffers.
         if (Texture->GpuVersion != 0)
             RetiredVersions_.push_back(Texture->GpuVersion);
@@ -176,7 +173,7 @@ GENRESULT DACOM_API FRpGpu::DestroyTexture(void* Handle)
             if (Bound == Texture)
                 Bound = nullptr;
         }
-        delete Texture;
+        Textures_.erase(Texture);
     }
     return GR_OK;
 }
@@ -363,19 +360,22 @@ FRpGpuBuffer* FRpGpu::PoolBuffer(unsigned int Fvf)
 {
     auto Found = VbPools_.find(Fvf);
     if (Found != VbPools_.end())
-        return Found->second;
-    FRpGpuBuffer* const Pool = new (std::nothrow) FRpGpuBuffer();
+        return Found->second.get();
+    std::unique_ptr<FRpGpuBuffer> Pool(new (std::nothrow) FRpGpuBuffer());
     if (Pool == nullptr)
         return nullptr;
     Pool->Fvf = Fvf;
     Pool->bRing = true;
-    if (!ResizeStorage(Pool, kPoolGrowVertices, std::max(1u, Rp8FvfStride(Fvf))))
+    if (!ResizeStorage(Pool.get(), kPoolGrowVertices, std::max(1u, Rp8FvfStride(Fvf))))
+        return nullptr;
+    try
     {
-        delete Pool;
+        return (VbPools_[Fvf] = std::move(Pool)).get();
+    }
+    catch (const std::bad_alloc&)
+    {
         return nullptr;
     }
-    VbPools_[Fvf] = Pool;
-    return Pool;
 }
 
 FRpGpuBuffer* FRpGpu::LiveVb(void* Handle) const
@@ -385,7 +385,7 @@ FRpGpuBuffer* FRpGpu::LiveVb(void* Handle) const
         return Buffer;
     for (const auto& Pool : VbPools_)
     {
-        if (Pool.second == Buffer)
+        if (Pool.second.get() == Buffer)
             return Buffer;
     }
     return nullptr;
@@ -460,21 +460,23 @@ GENRESULT DACOM_API FRpGpu::CreateIb(unsigned int Count, unsigned int** Out, uns
 {
     if (Out == nullptr)
         return GR_INVALID_PARMS;
-    FRpGpuBuffer* const Buffer = new (std::nothrow) FRpGpuBuffer();
+    *Out = nullptr;
+    std::unique_ptr<FRpGpuBuffer> Buffer(new (std::nothrow) FRpGpuBuffer());
     if (Buffer == nullptr)
-    {
-        *Out = nullptr;
         return GR_OUT_OF_MEMORY;
-    }
+    FRpGpuBuffer* const Handle = Buffer.get();
     Buffer->bRing = (Flags & 1) != 0;
-    if (!ResizeStorage(Buffer, std::max(1u, Count), 2))
+    if (!ResizeStorage(Handle, std::max(1u, Count), 2))
+        return GR_OUT_OF_MEMORY;
+    try
     {
-        delete Buffer;
-        *Out = nullptr;
+        IndexBuffers_.emplace(Handle, std::move(Buffer));
+    }
+    catch (const std::bad_alloc&)
+    {
         return GR_OUT_OF_MEMORY;
     }
-    IndexBuffers_.insert(Buffer);
-    *Out = reinterpret_cast<unsigned int*>(Buffer);
+    *Out = reinterpret_cast<unsigned int*>(Handle);
     return GR_OK;
 }
 
@@ -485,11 +487,10 @@ GENRESULT DACOM_API FRpGpu::DestroyIb(void** Handle)
     FRpGpuBuffer* const Buffer = LiveIb(*Handle);
     if (Buffer != nullptr)
     {
-        IndexBuffers_.erase(Buffer);
         RetireBlocks(Buffer);
         if (SelectedIb_ == Buffer)
             SelectedIb_ = nullptr; // a later buffer at the same address is not selected
-        delete Buffer;
+        IndexBuffers_.erase(Buffer);
     }
     *Handle = nullptr;
     return GR_OK;
@@ -610,18 +611,21 @@ GENRESULT DACOM_API FRpGpu::CreateVb(unsigned int Fvf, unsigned int Count, unsig
     }
     else
     {
-        Buffer = new (std::nothrow) FRpGpuBuffer();
-        if (Buffer != nullptr)
+        std::unique_ptr<FRpGpuBuffer> Made(new (std::nothrow) FRpGpuBuffer());
+        if (Made != nullptr)
         {
-            Buffer->Fvf = Fvf;
-            if (ResizeStorage(Buffer, std::max(1u, Count), std::max(1u, Rp8FvfStride(Fvf))))
+            Made->Fvf = Fvf;
+            if (ResizeStorage(Made.get(), std::max(1u, Count), std::max(1u, Rp8FvfStride(Fvf))))
             {
-                VertexBuffers_.insert(Buffer);
-            }
-            else
-            {
-                delete Buffer;
-                Buffer = nullptr;
+                try
+                {
+                    Buffer = Made.get();
+                    VertexBuffers_.emplace(Buffer, std::move(Made));
+                }
+                catch (const std::bad_alloc&)
+                {
+                    Buffer = nullptr;
+                }
             }
         }
     }
@@ -638,11 +642,10 @@ GENRESULT DACOM_API FRpGpu::DestroyVb(void** Handle)
     FRpGpuBuffer* const Buffer = static_cast<FRpGpuBuffer*>(*Handle);
     if (VertexBuffers_.count(Buffer) != 0)
     {
-        VertexBuffers_.erase(Buffer);
         RetireBlocks(Buffer);
         if (SelectedVb_ == Buffer)
             SelectedVb_ = nullptr; // a later buffer at the same address is not selected
-        delete Buffer;
+        VertexBuffers_.erase(Buffer);
     }
     *Handle = nullptr; // a pool buffer stays alive
     return GR_OK;
@@ -866,9 +869,10 @@ GENRESULT FRpGpu::MakeCubemap(const void* Data, FlULong Size, void** OutHandle)
     FDdsCube Cube;
     if (Size > 0xFFFFFFFFul || !ReadDdsCube(&Cube, static_cast<unsigned int>(Size), Data))
         return kInvalidData;
-    FRpGpuTexture* const Texture = new (std::nothrow) FRpGpuTexture();
+    std::unique_ptr<FRpGpuTexture> Texture(new (std::nothrow) FRpGpuTexture());
     if (Texture == nullptr)
         return GR_OUT_OF_MEMORY;
+    FRpGpuTexture* const Handle = Texture.get();
     const unsigned int Levels = MaxMipLevels(Cube.Edge, Cube.Edge);
     Texture->Width = Cube.Edge;
     Texture->Height = Cube.Edge;
@@ -885,10 +889,7 @@ GENRESULT FRpGpu::MakeCubemap(const void* Data, FlULong Size, void** OutHandle)
             {
                 FRpGpuImage& Image = Texture->Images[static_cast<std::size_t>(Face) * Levels + Level];
                 if (!MakeImage(Cube.Format, Cube.Edge >> Level, Cube.Edge >> Level, &Image))
-                {
-                    delete Texture;
                     return GR_OUT_OF_MEMORY;
-                }
                 if (Level < Cube.Levels)
                 {
                     // MakeImage's pitch is tight, as the file's rows are.
@@ -910,27 +911,15 @@ GENRESULT FRpGpu::MakeCubemap(const void* Data, FlULong Size, void** OutHandle)
                 From.Pitch = Above.Pitch;
                 From.Bits = Above.Bits.data();
                 if (TexConvert::Load(To, From) == TexConvert::EResult::Failed)
-                {
-                    delete Texture;
                     return kInvalidData;
-                }
             }
         }
+        Textures_.emplace(Handle, std::move(Texture));
     }
     catch (const std::bad_alloc&)
     {
-        delete Texture;
         return GR_OUT_OF_MEMORY;
     }
-    try
-    {
-        Textures_.insert(Texture);
-    }
-    catch (const std::bad_alloc&)
-    {
-        delete Texture;
-        return GR_OUT_OF_MEMORY;
-    }
-    *OutHandle = Texture;
+    *OutHandle = Handle;
     return GR_OK;
 }
