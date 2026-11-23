@@ -6,7 +6,9 @@ own dependency records, `ninja -t deps`, so the portable build has to have run f
 sources the clang-tidy build would check are candidates: the compile database's entries under
 src/, without the vendored libraries (cmake/Freelancer.cmake's FL_VENDORED_MODULES).
 
-Usage: tidy_changed.py <build dir> <changed-files list>   (prints one absolute source per line)
+Usage: tidy_changed.py <build dir> <changed-files list>
+The list is NUL-separated (git diff --name-only -z) and so is the output (for xargs -0): any
+file name, spaces and non-ASCII included, stays one name.
 """
 
 import json
@@ -20,8 +22,9 @@ VENDORED = ("src/zlib/", "src/qhull/")
 def main() -> int:
     build, changed_list = sys.argv[1], sys.argv[2]
     root = os.getcwd()
-    with open(changed_list, encoding="utf-8") as stream:
-        changed = {os.path.normpath(os.path.join(root, line.strip())) for line in stream if line.strip()}
+    with open(changed_list, "rb") as stream:
+        names = [name for name in stream.read().split(b"\0") if name]
+    changed = {os.path.normpath(os.path.join(root, os.fsdecode(name))) for name in names}
 
     with open(os.path.join(build, "compile_commands.json"), encoding="utf-8") as stream:
         database = json.load(stream)
@@ -51,7 +54,7 @@ def main() -> int:
             selected.add(source)
 
     for path in sorted(selected):
-        print(path)
+        sys.stdout.buffer.write(os.fsencode(path) + b"\0")
     return 0
 
 
