@@ -820,6 +820,9 @@ int main(int argc, char** argv)
             Platform::ModuleFree(Again);
             Check(LoadLibraryFn("/nonexistent/Missing.dll") == nullptr,
                   "pub::DLL_LoadLibrary gives nullptr for a missing file");
+            std::string const Overlong = "/" + std::string(0x200, 'a') + "/Missing.dll";
+            Check(LoadLibraryFn(Overlong.c_str()) == nullptr,
+                  "pub::DLL_LoadLibrary refuses an absolute path longer than MAX_PATH");
         }
     }
 

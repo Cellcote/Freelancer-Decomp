@@ -3555,11 +3555,14 @@ unsigned int Server_ControllerCreate(const char* dll_path, const char* instance_
 #if defined(_WIN32)
     node->InterfacePtr = CreateInstance(flid, instance_name, parms);
 #else
-    // PORT(macOS): retail calls GetProcAddress's result untested, so a DLL that failed to load
-    // (or exports no CreateInstance) faults on a null call. Off Windows that takes the
-    // not-created path below instead: the record is removed and 0 returned.
-    node->InterfacePtr =
-        CreateInstance != nullptr ? CreateInstance(flid, instance_name, parms) : nullptr;
+    // PORT(macOS): retail calls GetProcAddress's results untested, so a DLL that failed to load
+    // (or lacks CreateInstance or DestroyInstance) faults on a null call, now or when the
+    // controller is destroyed. Off Windows a module without both is not created: it takes the
+    // not-created path below, which removes the record and returns 0.
+    bool const bHasExports =
+        CreateInstance != nullptr &&
+        Platform::ModuleSymbol(node->ModuleHandle, "DestroyInstance") != nullptr;
+    node->InterfacePtr = bHasExports ? CreateInstance(flid, instance_name, parms) : nullptr;
 #endif
     if (node->InterfacePtr != nullptr) return flid;
 

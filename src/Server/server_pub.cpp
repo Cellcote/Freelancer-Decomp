@@ -566,6 +566,16 @@ SERVER_API HINSTANCE __cdecl DLL_LoadLibrary(const char* DllPath) {
     char FullPath[0x104];
     if (IsAbsoluteDllPath(DllPath))
     {
+#if !defined(_WIN32)
+        // PORT(macOS): retail copies the path unbounded; off Windows a path that does not fit
+        // fails to load instead.
+        if (strlen(DllPath) >= sizeof(FullPath))
+        {
+            FDUMP(0x100002, "%s(%d) : *** WARNING: failed to load mission DLL '%s'\n",
+                  "E:\\FL\\Scratch\\Source\\Server\\dlls.cpp", 0x1de, DllPath);
+            return nullptr;
+        }
+#endif
         strcpy(FullPath, DllPath);
     }
     else
