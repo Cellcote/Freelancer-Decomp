@@ -960,7 +960,7 @@ FMaterialLibraryRecord* FMaterialLibrary::CreateGenericRecord(const char* Name, 
 
     FAGGDESC14 Desc = {};
     IDAComponent* Inner;
-    Desc.Size = sizeof(Desc);
+    Desc.Size = kAggDesc14Size;
     Desc.Name = SelectedType;
     Desc.Outer = AggregateOuter;
     Desc.InnerOut = &Inner;
@@ -1036,7 +1036,7 @@ FMaterialLibraryRecord* DACOM_API FMaterialLibrary::CreateAfterMap(const char* N
 
     FAGGDESC14 Desc = {};
     IDAComponent* Inner;
-    Desc.Size = sizeof(Desc);
+    Desc.Size = kAggDesc14Size;
     Desc.Name = "BatchedMaterial";
     Desc.Outer = AggregateOuter;
     Desc.InnerOut = &Inner;

@@ -3305,7 +3305,7 @@ GENRESULT DACOM_API FBatchedFace::CreateInnerMaterial(void* Name)
         Owner->InnerController = nullptr;
     }
     FAGGDESC14 Desc = {};
-    Desc.Size = sizeof(Desc);
+    Desc.Size = kAggDesc14Size;
     Desc.Name = (const char*)Name;
     Desc.Outer = (IBatchedMaterial*)this;
     Desc.InnerOut = &Owner->InnerController;
