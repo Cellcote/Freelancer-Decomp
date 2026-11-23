@@ -56,6 +56,7 @@ struct FRpGpuBuffer
     unsigned int Count = 0;   // capacity in vertices or indices
     bool bRing = false;
     bool bLocked = false;
+    unsigned int LockStart = 0; // the first element of the current lock (LockVb)
     unsigned int Cursor = 0;  // ring position, in elements
     std::vector<unsigned char> Data;
     // A vertex buffer that is not a ring, converted to FRpGpuVertex and kept on the GPU: one

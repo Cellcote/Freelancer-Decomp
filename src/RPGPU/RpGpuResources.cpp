@@ -666,7 +666,6 @@ GENRESULT DACOM_API FRpGpu::ResizeVb(void* Handle, unsigned int Fvf, unsigned in
 GENRESULT DACOM_API FRpGpu::CopyVertices(void* Handle, unsigned int* OutOffset, const FRpVertexSrcDesc* SrcData,
                                          unsigned int StartVertex, unsigned int Count)
 {
-    (void)StartVertex;
     if (Handle == nullptr)
         return GR_GENERIC;
     void* Target = Handle;
@@ -679,17 +678,38 @@ GENRESULT DACOM_API FRpGpu::CopyVertices(void* Handle, unsigned int* OutOffset, 
     FRpGpuBuffer* const Buffer = LiveVb(Target);
     if (Buffer == nullptr)
         return GR_GENERIC;
-    if (Buffer->bLocked)
-        return GR_OK; // the offset is already a vertex index
-    // The vertices are not converted yet: nothing reads them.
-    void* Bits = nullptr;
-    unsigned int Offset = OutOffset != nullptr ? *OutOffset : 0; // bytes in, as LockVb takes them
-    const GENRESULT Result = LockVb(Target, &Offset, &Bits, Count);
-    if (Result != GR_OK)
-        return Result;
+    // RP8 (FUN_06d1228c): a buffer that is already locked is written in place, Offset vertices
+    // into the lock; otherwise Count vertices are locked at Offset (bytes in, a vertex index
+    // out) and unlocked again. The source's vertices StartVertex.. land at the vertex the
+    // offset names (the converter adds StartVertex back).
+    unsigned int Offset = OutOffset != nullptr ? *OutOffset : 0;
+    unsigned char* Bits = nullptr;
+    const bool bWasLocked = Buffer->bLocked;
+    if (bWasLocked)
+    {
+        if (Buffer->LockStart > Buffer->Count || Offset > Buffer->Count - Buffer->LockStart ||
+            Count > Buffer->Count - Buffer->LockStart - Offset)
+            return kFail; // RP8 writes past the lock; here the copy is refused
+        Bits = Buffer->Data.data() +
+               static_cast<std::size_t>(Buffer->LockStart + Offset) * Buffer->Stride;
+    }
+    else
+    {
+        void* Locked = nullptr;
+        const GENRESULT Result = LockVb(Target, &Offset, &Locked, Count);
+        if (Result != GR_OK)
+            return Result;
+        Bits = static_cast<unsigned char*>(Locked);
+    }
+    if (SrcData != nullptr)
+        Rp8CopyVertexData(Bits - static_cast<std::ptrdiff_t>(Buffer->Stride) * StartVertex,
+                          Buffer->Fvf, SrcData, StartVertex, Count);
+    GENRESULT Result = GR_OK;
+    if (!bWasLocked)
+        Result = UnlockVb(Target);
     if (OutOffset != nullptr)
         *OutOffset = Offset;
-    return UnlockVb(Target);
+    return Result;
 }
 
 // Offset goes in as bytes and comes back as a vertex index. Pool buffers ignore the input and
@@ -716,6 +736,7 @@ GENRESULT DACOM_API FRpGpu::LockVb(void* Handle, unsigned int* Offset, void** Ou
     if (Offset != nullptr)
         *Offset = Start;
     Buffer->bLocked = true;
+    Buffer->LockStart = Start;
     RetireBlocks(Buffer); // the caller may write any vertex it locked
     Buffer->LastWriteFrame = FrameNumber_;
     *Out = Buffer->Data.data() + static_cast<std::size_t>(Start) * Buffer->Stride;
