@@ -657,7 +657,8 @@ namespace DPNet
     {
     }
 
-    void FClient::EnumHosts(const FAddress& To, const FGuid* Application, const FBytes& UserData, uint32_t InNow)
+    uint16_t FClient::EnumHosts(const FAddress& To, const FGuid* Application,
+                                const FBytes& UserData, uint32_t InNow)
     {
         Now = InNow;
         FEnumQuery Query;
@@ -672,6 +673,7 @@ namespace DPNet
         FBytes Out;
         Query.Write(Out);
         Transport.SendTo(To, Out.data(), Out.size());
+        return Query.EnumPayload;
     }
 
     bool FClient::Connect(const FAddress& InHost, const FConnectRequest& InRequest, uint32_t SessId, uint32_t InNow)
@@ -706,6 +708,14 @@ namespace DPNet
         }
         if (OutHandle != nullptr)
             *OutHandle = Handle;
+        return true;
+    }
+
+    bool FClient::GetSendQueueInfo(uint32_t& Messages, uint32_t& Bytes) const
+    {
+        if (!Link)
+            return false;
+        Link->GetQueueInfo(Messages, Bytes);
         return true;
     }
 

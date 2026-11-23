@@ -243,8 +243,10 @@ namespace DPNet
 
         FClient(ITransport& InTransport, IClientEvents& InEvents, const FLinkConfig& InConfig = FLinkConfig());
 
-        // Sends one EnumQuery; repeat it as long as you want answers.
-        void EnumHosts(const FAddress& To, const FGuid* Application, const FBytes& UserData, uint32_t Now);
+        // Sends one EnumQuery; repeat it as long as you want answers. Returns the query's
+        // EnumPayload, which its responses carry back (FEnumResponse::EnumPayload).
+        uint16_t EnumHosts(const FAddress& To, const FGuid* Application, const FBytes& UserData,
+                           uint32_t Now);
         bool Connect(const FAddress& Host, const FConnectRequest& Request, uint32_t SessId, uint32_t Now);
         bool Send(const uint8_t* Data, size_t Size, uint32_t Flags, void* UserContext, uint64_t* OutHandle, uint32_t Now);
         void Close(uint32_t Now);
@@ -254,7 +256,11 @@ namespace DPNet
 
         EState GetState() const { return State; }
         const FSendConnectInfo& GetSessionInfo() const { return Session; }
+        // Only while a connection exists (after Connect).
         const FLinkStats& GetLinkStats() const { return Link->GetStats(); }
+        // Messages (and their bytes) queued or sent but not yet acknowledged; false without a
+        // connection.
+        bool GetSendQueueInfo(uint32_t& Messages, uint32_t& Bytes) const;
 
     private:
         void LinkTransmit(const uint8_t* Data, size_t Size) override;

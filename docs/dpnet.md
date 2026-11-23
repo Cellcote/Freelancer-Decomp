@@ -40,17 +40,19 @@ threads of its own. The owner feeds in each received datagram with its sender's 
 `Tick` every 10–20 ms with a millisecond clock, and sends what comes out through `ITransport`.
 That keeps the protocol deterministic and testable.
 
-## The adapter: DPNet behind IDirectPlay8Server
+## The adapter: DPNet behind IDirectPlay8Server and IDirectPlay8Client
 
-`src/DALib/DPNetAdapter.cpp` puts `FServer` behind the COM interfaces DALib's `CDPServer` calls:
-`IDirectPlay8Server` and `IDirectPlay8Address`. `CDPServer` takes its objects from
-`DPNetAdapter::CreateServer` / `CreateAddress` instead of `CoCreateInstance` when
-`FREELANCER_DPNET` is defined, and calls them exactly as it calls Microsoft's. The x64 build
-and the macOS and Linux builds define it (only their DALib compiles the DPNet sources); the Win32
-build keeps Microsoft's `dpnet.dll`, as retail. On macOS and Linux the DirectPlay names come from a
-stand-in `<dplay8.h>` and the sockets from a stand-in `<winsock2.h>` over BSD sockets
-(`src/include/posix`); `CoCreateInstance` finds no DirectPlay class there, so the client
-(`CDPClient`) has no DirectPlay yet.
+`src/DALib/DPNetAdapter.cpp` puts `FServer` and `FClient` behind the COM interfaces DALib calls:
+`IDirectPlay8Server` for `CDPServer`, `IDirectPlay8Client` for `CDPClient`, and
+`IDirectPlay8Address` for both. They take their objects from `DPNetAdapter::CreateServer` /
+`CreateClient` / `CreateAddress` instead of `CoCreateInstance` when `FREELANCER_DPNET` is defined,
+and call them exactly as they call Microsoft's. The x64 build and the macOS and Linux builds
+define it (only their DALib compiles the DPNet sources); the Win32 build keeps Microsoft's
+`dpnet.dll`, as retail. On macOS and Linux the DirectPlay names come from a stand-in `<dplay8.h>`
+and the sockets from a stand-in `<winsock2.h>` over BSD sockets (`src/include/posix`), where
+`CoCreateInstance` finds no class at all.
+
+The server:
 
 - **Socket and thread:** one UDP socket bound like DirectPlay's TCP/IP service provider (all
   interfaces; the given port, else the first free one of 2302–2400), and a network thread that
@@ -68,6 +70,50 @@ stand-in `<dplay8.h>` and the sockets from a stand-in `<winsock2.h>` over BSD so
 - **`GetConnectionInfo`** fills the round-trip time, the guaranteed bytes and packets each way,
   retries, drops and message counts; the throughput fields are 0.
 - Methods `CDPServer` never calls return `DPNERR_UNSUPPORTED`.
+
+The client, the same way (one socket, a network thread, one lock, the handler called with it
+held, Close and Release from a handler):
+
+- **Socket:** opened by the first `EnumHosts` or `Connect`, on the device address's port, else the
+  first free one of 2302–2400, with broadcasting allowed; kept until `Close`. IPv4 only.
+- **Addresses:** `BuildFromURLW` / `BuildFromURLA` parse DirectPlay URLs
+  (`x-directplay:/hostname=...;port=...`, `%XX` escapes; provider and device are GUIDs, digits a
+  DWORD, `{...}` a GUID, anything else a string), which is how `CDPClient` and RemoteServer name
+  the host. A host name is resolved with `getaddrinfo` on the calling thread.
+- **`EnumHosts`:** a query every retry interval, `EnumCount` of them (`INFINITE`: until cancelled),
+  then `ASYNC_OP_COMPLETE` once the timeout after the last has run out (`DPNERR_USERCANCEL` when
+  cancelled). 0 takes the TCP/IP service provider's defaults: 5 queries, 1500 ms apart, 1500 ms
+  timeout. Answers come as `ENUM_HOSTS_RESPONSE`, matched to their enumeration by the query's
+  EnumPayload; late ones are dropped. A host address with a port gets the queries there; without
+  one, they go to DPNSVR's port 6073 (where DirectPlay sends them) and to 2302 (where a DPNet
+  server, which has no DPNSVR, listens by default); without a host name they are broadcast, unless
+  `DPNENUMHOSTS_NOBROADCASTFALLBACK`.
+- **`Connect`:** a fresh `FClient` for each, to the host's port (2302 if it names none), with the
+  application and instance GUIDs, password and connect data of the call. `CONNECT_COMPLETE`
+  follows once, with the server's reply data; a failed or cancelled connect leaves the object
+  free to connect again.
+- **Messages:** `RECEIVE` (buffers kept until `ReturnBuffer`, as the server's; the sender is the
+  server's DPNID from the name table), `SEND_COMPLETE`, and `TERMINATE_SESSION` when an
+  established session ends: `DPNERR_HOSTTERMINATEDSESSION` with the server's data when it sent
+  `DN_TERMINATE_SESSION` (`DestroyClient`, its `Close`), otherwise `DPNERR_CONNECTIONLOST`.
+- **`CancelAsyncOperation`** ends enumerations and a pending connect; sends are not cancelled
+  (DPNet's link cannot take a queued message back): they complete or fail with the connection.
+- **`Close`** cancels what is outstanding, then says goodbye (END_STREAM) and waits up to 5 s for
+  the server to answer. The handler hears nothing after the cancellations: no `TERMINATE_SESSION`
+  for our own `Close`.
+- **`GetConnectionInfo`** and **`GetSendQueueInfo`** as the server's, for the connection.
+
+Unverified against Microsoft's `dpnet.dll` (captures would settle them): the enumeration
+defaults above; `S_OK` as the result of an enumeration that ran its course; `DPNERR_TIMEDOUT` for
+a connect nobody answers (`FClient`'s; dpnet.dll may say `DPNERR_NORESPONSE`); that dpnet.dll's
+own `Close` sends no `TERMINATE_SESSION`; and whether it accepts a second `Connect` after a session
+ended without `Close` and `Initialize` (CDPClient never does that; DPNet allows it).
+
+`dalib_net_tests` (`src/PortTest/`, Linux and macOS, run by ctest in the portable CI job, also
+under ASan and UBSan) has a DALib `CDPClient` talk to a DALib `CDPServer` over loopback: the
+server list's enumeration (session name, player counts, reply data, sender address), a refused
+connect (wrong application), connect, a message each way, the ping and its link-quality reply,
+the server dropping the client, and a second client whose destructor closes the connection.
 
 `DPNetInteropTest.exe` (`src/DPNetInteropTest/`, Win32 only) joins a running server through Microsoft's
 DirectPlay 8 client, as a retail client does: enumeration, connect, and one guaranteed message
@@ -203,5 +249,5 @@ AddressSanitizer and UndefinedBehaviorSanitizer) and on Windows (MSVC, Win32 and
    the choices above.
 2. **A full login through DPNet:** the x64 server with a retail client logging in and flying,
    once the x64 server runs past the base entry (docs/x64.md).
-3. **Other platforms.** With the adapter's socket code ported, the server no longer needs
-   DirectPlay from the operating system.
+3. **Other platforms.** With the adapter's socket code ported, neither the server nor the client
+   needs DirectPlay from the operating system.

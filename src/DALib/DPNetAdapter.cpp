@@ -3,14 +3,15 @@
 
 // PORT(dpnet): DPNet behind DirectPlay 8's COM interfaces (DPNetAdapter.h, docs/dpnet.md).
 //
-// DPNet's FServer has no socket, clock or thread of its own. This file supplies them: a UDP
-// socket bound like DirectPlay's TCP/IP service provider, a network thread that feeds received
-// datagrams to FServer and calls Tick every 10 ms, and GetTickCount as the clock. One lock
-// guards FServer. The application's message handler is called with the lock held, on whichever
-// thread is inside FServer (the network thread, or the caller of SendTo, DestroyClient or
-// Close). DALib's handler only queues messages under its own locks and never calls back into
-// the server, so that is safe for it. A handler on the network thread may still Close the
-// server or drop the last reference: NetLoop then finishes the teardown once it unwinds.
+// DPNet's FServer and FClient have no socket, clock or thread of their own. This file supplies
+// them: a UDP socket bound like DirectPlay's TCP/IP service provider, a network thread that feeds
+// received datagrams in and calls Tick every 10 ms, and GetTickCount as the clock. One lock per
+// object guards its DPNet state. The application's message handler is called with the lock
+// held, on whichever thread is inside DPNet (the network thread, or the caller of SendTo,
+// DestroyClient, CancelAsyncOperation or Close). DALib's handlers only queue messages under their
+// own locks (CDPClient's also reads GetConnectionInfo, which takes the same lock again), so that
+// is safe for them. A handler on the network thread may still Close the object or drop the last
+// reference: NetLoop then finishes the teardown once it unwinds.
 
 #define NOMINMAX
 #include <winsock2.h>
@@ -25,9 +26,12 @@
 #include "DPNetAdapter.h"
 #include "dpnet_session.h"
 
+#include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <cstdio>
 #include <cstring>
+#include <deque>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -171,6 +175,49 @@ namespace
         bool bStarted = false;
     };
 
+    // Bound like DirectPlay's TCP/IP SP: all interfaces, the given port, else the first free
+    // one of 2302..2400. Bound: the port it took.
+    FUdpSocket OpenSocket(unsigned short Port, unsigned short& Bound)
+    {
+        const unsigned short First = Port != 0 ? Port : kFirstDefaultPort;
+        const unsigned short Last = Port != 0 ? Port : kLastDefaultPort;
+        for (unsigned int Candidate = First; Candidate <= Last; ++Candidate)
+        {
+            FUdpSocket Created(socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
+            if (!Created)
+                return FUdpSocket();
+#if !defined(_WIN32)
+            // PORT(macOS): NetLoop waits with select, whose fd_set holds only descriptors below
+            // FD_SETSIZE on POSIX (a Windows fd_set is a list of handles, with no such limit).
+            if (Created.Get() >= FD_SETSIZE)
+                return FUdpSocket();
+#endif
+#if defined(_WIN32)
+            BOOL Exclusive = TRUE;
+            setsockopt(Created.Get(), SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
+                       reinterpret_cast<const char*>(&Exclusive), sizeof(Exclusive));
+#endif // (macOS and Linux bind exclusively unless SO_REUSEADDR / SO_REUSEPORT is set)
+            sockaddr_in Local{};
+            Local.sin_family = AF_INET;
+            Local.sin_addr.s_addr = htonl(INADDR_ANY);
+            Local.sin_port = htons((unsigned short)Candidate);
+            if (bind(Created.Get(), reinterpret_cast<const sockaddr*>(&Local), sizeof(Local)) == 0)
+            {
+                // An ICMP port-unreachable from a vanished client must not fail the next
+                // recvfrom (Windows reports it as WSAECONNRESET on a UDP socket).
+                BOOL Report = FALSE;
+                DWORD Returned = 0;
+                WSAIoctl(Created.Get(), SIO_UDP_CONNRESET, &Report, sizeof(Report), nullptr, 0,
+                         &Returned, nullptr, nullptr);
+                u_long NonBlocking = 1;
+                ioctlsocket(Created.Get(), FIONBIO, &NonBlocking);
+                Bound = (unsigned short)Candidate;
+                return Created;
+            }
+        }
+        return FUdpSocket();
+    }
+
     // ---------------------------------------------------------------------------------------
     // IDirectPlay8Address: a service provider, a device and named components, as
     // dpnet.dll keeps them. Enough for DALib: SetSP, AddComponent, GetComponentByName, GetURLA.
@@ -202,8 +249,26 @@ namespace
         }
 
         // IDirectPlay8Address
-        STDMETHOD(BuildFromURLW)(WCHAR*) override { return DPNERR_UNSUPPORTED; }
-        STDMETHOD(BuildFromURLA)(CHAR*) override { return DPNERR_UNSUPPORTED; }
+        STDMETHOD(BuildFromURLW)(WCHAR* Url) override
+        {
+            if (Url == nullptr)
+                return DPNERR_INVALIDPOINTER;
+            std::string Narrow;
+            for (; *Url != 0; ++Url)
+            {
+                // A DirectPlay URL is ASCII; anything else is escaped (%XX) in it.
+                if ((uint32_t)*Url > 0x7F)
+                    return DPNERR_INVALIDURL;
+                Narrow += (char)*Url;
+            }
+            return BuildFromUrl(Narrow);
+        }
+        STDMETHOD(BuildFromURLA)(CHAR* Url) override
+        {
+            if (Url == nullptr)
+                return DPNERR_INVALIDPOINTER;
+            return BuildFromUrl(Url);
+        }
         STDMETHOD(Duplicate)(PDIRECTPLAY8ADDRESS* Out) override
         {
             if (Out == nullptr)
@@ -392,6 +457,30 @@ namespace
             return Address;
         }
 
+        // A string component (DPNA_DATATYPE_STRING or _ANSI), as ASCII.
+        bool GetText(const WCHAR* Name, std::string& Out) const
+        {
+            const FComponent* Found = const_cast<FAddressObject*>(this)->Find(Name);
+            if (Found == nullptr)
+                return false;
+            Out.clear();
+            if (Found->Type == DPNA_DATATYPE_STRING)
+            {
+                const WCHAR* Text = reinterpret_cast<const WCHAR*>(Found->Data.data());
+                for (size_t Index = 0;
+                     Index < Found->Data.size() / sizeof(WCHAR) && Text[Index] != 0; ++Index)
+                    Out += (char)Text[Index];
+                return true;
+            }
+            if (Found->Type == DPNA_DATATYPE_STRING_ANSI)
+            {
+                Out.assign(reinterpret_cast<const char*>(Found->Data.data()), Found->Data.size());
+                Out = Out.c_str();
+                return true;
+            }
+            return false;
+        }
+
         bool GetDword(const WCHAR* Name, DWORD& Out) const
         {
             const FComponent* Found = const_cast<FAddressObject*>(this)->Find(Name);
@@ -417,6 +506,116 @@ namespace
                     return &Component;
             }
             return nullptr;
+        }
+
+        // "x-directplay:/key=value;key=value", values %XX-escaped, as dpnet.dll writes them
+        // (GetURLA): provider and device are GUIDs, digits a DWORD, {...} a GUID, else a string.
+        HRESULT BuildFromUrl(const std::string& Url)
+        {
+            static const char kHeader[] = "x-directplay:/";
+            const size_t HeaderSize = sizeof(kHeader) - 1;
+            if (Url.size() < HeaderSize || _strnicmp(Url.c_str(), kHeader, HeaderSize) != 0)
+                return DPNERR_INVALIDURL;
+            FAddressObject Parsed;
+            size_t Start = HeaderSize;
+            while (Start < Url.size())
+            {
+                size_t End = Url.find(';', Start);
+                if (End == std::string::npos)
+                    End = Url.size();
+                const std::string Pair = Url.substr(Start, End - Start);
+                Start = End + 1;
+                if (Pair.empty())
+                    continue;
+                const size_t Equals = Pair.find('=');
+                if (Equals == std::string::npos || Equals == 0)
+                    return DPNERR_INVALIDURL;
+                std::string Value;
+                if (!Unescape(Pair.substr(Equals + 1), Value))
+                    return DPNERR_INVALIDURL;
+                const std::wstring Key(Pair.begin(), Pair.begin() + (std::ptrdiff_t)Equals);
+                GUID Guid{};
+                const bool bGuid = ParseGuid(Value, Guid);
+                if (_wcsicmp(Key.c_str(), DPNA_KEY_PROVIDER) == 0 ||
+                    _wcsicmp(Key.c_str(), DPNA_KEY_DEVICE) == 0)
+                {
+                    if (!bGuid)
+                        return DPNERR_INVALIDURL;
+                    if (_wcsicmp(Key.c_str(), DPNA_KEY_PROVIDER) == 0)
+                        Parsed.SetSP(&Guid);
+                    else
+                        Parsed.SetDevice(&Guid);
+                }
+                else if (bGuid)
+                {
+                    Parsed.AddComponent(Key.c_str(), &Guid, sizeof(Guid), DPNA_DATATYPE_GUID);
+                }
+                else if (!Value.empty() && Value.size() <= 10 &&
+                         Value.find_first_not_of("0123456789") == std::string::npos &&
+                         std::stoull(Value) <= 0xFFFFFFFFull)
+                {
+                    const DWORD Number = (DWORD)std::stoull(Value);
+                    Parsed.AddComponent(Key.c_str(), &Number, sizeof(Number), DPNA_DATATYPE_DWORD);
+                }
+                else
+                {
+                    const std::wstring Wide(Value.begin(), Value.end());
+                    Parsed.AddComponent(Key.c_str(), Wide.c_str(),
+                                        (DWORD)((Wide.size() + 1) * sizeof(WCHAR)),
+                                        DPNA_DATATYPE_STRING);
+                }
+            }
+            bHasSp = Parsed.bHasSp;
+            SpGuid = Parsed.SpGuid;
+            bHasDevice = Parsed.bHasDevice;
+            DeviceGuid = Parsed.DeviceGuid;
+            Components = std::move(Parsed.Components);
+            UserData.clear();
+            return S_OK;
+        }
+
+        static bool Unescape(const std::string& In, std::string& Out)
+        {
+            Out.clear();
+            for (size_t Index = 0; Index < In.size(); ++Index)
+            {
+                if (In[Index] != '%')
+                {
+                    Out += In[Index];
+                    continue;
+                }
+                if (Index + 2 >= In.size() || !std::isxdigit((unsigned char)In[Index + 1]) ||
+                    !std::isxdigit((unsigned char)In[Index + 2]))
+                    return false;
+                Out += (char)std::stoi(In.substr(Index + 1, 2), nullptr, 16);
+                Index += 2;
+            }
+            return true;
+        }
+
+        // "{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}", as GuidText writes it (unescaped).
+        static bool ParseGuid(const std::string& Text, GUID& Out)
+        {
+            if (Text.size() != 38 || Text.front() != '{' || Text.back() != '}' || Text[9] != '-' ||
+                Text[14] != '-' || Text[19] != '-' || Text[24] != '-')
+                return false;
+            std::string Hex;
+            for (size_t Index = 1; Index < 37; ++Index)
+            {
+                if (Text[Index] == '-')
+                    continue;
+                if (!std::isxdigit((unsigned char)Text[Index]))
+                    return false;
+                Hex += Text[Index];
+            }
+            auto Field = [&](size_t Offset, size_t Digits)
+            { return (unsigned long)std::stoul(Hex.substr(Offset, Digits), nullptr, 16); };
+            Out.Data1 = (decltype(Out.Data1))Field(0, 8);
+            Out.Data2 = (unsigned short)Field(8, 4);
+            Out.Data3 = (unsigned short)Field(12, 4);
+            for (size_t Index = 0; Index < 8; ++Index)
+                Out.Data4[Index] = (unsigned char)Field(16 + Index * 2, 2);
+            return true;
         }
 
         static std::string GuidText(const GUID& Guid)
@@ -922,50 +1121,6 @@ namespace
 
         // --- socket and thread ---
 
-        // Bound like DirectPlay's TCP/IP SP: all interfaces, the given port, else the first free
-        // one of 2302..2400. Bound: the port it took.
-        static FUdpSocket OpenSocket(unsigned short Port, unsigned short& Bound)
-        {
-            const unsigned short First = Port != 0 ? Port : kFirstDefaultPort;
-            const unsigned short Last = Port != 0 ? Port : kLastDefaultPort;
-            for (unsigned int Candidate = First; Candidate <= Last; ++Candidate)
-            {
-                FUdpSocket Created(socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP));
-                if (!Created)
-                    return FUdpSocket();
-#if !defined(_WIN32)
-                // PORT(macOS): NetLoop waits with select, whose fd_set holds only descriptors below
-                // FD_SETSIZE on POSIX (a Windows fd_set is a list of handles, with no such limit).
-                if (Created.Get() >= FD_SETSIZE)
-                    return FUdpSocket();
-#endif
-#if defined(_WIN32)
-                BOOL Exclusive = TRUE;
-                setsockopt(Created.Get(), SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
-                           reinterpret_cast<const char*>(&Exclusive), sizeof(Exclusive));
-#endif // (macOS and Linux bind exclusively unless SO_REUSEADDR / SO_REUSEPORT is set)
-                sockaddr_in Local{};
-                Local.sin_family = AF_INET;
-                Local.sin_addr.s_addr = htonl(INADDR_ANY);
-                Local.sin_port = htons((unsigned short)Candidate);
-                if (bind(Created.Get(), reinterpret_cast<const sockaddr*>(&Local), sizeof(Local)) ==
-                    0)
-                {
-                    // An ICMP port-unreachable from a vanished client must not fail the next
-                    // recvfrom (Windows reports it as WSAECONNRESET on a UDP socket).
-                    BOOL Report = FALSE;
-                    DWORD Returned = 0;
-                    WSAIoctl(Created.Get(), SIO_UDP_CONNRESET, &Report, sizeof(Report), nullptr, 0,
-                             &Returned, nullptr, nullptr);
-                    u_long NonBlocking = 1;
-                    ioctlsocket(Created.Get(), FIONBIO, &NonBlocking);
-                    Bound = (unsigned short)Candidate;
-                    return Created;
-                }
-            }
-            return FUdpSocket();
-        }
-
         void CloseSocket()
         {
             Socket = FUdpSocket();
@@ -1105,15 +1260,916 @@ namespace
         std::map<DPNHANDLE, DPNet::FBytes> ReceiveBuffers;
         DPNHANDLE NextBufferHandle = 1;
     };
-}
 
-namespace DPNetAdapter
-{
+    // ---------------------------------------------------------------------------------------
+    // IDirectPlay8Client on DPNet::FClient.
+    //
+    // Two FClients share one socket: one sends the enumeration queries and reads their answers
+    // (datagrams whose first byte is 0), the other holds the connection; a fresh one for every
+    // Connect, as an FClient connects once. The messages, as dpnet.dll sends them to a client:
+    // ENUM_HOSTS_RESPONSE per answer and ASYNC_OP_COMPLETE when an enumeration ends,
+    // CONNECT_COMPLETE once per Connect, RECEIVE, SEND_COMPLETE, and TERMINATE_SESSION when an
+    // established session ends other than by our own Close.
+
+    // Strings from the wire (UTF-16) as WCHAR: a surrogate pair becomes one character where
+    // WCHAR is the 32-bit wchar_t (macOS, Linux).
+    std::basic_string<WCHAR> FromU16(const std::u16string& Text)
+    {
+        std::basic_string<WCHAR> Out;
+        for (size_t Index = 0; Index < Text.size(); ++Index)
+        {
+            const uint32_t Char = Text[Index];
+            if (sizeof(WCHAR) == 4 && Char >= 0xD800 && Char < 0xDC00 && Index + 1 < Text.size() &&
+                Text[Index + 1] >= 0xDC00 && Text[Index + 1] < 0xE000)
+            {
+                Out += (WCHAR)(0x10000 + ((Char - 0xD800) << 10) + (Text[Index + 1] - 0xDC00));
+                ++Index;
+            }
+            else
+            {
+                Out += (WCHAR)Char;
+            }
+        }
+        return Out;
+    }
+
+    GUID FromGuid(const DPNet::FGuid& In)
+    {
+        GUID Out{};
+        Out.Data1 = In.Data1;
+        Out.Data2 = In.Data2;
+        Out.Data3 = In.Data3;
+        std::memcpy(Out.Data4, In.Data4, sizeof(Out.Data4));
+        return Out;
+    }
+
+    bool IsZero(const GUID& Guid)
+    {
+        static const GUID Zero{};
+        return std::memcmp(&Guid, &Zero, sizeof(Guid)) == 0;
+    }
+
+    // A host name or dotted address, IPv4 only (as DPNet's socket is).
+    bool ResolveHost(const std::string& Host, uint16_t Port, DPNet::FAddress& Out)
+    {
+        in_addr Numeric{};
+        if (inet_pton(AF_INET, Host.c_str(), &Numeric) == 1)
+        {
+            sockaddr_in Address{};
+            Address.sin_family = AF_INET;
+            Address.sin_addr = Numeric;
+            Out = FromSockaddr(Address);
+            Out.Port = Port;
+            return true;
+        }
+        addrinfo Hints{};
+        Hints.ai_family = AF_INET;
+        Hints.ai_socktype = SOCK_DGRAM;
+        addrinfo* Found = nullptr;
+        if (getaddrinfo(Host.c_str(), nullptr, &Hints, &Found) != 0 || Found == nullptr)
+            return false;
+        Out = FromSockaddr(*reinterpret_cast<const sockaddr_in*>(Found->ai_addr));
+        Out.Port = Port;
+        freeaddrinfo(Found);
+        return true;
+    }
+
+    class FClientObject final : public IDirectPlay8Client,
+                                private DPNet::ITransport,
+                                private DPNet::IClientEvents
+    {
+    public:
+        FClientObject() = default;
+        ~FClientObject() { Shutdown(); }
+
+        // IUnknown
+        STDMETHOD(QueryInterface)(REFIID Iid, void** Out) override
+        {
+            if (Out == nullptr)
+                return E_POINTER;
+            if (Iid == IID_IUnknown || Iid == IID_IDirectPlay8Client)
+            {
+                AddRef();
+                *Out = static_cast<IDirectPlay8Client*>(this);
+                return S_OK;
+            }
+            *Out = nullptr;
+            return E_NOINTERFACE;
+        }
+        STDMETHOD_(ULONG, AddRef)() override { return (ULONG)InterlockedIncrement(&Refs); }
+        STDMETHOD_(ULONG, Release)() override
+        {
+            const LONG Left = InterlockedDecrement(&Refs);
+            if (Left == 0)
+            {
+                // As FServerObject: dropped by a handler on the network thread, NetLoop deletes it.
+                if (OnNetThread())
+                {
+                    Close(0);
+                    bDeleteOnExit = true;
+                }
+                else
+                {
+                    delete this;
+                }
+            }
+            return (ULONG)Left;
+        }
+
+        // IDirectPlay8Client
+        STDMETHOD(Initialize)(PVOID UserContext, PFNDPNMESSAGEHANDLER Handler, DWORD) override
+        {
+            if (Handler == nullptr)
+                return DPNERR_INVALIDPARAM;
+            std::lock_guard<std::recursive_mutex> Guard(Lock);
+            if (MessageHandler != nullptr)
+                return DPNERR_ALREADYINITIALIZED;
+            if (EnumSession != nullptr || ClosesUnderWay != 0)
+                return DPNERR_ALREADYCLOSING;
+            Winsock.emplace();
+            if (!Winsock->bStarted)
+            {
+                Winsock.reset();
+                return DPNERR_GENERIC;
+            }
+            MessageHandler = Handler;
+            HandlerContext = UserContext;
+            return S_OK;
+        }
+        STDMETHOD(EnumServiceProviders)(const GUID*, const GUID*, DPN_SERVICE_PROVIDER_INFO*,
+                                        PDWORD, PDWORD, DWORD) override
+        {
+            return DPNERR_UNSUPPORTED;
+        }
+        STDMETHOD(EnumHosts)(PDPN_APPLICATION_DESC Desc, IDirectPlay8Address* Host,
+                             IDirectPlay8Address* Device, PVOID UserEnumData,
+                             DWORD UserEnumDataSize, DWORD EnumCount, DWORD RetryInterval,
+                             DWORD TimeOut, PVOID UserContext, DPNHANDLE* AsyncHandle,
+                             DWORD Flags) override
+        {
+            if (Desc == nullptr || Device == nullptr || AsyncHandle == nullptr ||
+                (UserEnumData == nullptr && UserEnumDataSize != 0))
+                return DPNERR_INVALIDPOINTER;
+            if ((Flags & DPNENUMHOSTS_SYNC) != 0)
+                return DPNERR_UNSUPPORTED;
+            std::lock_guard<std::recursive_mutex> Guard(Lock);
+            if (MessageHandler == nullptr || bMuted)
+                return DPNERR_UNINITIALIZED;
+
+            // The host address names the host and maybe its port. Without a port the query goes
+            // to DPNSVR's port, as DirectPlay sends it, and to the first game port, where a DPNet
+            // host (which has no DPNSVR) listens by default. Without a host it is broadcast.
+            FAddressObject* HostAddress = static_cast<FAddressObject*>(Host);
+            std::string HostName;
+            DWORD Port = 0;
+            if (HostAddress != nullptr)
+            {
+                HostAddress->GetText(DPNA_KEY_HOSTNAME, HostName);
+                HostAddress->GetDword(DPNA_KEY_PORT, Port);
+            }
+            if (Port > 0xFFFF)
+                return DPNERR_INVALIDHOSTADDRESS;
+            std::vector<uint16_t> Ports;
+            if (Port != 0)
+                Ports.push_back((uint16_t)Port);
+            else
+                Ports = {(uint16_t)DPNA_DPNSVR_PORT, kFirstDefaultPort};
+            FEnumOp Op;
+            for (const uint16_t Target : Ports)
+            {
+                DPNet::FAddress Address = DPNet::FAddress::Ipv4(255, 255, 255, 255, Target);
+                if (!HostName.empty() && !ResolveHost(HostName, Target, Address))
+                    return DPNERR_INVALIDHOSTADDRESS;
+                if (HostName.empty() && (Flags & DPNENUMHOSTS_NOBROADCASTFALLBACK) != 0)
+                    return DPNERR_ADDRESSING;
+                Op.Targets.push_back(Address);
+            }
+            if (!StartNetwork(Device))
+                return DPNERR_INVALIDDEVICEADDRESS;
+
+            Op.Handle = NextAsyncHandle();
+            Op.UserContext = UserContext;
+            Op.bHasApplication = !IsZero(Desc->guidApplication);
+            Op.Application = ToGuid(Desc->guidApplication);
+            if (UserEnumData != nullptr)
+            {
+                const BYTE* Data = static_cast<const BYTE*>(UserEnumData);
+                Op.UserData.assign(Data, Data + UserEnumDataSize);
+            }
+            // 0: the TCP/IP service provider's defaults (its DPN_SP_CAPS).
+            Op.Left = EnumCount != 0 ? EnumCount : kDefaultEnumCount;
+            Op.Interval = RetryInterval != 0 ? RetryInterval : kDefaultEnumInterval;
+            Op.Timeout = TimeOut != 0 ? TimeOut : kDefaultEnumTimeout;
+            Enums.push_back(std::move(Op));
+            SendEnumQueries(Enums.back(), NowMs());
+            *AsyncHandle = Enums.back().Handle;
+            return DPNSUCCESS_PENDING;
+        }
+        STDMETHOD(CancelAsyncOperation)(DPNHANDLE Handle, DWORD Flags) override
+        {
+            std::lock_guard<std::recursive_mutex> Guard(Lock);
+            if (MessageHandler == nullptr)
+                return DPNERR_UNINITIALIZED;
+            if (Handle != 0)
+            {
+                for (const FEnumOp& Op : Enums)
+                {
+                    if (Op.Handle == Handle)
+                    {
+                        FinishEnum(Handle, DPNERR_USERCANCEL);
+                        return S_OK;
+                    }
+                }
+                if (Phase == EPhase::Connecting && Handle == ConnectHandle)
+                {
+                    CancelConnect();
+                    return S_OK;
+                }
+                return DPNERR_INVALIDHANDLE;
+            }
+            if ((Flags & (DPNCANCEL_ENUM | DPNCANCEL_ALL_OPERATIONS)) != 0)
+                CancelEnums();
+            if ((Flags & (DPNCANCEL_CONNECT | DPNCANCEL_ALL_OPERATIONS)) != 0 &&
+                Phase == EPhase::Connecting)
+                CancelConnect();
+            // Sends are not cancelled: DPNet's link has no way to take a queued message back.
+            // They complete, or fail when the connection goes.
+            return S_OK;
+        }
+        STDMETHOD(Connect)(const DPN_APPLICATION_DESC* Desc, IDirectPlay8Address* Host,
+                           IDirectPlay8Address* Device, const DPN_SECURITY_DESC*,
+                           const DPN_SECURITY_CREDENTIALS*, const void* UserConnectData,
+                           DWORD UserConnectDataSize, void* AsyncContext, DPNHANDLE* AsyncHandle,
+                           DWORD Flags) override
+        {
+            if (Desc == nullptr || Host == nullptr || Device == nullptr ||
+                (UserConnectData == nullptr && UserConnectDataSize != 0))
+                return DPNERR_INVALIDPOINTER;
+            if ((Flags & DPNCONNECT_SYNC) != 0)
+                return DPNERR_UNSUPPORTED;
+            std::lock_guard<std::recursive_mutex> Guard(Lock);
+            if (MessageHandler == nullptr || bMuted)
+                return DPNERR_UNINITIALIZED;
+            if (Phase == EPhase::Connecting)
+                return DPNERR_CONNECTING;
+            if (Phase == EPhase::Connected)
+                return DPNERR_ALREADYCONNECTED;
+
+            FAddressObject* HostAddress = static_cast<FAddressObject*>(Host);
+            std::string HostName;
+            DWORD Port = 0;
+            if (!HostAddress->GetText(DPNA_KEY_HOSTNAME, HostName) || HostName.empty())
+                return DPNERR_INVALIDHOSTADDRESS;
+            if (!HostAddress->GetDword(DPNA_KEY_PORT, Port))
+                Port = kFirstDefaultPort;
+            DPNet::FAddress Target;
+            if (Port == 0 || Port > 0xFFFF || !ResolveHost(HostName, (uint16_t)Port, Target))
+                return DPNERR_INVALIDHOSTADDRESS;
+            if (!StartNetwork(Device))
+                return DPNERR_INVALIDDEVICEADDRESS;
+
+            DPNet::FConnectRequest Request;
+            Request.Application = ToGuid(Desc->guidApplication);
+            Request.Instance = ToGuid(Desc->guidInstance);
+            if (Desc->pwszPassword != nullptr)
+            {
+                Request.bHasPassword = true;
+                Request.Password = ToU16(Desc->pwszPassword);
+            }
+            if (UserConnectData != nullptr)
+            {
+                const BYTE* Data = static_cast<const BYTE*>(UserConnectData);
+                Request.ConnectData.assign(Data, Data + UserConnectDataSize);
+            }
+            uint32_t SessId = 0;
+            while (SessId == 0)
+                SessId = (uint32_t)Random();
+            DPNet::ITransport& Transport = *this;
+            DPNet::IClientEvents& Events = *this;
+            Connection = std::make_unique<DPNet::FClient>(Transport, Events);
+            if (!Connection->Connect(Target, Request, SessId, NowMs()))
+            {
+                Connection.reset();
+                return DPNERR_GENERIC;
+            }
+            Phase = EPhase::Connecting;
+            ConnectHandle = NextAsyncHandle();
+            ConnectContext = AsyncContext;
+            if (AsyncHandle != nullptr)
+                *AsyncHandle = ConnectHandle;
+            return DPNSUCCESS_PENDING;
+        }
+        STDMETHOD(Send)(const DPN_BUFFER_DESC* Buffers, DWORD NumBuffers, DWORD, void* AsyncContext,
+                        DPNHANDLE* AsyncHandle, DWORD Flags) override
+        {
+            if (Buffers == nullptr && NumBuffers != 0)
+                return DPNERR_INVALIDPOINTER;
+            std::vector<uint8_t> Data;
+            for (DWORD Index = 0; Index < NumBuffers; ++Index)
+                Data.insert(Data.end(), Buffers[Index].pBufferData,
+                            Buffers[Index].pBufferData + Buffers[Index].dwBufferSize);
+            if (Data.empty())
+                return DPNERR_INVALIDPARAM;
+            std::lock_guard<std::recursive_mutex> Guard(Lock);
+            if (Phase != EPhase::Connected || Connection == nullptr)
+                return DPNERR_NOCONNECTION;
+            uint64_t Handle = 0;
+            if (!Connection->Send(Data.data(), Data.size(), Flags, AsyncContext, &Handle, NowMs()))
+                return DPNERR_NOCONNECTION;
+            if (AsyncHandle != nullptr)
+                *AsyncHandle = (DPNHANDLE)Handle;
+            return (Flags & DPNSEND_NOCOMPLETE) != 0 ? S_OK : DPNSUCCESS_PENDING;
+        }
+        STDMETHOD(GetSendQueueInfo)(DWORD* NumMsgs, DWORD* NumBytes, DWORD) override
+        {
+            std::lock_guard<std::recursive_mutex> Guard(Lock);
+            uint32_t Messages = 0;
+            uint32_t Bytes = 0;
+            if (Phase != EPhase::Connected || Connection == nullptr ||
+                !Connection->GetSendQueueInfo(Messages, Bytes))
+                return DPNERR_NOCONNECTION;
+            if (NumMsgs != nullptr)
+                *NumMsgs = Messages;
+            if (NumBytes != nullptr)
+                *NumBytes = Bytes;
+            return S_OK;
+        }
+        STDMETHOD(GetApplicationDesc)(DPN_APPLICATION_DESC*, DWORD*, DWORD) override
+        {
+            return DPNERR_UNSUPPORTED;
+        }
+        STDMETHOD(SetClientInfo)(const DPN_PLAYER_INFO*, PVOID, DPNHANDLE*, DWORD) override
+        {
+            return DPNERR_UNSUPPORTED;
+        }
+        STDMETHOD(GetServerInfo)(DPN_PLAYER_INFO*, DWORD*, DWORD) override
+        {
+            return DPNERR_UNSUPPORTED;
+        }
+        STDMETHOD(GetServerAddress)(IDirectPlay8Address**, DWORD) override
+        {
+            return DPNERR_UNSUPPORTED;
+        }
+        STDMETHOD(Close)(DWORD) override
+        {
+            bool bGoodbye = false;
+            {
+                std::lock_guard<std::recursive_mutex> Guard(Lock);
+                if (MessageHandler == nullptr)
+                    return DPNERR_UNINITIALIZED;
+                // Outstanding enumerations and a pending connect complete as cancelled. Then the
+                // handler hears nothing more: no TERMINATE_SESSION for our own Close.
+                CancelEnums();
+                if (Phase == EPhase::Connecting)
+                    CancelConnect();
+                bMuted = true;
+                // Only an established connection is waited for; a refused or cancelled one is
+                // already on its way out.
+                bGoodbye = Connection != nullptr &&
+                           Connection->GetState() == DPNet::FClient::EState::Connected;
+                if (Connection != nullptr)
+                    Connection->Close(NowMs());
+                // From a message handler on the network thread, as FServerObject::Close.
+                if (OnNetThread())
+                {
+                    MessageHandler = nullptr;
+                    HandlerContext = nullptr;
+                    bTeardownOnExit = true;
+                    bStop = true;
+                    return S_OK;
+                }
+                ++ClosesUnderWay;
+            }
+            // The network thread carries the goodbye out; wait for the server to answer it.
+            const DWORD Start = GetTickCount();
+            for (;;)
+            {
+                {
+                    std::lock_guard<std::recursive_mutex> Guard(Lock);
+                    if (!bGoodbye || Connection == nullptr ||
+                        Connection->GetState() == DPNet::FClient::EState::Closed ||
+                        !NetThread.joinable())
+                        break;
+                }
+                if (GetTickCount() - Start > kCloseWaitMs)
+                    break;
+                Sleep(kTickMs);
+            }
+            StopThread();
+            std::lock_guard<std::recursive_mutex> Guard(Lock);
+            Teardown();
+            --ClosesUnderWay;
+            return S_OK;
+        }
+        STDMETHOD(ReturnBuffer)(DPNHANDLE Handle, DWORD) override
+        {
+            std::lock_guard<std::recursive_mutex> Guard(Lock);
+            return ReceiveBuffers.erase(Handle) != 0 ? S_OK : DPNERR_INVALIDHANDLE;
+        }
+        STDMETHOD(GetCaps)(DPN_CAPS* Caps, DWORD) override
+        {
+            if (Caps == nullptr)
+                return DPNERR_INVALIDPOINTER;
+            const DWORD Size = Caps->dwSize;
+            std::memset(Caps, 0, sizeof(*Caps));
+            Caps->dwSize = Size;
+            return S_OK;
+        }
+        // DPNet keeps its own timeouts and retry limits (docs/dpnet.md).
+        STDMETHOD(SetCaps)(const DPN_CAPS*, DWORD) override { return S_OK; }
+        STDMETHOD(SetSPCaps)(const GUID*, const DPN_SP_CAPS*, DWORD) override { return S_OK; }
+        STDMETHOD(GetSPCaps)(const GUID*, DPN_SP_CAPS*, DWORD) override
+        {
+            return DPNERR_UNSUPPORTED;
+        }
+        STDMETHOD(GetConnectionInfo)(DPN_CONNECTION_INFO* Info, DWORD) override
+        {
+            if (Info == nullptr)
+                return DPNERR_INVALIDPOINTER;
+            std::lock_guard<std::recursive_mutex> Guard(Lock);
+            if (Phase != EPhase::Connected || Connection == nullptr)
+                return DPNERR_NOCONNECTION;
+            const DPNet::FLinkStats& Stats = Connection->GetLinkStats();
+            const DWORD Size = Info->dwSize;
+            std::memset(Info, 0, sizeof(*Info));
+            Info->dwSize = Size;
+            Info->dwRoundTripLatencyMS = Stats.RttMs;
+            Info->dwBytesSentGuaranteed = (DWORD)Stats.BytesSent;
+            Info->dwPacketsSentGuaranteed = (DWORD)Stats.FramesSent;
+            Info->dwBytesReceivedGuaranteed = (DWORD)Stats.BytesReceived;
+            Info->dwPacketsReceivedGuaranteed = (DWORD)Stats.FramesReceived;
+            Info->dwPacketsRetried = (DWORD)Stats.FramesRetried;
+            Info->dwPacketsDropped = (DWORD)Stats.FramesDropped;
+            Info->dwMessagesTransmittedNormalPriority = (DWORD)Stats.MessagesSent;
+            Info->dwMessagesTimedOutNormalPriority = (DWORD)Stats.MessagesTimedOut;
+            Info->dwMessagesReceived = (DWORD)Stats.MessagesReceived;
+            return S_OK;
+        }
+        STDMETHOD(RegisterLobby)(DPNHANDLE, struct IDirectPlay8LobbiedApplication*, DWORD) override
+        {
+            return DPNERR_UNSUPPORTED;
+        }
+
+    private:
+        // dpnet.dll's TCP/IP service provider defaults for EnumHosts' 0 arguments.
+        static constexpr DWORD kDefaultEnumCount = 5;
+        static constexpr DWORD kDefaultEnumInterval = 1500;
+        static constexpr DWORD kDefaultEnumTimeout = 1500;
+        // Answers are matched to their enumeration by the query's EnumPayload; this many recent
+        // queries are remembered.
+        static constexpr size_t kMaxEnumPayloads = 256;
+
+        enum class EPhase
+        {
+            Idle, // no connection, or the last one is over
+            Connecting, // Connect called, CONNECT_COMPLETE not yet sent
+            Connected, // CONNECT_COMPLETE sent with success
+        };
+
+        struct FEnumOp
+        {
+            DPNHANDLE Handle = 0;
+            void* UserContext = nullptr;
+            std::vector<DPNet::FAddress> Targets;
+            bool bHasApplication = false;
+            DPNet::FGuid Application;
+            DPNet::FBytes UserData;
+            DWORD Left = 0; // queries still to send; INFINITE: until cancelled
+            DWORD Interval = 0;
+            DWORD Timeout = 0;
+            uint32_t LastSent = 0;
+        };
+
+        // ITransport
+        void SendTo(const DPNet::FAddress& To, const uint8_t* Data, size_t Size) override
+        {
+            if (!Socket || To.Family != 4)
+                return;
+            const sockaddr_in Target = ToSockaddr(To);
+            sendto(Socket.Get(), reinterpret_cast<const char*>(Data), (int)Size, 0,
+                   reinterpret_cast<const sockaddr*>(&Target), sizeof(Target));
+        }
+
+        HRESULT Notify(DWORD MessageId, void* Message)
+        {
+            return MessageHandler != nullptr && !bMuted
+                       ? MessageHandler(HandlerContext, MessageId, Message)
+                       : S_OK;
+        }
+
+        // IClientEvents: each becomes the DPN_MSGID_ message dpnet.dll would send.
+        void ClientEnumResponse(const DPNet::FAddress& From, const DPNet::FEnumResponse& Response,
+                                uint32_t RoundTripMs) override
+        {
+            const auto Payload = EnumPayloads.find(Response.EnumPayload);
+            if (Payload == EnumPayloads.end())
+                return;
+            const FEnumOp* Op = FindEnum(Payload->second);
+            if (Op == nullptr)
+                return; // that enumeration is over: dpnet.dll drops late answers too
+            const std::basic_string<WCHAR> SessionName = FromU16(Response.SessionName);
+            DPN_APPLICATION_DESC Desc{};
+            Desc.dwSize = sizeof(Desc);
+            Desc.dwFlags = Response.Flags;
+            Desc.guidInstance = FromGuid(Response.Instance);
+            Desc.guidApplication = FromGuid(Response.Application);
+            Desc.dwMaxPlayers = Response.MaxPlayers;
+            Desc.dwCurrentPlayers = Response.CurrentPlayers;
+            Desc.pwszSessionName = const_cast<WCHAR*>(SessionName.c_str());
+            if (!Response.ApplicationReserved.empty())
+            {
+                Desc.pvApplicationReservedData =
+                    const_cast<uint8_t*>(Response.ApplicationReserved.data());
+                Desc.dwApplicationReservedDataSize = (DWORD)Response.ApplicationReserved.size();
+            }
+            const FAddressRef Sender(FAddressObject::ForEndpoint(From));
+            const FAddressRef Device(
+                FAddressObject::ForEndpoint(DPNet::FAddress::Ipv4(0, 0, 0, 0, BoundPort)));
+            DPNMSG_ENUM_HOSTS_RESPONSE Message{};
+            Message.dwSize = sizeof(Message);
+            Message.pAddressSender = Sender.get();
+            Message.pAddressDevice = Device.get();
+            Message.pApplicationDescription = &Desc;
+            if (!Response.UserData.empty())
+            {
+                Message.pvResponseData = const_cast<uint8_t*>(Response.UserData.data());
+                Message.dwResponseDataSize = (DWORD)Response.UserData.size();
+            }
+            Message.pvUserContext = Op->UserContext;
+            Message.dwRoundTripLatencyMS = RoundTripMs;
+            Notify(DPN_MSGID_ENUM_HOSTS_RESPONSE, &Message);
+        }
+
+        void ClientConnectComplete(uint32_t Result, const DPNet::FBytes& Reply) override
+        {
+            if (Phase != EPhase::Connecting)
+                return; // cancelled
+            Phase = Result == DPNet::Result::Ok ? EPhase::Connected : EPhase::Idle;
+            DPNMSG_CONNECT_COMPLETE Message{};
+            Message.dwSize = sizeof(Message);
+            Message.hAsyncOp = ConnectHandle;
+            Message.pvUserContext = ConnectContext;
+            Message.hResultCode = (HRESULT)Result;
+            if (!Reply.empty())
+            {
+                Message.pvApplicationReplyData = const_cast<uint8_t*>(Reply.data());
+                Message.dwApplicationReplyDataSize = (DWORD)Reply.size();
+            }
+            ConnectHandle = 0;
+            ConnectContext = nullptr;
+            Notify(DPN_MSGID_CONNECT_COMPLETE, &Message);
+        }
+
+        // The data stays ours until the application returns it, as FServerObject::ServerReceive.
+        void ClientReceive(DPNet::FBytes&& Data) override
+        {
+            if (Phase != EPhase::Connected)
+                return;
+            DPNHANDLE Handle = NextBufferHandle++;
+            if (Handle == 0)
+                Handle = NextBufferHandle++;
+            DPNet::FBytes& Stored = ReceiveBuffers[Handle];
+            Stored = std::move(Data);
+            DPNMSG_RECEIVE Message{};
+            Message.dwSize = sizeof(Message);
+            Message.dpnidSender = HostDpnid();
+            Message.pReceiveData = Stored.data();
+            Message.dwReceiveDataSize = (DWORD)Stored.size();
+            Message.hBufferHandle = Handle;
+            if (Notify(DPN_MSGID_RECEIVE, &Message) != DPNSUCCESS_PENDING)
+                ReceiveBuffers.erase(Handle);
+        }
+
+        void ClientSendComplete(uint64_t Handle, void* UserContext, bool bOk,
+                                uint32_t SendTimeMs) override
+        {
+            DPNMSG_SEND_COMPLETE Message{};
+            Message.dwSize = sizeof(Message);
+            Message.hAsyncOp = (DPNHANDLE)Handle;
+            Message.pvUserContext = UserContext;
+            Message.hResultCode = bOk ? S_OK : DPNERR_CONNECTIONLOST;
+            Message.dwSendTime = SendTimeMs;
+            Notify(DPN_MSGID_SEND_COMPLETE, &Message);
+        }
+
+        // DPNERR_HOSTTERMINATEDSESSION when the server ended it (DestroyClient, or its Close),
+        // with the data it sent; otherwise the connection was lost.
+        void ClientTerminated(bool bByHost, const DPNet::FBytes& Data, DPNet::ECloseReason) override
+        {
+            if (Phase != EPhase::Connected)
+                return;
+            Phase = EPhase::Idle;
+            DPNMSG_TERMINATE_SESSION Message{};
+            Message.dwSize = sizeof(Message);
+            Message.hResultCode = bByHost ? DPNERR_HOSTTERMINATEDSESSION : DPNERR_CONNECTIONLOST;
+            if (bByHost && !Data.empty())
+            {
+                Message.pvTerminateData = const_cast<uint8_t*>(Data.data());
+                Message.dwTerminateDataSize = (DWORD)Data.size();
+            }
+            Notify(DPN_MSGID_TERMINATE_SESSION, &Message);
+        }
+
+        // The server's player, from the name table the server sent.
+        DPNID HostDpnid() const
+        {
+            if (Connection == nullptr)
+                return 0;
+            for (const DPNet::FNameTableEntry& Entry : Connection->GetSessionInfo().Entries)
+            {
+                if ((Entry.Flags & DPNet::EntryFlags::Host) != 0)
+                    return Entry.Dpnid;
+            }
+            return 0;
+        }
+
+        // --- enumeration ---
+
+        DPNHANDLE NextAsyncHandle()
+        {
+            // Apart from the send handles (FClient counts those up from 1).
+            DPNHANDLE Handle = AsyncHandles++;
+            if (Handle == 0)
+                Handle = AsyncHandles++;
+            return Handle;
+        }
+
+        FEnumOp* FindEnum(DPNHANDLE Handle)
+        {
+            for (FEnumOp& Op : Enums)
+            {
+                if (Op.Handle == Handle)
+                    return &Op;
+            }
+            return nullptr;
+        }
+
+        void SendEnumQueries(FEnumOp& Op, uint32_t Now)
+        {
+            for (const DPNet::FAddress& Target : Op.Targets)
+            {
+                const uint16_t Payload = EnumSession->EnumHosts(
+                    Target, Op.bHasApplication ? &Op.Application : nullptr, Op.UserData, Now);
+                EnumPayloads.erase(Payload);
+                EnumPayloads.emplace(Payload, Op.Handle);
+                EnumPayloadOrder.push_back(Payload);
+                if (EnumPayloadOrder.size() > kMaxEnumPayloads)
+                {
+                    const uint16_t Oldest = EnumPayloadOrder.front();
+                    EnumPayloadOrder.pop_front();
+                    // The same payload may have come round again since: only forget the old one.
+                    if (std::count(EnumPayloadOrder.begin(), EnumPayloadOrder.end(), Oldest) == 0)
+                        EnumPayloads.erase(Oldest);
+                }
+            }
+            if (Op.Left != INFINITE)
+                --Op.Left;
+            Op.LastSent = Now;
+        }
+
+        // Each enumeration sends its next query after Interval and ends Timeout after its last.
+        void TickEnums(uint32_t Now)
+        {
+            std::vector<DPNHANDLE> Done;
+            for (FEnumOp& Op : Enums)
+            {
+                if (Op.Left == 0)
+                {
+                    if (Now - Op.LastSent >= Op.Timeout)
+                        Done.push_back(Op.Handle);
+                }
+                else if (Now - Op.LastSent >= Op.Interval)
+                {
+                    SendEnumQueries(Op, Now);
+                }
+            }
+            for (const DPNHANDLE Handle : Done)
+                FinishEnum(Handle, S_OK);
+        }
+
+        // DPN_MSGID_ASYNC_OP_COMPLETE: S_OK when it ran its course, DPNERR_USERCANCEL when
+        // cancelled.
+        void FinishEnum(DPNHANDLE Handle, HRESULT Result)
+        {
+            void* UserContext = nullptr;
+            bool bFound = false;
+            for (auto It = Enums.begin(); It != Enums.end(); ++It)
+            {
+                if (It->Handle == Handle)
+                {
+                    UserContext = It->UserContext;
+                    Enums.erase(It);
+                    bFound = true;
+                    break;
+                }
+            }
+            if (!bFound)
+                return;
+            for (auto It = EnumPayloads.begin(); It != EnumPayloads.end();)
+                It = It->second == Handle ? EnumPayloads.erase(It) : std::next(It);
+            DPNMSG_ASYNC_OP_COMPLETE Message{};
+            Message.dwSize = sizeof(Message);
+            Message.hAsyncOp = Handle;
+            Message.pvUserContext = UserContext;
+            Message.hResultCode = Result;
+            Notify(DPN_MSGID_ASYNC_OP_COMPLETE, &Message);
+        }
+
+        void CancelEnums()
+        {
+            while (!Enums.empty())
+                FinishEnum(Enums.front().Handle, DPNERR_USERCANCEL);
+        }
+
+        // CONNECT_COMPLETE with DPNERR_USERCANCEL; the half-made connection is dropped.
+        void CancelConnect()
+        {
+            if (Connection != nullptr)
+                Connection->Close(NowMs());
+            ClientConnectComplete((uint32_t)DPNERR_USERCANCEL, DPNet::FBytes());
+        }
+
+        // --- socket and thread ---
+
+        // The first Connect or EnumHosts opens the socket on the device address's port (else the
+        // first free one of 2302..2400, as DirectPlay's TCP/IP SP) and starts the network thread.
+        bool StartNetwork(IDirectPlay8Address* Device)
+        {
+            if (EnumSession != nullptr)
+                return true;
+            DWORD Port = 0;
+            static_cast<FAddressObject*>(Device)->GetDword(DPNA_KEY_PORT, Port);
+            if (Port > 0xFFFF)
+                return false;
+            unsigned short Bound = 0;
+            FUdpSocket Opened = OpenSocket((unsigned short)Port, Bound);
+            if (!Opened)
+                return false;
+            // Enumeration without a host name is broadcast.
+            BOOL Broadcast = TRUE;
+            setsockopt(Opened.Get(), SOL_SOCKET, SO_BROADCAST,
+                       reinterpret_cast<const char*>(&Broadcast), sizeof(Broadcast));
+            Socket = std::move(Opened);
+            BoundPort = Bound;
+            DPNet::ITransport& Transport = *this;
+            DPNet::IClientEvents& Events = *this;
+            EnumSession = std::make_unique<DPNet::FClient>(Transport, Events);
+            if (NetThread.joinable())
+                NetThread.join();
+            bStop = false;
+            NetThread = std::thread([this] { NetLoop(); });
+            return true;
+        }
+
+        void NetLoop()
+        {
+            std::vector<char> Buffer(64 * 1024);
+            while (!bStop)
+            {
+                fd_set Readable;
+                FD_ZERO(&Readable);
+                FD_SET(Socket.Get(), &Readable);
+                timeval Timeout{0, (FlLong)(kTickMs * 1000)};
+                select((int)Socket.Get() + 1, &Readable, nullptr, nullptr, &Timeout);
+
+                std::lock_guard<std::recursive_mutex> Guard(Lock);
+                if (EnumSession == nullptr)
+                    break;
+                for (;;)
+                {
+                    sockaddr_in From{};
+                    socklen_t FromSize = sizeof(From);
+                    const int Got = recvfrom(Socket.Get(), Buffer.data(), (int)Buffer.size(), 0,
+                                             reinterpret_cast<sockaddr*>(&From), &FromSize);
+                    if (Got < 0)
+                        break; // WSAEWOULDBLOCK: nothing more queued
+                    if (Got == 0 || From.sin_family != AF_INET)
+                        continue;
+                    const uint8_t* Data = reinterpret_cast<const uint8_t*>(Buffer.data());
+                    // [MC-DPLHP] messages start with a zero byte, [MC-DPL8R] frames never do.
+                    if (Data[0] == 0)
+                        EnumSession->OnDatagram(FromSockaddr(From), Data, (size_t)Got, NowMs());
+                    else if (Connection != nullptr)
+                        Connection->OnDatagram(FromSockaddr(From), Data, (size_t)Got, NowMs());
+                    if (EnumSession == nullptr)
+                        break; // a handler closed us
+                }
+                if (EnumSession == nullptr)
+                    break;
+                if (Connection != nullptr)
+                    Connection->Tick(NowMs());
+                TickEnums(NowMs());
+            }
+
+            // As FServerObject::NetLoop.
+            bool bDelete = false;
+            {
+                std::lock_guard<std::recursive_mutex> Guard(Lock);
+                if (bTeardownOnExit)
+                {
+                    Teardown();
+                    bTeardownOnExit = false;
+                }
+                bDelete = bDeleteOnExit;
+            }
+            if (bDelete)
+            {
+                NetThread.detach();
+                delete this;
+            }
+        }
+
+        // Under Lock.
+        void Teardown()
+        {
+            Connection.reset();
+            EnumSession.reset();
+            Enums.clear();
+            EnumPayloads.clear();
+            EnumPayloadOrder.clear();
+            Phase = EPhase::Idle;
+            ConnectHandle = 0;
+            ConnectContext = nullptr;
+            Socket = FUdpSocket();
+            BoundPort = 0;
+            // As in dpnet.dll, a closed object must be initialized again before it is used.
+            MessageHandler = nullptr;
+            HandlerContext = nullptr;
+            bMuted = false;
+            Winsock.reset();
+        }
+
+        bool OnNetThread() const
+        {
+            return NetThread.joinable() && NetThread.get_id() == std::this_thread::get_id();
+        }
+
+        void StopThread()
+        {
+            bStop = true;
+            if (NetThread.joinable())
+                NetThread.join();
+        }
+
+        void Shutdown()
+        {
+            if (MessageHandler != nullptr)
+                Close(0);
+            StopThread();
+        }
+
+        uint64_t Random()
+        {
+            LARGE_INTEGER Counter;
+            QueryPerformanceCounter(&Counter);
+            RandomState ^= (uint64_t)Counter.QuadPart + 0x9E3779B97F4A7C15ull + (RandomState << 6) +
+                           (RandomState >> 2);
+            return RandomState ^ ((uint64_t)GetCurrentProcessId() << 32);
+        }
+
+        LONG Refs = 1;
+        std::recursive_mutex Lock;
+        PFNDPNMESSAGEHANDLER MessageHandler = nullptr;
+        void* HandlerContext = nullptr;
+        bool bMuted = false; // Close under way: the handler hears nothing more
+        std::optional<FWinsockSession> Winsock;
+        FUdpSocket Socket;
+        unsigned short BoundPort = 0;
+        std::unique_ptr<DPNet::FClient> EnumSession; // also: the network is up
+        std::unique_ptr<DPNet::FClient> Connection;
+        EPhase Phase = EPhase::Idle;
+        DPNHANDLE ConnectHandle = 0;
+        void* ConnectContext = nullptr;
+        std::vector<FEnumOp> Enums;
+        std::map<uint16_t, DPNHANDLE> EnumPayloads;
+        std::deque<uint16_t> EnumPayloadOrder;
+        DPNHANDLE AsyncHandles = 0x40000001;
+        uint64_t RandomState = 0;
+        std::thread NetThread;
+        std::atomic<bool> bStop{false};
+        int ClosesUnderWay = 0;
+        bool bTeardownOnExit = false;
+        bool bDeleteOnExit = false;
+        std::map<DPNHANDLE, DPNet::FBytes> ReceiveBuffers;
+        DPNHANDLE NextBufferHandle = 1;
+    };
+    }
+
+    namespace DPNetAdapter
+    {
     HRESULT CreateServer(IDirectPlay8Server** Out)
     {
         if (Out == nullptr)
             return E_POINTER;
         *Out = new FServerObject();
+        return S_OK;
+    }
+
+    HRESULT CreateClient(IDirectPlay8Client** Out)
+    {
+        if (Out == nullptr)
+            return E_POINTER;
+        *Out = new FClientObject();
         return S_OK;
     }
 
@@ -1124,4 +2180,4 @@ namespace DPNetAdapter
         *Out = new FAddressObject();
         return S_OK;
     }
-}
+    }

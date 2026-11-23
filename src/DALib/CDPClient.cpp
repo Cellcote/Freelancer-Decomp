@@ -11,6 +11,9 @@
 #include "dalib_net.h"
 #include "platform.h"
 #include "CDPNetCodec.h"
+#if defined(FREELANCER_DPNET)
+#include "DPNetAdapter.h"
+#endif
 
 // .data:065ca120 is seeded at DLL load by the static initializer LAB_065c19c0 (__xc table entry
 // .data:065ca004): CALL timeGetTime; MOV [065ca120],EAX.
@@ -37,6 +40,19 @@ namespace
     // Retail DAT_065ca1c8 -- the live CDPClient (set by the ctor, read by GetSendQueueSize).
     // A module global, not a class member: retail exports no such name.
     CDPClient* GActiveClient = nullptr;
+
+    // CoCreateInstance(CLSID_DirectPlay8Address, nullptr, ClsCtx, IID_IDirectPlay8Address, Out).
+    HRESULT CreateAddress(DWORD ClsCtx, IDirectPlay8Address** Out)
+    {
+#if defined(FREELANCER_DPNET)
+        // PORT(dpnet): the port's own DirectPlay (docs/dpnet.md) instead of Microsoft's dpnet.dll.
+        (void)ClsCtx;
+        return DPNetAdapter::CreateAddress(Out);
+#else
+        return CoCreateInstance(CLSID_DirectPlay8Address, nullptr, ClsCtx, IID_IDirectPlay8Address,
+                                (void**)Out);
+#endif
+    }
 }
 
 // Retail DALib.dll.c CDPClient::CDPClient(void) @ 0x2090.
@@ -47,11 +63,23 @@ CDPClient::CDPClient()
     CoInitialize(nullptr);
     bCoInitialized = true;
 
+#if defined(FREELANCER_DPNET)
+    // PORT(dpnet): the port's own DirectPlay (docs/dpnet.md) instead of Microsoft's dpnet.dll.
+    const HRESULT Hr = DPNetAdapter::CreateClient(&Client);
+#else
     const HRESULT Hr = CoCreateInstance(CLSID_DirectPlay8Client, nullptr, CLSCTX_INPROC_SERVER,
                                          IID_IDirectPlay8Client, (void**)(&Client));
+#endif
     if (FAILED(Hr))
     {
-        (*CriticalWarningFn)(0xd4, nullptr);
+#if defined(FREELANCER_DPNET)
+        // PORT(dpnet): the game's CLoginMgr is a static object, made before WinMain installs this
+        // hook, so retail calls a null CriticalWarningFn here when DirectPlay is missing. Without
+        // the hook there is no warning; the client runs on without a network (ConnectToServer
+        // refuses, the other members check Client).
+        if (CriticalWarningFn != nullptr)
+#endif
+            (*CriticalWarningFn)(0xd4, nullptr);
         return;
     }
 
@@ -141,14 +169,18 @@ bool CDPClient::ConnectToServer(const wchar_t* Host, const wchar_t* /*Port*/)
     m_dwPingReceiveCount = 0;
     m_dwPingLastTime = 0;
 
+#if defined(FREELANCER_DPNET)
+    // PORT(dpnet): no DirectPlay client (see the constructor). Retail calls through the null.
+    if (Client == nullptr)
+        return false;
+#endif
+
     IDirectPlay8Address* HostAddr = nullptr;
-    if (FAILED(CoCreateInstance(CLSID_DirectPlay8Address, nullptr, CLSCTX_INPROC_SERVER,
-                                 IID_IDirectPlay8Address, (void**)(&HostAddr))))
+    if (FAILED(CreateAddress(CLSCTX_INPROC_SERVER, &HostAddr)))
         return false;
 
     IDirectPlay8Address* DeviceAddr = nullptr;
-    if (FAILED(CoCreateInstance(CLSID_DirectPlay8Address, nullptr, CLSCTX_INPROC_SERVER,
-                                 IID_IDirectPlay8Address, (void**)(&DeviceAddr))))
+    if (FAILED(CreateAddress(CLSCTX_INPROC_SERVER, &DeviceAddr)))
     {
         HostAddr->Release();
         return false;
@@ -218,13 +250,11 @@ bool CDPClient::EnumerateHosts()
     constexpr DWORD kEnumHostsClsCtx = CLSCTX_INPROC_SERVER | CLSCTX_INPROC_HANDLER | CLSCTX_LOCAL_SERVER;
 
     IDirectPlay8Address* HostAddr = nullptr;
-    if (FAILED(CoCreateInstance(CLSID_DirectPlay8Address, nullptr, kEnumHostsClsCtx,
-                                 IID_IDirectPlay8Address, (void**)(&HostAddr))))
+    if (FAILED(CreateAddress(kEnumHostsClsCtx, &HostAddr)))
         return false;
 
     IDirectPlay8Address* DeviceAddr = nullptr;
-    if (FAILED(CoCreateInstance(CLSID_DirectPlay8Address, nullptr, kEnumHostsClsCtx,
-                                 IID_IDirectPlay8Address, (void**)(&DeviceAddr))))
+    if (FAILED(CreateAddress(kEnumHostsClsCtx, &DeviceAddr)))
     {
         HostAddr->Release();
         return false;
@@ -268,11 +298,9 @@ bool CDPClient::EnumerateHost(const wchar_t* HostAddress, FlULong Port, FlULong 
     IDirectPlay8Address* HostAddr = nullptr;
     IDirectPlay8Address* DeviceAddr = nullptr;
 
-    if (CoCreateInstance(CLSID_DirectPlay8Address, nullptr, CLSCTX_INPROC_SERVER, IID_IDirectPlay8Address,
-                         (void**)(&HostAddr)) != S_OK)
+    if (CreateAddress(CLSCTX_INPROC_SERVER, &HostAddr) != S_OK)
         return false;
-    if (CoCreateInstance(CLSID_DirectPlay8Address, nullptr, CLSCTX_INPROC_SERVER, IID_IDirectPlay8Address,
-                         (void**)(&DeviceAddr)) != S_OK)
+    if (CreateAddress(CLSCTX_INPROC_SERVER, &DeviceAddr) != S_OK)
         return false;
 
     wchar_t Url[0x400];
