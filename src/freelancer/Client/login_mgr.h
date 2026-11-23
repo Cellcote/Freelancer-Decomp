@@ -225,10 +225,10 @@ public:
     // match SelectCharacter(0), i.e. false.
     bool SelectCharacterById(CHARACTER_ID const& CharId);                  // .text:005ab1f0
     // IServer::CharacterSelect, wait for the answer (+0x21c), then copy the record into the
-    // player globals (character_select_equip.cpp) and its name into DAT_006732f0.
+    // player globals (interface/character_select_equip.cpp) and its name into DAT_006732f0.
     bool SelectCharacter(CCharacterSet::CharacterInfo* Info);               // .text:005ab250
     // IClient slot 14 (LAB_005a8240): the CharacterSelect answer -- +0x21c = 1 and the
-    // response fields (character_select_equip.cpp NotifyCharacterSelectComplete).
+    // response fields (interface/character_select_equip.cpp NotifyCharacterSelectComplete).
     void OnCharacterSelectResponse(unsigned int const* Response);           // .text:005ab380
     void SetListServerHost(char const* Host);       // .text:005ab400
     void SetListServerPort(unsigned int Port);      // .text:005ab4b0

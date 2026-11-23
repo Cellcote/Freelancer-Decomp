@@ -8,7 +8,7 @@
 
 #include "common_exports.h"
 
-// DataConfig -- defined in common_dataconfig.cpp.
+// DataConfig -- defined in Common/core/dataconfig.cpp.
 namespace Archetype
 {
     struct ICliObjFactory;

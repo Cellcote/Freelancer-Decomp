@@ -37,8 +37,8 @@
 // 225461-225695) and, where named, from the readers cited on the field. Offset-named members
 // are fields whose type the ctor or a reader confirms but whose meaning is not recovered.
 // Some per-tick methods of this class are still ported as free functions over a raw byte
-// pointer (common_obstacleavoidance.cpp: ClassifyShipObstaclePhase, UpdateShipHeadingBlend, ...) --
-// see their own comments. Definitions: common_pathfind.cpp.
+// pointer (Common/ai/obstacleavoidance.cpp: ClassifyShipObstaclePhase, UpdateShipHeadingBlend, ...) --
+// see their own comments. Definitions: Common/ai/pathfind.cpp.
 // ============================================================================
 class PathfindManager
 {
@@ -166,7 +166,7 @@ public:
     // (padded by 750 / 250 and Field_1FC) holds the ship and lies closest to the target from
     // the own scan list and a 20000-radius spatial query; commits a State 1 escape or asks
     // NudgeObstaclePathPoint for a deflection point (State 0). 4 = nothing reacts, 0 = a commit,
-    // otherwise NudgeObstaclePathPoint's non-zero result. Definition: common_obstacleavoidance.cpp.
+    // otherwise NudgeObstaclePathPoint's non-zero result. Definition: Common/ai/obstacleavoidance.cpp.
     int ClassifyObstaclePhase();
 
     // formerly the free UpdateShipHeadingBlend(Self, Dt) -- FUN_062dc590 (item 1680), RET 4.
@@ -174,7 +174,7 @@ public:
     // an expired timer or a clear bBlendEnabled reset Reaction (State 3, Heading 0); otherwise
     // Reaction.Heading turns from BlendStart towards TargetPosition by the elapsed fraction of
     // the blend (snapping when within acos(0.999)), State 2. Definition:
-    // common_obstacleavoidance.cpp.
+    // Common/ai/obstacleavoidance.cpp.
     void UpdateHeadingBlend(float Dt);
 
     // The sub-record at +0x16C. Its ctor is inlined into PathfindManager's: the member at
@@ -314,6 +314,6 @@ FL_LAYOUT_ASSERT(sizeof(PathfindManager) == 0x580,
 // ObjectDb->GetZoneDb()->slot 0() -- retail makes the GetZoneDb / slot-0 pair twice and keeps
 // the second result (.text:062db7cc-062db7e6). Without one: PhysSystemId = 0. The zone
 // database's type has no published interface; its slot 0 is the PhySys system id getter the
-// launcher line-of-fire probe also calls (common_aifirecontrol.cpp).
+// launcher line-of-fire probe also calls (Common/ai/aifirecontrol.cpp).
 struct IObjDB;
 void SetPathfindObjectDb(PathfindManager* Self, IObjDB* ObjectDb);

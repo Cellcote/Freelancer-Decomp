@@ -33,7 +33,7 @@ Sections not listed here (for example the commented-out `[;Display]` block of th
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `movie_file` | path (repeated) | none | Intro movies, played in order at engine start. Only the **first three** occurrences are kept (counted over the whole file); the rest are ignored. The path is joined as `<data path>\<value>`. | [startup_config.cpp](../../src/freelancer/Client/startup_config.cpp), [engine_init.cpp](../../src/freelancer/Client/engine_init.cpp) |
+| `movie_file` | path (repeated) | none | Intro movies, played in order at engine start. Only the **first three** occurrences are kept (counted over the whole file); the rest are ignored. The path is joined as `<data path>\<value>`. | [startup_config.cpp](../../src/freelancer/Client/startup_config.cpp), [Client/cmn/engine_init.cpp](../../src/freelancer/Client/cmn/engine_init.cpp) |
 
 ## `[ListServer]`
 
@@ -81,7 +81,7 @@ Configures the log channels of the error handler (`FDUMP` output). Read once by 
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `log` | `[where, kind, severity]` (repeated) | none | One output channel per line. **where**: `$Window` (message box), `$Text` (debugger output), or a file name (the file is created/truncated for each run). **kind**: number or char literal such as `'c'`, default `-1` = all kinds. **severity**: default `100`; messages whose severity number is greater than this limit are dropped (lower number = more severe; the shipped comment lists 0 fatal, 1 error, 2 warning, 3 notice, 4+ trace). Kind and severity are parsed as numbers, so `65540`, `'I'` and `0x10004` are all accepted. | [common_errorhandler.cpp](../../src/Common/common_errorhandler.cpp), [main.cpp](../../src/freelancer/Client/main.cpp) |
+| `log` | `[where, kind, severity]` (repeated) | none | One output channel per line. **where**: `$Window` (message box), `$Text` (debugger output), or a file name (the file is created/truncated for each run). **kind**: number or char literal such as `'c'`, default `-1` = all kinds. **severity**: default `100`; messages whose severity number is greater than this limit are dropped (lower number = more severe; the shipped comment lists 0 fatal, 1 error, 2 warning, 3 notice, 4+ trace). Kind and severity are parsed as numbers, so `65540`, `'I'` and `0x10004` are all accepted. | [Common/core/errorhandler.cpp](../../src/Common/core/errorhandler.cpp), [main.cpp](../../src/freelancer/Client/main.cpp) |
 
 After this section the client also opens a fixed channel `FLSpew.txt` in the per-user local data folder (kind -1, severity 7); it is not configured by the INI file. Each channel keeps only the **first 127 characters** of its `where` string. The one-letter kinds in the shipped comment (`R` render, `n` network, `w` warning, `i` instance creation, `r` reputation, `a` archetypes, `c` controllers, `m` missions, `s` second thread, `f` file I/O, `e` explosion/fuse, `d` damage, `A` reload console) come from that comment and from the call sites that raise them; the reader does not check them.
 
@@ -91,7 +91,7 @@ Every key of `[Data]` names a file (or, for `bases`, a loading step). The values
 
 Loading happens in two passes over the same section:
 
-1. `DataConfig::startup` ([common_dataconfig.cpp](../../src/Common/common_dataconfig.cpp)) runs on **both** client and server. It handles the keys marked *both* below. It is reference-counted: a second call only increments the counter and does not re-read the file. After the loop it also loads the binary `AI\state_graph.db` from the Data folder (not an INI file). On the client a progress callback sees every value first and can abort the load.
+1. `DataConfig::startup` ([Common/core/dataconfig.cpp](../../src/Common/core/dataconfig.cpp)) runs on **both** client and server. It handles the keys marked *both* below. It is reference-counted: a second call only increments the counter and does not re-read the file. After the loop it also loads the binary `AI\state_graph.db` from the Data folder (not an INI file). On the client a progress callback sees every value first and can abort the load.
 2. The client then runs `LoadClientIniData` ([dataconfig_progress.cpp](../../src/freelancer/Client/dataconfig_progress.cpp)) for the keys marked *client*. `gate_tunnels` and `jump_effect` are captured earlier by `LoadStartupConfig` and loaded by their own modules later.
 
 | Key | Count in dev file | Side | What the file holds | Loader | Documented in |

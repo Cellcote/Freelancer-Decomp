@@ -6,7 +6,7 @@
 
 #include "server_connect.h"
 
-#include "chat_init.h"          // ChatResetForDisconnect (FUN_0046b170)
+#include "nn/chat_init.h"          // ChatResetForDisconnect (FUN_0046b170)
 #include "common_ini.h"         // RefreshLoadingProgress
 #include "server_pub.h"      // IServer
 #include "common_server_types.h" // SStartupInfo
@@ -15,8 +15,8 @@
 #include "dacom.h"              // FDUMP
 #include "globals.h"            // ShouldSkipLocalServerTick (FUN_0042d740)
 #include "login_mgr.h"
-#include "menu_enter_state.h"   // MenuNavGetIntroModeRequest (DAT_0067c200)
-#include "player_spawn.h"       // SetPlayerConnectionId (DAT_00673344)
+#include "interface/menu_enter_state.h"   // MenuNavGetIntroModeRequest (DAT_0067c200)
+#include "space/player_spawn.h"       // SetPlayerConnectionId (DAT_00673344)
 
 #include <string.h>
 #include <windows.h>

@@ -36,7 +36,7 @@
 //   size 0x39c
 
 #include "server_filter.h"
-#include "wincontrol_base.h"
+#include "interface/wincontrol_base.h"
 
 #include <stddef.h>
 

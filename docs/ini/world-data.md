@@ -18,19 +18,19 @@ Because the keys are processed in file order, the order matters: `universe` must
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `universe` | path | none | `universe.ini`; passed unresolved to `Universe::Startup`, which resolves it against the data path. The directory of this file becomes the root for the `file =` values of `[System]` blocks (section 2). | [common_dataconfig.cpp](../../src/Common/common_dataconfig.cpp#L46) |
-| `constants` | path | none | Constants file (`ReadConstants`); contents described in [data-driven-files.md](data-driven-files.md). | [common_dataconfig.cpp](../../src/Common/common_dataconfig.cpp#L51) |
-| `equipment`, `solar`, `ships`, `asteroids`, `explosions`, `loadouts` | path (repeatable) | none | Archetype files; each repeated key loads one more file. A warning "contains no new definitions" is logged when the loader reports zero new entries. See [archetypes-and-equipment.md](archetypes-and-equipment.md). (`explosions` goes to the simple-archetype loader.) | [common_dataconfig.cpp](../../src/Common/common_dataconfig.cpp#L55) |
-| `bodyparts` / `costumes` | path | none | Section 6. | [common_dataconfig.cpp](../../src/Common/common_dataconfig.cpp#L96) |
-| `bases` | none | none | The value is not read. Presence triggers `BaseDataList_load()`: one `BaseData` is built per base known to the universe, each reading its own base file (section 3). The retail file notes "bases has no filename but the key specifies the load order". | [common_dataconfig.cpp](../../src/Common/common_dataconfig.cpp#L106) |
-| `goods` | path | none | Goods list; see [archetypes-and-equipment.md](archetypes-and-equipment.md). | [common_dataconfig.cpp](../../src/Common/common_dataconfig.cpp#L110) |
-| `markets` | path (repeatable) | none | Market file, section 4. Each repeated key adds one more file to the same base-data list. | [common_dataconfig.cpp](../../src/Common/common_dataconfig.cpp#L114) |
-| `PetalDB` | path | none | Section 8. | [common_dataconfig.cpp](../../src/Common/common_dataconfig.cpp#L118) |
-| `Groups` | path | none | `InitialWorld.ini` as reputation-group list, section 9. (The dev file spells the key `groups`.) | [common_dataconfig.cpp](../../src/Common/common_dataconfig.cpp#L122) |
-| `fuses` | path (repeatable) | none | Each value is only queued (`FuseDB::AddFuseINIFile`); Common does not open the file. The client and server fuse loaders read the queue, see section 10. | [common_dataconfig.cpp](../../src/Common/common_dataconfig.cpp#L135) |
-| `WeaponModDB` | path | none | Section 11. | [common_dataconfig.cpp](../../src/Common/common_dataconfig.cpp#L140) |
-| `NewCharDB` | path | none | Section 7. | [common_dataconfig.cpp](../../src/Common/common_dataconfig.cpp#L145) |
-| `RtcSlider` | path | none | Section 12. (The dev file spells the key `rtcslider`.) | [common_dataconfig.cpp](../../src/Common/common_dataconfig.cpp#L151) |
+| `universe` | path | none | `universe.ini`; passed unresolved to `Universe::Startup`, which resolves it against the data path. The directory of this file becomes the root for the `file =` values of `[System]` blocks (section 2). | [Common/core/dataconfig.cpp](../../src/Common/core/dataconfig.cpp#L46) |
+| `constants` | path | none | Constants file (`ReadConstants`); contents described in [data-driven-files.md](data-driven-files.md). | [Common/core/dataconfig.cpp](../../src/Common/core/dataconfig.cpp#L51) |
+| `equipment`, `solar`, `ships`, `asteroids`, `explosions`, `loadouts` | path (repeatable) | none | Archetype files; each repeated key loads one more file. A warning "contains no new definitions" is logged when the loader reports zero new entries. See [archetypes-and-equipment.md](archetypes-and-equipment.md). (`explosions` goes to the simple-archetype loader.) | [Common/core/dataconfig.cpp](../../src/Common/core/dataconfig.cpp#L55) |
+| `bodyparts` / `costumes` | path | none | Section 6. | [Common/core/dataconfig.cpp](../../src/Common/core/dataconfig.cpp#L96) |
+| `bases` | none | none | The value is not read. Presence triggers `BaseDataList_load()`: one `BaseData` is built per base known to the universe, each reading its own base file (section 3). The retail file notes "bases has no filename but the key specifies the load order". | [Common/core/dataconfig.cpp](../../src/Common/core/dataconfig.cpp#L106) |
+| `goods` | path | none | Goods list; see [archetypes-and-equipment.md](archetypes-and-equipment.md). | [Common/core/dataconfig.cpp](../../src/Common/core/dataconfig.cpp#L110) |
+| `markets` | path (repeatable) | none | Market file, section 4. Each repeated key adds one more file to the same base-data list. | [Common/core/dataconfig.cpp](../../src/Common/core/dataconfig.cpp#L114) |
+| `PetalDB` | path | none | Section 8. | [Common/core/dataconfig.cpp](../../src/Common/core/dataconfig.cpp#L118) |
+| `Groups` | path | none | `InitialWorld.ini` as reputation-group list, section 9. (The dev file spells the key `groups`.) | [Common/core/dataconfig.cpp](../../src/Common/core/dataconfig.cpp#L122) |
+| `fuses` | path (repeatable) | none | Each value is only queued (`FuseDB::AddFuseINIFile`); Common does not open the file. The client and server fuse loaders read the queue, see section 10. | [Common/core/dataconfig.cpp](../../src/Common/core/dataconfig.cpp#L135) |
+| `WeaponModDB` | path | none | Section 11. | [Common/core/dataconfig.cpp](../../src/Common/core/dataconfig.cpp#L140) |
+| `NewCharDB` | path | none | Section 7. | [Common/core/dataconfig.cpp](../../src/Common/core/dataconfig.cpp#L145) |
+| `RtcSlider` | path | none | Section 12. (The dev file spells the key `rtcslider`.) | [Common/core/dataconfig.cpp](../../src/Common/core/dataconfig.cpp#L151) |
 
 Example (synthetic):
 
@@ -55,7 +55,7 @@ Header names tested while walking `universe.ini`: `Time`, `System`, `Base`. Any 
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `seconds_per_day` | float | 60 (built-in days-per-second is 1/60) | `[0]`; the stored days-per-second value is `1.0 / seconds_per_day`. Not validated (0 divides by zero). Only the first occurrence in the block is used (the loop stops after it). | [common_universe.cpp](../../src/Common/common_universe.cpp#L145) |
+| `seconds_per_day` | float | 60 (built-in days-per-second is 1/60) | `[0]`; the stored days-per-second value is `1.0 / seconds_per_day`. Not validated (0 divides by zero). Only the first occurrence in the block is used (the loop stops after it). | [Common/universe/universe.cpp](../../src/Common/universe/universe.cpp#L145) |
 
 ### 2.2 `[System]` (one block per star system)
 
@@ -63,9 +63,9 @@ Repeated blocks add systems; a block whose `nickname` hashes to an id that alrea
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `nickname` | id + string | none | Whole value. Hashed with `CreateID`; the text is also kept. Must come before `file` (the zones read from the system file take the nickname known at that moment as their system id). | [common_universe.cpp](../../src/Common/common_universe.cpp#L165) |
-| `msg_id_prefix` | string | empty | Whole value, truncated to 63 characters (fixed `TString<64>`). Used by the space GCS voice-line lookup. Read by `CommReferrable::read_comm_ini_data`. | [common_watchable.cpp](../../src/Common/common_watchable.cpp#L72) |
-| `file` | path | none | System file, relative to the **directory of `universe.ini`** (not the data path). The file is opened and parsed immediately, in the middle of the block (section 2.4). A file that cannot be opened is skipped silently. | [common_universe.cpp](../../src/Common/common_universe.cpp#L183) |
+| `nickname` | id + string | none | Whole value. Hashed with `CreateID`; the text is also kept. Must come before `file` (the zones read from the system file take the nickname known at that moment as their system id). | [Common/universe/universe.cpp](../../src/Common/universe/universe.cpp#L165) |
+| `msg_id_prefix` | string | empty | Whole value, truncated to 63 characters (fixed `TString<64>`). Used by the space GCS voice-line lookup. Read by `CommReferrable::read_comm_ini_data`. | [Common/object/watchable.cpp](../../src/Common/object/watchable.cpp#L72) |
+| `file` | path | none | System file, relative to the **directory of `universe.ini`** (not the data path). The file is opened and parsed immediately, in the middle of the block (section 2.4). A file that cannot be opened is skipped silently. | [Common/universe/universe.cpp](../../src/Common/universe/universe.cpp#L183) |
 | `strid_name` | int | 0 | `[0]`; string-resource id of the display name. Not validated. | same |
 | `ids_info` | int | 0 | `[0]`; infocard resource id. | same |
 | `visit` | int | 0 | `[0]` cast to an 8-bit value (visit flags). | same |
@@ -80,7 +80,7 @@ The position of a block that has no `pos`/`real_pos` is whatever the previous `[
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `nickname` | id + string | none | Whole value; hashed. An invalid id or a duplicate id is an error and the block is dropped. | [common_universe.cpp](../../src/Common/common_universe.cpp#L865) |
+| `nickname` | id + string | none | Whole value; hashed. An invalid id or a duplicate id is an error and the block is dropped. | [Common/universe/universe.cpp](../../src/Common/universe/universe.cpp#L865) |
 | `strid_name` | int | 0 | `[0]`. | same |
 | `file` | path | none | Base file, **relative to the data path** (read later by `BaseData::read_from_ini`, section 3). | same |
 | `system` | id | 0 | Whole value, hashed: system the base belongs to. | same |
@@ -101,10 +101,10 @@ The position of a block that has no `pos`/`real_pos` is whatever the previous `[
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `nickname`, `name` | id | 0 | Either key; hashed (text is not kept). | [common_universe.cpp](../../src/Common/common_universe.cpp#L349) |
+| `nickname`, `name` | id | 0 | Either key; hashed (text is not kept). | [Common/universe/universe.cpp](../../src/Common/universe/universe.cpp#L349) |
 | `pos` | float x,y,z | zone constructor value | `[0..2]`. | same |
 | `rotate` | float x,y,z | zone constructor value | `[0..2]` Euler angles, converted with `EulerMatrix`. | same |
-| `shape` | enum | invalid | `[0]`, case-insensitive: `sphere`, `ellipsoid`, `BOX`, `CYLINDER`, `RING`, `MESH`. Any other text logs "invalid ZoneShape" and stores the invalid shape. | [common_universe.cpp](../../src/Common/common_universe.cpp#L293) |
+| `shape` | enum | invalid | `[0]`, case-insensitive: `sphere`, `ellipsoid`, `BOX`, `CYLINDER`, `RING`, `MESH`. Any other text logs "invalid ZoneShape" and stores the invalid shape. | [Common/universe/universe.cpp](../../src/Common/universe/universe.cpp#L293) |
 | `size` | float x[,y[,z]] | y,z = 0 | `[0]` required; `[1]`,`[2]` default to 0.0 when empty. | same |
 | `mesh` | string | none | `[0]`; archetype (mesh) name loaded with `Archetype::Load`, used by `MESH` shapes. | same |
 | `edge_fraction` | float | zone constructor value | `[0]`, clamped into 0.0..1.0 (below 0 gives 0, 1 or more gives 1). | same |
@@ -127,7 +127,7 @@ The position of a block that has no `pos`/`real_pos` is whatever the previous `[
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `nickname` | id | carried from the previous `[Object]` | `[0]`. | [common_universe.cpp](../../src/Common/common_universe.cpp#L702) |
+| `nickname` | id | carried from the previous `[Object]` | `[0]`. | [Common/universe/universe.cpp](../../src/Common/universe/universe.cpp#L702) |
 | `base` | nickname | none | Whole value; looked up in the base table. Unknown base logs "get_base failed". | same |
 | `ids_name` | int | 0 | `[0]`; compared with the base's `strid_name`: only when they are equal does the object record itself as the base's space object. | same |
 | `archetype` | id | 0 | `[0]`; used to classify the object as jump gate / jump hole / airlock (from the solar archetype's object type) when `goto` is present. | same |
@@ -139,13 +139,13 @@ The position of a block that has no `pos`/`real_pos` is whatever the previous `[
 
 | Key | Type | Default | Meaning | Source |
 |---|---|---|---|---|
-| `nickname` | id | none | `CreateID` of the whole value. | [common_cobjdb.cpp](../../src/Common/common_cobjdb.cpp#L54) |
+| `nickname` | id | none | `CreateID` of the whole value. | [Common/object/cobjdb.cpp](../../src/Common/object/cobjdb.cpp#L54) |
 | `ids_name` | int | 0 | `[0]`. | same |
 | `infocard_ids`, `ids_info` | int | 0 | Either spelling, `[0]`. | same |
 | `group` | string | empty | Whole value, truncated to 15 characters (`TString<16>`): reputation group name. | same |
 | `archetype` | id | none | Solar archetype; supplies the rank (toughness) of the vibe. | same |
 
-**`[Object]` pool** (`LoadSystemObjectPool`, a separate loader that fills a shared list of records (capacity 300, grows as needed) for other modules). Keys read: `nickname`, `next_ring`, `prev_ring` (strings), `pos` (x,y,z), `archetype` (hashed), `ids_name` (int), `ids_info` / `ids_info_card` / `infocard_ids` (int, any spelling), `goto`, `dock_with` (hashed), `reputation` (string), `visit` (8-bit), `base` (nickname looked up in the base table), `star` (presence only; forces `visit = 1`). Source: [common_universe.cpp](../../src/Common/common_universe.cpp#L565).
+**`[Object]` pool** (`LoadSystemObjectPool`, a separate loader that fills a shared list of records (capacity 300, grows as needed) for other modules). Keys read: `nickname`, `next_ring`, `prev_ring` (strings), `pos` (x,y,z), `archetype` (hashed), `ids_name` (int), `ids_info` / `ids_info_card` / `infocard_ids` (int, any spelling), `goto`, `dock_with` (hashed), `reputation` (string), `visit` (8-bit), `base` (nickname looked up in the base table), `star` (presence only; forces `visit = 1`). Source: [Common/universe/universe.cpp](../../src/Common/universe/universe.cpp#L565).
 
 ---
 
@@ -157,7 +157,7 @@ One file per universe base, named by the `[Base] file =` value in `universe.ini`
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `nickname` | ignored | n/a | Skipped without checking. | [common_basedata.cpp](../../src/Common/common_basedata.cpp#L167) |
+| `nickname` | ignored | n/a | Skipped without checking. | [Common/universe/basedata.cpp](../../src/Common/universe/basedata.cpp#L167) |
 | `start_room` | id | 0 | Whole value. The stored start-room id is `CreateID("<BASEID in hex>_<value>")`, i.e. the room nickname made unique per base. Missing (id stays 0) logs "No start room in base ini file". | same |
 | `price_variance` | float | 0.0 | `[0]`. Not validated. | same |
 | `ship_repair_cost` | float | 0.33 | `[0]`. Not validated. | same |
@@ -166,7 +166,7 @@ One file per universe base, named by the `[Base] file =` value in `universe.ini`
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `nickname` | string | none | Whole value. Room id = `CreateID("<BASEID in hex>_<nickname>")`. | [common_basedata.cpp](../../src/Common/common_basedata.cpp#L206) |
+| `nickname` | string | none | Whole value. Room id = `CreateID("<BASEID in hex>_<nickname>")`. | [Common/universe/basedata.cpp](../../src/Common/universe/basedata.cpp#L206) |
 | `file` | path | none | Room file (section 5), relative to the data path. | same |
 
 A room block missing `nickname` or `file` logs an error and leaves an uninitialised `RoomData` in the base's room list (retail behaviour); any other key logs "Invalid ini data". Room files themselves are read lazily by `RoomData::load` the first time the room is entered.
@@ -192,7 +192,7 @@ file = rooms\xx01_deck.ini
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `base` | nickname | none | Whole value. Selects the base the following `MarketGood` lines belong to. An unknown base nickname logs a warning and leaves the previously selected base unchanged (a block starts with no base selected, so lines before a valid `base` are dropped). | [common_basedata.cpp](../../src/Common/common_basedata.cpp#L386) |
+| `base` | nickname | none | Whole value. Selects the base the following `MarketGood` lines belong to. An unknown base nickname logs a warning and leaves the previously selected base unchanged (a block starts with no base selected, so lines before a valid `base` are dropped). | [Common/universe/basedata.cpp](../../src/Common/universe/basedata.cpp#L386) |
 | `MarketGood` | positional list | n/a | Repeatable. `MarketGood = good, level, rep, min_stock, max_stock, type, price_mult[, ignored]`: see below. Lines for unknown goods, with no selected base, or with every value at its default are dropped. A later line for the same good replaces the earlier entry. | same |
 
 `MarketGood` parameters (all after `[0]` optional; an empty parameter keeps the default):
@@ -220,7 +220,7 @@ Header dispatch:
 
 | Header | Handling | Source |
 |---|---|---|
-| `Room`, `Room_Info` | room information block (5.1) | [common_roomdata.cpp](../../src/Common/common_roomdata.cpp#L590) |
+| `Room`, `Room_Info` | room information block (5.1) | [Common/universe/roomdata.cpp](../../src/Common/universe/roomdata.cpp#L590) |
 | `Room_Sound`, `Sound` | sound block (5.3) | same |
 | `Camera` | camera block (5.2) | same |
 | `CharacterPlacement` | start-script binding (5.4) | same |
@@ -236,13 +236,13 @@ Defaults come from `RoomData::clear()`: both loop flags true, ambient colour (1,
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `set_script` | path | none | Whole value; a Thorn scene script (`.thn`, not INI) loaded with `ThornScriptLoad`. Its entities supply the room's props, lights, cameras and setpoints (placements for characters whose setpoint names follow the `zs`/`zg` convention). No script means no props at all. | [common_roomdata.cpp](../../src/Common/common_roomdata.cpp#L1024) |
+| `set_script` | path | none | Whole value; a Thorn scene script (`.thn`, not INI) loaded with `ThornScriptLoad`. Its entities supply the room's props, lights, cameras and setpoints (placements for characters whose setpoint names follow the `zs`/`zg` convention). No script means no props at all. | [Common/universe/roomdata.cpp](../../src/Common/universe/roomdata.cpp#L1024) |
 | `animation` | string | none | Repeatable. Appends a looping animation name. At most 32 are stored; a 33rd is not bounds-checked in retail. | same |
 | `animation_oneshot` | string | none | Repeatable. As `animation`, played once. | same |
 | `goodscart_script` | path[, priority] | none | `[0]` script, optional `[1]` priority name (hashed; passed through `RtcSlider::validate_setting`, which accepts everything). | same |
 | `cutoff_shadow_z` | float | off | `[0]`; presence turns the cut-off on. | same |
 | `extra_shadow_height_offset` | float | 0.0 | `[0]`. | same |
-| `scene` | list | none | Repeatable ambient script: `scene = [all,] ambient\|traffic\|once, script.thn [, priority]`. A leading `all` (case-insensitive) is dropped. After that exactly 2 or 3 values are required (else an error is logged and the line ignored). Type: `ambient` = 1, `traffic` = 2 (logged as obsolete but stored), `once` = 3; any other word logs an error and the line is ignored. Third value = priority name (hashed). Values are copied into 256-byte buffers without a length check. | [common_roomdata.cpp](../../src/Common/common_roomdata.cpp#L1139) |
+| `scene` | list | none | Repeatable ambient script: `scene = [all,] ambient\|traffic\|once, script.thn [, priority]`. A leading `all` (case-insensitive) is dropped. After that exactly 2 or 3 values are required (else an error is logged and the line ignored). Type: `ambient` = 1, `traffic` = 2 (logged as obsolete but stored), `once` = 3; any other word logs an error and the line is ignored. Third value = priority name (hashed). Values are copied into 256-byte buffers without a length check. | [Common/universe/roomdata.cpp](../../src/Common/universe/roomdata.cpp#L1139) |
 | `mesh`, `background_script`, `background_script_oneshot`, `mission_vendor_type`, `goodscart_script_fighter`, `goodscart_script_elite`, `goodscart_script_freighter`, `is_outside` | any | n/a | Obsolete: warning only. | same |
 | `news_material` | any | n/a | Obsolete: logged as an **error**. | same |
 
@@ -250,14 +250,14 @@ Defaults come from `RoomData::clear()`: both loop flags true, ambient colour (1,
 
 | Key | Type | Default | Meaning | Source |
 |---|---|---|---|---|
-| `name` | string | none | Camera name chosen for the room. The names `debug_detailtest`, `debug_straight_up`, `debug_anim` install fixed built-in poses; any other name selects the first camera of that name found in the `set_script` scene. | [common_roomdata.cpp](../../src/Common/common_roomdata.cpp#L1215) |
+| `name` | string | none | Camera name chosen for the room. The names `debug_detailtest`, `debug_straight_up`, `debug_anim` install fixed built-in poses; any other name selects the first camera of that name found in the `set_script` scene. | [Common/universe/roomdata.cpp](../../src/Common/universe/roomdata.cpp#L1215) |
 | `index`, `near_plane`, `far_plane` | any | n/a | Obsolete: warning only. | same |
 
 ### 5.3 `[Room_Sound]` / `[Sound]`
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `music` | id[, word] | none | `[0]` music id (hashed). `[1]`, if present and equal to `oneshot` (case-insensitive), turns looping off; any other `[1]` leaves looping on. | [common_roomdata.cpp](../../src/Common/common_roomdata.cpp#L1240) |
+| `music` | id[, word] | none | `[0]` music id (hashed). `[1]`, if present and equal to `oneshot` (case-insensitive), turns looping off; any other `[1]` leaves looping on. | [Common/universe/roomdata.cpp](../../src/Common/universe/roomdata.cpp#L1240) |
 | `ambient` | id[, word] | none | As `music`, for the ambient sound. | same |
 
 ### 5.4 `[CharacterPlacement]`
@@ -266,7 +266,7 @@ Does not create a placement; it gives an existing setpoint-derived placement its
 
 | Key | Type | Default | Meaning | Source |
 |---|---|---|---|---|
-| `name` | string | none | Setpoint name (case-insensitive match; the last match wins). Missing logs an error. | [common_roomdata.cpp](../../src/Common/common_roomdata.cpp#L1267) |
+| `name` | string | none | Setpoint name (case-insensitive match; the last match wins). Missing logs an error. | [Common/universe/roomdata.cpp](../../src/Common/universe/roomdata.cpp#L1267) |
 | `start_script` | string | none | Script name stored on the placement (replaces an earlier one). | same |
 | `zoom_in`, `zoom_out` | any | n/a | Obsolete: logged as errors. | same |
 
@@ -278,7 +278,7 @@ Every block appends one placement (even an empty one).
 
 | Key | Type | Default | Meaning | Source |
 |---|---|---|---|---|
-| `name` | string | none | Setpoint name; its frame and name are copied into the placement. An unknown setpoint is an error. Both headers. | [common_roomdata.cpp](../../src/Common/common_roomdata.cpp#L1324) |
+| `name` | string | none | Setpoint name; its frame and name are copied into the placement. An unknown setpoint is an error. Both headers. | [Common/universe/roomdata.cpp](../../src/Common/universe/roomdata.cpp#L1324) |
 | `landing_script` | string | none | Player-ship only. | same |
 | `launching_script` | string | none | Player-ship only. | same |
 
@@ -288,7 +288,7 @@ Every block appends one hotspot (button), even an empty one.
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `name` | string | none | Hotspot name. | [common_roomdata.cpp](../../src/Common/common_roomdata.cpp#L1390) |
+| `name` | string | none | Hotspot name. | [Common/universe/roomdata.cpp](../../src/Common/universe/roomdata.cpp#L1390) |
 | `behavior` | enum | -1 | Case-insensitive; only the first token (split at `,` `;` `/` space) is compared. Values: `ExitDoor`=1, `NewsVendor`=2, `MissionVendor`=3, `Launch`=4, `StartDealer`=5, `FrontDesk`=6, `StartShipDealer`=7, `StartEquipDealer`=8, `MoveRight`=9, `MoveLeft`=10, `VirtualRoom`=11, `Repair`=12. An unknown word stores -1 without any message. | same |
 | `room_switch` | string | none | Room to switch to. | same |
 | `virtual_room` | string | none | Virtual room name. | same |
@@ -304,7 +304,7 @@ Each block appends a flashlight group (`Mode` 1 for `FlashlightSet`, 2 for `Flas
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `color` | float r,g,b | 0 | `[0..2]` used as given. | [common_roomdata.cpp](../../src/Common/common_roomdata.cpp#L53) |
+| `color` | float r,g,b | 0 | `[0..2]` used as given. | [Common/universe/roomdata.cpp](../../src/Common/universe/roomdata.cpp#L53) |
 | `icolor` | float r,g,b | 0 | `[0..2]`, each divided by 255; same destination as `color`, last one wins. | same |
 | `scale`, `gap`, `blink`, `endpause` | float | 0 | `[0]`. | same |
 | `hardpoint` | string | none | Repeatable; appends a hardpoint name. `hardpoint` and `setpoint` share one counter and a 64-slot array that is not bounds-checked. | same |
@@ -321,7 +321,7 @@ An unopenable file logs an error. The file is a sequence of sections; the loader
 
 | Section | Handling | Source |
 |---|---|---|
-| `[Skeleton]` | Resets the remembered sex to `none`, then reads `sex` and `nomotion`. | [common_costume.cpp](../../src/Common/common_costume.cpp#L422) |
+| `[Skeleton]` | Resets the remembered sex to `none`, then reads `sex` and `nomotion`. | [Common/archetype/costume.cpp](../../src/Common/archetype/costume.cpp#L422) |
 | `[Animations]` | `anim` and `preload` names (below). | same |
 | `[PetalAnimations]` | Only `anim` is read; each section is stored as one separate list. | same |
 | `[DetailSwitchTable]` | Switch table (6.2). Each section appends a table and becomes the "current" table. | same |
@@ -330,17 +330,17 @@ An unopenable file logs an error. The file is a sequence of sections; the loader
 
 | Section.Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `[Skeleton] sex` | enum | `none` | `none` (0), `male` (1), `female` (2), case-insensitive. An unknown word leaves the previous value (0 after the header reset). | [common_costume.cpp](../../src/Common/common_costume.cpp#L452) |
+| `[Skeleton] sex` | enum | `none` | `none` (0), `male` (1), `female` (2), case-insensitive. An unknown word leaves the previous value (0 after the header reset). | [Common/archetype/costume.cpp](../../src/Common/archetype/costume.cpp#L452) |
 | `[Skeleton] nomotion` | any | n/a | Obsolete: warning only. | same |
-| `[Animations] anim` | string | none | Repeatable; adds an animation name to the global list unless already present (case-insensitive). | [common_costume.cpp](../../src/Common/common_costume.cpp#L472) |
+| `[Animations] anim` | string | none | Repeatable; adds an animation name to the global list unless already present (case-insensitive). | [Common/archetype/costume.cpp](../../src/Common/archetype/costume.cpp#L472) |
 | `[Animations] preload` | string | none | Repeatable; adds to the preload list (same de-duplication). | same |
-| `[PetalAnimations] anim` | string | none | Repeatable, de-duplicated within the section. `preload` is not accepted here. | [common_costume.cpp](../../src/Common/common_costume.cpp#L498) |
+| `[PetalAnimations] anim` | string | none | Repeatable, de-duplicated within the section. `preload` is not accepted here. | [Common/archetype/costume.cpp](../../src/Common/archetype/costume.cpp#L498) |
 
 ### 6.2 `[DetailSwitchTable]`
 
 | Key | Type | Default | Meaning | Source |
 |---|---|---|---|---|
-| `switch` | float, float | none | Repeatable `switch = distance, level`; appended to the table in file order. Retail requires the keys in descending order (the evaluator assumes it); an empty table faults at use. Not validated. | [common_costume.cpp](../../src/Common/common_costume.cpp#L309) |
+| `switch` | float, float | none | Repeatable `switch = distance, level`; appended to the table in file order. Retail requires the keys in descending order (the evaluator assumes it); an empty table faults at use. Not validated. | [Common/archetype/costume.cpp](../../src/Common/archetype/costume.cpp#L309) |
 | `fovx` | float | 40 (stored as 20.0 = half) | `[0]` full horizontal FOV in degrees; stored halved. | same |
 | `sizex` | float | 1280 | `[0]` reference screen width in pixels. | same |
 
@@ -348,7 +348,7 @@ An unopenable file logs an error. The file is a sequence of sections; the loader
 
 | Key | Type | Default | Meaning | Source |
 |---|---|---|---|---|
-| `nickname` | string / number | empty | Whole value. Id = the text parsed as a number if it parses to non-zero, otherwise `CreateID(text)`. An accessory without a nickname is still stored under the id of the empty string. | [common_costume.cpp](../../src/Common/common_costume.cpp#L379) |
+| `nickname` | string / number | empty | Whole value. Id = the text parsed as a number if it parses to non-zero, otherwise `CreateID(text)`. An accessory without a nickname is still stored under the id of the empty string. | [Common/archetype/costume.cpp](../../src/Common/archetype/costume.cpp#L379) |
 | `mesh` | string | empty | Mesh name. | same |
 | `hardpoint` | string | empty | Hardpoint on the accessory. | same |
 | `body_hardpoint` | string | empty | Hardpoint on the character it attaches to. | same |
@@ -360,7 +360,7 @@ A second accessory with an equal id keeps the first.
 
 | Key | Type | Default | Meaning | Source |
 |---|---|---|---|---|
-| `nickname` | string / number | none | Id as for accessories. | [common_costume.cpp](../../src/Common/common_costume.cpp#L334) |
+| `nickname` | string / number | none | Id as for accessories. | [Common/archetype/costume.cpp](../../src/Common/archetype/costume.cpp#L334) |
 | `mesh` | string | none | Mesh name. A part with an empty `nickname` or empty `mesh` is dropped silently. | same |
 | `multilevel` | any | n/a | Obsolete: warning only. | same |
 
@@ -372,7 +372,7 @@ An unopenable file logs an error. Headers other than `Costume` log a warning and
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `nickname` | string / number | 0 | Id as for accessories. A block without `nickname` is inserted with id 0. | [common_costume.cpp](../../src/Common/common_costume.cpp#L551) |
+| `nickname` | string / number | 0 | Id as for accessories. A block without `nickname` is inserted with id 0. | [Common/archetype/costume.cpp](../../src/Common/archetype/costume.cpp#L551) |
 | `accessory` | nickname | none | Repeatable; up to 8 accessories (the port drops the ninth; retail overruns the record). An unknown accessory logs a warning. | same |
 | `Body`, `Head`, `LeftHand`, `RightHand` | nickname | none | The key is the body-part type (compared case-insensitively); the value is the nickname of a part of that type defined in `bodyparts`. An unknown type logs "Invalid part type"; an unknown part logs a warning. The first part with a non-zero sex fixes the costume's gender. | same |
 
@@ -388,7 +388,7 @@ Read by `NewChar::Database::Load`. An unopenable file logs an error and returns 
 
 | Key | Type | Default | Meaning | Source |
 |---|---|---|---|---|
-| `nickname` | id | 0 | Whole value. | [common_newchar.cpp](../../src/Common/common_newchar.cpp#L28) |
+| `nickname` | id | 0 | Whole value. | [Common/player/newchar.cpp](../../src/Common/player/newchar.cpp#L28) |
 | `rep_group` | string | empty | Reputation group the new player starts in. | same |
 | `base` | nickname | none | Repeatable; each value adds a selectable home base (the record `{CreateID(name), name}` goes into a global table used for `%%Home_Base%%`). | same |
 | `package` | id | none | Repeatable; adds a package nickname to the faction's set. | same |
@@ -429,7 +429,7 @@ Any other header or key is ignored.
 
 | Key | Type | Default | Meaning | Source |
 |---|---|---|---|---|
-| `room`, `cart`, `prop` | list | none | Repeatable `key = nickname, mesh [, extra ...]`. `[0]` nickname (hashed), `[1]` mesh name, `[2..]` up to 16 extra names (extras beyond 16 are dropped in the port; retail overruns). A line missing nickname or mesh logs "Invalid PetalDB entry" but is still stored. The first record per nickname within a category stays. | [common_fuses.cpp](../../src/Common/common_fuses.cpp#L159) |
+| `room`, `cart`, `prop` | list | none | Repeatable `key = nickname, mesh [, extra ...]`. `[0]` nickname (hashed), `[1]` mesh name, `[2..]` up to 16 extra names (extras beyond 16 are dropped in the port; retail overruns). A line missing nickname or mesh logs "Invalid PetalDB entry" but is still stored. The first record per nickname within a category stays. | [Common/equip/fuses.cpp](../../src/Common/equip/fuses.cpp#L159) |
 
 ---
 
@@ -444,7 +444,7 @@ Any other header or key is ignored.
 
 | Position | Expected key | Type | Default | Meaning | Source |
 |---|---|---|---|---|---|
-| 1 | `nickname` | string (<= 15 chars) | empty | Group nickname; hashed with the 16-bit `MakeId`. A group with an id already present reuses the existing record. | [common_reputation.cpp](../../src/Common/common_reputation.cpp#L118) |
+| 1 | `nickname` | string (<= 15 chars) | empty | Group nickname; hashed with the 16-bit `MakeId`. A group with an id already present reuses the existing record. | [Common/player/reputation.cpp](../../src/Common/player/reputation.cpp#L118) |
 | 2 | `ids_name` | int | n/a | `[0]` truncated from float. | same |
 | 3 | `ids_info` | int | 0 | `[0]`. | same |
 | 4 | `ids_short_name` | int | 0 | `[0]`. | same |
@@ -453,7 +453,7 @@ Remaining lines of the block (for example `rep`) are ignored by `Startup`. The `
 
 | Key | Type | Default | Meaning | Source |
 |---|---|---|---|---|
-| `rep` | float, nickname | none | Repeatable `rep = value, other_group`: the group's feeling toward `other_group` (`MakeId`). A pair already present keeps its first value. A `[Group]` block with no `rep` line logs "save game has corrupted reputation data"; a group name that matches no loaded group skips its lines. | [common_reputation.cpp](../../src/Common/common_reputation.cpp#L208) |
+| `rep` | float, nickname | none | Repeatable `rep = value, other_group`: the group's feeling toward `other_group` (`MakeId`). A pair already present keeps its first value. A `[Group]` block with no `rep` line logs "save game has corrupted reputation data"; a group name that matches no loaded group skips its lines. | [Common/player/reputation.cpp](../../src/Common/player/reputation.cpp#L208) |
 
 The saver writes the same block shape (`nickname`, then one `rep = <value>, <group>` per relation) through the save-game writer.
 
@@ -465,10 +465,10 @@ Common only queues the (resolved) paths in `FuseDB::m_FuseINIFiles`; no file is 
 
 | Section.Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `[fuse] name` | id | 0 | Whole value, hashed (the fuse nickname). | [common_fuses.cpp](../../src/Common/common_fuses.cpp#L538) |
+| `[fuse] name` | id | 0 | Whole value, hashed (the fuse nickname). | [Common/equip/fuses.cpp](../../src/Common/equip/fuses.cpp#L538) |
 | `[fuse] lifetime` | float | -1.0 | `[0]`, seconds; -1 means unlimited. | same |
 | `[fuse] death_fuse` | bool | false | `[0]`; text accepts exactly `true`/`1`/`false`/`0`, anything else logs an error. | same |
-| action `at_t` | float[, float] | -1.0 / -1.0 | `[0]` trigger time (seconds from ignition); an optional `[1]` turns it into a random range `[at_t, at_t_end]`, picked once with `rand()`. Consumed by every action subclass through `FuseAction::ReadFuseActionValue`. | [common_fuses.cpp](../../src/Common/common_fuses.cpp#L448) |
+| action `at_t` | float[, float] | -1.0 / -1.0 | `[0]` trigger time (seconds from ignition); an optional `[1]` turns it into a random range `[at_t, at_t_end]`, picked once with `rand()`. Consumed by every action subclass through `FuseAction::ReadFuseActionValue`. | [Common/equip/fuses.cpp](../../src/Common/equip/fuses.cpp#L448) |
 
 ---
 
@@ -478,7 +478,7 @@ Common only queues the (resolved) paths in `FuseDB::m_FuseINIFiles`; no file is 
 
 | Key | Type | Default | Meaning | Source |
 |---|---|---|---|---|
-| `nickname` | id | none | Whole value; creates (or reuses) the weapon-type entry and makes it current. | [common_fuses.cpp](../../src/Common/common_fuses.cpp#L257) |
+| `nickname` | id | none | Whole value; creates (or reuses) the weapon-type entry and makes it current. | [Common/equip/fuses.cpp](../../src/Common/equip/fuses.cpp#L257) |
 | `shield_mod` | id, float | n/a | Repeatable `shield_mod = shield_type, multiplier`. Ignored while no `nickname` has been seen in the block. The first value per shield type wins. A pair that is absent at query time yields a multiplier of 1.0. | same |
 
 Example (synthetic): `shield_mod = shield_type_a, 0.75`.
@@ -491,7 +491,7 @@ Example (synthetic): `shield_mod = shield_type_a, 0.75`.
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `set` | name, float | none | Repeatable `set = feature, threshold`. Both parameters required (else a warning, line ignored). The feature is enabled when the slider value is greater than or equal to the threshold. The first definition of a name wins. | [common_rtcslider.cpp](../../src/Common/common_rtcslider.cpp#L59) |
+| `set` | name, float | none | Repeatable `set = feature, threshold`. Both parameters required (else a warning, line ignored). The feature is enabled when the slider value is greater than or equal to the threshold. The first definition of a name wins. | [Common/core/rtcslider.cpp](../../src/Common/core/rtcslider.cpp#L59) |
 | `set_less` | name, float | none | As `set`, but the feature is enabled when the slider value is strictly below the threshold. | same |
 
 A feature name with no entry is reported as a warning at query time and treated as enabled. `fps_20_cap` and `fps_30_cap` are looked up by name for the frame-rate cap (20 fps, then 30 fps, else 200). Room files may reference setting names as priorities (section 5); no check is made that a name exists.
@@ -504,7 +504,7 @@ A feature name with no entry is reported as a warning at query time and treated 
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `log` | list | none | Repeatable `log = where[, kind[, severity]]`, one log channel per line (channels are pushed to the front of the list, except `$Window` channels, which are appended). `[0]` where: `$Text` (debugger output), `$Window` (message box, case-insensitive match on the `$` names) or any other text = file name, opened with `"wb"` (truncated). Longer than 127 characters is cut. `[1]` kind, default -1 (all kinds): a number or a quoted character such as `'c'` (character literals are accepted by the number parser); it is compared with the message flags shifted right by 4. `[2]` severity limit, default 100: messages whose severity (the low nibble of the message flags; 1 = error, 2 = warning, 3 = notice in the flags the code uses) is numerically above the limit are dropped. Neither `[1]` nor `[2]` is validated. A channel that cannot be activated (file cannot be opened) is dropped. | [common_errorhandler.cpp](../../src/Common/common_errorhandler.cpp#L381) |
+| `log` | list | none | Repeatable `log = where[, kind[, severity]]`, one log channel per line (channels are pushed to the front of the list, except `$Window` channels, which are appended). `[0]` where: `$Text` (debugger output), `$Window` (message box, case-insensitive match on the `$` names) or any other text = file name, opened with `"wb"` (truncated). Longer than 127 characters is cut. `[1]` kind, default -1 (all kinds): a number or a quoted character such as `'c'` (character literals are accepted by the number parser); it is compared with the message flags shifted right by 4. `[2]` severity limit, default 100: messages whose severity (the low nibble of the message flags; 1 = error, 2 = warning, 3 = notice in the flags the code uses) is numerically above the limit are dropped. Neither `[1]` nor `[2]` is validated. A channel that cannot be activated (file cannot be opened) is dropped. | [Common/core/errorhandler.cpp](../../src/Common/core/errorhandler.cpp#L381) |
 
 Example (synthetic):
 

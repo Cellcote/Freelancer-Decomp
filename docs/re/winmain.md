@@ -1,6 +1,6 @@
 # WinMain: client start-up order
 
-How `freelancer.exe` comes up to the game loop and in what order it depends on the other modules. Source: retail exe `WinMain` (`FUN_005b2f50`, source file `E:\FL\Scratch\Source\Client\main.cpp`); our code: `src/freelancer/Client/main.cpp`, `engine_init.cpp`. The status of individual functions lives in decomp-tracker; exe gaps are in [freelancer.md](freelancer.md).
+How `freelancer.exe` comes up to the game loop and in what order it depends on the other modules. Source: retail exe `WinMain` (`FUN_005b2f50`, source file `E:\FL\Scratch\Source\Client\main.cpp`); our code: `src/freelancer/Client/main.cpp`, `Client/cmn/engine_init.cpp`. The status of individual functions lives in decomp-tracker; exe gaps are in [freelancer.md](freelancer.md).
 
 ## Order
 

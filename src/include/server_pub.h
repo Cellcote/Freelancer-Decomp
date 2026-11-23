@@ -934,7 +934,7 @@ namespace Player {
 //     emits and exports its own copy, with its own ??_7 (emitted with the copy
 //     constructor). There is exactly one body per member, here;
 //   * the seven Common-only members have their only bodies in
-//     src/Common/common_remotephysics.cpp. Server.dll and freelancer.exe declare them
+//     src/Common/physics/remotephysics.cpp. Server.dll and freelancer.exe declare them
 //     through the same dllexport class but define none, so their references (the
 //     ctor, Doit, Reset, CheckForSync calls, slot 1 of their ??_7, and the destructor
 //     their deleting destructors call) bind to Common.lib's import thunks -- the
@@ -1251,7 +1251,7 @@ FL_LAYOUT_ASSERT(sizeof(CRemotePhysicsSimulation) == 0x2E8, "CRemotePhysicsSimul
 // .text:06d4d672 (FUN_06d4ccd0), which compares type descriptors by name across modules,
 // then reads the CRemotePhysicsSimulation base's sample count (+0x388 = +0xd0 + 0x2b8)
 // and latest sample (+0xe0 = +0xd0 + 0x10) through that base's inline accessors.
-// Defined in src/Common/common_remotephysics.cpp.
+// Defined in src/Common/physics/remotephysics.cpp.
 // ============================================================================
 class CRemotePhysicsController : public IVP_Controller_Golem, public CRemotePhysicsSimulation
 {
@@ -1292,8 +1292,8 @@ FL_LAYOUT_ASSERT(sizeof(CRemotePhysicsController) == 0x3C0,
 // (??0 default and copy, ??1, ??4, ??_7, free) from Common.dll (ords 3, 4, 495,
 // 697, 962, 2562), Server.dll (1, 2, 18, 23, 34, 483) AND freelancer.exe (1, 2,
 // 14, 15, 25, 58), with identical bodies, so each of the three modules expands
-// OWNERLIST_CARGODESC_EXPORTS once (src/Common/common_goodinfo.cpp,
-// src/Server/server_classes.cpp, src/freelancer/Client/client_objdb.cpp).
+// OWNERLIST_CARGODESC_EXPORTS once (src/Common/archetype/goodinfo.cpp,
+// src/Server/server_classes.cpp, src/freelancer/Client/space/objdb.cpp).
 // ============================================================================
 namespace pub {
 namespace SpaceObj {

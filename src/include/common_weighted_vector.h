@@ -146,7 +146,7 @@ public:
 };
 
 // Retail Common.dll exports the unsigned int instantiation. The explicit instantiation
-// definition is in common_equipdesc.cpp; importing modules take it from Common.dll.
+// definition is in Common/archetype/equipdesc.cpp; importing modules take it from Common.dll.
 #ifndef COMMON_EXPORTS
 extern template class COMMON_API weighted_vector<unsigned int>;
 #endif

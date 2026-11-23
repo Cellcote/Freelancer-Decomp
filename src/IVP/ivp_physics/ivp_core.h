@@ -127,7 +127,7 @@ public:
     //     `FSUB float ptr [ESI + 0x4]`, where ESI is `MOV ESI,[EBX + 0x98]`
     //     (.text:0634ec3d) and IVP_Real_Object+0x98 is `IVP_Core* core`. Receiver proven,
     //     not assumed from the offset.
-    //   * common_physys.cpp had already recorded, independently, that retail uses this
+    //   * Common/physics/physys.cpp had already recorded, independently, that retail uses this
     //     field as a radius (see its case-3 comment).
     //   * The apparent counter-evidence dissolves: `DAngularLimitFactor = 0.5f / this`
     //     (ivp_core.cpp) is exactly how a RADIUS converts a linear half-displacement into
@@ -366,7 +366,7 @@ public:
     // is left uninitialized, exactly as before this pass added the real,
     // parameterized retail constructor below). NOT a retail function --
     // preserved solely so this port's separate PhySys reimplementation
-    // (common_physys.cpp's BuildIVP_Real/BuildIVP_Sphere, `new IVP_Core()`)
+    // (Common/physics/physys.cpp's BuildIVP_Real/BuildIVP_Sphere, `new IVP_Core()`)
     // keeps compiling and behaving identically; that code path populates
     // every field itself rather than going through retail's own construction
     // chain (see IVP_Real_Object::EnsureInSimulation's own comment on why
@@ -750,7 +750,7 @@ public:
     // 2817; the function's own body is elsewhere in the listing). D-
     // rotinertia-selector pass (2026-09-10): this is the SAME retail function
     // already ported, file-local, as PhySys_RecomputeInverseInertia in
-    // common_physys.cpp (that copy operates on raw byte offsets into an
+    // Common/physics/physys.cpp (that copy operates on raw byte offsets into an
     // opaque `void* Core` for the separate PhySys reimplementation's own
     // callers -- PhySys::SetMass/SetMomentOfInertia -- and is `static` there,
     // so it cannot be called from this retail-accurate IVP_* subsystem

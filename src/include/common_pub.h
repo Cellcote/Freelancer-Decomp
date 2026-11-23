@@ -1369,7 +1369,7 @@ struct DirectiveCallback
 {
     // Slot 0, and the only virtual. Retail 0x62b01f0 is
     // LaunchAction::OnDirectiveComplete, still the only identified override
-    // (see common_launchaction.cpp). Dispatched when a queued AI directive this
+    // (see Common/object/launchaction.cpp). Dispatched when a queued AI directive this
     // callback was registered for finishes.
     virtual void OnDirectiveComplete(int ResultWord11c, int ResultWord118) = 0;
 };

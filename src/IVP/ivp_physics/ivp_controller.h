@@ -50,7 +50,7 @@
 // is quoted at get_controller_priority below). The sentence that used to stand
 // here -- "this port has no concrete IVP_Controller subclass yet, so
 // Core->Controllers is always empty and nothing calls through them" -- is no
-// longer true: FLControllerGolem (src/Common/common_physys.cpp, RTTI name from
+// longer true: FLControllerGolem (src/Common/physics/physys.cpp, RTTI name from
 // the COL trail at .rdata:0639c1c4) is a real one, and its constructor calls
 // IVP_Core::register_controller(this) exactly as retail does.
 class IVP_Core;
@@ -61,7 +61,7 @@ class IVP_Environment;
 // overrides mangle it as PAVIVP_Event_Sim@@ (e.g.
 // ?do_simulation_controller@CEEngine@@MAEXPAVIVP_Event_Sim@@PAV?$IVP_U_Vector@VIVP_Core@@@@@Z).
 // Recovered 2026-09-17 (lane claude:w19-integrator, while porting LAB_06343150) and moved
-// here from common_physys.cpp once slot 4 got its real signature.
+// here from Common/physics/physys.cpp once slot 4 got its real signature.
 //
 // Layout proven from the one retail site that BUILDS one, FUN_063499c0
 // (.text:063499c0-06349a57), which fills a 3-dword stack local from the environment and then
@@ -181,7 +181,7 @@ public:
     // 062bb960; all `...do_simulation_controller@...@@?AEXPAVIVP_Event_Sim@@
     // PAV?$IVP_U_Vector@VIVP_Core@@@@@Z`, RET 0x8). _purecall in PhySys::Controller's
     // table, so every concrete controller overrides it; FLControllerGolem's force
-    // integrator LAB_06343150 is its override (common_physys.cpp).
+    // integrator LAB_06343150 is its override (Common/physics/physys.cpp).
     // Retail's only dispatcher is the per-PSI controller loop FUN_063496a0
     // (.text:063498fa-0634990d: `PUSH element+4; PUSH EBX(event); CALL [EDX+0x10]`),
     // ported as IVP_Simulation_Unit_Process_One_Psi_Step (ivp_simulation_unit.cpp), which
@@ -310,7 +310,7 @@ FL_LAYOUT_ASSERT(sizeof(IVP_Controller_Independent) == 0x4,
 // read). PORT-LOCAL NAME: retail's type name is not in any binary. The split mirrors retail's
 // own construction of the block: FUN_06343020 (the whole 0x38-byte block) first calls
 // FUN_06342c40, which zero-fills exactly these nine dwords and sets their defaults, then adds
-// its own five (.text:06343028-06343041). FLControllerGolemParms (src/Common/common_physys.cpp)
+// its own five (.text:06343028-06343041). FLControllerGolemParms (src/Common/physics/physys.cpp)
 // derives from this.
 struct IVP_Controller_Motion_Parms
 {
@@ -363,8 +363,8 @@ public:
     // Slot 5, LAB_06285a70 -- 500.
     virtual IVP_CONTROLLER_PRIORITY get_controller_priority() override;
 
-    // Members are public so the offsetof static_asserts in common_physys.cpp can reach them.
-    // Offsets are retail's; the field notes are in common_physys.cpp (FIELD NOTES).
+    // Members are public so the offsetof static_asserts in Common/physics/physys.cpp can reach them.
+    // Offsets are retail's; the field notes are in Common/physics/physys.cpp (FIELD NOTES).
 public:
     IVP_U_Point CurrentTargetPosition;  // +0x04  the pose slot 4 servoes to
     IVP_U_Quat CurrentTargetQuat;       // +0x14
@@ -391,7 +391,7 @@ FL_LAYOUT_ASSERT(sizeof(IVP_Controller_Motion) == 0x60,
 // IVP_Controller_Golem (063eaeb8), IVP_Controller_Motion (063eae94),
 // IVP_Controller_Independent (063eae68), the IVP_Controller root (063eacf0) and, with
 // mdisp 0xd0, CRemotePhysicsSimulation (063eae40). FLControllerGolem (the leaf at
-// .rdata:0639c1c8, src/Common/common_physys.cpp) is the other class built on it.
+// .rdata:0639c1c8, src/Common/physics/physys.cpp) is the other class built on it.
 //
 // Retail's own tables and code for this class, all shared by both leaves:
 //   vftable .rdata:063a53dc, stamped by FUN_06343050 (.text:06343063) and by the
@@ -412,7 +412,7 @@ FL_LAYOUT_ASSERT(sizeof(IVP_Controller_Motion) == 0x60,
 //   slot 6  virtual destructor
 //   slot 7  pure: the leaf's "beam to the target" hook, called by slot 4 with 0/1.
 //
-// The layout is RETAIL's and is asserted offset by offset in common_physys.cpp.
+// The layout is RETAIL's and is asserted offset by offset in Common/physics/physys.cpp.
 class IVP_Controller_Golem : public IVP_Controller_Motion
 {
 public:
@@ -447,7 +447,7 @@ public:
     // (argument 0, the position gate) and .text:06343425 (argument 1, the orientation gate).
     virtual int beam_to_target(IVP_Event_Sim const* EventSim, int Reason) = 0;
 
-    // Members are public so the offsetof static_asserts in common_physys.cpp can reach them;
+    // Members are public so the offsetof static_asserts in Common/physics/physys.cpp can reach them;
     // see the field notes there. Offsets are retail's.
 public:
     float SmoothedPositionErrorSq;      // +0x60

@@ -2,7 +2,7 @@
 
 When the player selects an item in the buy/sell window (equipment, ship), the window updates the
 description panel: name, IDS text and a block of statistics. The selection is handled by
-`NnInventory::ShowInfoCard(ArchId, Ids)` (`src/freelancer/Client/nn_inventory.cpp`, retail
+`NnInventory::ShowInfoCard(ArchId, Ids)` (`src/freelancer/Client/nn/nn_inventory.cpp`, retail
 `FUN_0047ba90`; the trade window is `NN_Inventory` / `NN_Dealer`); the statistics text is built by
 `BuildDealerEquipmentStatText` (`dealer_equip_stats.{h,cpp}`, retail `FUN_00484090`). Function status
 and gaps are in decomp-tracker.
@@ -24,7 +24,7 @@ The two-column path is chosen for the classes `ShieldGenerator`, `Thruster`, `Gu
 those the generator can format — and only if the column panels exist. For ships
 (`+0x4e0 != 0`) the description is taken from the ship's `IdsInfo1/2/3`, and no statistics block is
 built. The "prices at all bases" comparison block for commodities is `AppendCommodityTradeReport`
-(`commodity_by_base.cpp`, retail `FUN_004704d0`).
+(`Client/nn/commodity_by_base.cpp`, retail `FUN_004704d0`).
 
 ## Statistics generator
 
@@ -52,6 +52,6 @@ range shows `SeekerRange` — the leftover on the FPU stack after `FSTP`
 of the full formula, not the computed value.
 
 For the layout of the IDS labels (`0x6cf`…`0x6e0`, `0x3b1`, `0x3c6`, `0x3d1`) see
-`dealer_equip_stats.cpp` — the table there is the only source; the field offsets of `Launcher`, `Munition`,
+`Client/nn/dealer_equip_stats.cpp` — the table there is the only source; the field offsets of `Launcher`, `Munition`,
 `Mine`, `CounterMeasure`, `ShieldGenerator`, `Thruster`, `Explosion`, `MotorData` are in
 `src/include/common_archetype.h`.

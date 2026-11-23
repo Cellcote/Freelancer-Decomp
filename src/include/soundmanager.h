@@ -16,7 +16,7 @@
 // src/SoundManager/SoundManagerInternal.h.
 //
 // DALib holds the live manager in DALib::Sound and freelancer drives it from
-// menu_sound_arch.cpp; until 2026-09-16 both did it by raw slot number
+// Client/cmn/menu_sound_arch.cpp; until 2026-09-16 both did it by raw slot number
 // (docs/re/cross_dll_protocol.md).
 
 // The listener/source vectors this interface takes are plain 3-float records -- x86math.h's
@@ -47,7 +47,7 @@ struct ISoundArchetype : IDAComponent
 // through AttachPlayKey and the mixer then calls back into it every tick to ask where the
 // sound is, how loud, how far, whether it is still alive. The port had no declaration for it
 // at all -- SoundManager reached it through 44 hand-written `reinterpret_cast<Fn>(Vtable[N])`
-// wrappers, and menu_sound_arch.cpp answered with a hand-built `static void* [42]` table that
+// wrappers, and Client/cmn/menu_sound_arch.cpp answered with a hand-built `static void* [42]` table that
 // it memcpy'd onto two more tables to fake derived classes.
 //
 // Slot widths below are read off retail's own Source3D vtable, PTR_LAB_005c9efc in
@@ -197,7 +197,7 @@ struct ISoundSource : IDAComponent
 // keeps its current setting otherwise.
 //
 // NOT IMPLEMENTED ANYWHERE IN THE PORT YET: both MixerTick call sites in
-// menu_sound_arch.cpp pass nullptr, so the listener never moves. Declaring the interface is
+// Client/cmn/menu_sound_arch.cpp pass nullptr, so the listener never moves. Declaring the interface is
 // what makes that gap visible instead of hiding it behind a void*.
 struct ISoundListenerPose : IDAComponent
 {

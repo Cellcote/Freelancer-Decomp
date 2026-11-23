@@ -28,20 +28,20 @@ the `IBehaviorManager`/`IObjInspect` interfaces are declared in `src/include/com
 
 ## Source layout
 
-One translation unit per retail class (or a tight group that retail keeps in one `.cpp`).
+One translation unit per retail class (or a tight group that retail keeps in one `.cpp`), in a
+subfolder per subsystem. The file names are the old `common_*` names without the prefix.
 
-| Subsystem | `src/Common/` files |
-|---|---|
-| Time, async, heap, errors | `common_timing`, `common_async`, `common_heap`, `common_errorhandler`, `common_constants` (`ReadConstants`), `common_misc` (paths, `SinglePlayer`, math, `DllMain`) |
-| IDs and INI | `common_id`, `common_ini`, `common_textfile` (`FileMap`, `LineParser32`, `TextFile32`), `common_stringcache`, `common_fmtstr` |
-| Data loading | `common_dataconfig`, `common_archetypeloader`, `common_goodinfo`, `common_loadout`, `common_equipdesc`, `common_basedata`, `common_baseproperties`, `common_roomdata`, `common_roominfo`, `common_universe*`, `common_reputation`, `common_vibe`, `common_costume`, `common_fuses`, `common_newchar`, `common_rtcslider`, `common_pubstategraph` |
-| Archetypes | `common_archetype`, `common_archetype_ships/_equipment/_weapons/_misc`, `common_phyarch` |
-| Objects | `common_cobject`, `common_engineobject`, `common_csimple`, `common_ceqobj`, `common_cship`, `common_csolar`, `common_cloot`, `common_cmine`, `common_cprojectile`, `common_cattachment`, `common_carchgroup`, `common_casteroid*`, `common_hierarchy`, `common_hardpointsummary`, `common_basewatcher` |
-| Equipment | `common_cequip` (`CEquip`, manager, traversal) and one file per class: `common_ce*.cpp`, `common_cattachedequip`, `common_tractorarm`, `common_csteering`, `common_laneaction`, `common_launchaction` |
-| Physics | `common_physys*`, `common_physicalsystem`, `common_phycontroller`, `common_phycollisionstate`, `common_animdb`, `common_csys`; IVP is in `src/IVP/` |
-| AI and the `pub::` contract | `common_behavior*`, `common_*behavior.cpp`, `common_*idea.cpp`, `common_systemmanager*`, `common_targetmanager`, `common_pathfind`, `common_aisteer`, `common_pub`, `common_iobjinspectimpl`, `common_actiondb` |
-| Text and RDL | `common_rect`, `common_textrender`, `common_rdlnodes`, `common_renderdisplaylist`, `common_rdlio` |
-| Network-adjacent | `common_marshalbuffer`, `common_statemachine`, `common_watchable`, `common_mpcritsec`, `common_playeraccount`, `common_exclusionzone`, `common_deadreckonedvector`, `common_remotephysics`, `common_tradeoffer` |
+| Folder | Subsystem | Files |
+|---|---|---|
+| `core/` | time, async, heap, errors, IDs, INI, files | `timing`, `async`, `heap`, `errorhandler`, `misc` (paths, `SinglePlayer`, math, `DllMain`), `id`, `ini`, `textfile` (`FileMap`, `LineParser32`, `TextFile32`), `stringcache`, `dataconfig`, `csys`, `crspline`, `marshalbuffer`, `mpcritsec`, `rtcslider`, `file`, `dacom_stricmp`, `msvcrt_atof`, `platform_folders.h` |
+| `archetype/` | archetypes and the data they load | `archetype`, `archetype_ships/_equipment/_weapons/_misc`, `archetypeloader`, `constants` (`ReadConstants`), `goodinfo`, `loadout`, `equipdesc`, `costume`, `animdb` |
+| `universe/` | universe, systems, zones, bases and rooms | `universe*`, `zone`, `casteroid`, `casteroidfield`, `exclusionzone`, `basedata`, `baseproperties`, `roomdata`, `roominfo`, `flashlightsetinfo` |
+| `object/` | the `CObject` hierarchy | `cobject`, `engineobject`, `csimple`, `ceqobj`, `cship`, `csolar`, `cloot`, `cmine`, `cprojectile`, `casteroidobj`, `hierarchy`, `hardpointsummary`, `subobjectid`, `damagelist`, `deadreckonedvector`, `watchable`, `basewatcher`, `iobjinspectimpl`, `actiondb`, `laneaction`, `launchaction`, `cobjdb` |
+| `equip/` | equipment | `cequip` (`CEquip`, manager, traversal) and one file per class: `ce*.cpp`, `cattachedequip`, `cattachment`, `carchgroup`, `tractorarm`, `csteering`, `fuses` |
+| `physics/` | PhySys and the IVP glue | `physys*`, `physicalsystem`, `phycontroller`, `phycollisionstate`, `phyarch`, `phantom`, `controllergolem`, `remotephysics`, `spatial`, `sphereintruder`, `tick_profile`; IVP itself is in `src/IVP/` |
+| `ai/` | AI and the `pub::` contract | `behavior*`, `*behavior.cpp`, `*idea.cpp`, `systemmanager*`, `sysmgr_*`, `targetmanager`, `thrustmanager`, `repairmanager`, `gunconvergence`, `pathfind`, `obstacleavoidance`, `aisteer`, `ai*`, `statemachine`, `iustategraph`, `pubstategraph`, `pub` |
+| `player/` | players | `reputation`, `vibe`, `playeraccount`, `newchar`, `tradeoffer` |
+| `text/` | text and RDL | `fmtstr`, `rect`, `textrender`, `rdlnodes`, `renderdisplaylist`, `rdlio` |
 
 ## Data loading: `DataConfig`
 
@@ -148,7 +148,7 @@ sphere/ellipsoid/box/cylinder/ring/mesh, `size`, `edge_fraction`, `property_flag
 `[Object]` (`nickname`, `archetype`, `pos`, `base`, `dock_with`, `goto`, `reputation`, `next_ring`/
 `prev_ring`, `star`, `visit`). `goto` puts the object into the gate map (`get_gate_system`); the gate type
 is taken from the `OBJECT_TYPE` of the solar archetype. The zones of a system are gathered into a BSP
-partition (`ISpatialPartition`, `common_spatial.cpp`, built in `SYSTEM::BuildZoneTree`). Queries:
+partition (`ISpatialPartition`, `Common/physics/spatial.cpp`, built in `SYSTEM::BuildZoneTree`). Queries:
 `get_system/get_base/get_zone(+_id)`, `GetFirst/NextSystem/Base`, `first_zone/next_zone`.
 
 ## Reputation, costumes
