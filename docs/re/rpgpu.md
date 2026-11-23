@@ -274,6 +274,18 @@ RPGPU keeps the transforms as RP8 does (`RpGpuState.cpp`, after `RP8.cpp`'s `Set
 - Exponential, squared exponential and linear, blending the colour (not alpha) towards
   `FOGCOLOR`. `SPECULARENABLE` adds the specular colour before fog.
 
+## Vertex copies
+
+`IRPVertexBuffer::CopyVertices` and `IVertexBufferManager::CopyVertexData` write a source-vertex
+descriptor's streams (`FRpVertexSrcDesc`: position, normal, diffuse and two texture sets, each
+with its stride, sequential or through per-vertex indices) into a buffer of a D3D8 vertex
+format, as RP8's FUN_06d1f040 does: `render/rp8_vertex_copy.h` has its dispatch, its generic
+converters and the jump tables' empty entries (a pre-transformed format, a specular colour
+without a diffuse one), with the same bytes written and the same bytes left alone. The VMesh
+groups (`CopyVertices` into a locked buffer, in place) and SphereMesh's planets
+(`LockVertexMemory`, then `CopyVertexData`) fill their vertices this way; `module_tests` checks
+the bytes.
+
 ## Static vertex and index buffers
 
 A vertex buffer that is not a ring (`CreateVb`'s buffers; the pools of `LockVertexMemory` are
@@ -286,7 +298,8 @@ base vertex in it, so their indices go up as they are and no vertices are copied
 - Only a buffer that has stayed as it is gets a block: while it is locked, and in any frame it
   was written in, it is drawn from the frame's vertices. So a draw never reads half-written
   vertices into a block, and a buffer rewritten every frame is not converted whole per draw.
-- Any write retires the buffer's blocks: `LockVb` (and `CopyVertices`, which locks),
+- Any write retires the buffer's blocks: `LockVb` (and `CopyVertices`, which locks or writes
+  into a lock),
   `ResizeVb`, `DestroyVb`. Retired blocks are released after the frame that last used them, as
   the texture versions are.
 - `CreateBuffers` retires every block and texture version, so a kept device does not hold on to
