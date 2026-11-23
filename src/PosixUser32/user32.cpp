@@ -178,10 +178,12 @@ FThreadQueue& ThisQueue()
     return State().Queues[ThreadSerial()];
 }
 
-// Whether Window is Ancestor or one of its child windows; the caller holds the lock.
+// Whether Window is Ancestor or one of its child windows, at any depth; the caller holds the lock.
+// The parent chain has no cycle: a parent exists before its child is made, destroying it
+// destroys the child, and nothing here reparents a window.
 bool IsSelfOrDescendant(HWND Window, HWND Ancestor)
 {
-    for (int Depth = 0; Window != nullptr && Depth < 64; ++Depth)
+    while (Window != nullptr)
     {
         if (Window == Ancestor)
             return true;

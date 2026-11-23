@@ -239,6 +239,18 @@ void TestWindows()
     MSG ChildMessage = {};
     Check(PeekMessageA(&ChildMessage, Parent, 0, 0, PM_REMOVE) && ChildMessage.hwnd == Child,
           "PeekMessageA with a window takes its child windows' messages too");
+    // At any depth: a message for a child 70 levels down passes the top window's filter.
+    {
+        HWND Deepest = Parent;
+        for (int Level = 0; Level < 70 && Deepest != nullptr; ++Level)
+            Deepest = CreateWindowExA(0, "SecondClass", "", WS_CHILD, 0, 0, 1, 1, Deepest, nullptr,
+                                      nullptr, nullptr);
+        PostMessageA(Deepest, WM_USER + 6, 0, 0);
+        MSG Deep = {};
+        Check(Deepest != nullptr && PeekMessageA(&Deep, Parent, 0, 0, PM_REMOVE) &&
+                  Deep.hwnd == Deepest,
+              "PeekMessageA with a window takes a message of a child 70 levels down");
+    }
     // An owned popup's position is the desktop's, not relative to its owner.
     HWND const Popup = CreateWindowExA(0, "SecondClass", "", WS_POPUP, 10, 20, 30, 30, Parent,
                                        nullptr, nullptr, nullptr);
