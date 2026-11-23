@@ -616,6 +616,13 @@ inline int LoadStringW(HINSTANCE Instance, UINT Id, LPWSTR Buffer, int Size)
     int const Length = Cursor[Offset];
     if (Size == 0)
     {
+        // An empty string has no units to convert (it may end the block, and the file).
+        static wchar_t const kEmpty[1] = {0};
+        if (Length == 0)
+        {
+            *reinterpret_cast<LPWSTR*>(Buffer) = const_cast<LPWSTR>(kEmpty);
+            return 0;
+        }
         wchar_t const* const Text =
             Platform::ResourceWideText(Cursor + Offset + 1, static_cast<std::size_t>(Length));
         if (Text == nullptr)

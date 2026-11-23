@@ -95,6 +95,37 @@ MEMORY_FLAGS = {"PRELOAD", "LOADONCALL", "FIXED", "MOVEABLE", "DISCARDABLE", "PU
                 "SHARED", "NONSHARED"}
 
 
+def upper_name(name):
+    """A resource name in upper case, one UTF-16 unit for one, with the mappings the reader
+    compares by (src/include/pe_resources.h, Detail::Upper): ASCII, Latin-1, Latin Extended-A,
+    Greek and Cyrillic. str.upper() would differ (it makes 'ß' 'SS'), and the reader could
+    then not find the name."""
+    def upper(c):
+        code = ord(c)
+        if ord("a") <= code <= ord("z"):
+            return code - 32
+        if code < 0xE0:
+            return code
+        if code <= 0xFE:
+            return code if code == 0xF7 else code - 32
+        if code == 0xFF:
+            return 0x178
+        if 0x100 <= code <= 0x17F:
+            if code in (0x131, 0x138, 0x149, 0x17F):
+                return code
+            odd_pairs = 0x139 <= code <= 0x148 or 0x179 <= code <= 0x17E
+            lower = code % 2 == 0 if odd_pairs else code % 2 == 1
+            return code - 1 if lower else code
+        if 0x3B1 <= code <= 0x3CB and code != 0x3C2:
+            return code - 32
+        if 0x430 <= code <= 0x44F:
+            return code - 32
+        if 0x450 <= code <= 0x45F:
+            return code - 80
+        return code
+    return "".join(chr(upper(c)) for c in name)
+
+
 class RcError(Exception):
     pass
 
@@ -168,7 +199,9 @@ def tokenize(text, path):
             i += 1
             continue
         start = i
-        while i < n and text[i] not in " \t\r\n\f\v,{}\"":
+        # A word ends before a comment too (a single '/' stays in it, as in a file name).
+        while (i < n and text[i] not in " \t\r\n\f\v,{}\"" and
+               not text.startswith("//", i) and not text.startswith("/*", i)):
             i += 1
         tokens.append(("word", text[start:i], line))
     return tokens
@@ -375,8 +408,8 @@ class Script:
         if is_number(word):
             return number(word, self.path, line)
         if word.startswith('"'):
-            return unquote(word, self.path, line).upper()
-        return word.upper()
+            return upper_name(unquote(word, self.path, line))
+        return upper_name(word)
 
     def file_bytes(self, token):
         kind, value, line = token

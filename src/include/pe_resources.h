@@ -39,11 +39,13 @@ struct FImage
     std::uint32_t RootSize = 0;     // the bytes the directory tree may use from Root
 };
 
-// A type or name to look up: an id, or a narrow (UTF-8) string.
+// A type or name to look up: an id, or a narrow (UTF-8) string; or nothing (a malformed
+// "#" name), which no lookup finds.
 struct FName
 {
     char const* Text = nullptr; // nullptr: Id
     std::uint16_t Id = 0;
+    bool bInvalid = false;
 };
 
 // MAKEINTRESOURCEA's pointer, "#123" or a string.
@@ -58,17 +60,18 @@ inline FName NameOf(char const* Value)
     }
     if (Value[0] == '#')
     {
-        // RtlCharToInteger's decimal digits; anything else names nothing, and neither does
-        // "#0" (id 0 is not a valid "#" name, as on Windows, which rejects it).
+        // RtlCharToInteger's decimal digits. Anything else after the '#' names nothing (Windows
+        // fails the call), and neither does "#0": the prefix is for ids only, so a malformed
+        // one is not looked up as a string either.
         std::uint32_t Id = 0;
         char const* Digit = Value + 1;
         for (; *Digit >= '0' && *Digit <= '9' && Id <= 0xFFFF; ++Digit)
             Id = Id * 10 + static_cast<std::uint32_t>(*Digit - '0');
         if (*Digit == 0 && Digit != Value + 1 && Id != 0 && Id <= 0xFFFF)
-        {
             Name.Id = static_cast<std::uint16_t>(Id);
-            return Name;
-        }
+        else
+            Name.bInvalid = true;
+        return Name;
     }
     Name.Text = Value;
     return Name;
@@ -222,7 +225,7 @@ inline bool Child(FImage const& Image, std::uint32_t Relative, FName const& Key,
                   std::uint32_t& Target)
 {
     std::uint32_t First = 0, Named = 0, Ids = 0;
-    if (!Directory(Image, Relative, First, Named, Ids))
+    if (Key.bInvalid || !Directory(Image, Relative, First, Named, Ids))
         return false;
     if (Key.Text != nullptr)
     {

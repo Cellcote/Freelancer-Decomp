@@ -1528,7 +1528,8 @@ namespace Platform
 
         for (std::string const& Candidate : Candidates)
         {
-            int const Descriptor = open(Candidate.c_str(), O_RDONLY | O_CLOEXEC);
+            // O_NONBLOCK: a FIFO without a writer must not hold the open (S_ISREG refuses it).
+            int const Descriptor = open(Candidate.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
             if (Descriptor < 0)
                 continue;
             struct stat Info = {};
@@ -1649,9 +1650,12 @@ namespace Platform
         {
             if (!Resources->bIndexed)
             {
+                // Built aside and kept only when complete: a failed attempt leaves nothing behind.
+                std::vector<std::pair<std::uint32_t, std::uint32_t>> Index;
                 PeResources::ForEach(Resources->Image, [&](std::uint32_t Offset, std::uint32_t Size)
-                                     { Resources->Resources.emplace_back(Offset, Size); });
-                std::sort(Resources->Resources.begin(), Resources->Resources.end());
+                                     { Index.emplace_back(Offset, Size); });
+                std::sort(Index.begin(), Index.end());
+                Resources->Resources = std::move(Index);
                 Resources->bIndexed = true;
             }
             std::uint32_t const Into = static_cast<std::uint32_t>(

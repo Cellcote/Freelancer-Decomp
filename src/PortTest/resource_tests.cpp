@@ -153,6 +153,9 @@ void TestFixture(std::string const& Fixture)
     std::vector<unsigned char> const Image = ReadAll(Fixture);
     Check(Image.size() > 0x100 && Image[0x40 + 4] == 0x64 && Image[0x40 + 5] == 0x86,
           "the fixture is an AMD64 image");
+    // The optional header's magic, which is what makes the reader take the PE32+ layout.
+    Check(Image.size() > 0x100 && Image[0x40 + 24] == 0x0B && Image[0x40 + 25] == 0x02,
+          "the fixture has a PE32+ optional header");
     HMODULE const Module = Platform::ResourceModuleLoad(Fixture.c_str());
     Check(Module != nullptr, "a PE32+ image loads");
     if (Module == nullptr)
@@ -178,6 +181,8 @@ void TestFixture(std::string const& Fixture)
           "a supplementary character is the same surrogate pair");
     Check(LoadStringW(Module, 50, Text, 64) == 11 && std::wcscmp(Text, L"Hello world") == 0,
           "a line continuation joins the lines");
+    Check(LoadStringW(Module, 51, Text, 64) == 9 && std::wcscmp(Text, L"Commented") == 0,
+          "a comment ends an id");
 
     // The buffer: at most Size - 1 characters and a terminator.
     std::wmemset(Text, L'x', 64);
@@ -192,6 +197,14 @@ void TestFixture(std::string const& Fixture)
     Check(LoadStringW(Module, 1, reinterpret_cast<LPWSTR>(&Pointer), 0) == 3 &&
               Pointer != nullptr && std::wcsncmp(Pointer, L"One", 3) == 0,
           "size 0 hands out a pointer to the string and its length");
+    Pointer = nullptr;
+    Check(LoadStringW(Module, 15, reinterpret_cast<LPWSTR>(&Pointer), 0) == 0 &&
+              Pointer != nullptr && Pointer[0] == 0,
+          "size 0 hands out an empty string for an empty entry");
+    Pointer = nullptr;
+    Check(LoadStringW(Module, 0xFFF0, reinterpret_cast<LPWSTR>(&Pointer), 0) == 0 &&
+              Pointer == nullptr,
+          "size 0 leaves the pointer for a missing string");
     Check(LoadStringW(Module, 0x10001, Text, 64) == 3 && std::wcscmp(Text, L"One") == 0,
           "LoadStringW takes the id's low word");
 
@@ -219,8 +232,19 @@ void TestFixture(std::string const& Fixture)
     Check(!Resource(Module, "CARDTYPE", "caf\u00e9").empty() &&
               !Resource(Module, "CARDTYPE", "CAF\u00c9").empty(),
           "non-ASCII names match without regard to case");
-    Check(Resource(Module, "CARDTYPE", "\xc1\x81").empty(),
-          "an overlong UTF-8 form is no character (not 'A')");
+    Check(!Resource(Module, "CARDTYPE", "stra\u00dfe").empty() &&
+              Resource(Module, "CARDTYPE", "STRASSE").empty(),
+          "the generator folds names as the reader does ('\u00df' stays one character)");
+    // "CARDNAME" with its 'C' in an overlong three-byte form: a decoder that took that form as
+    // 'C' would find the resource.
+    Check(Resource(Module, "CARDTYPE",
+                   "\xe0\x81\x83"
+                   "ARDNAME")
+              .empty(),
+          "an overlong UTF-8 form is no character");
+    Check(Resource(Module, "CARDTYPE", "#CARDNAME").empty() &&
+              Resource(Module, "CARDTYPE", "#0").empty(),
+          "a malformed \"#\" name is not looked up as a string");
     Check(Resource(Module, "CARDTYPE", "CARDNAMEX").empty(), "a longer name is another name");
     Check(Resource(Module, "CARDTYPE", "CARD").empty(), "a shorter name is another name");
     Check(Resource(Module, MAKEINTRESOURCEA(23), MAKEINTRESOURCEA(6)).empty(), "a missing id");

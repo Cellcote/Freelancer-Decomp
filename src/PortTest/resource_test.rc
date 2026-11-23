@@ -34,6 +34,7 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
   49, 	"😀"
   50, 	"Hello \
 world"
+  51/*a comment ends the id*/, "Commented"
 }
 
 5 23 "resource_test_card.txt"
@@ -41,6 +42,8 @@ world"
 CardName CARDTYPE "resource_test_card.txt"
 
 Café CARDTYPE "resource_test_card.txt"
+
+Straße CARDTYPE "resource_test_card.txt"
 
 LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
 7 23 "resource_test_card.txt"
