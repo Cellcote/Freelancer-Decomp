@@ -532,7 +532,7 @@ void CliDynamicAsteroidParseIni(FCliDynamicAsteroid* This, INI_Reader& Reader)
         Mesh->GetFaceGroupPrimitiveType(&This->PrimitiveType);
         Mesh->CloseFaceGroup();
         // 0x00525ac8..0x00525ad5: DALib::Renderer slot 13 (engine index, LOD 0).
-        DALib::Renderer->SetArchetypeLod(reinterpret_cast<void*>(static_cast<intptr_t>(EngineIndex)), 0);
+        DALib::Renderer->SetArchetypeLod(EngineHandleFromId(EngineIndex), 0);
         // 0x00525ad8..0x00525aee: IRenderableMesh; the result is not tested.
         DALib::Engine->QueryEngineComponent(EngineIndex,
                                             const_cast<char*>(Iids::RenderableMesh),

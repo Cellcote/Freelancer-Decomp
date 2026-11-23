@@ -93,12 +93,12 @@ namespace
 
     void* HandleOf(FlLong Instance)
     {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
+        return EngineHandleFromId(Instance);
     }
 
     FlLong InstanceOf(void* Handle)
     {
-        return static_cast<FlLong>(reinterpret_cast<intptr_t>(Handle));
+        return EngineIdFromHandle(Handle);
     }
 
     IRenderPipeline* ShipViewPipeline()

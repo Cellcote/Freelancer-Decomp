@@ -87,8 +87,9 @@ std::list<FRoomObject*>& GetRoomObjectList();
 void RoomControlDrawObject(FRoomRuntime* Room, FRoomObject* Object);
 
 // FUN_0044b370 (thiscall on the room, RET 0xc) -- the SHADOWS option and "shadow_glare" with
-// the room's shadow light on: appearance slot 12 (bFlag) or 11 with the camera and {A, B}.
-void RoomControlDrawShadow(FRoomRuntime* Room, FlULong A, FlULong B,
+// the room's shadow light on: appearance slot 12 (bFlag) or 11 with the camera and {Instance,
+// RadiusBits} (flmaterials' shadow record: the engine instance and the radius's float bits).
+void RoomControlDrawShadow(FRoomRuntime* Room, void* Instance, FlULong RadiusBits,
                            unsigned char bFlag);
 
 // FUN_00449260 + camera install from RoomData (FUN_00449796 / FUN_00556be0).

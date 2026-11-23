@@ -164,9 +164,9 @@ void SolarSpheresApplyDetail(float Detail)
         if (Obj != nullptr && (static_cast<unsigned>(Obj->ObjectClass) & 3u) == 3u)
             Simple = Obj;
         ISphereMesh* Sphere = nullptr;
-        GENRESULT const Result = DALib::Engine->QueryInstance(
-            reinterpret_cast<void*>(static_cast<intptr_t>(Simple->EngineInstanceId)),
-            Iids::SphereMesh, reinterpret_cast<void**>(&Sphere));
+        GENRESULT const Result =
+            DALib::Engine->QueryInstance(EngineHandleFromId(Simple->EngineInstanceId),
+                                         Iids::SphereMesh, reinterpret_cast<void**>(&Sphere));
         if (Result < 0)
         {
             // 005489b3..005489c2: a failed query still releases whatever came back.

@@ -471,7 +471,7 @@ void* MiscUtilLoadEngineInstance(char const* File, IFileSystem* /*Data*/, FAnimS
     {
         // 0041c6fa..0041c722: already loaded -- *OutHandle, Engine +0x5c (Handle, 0), +0x3c.
         if (OutHandle != nullptr)
-            *OutHandle = static_cast<FlLong>(reinterpret_cast<std::intptr_t>(Found));
+            *OutHandle = EngineIdFromHandle(Found);
         void* const Created = DALib::Engine->CreateInstance(Found, nullptr);
         DALib::Engine->ReleaseHandle(Found);
         // 0041c725..0041c763: the scripts through a fresh file system (retail parks it in the
@@ -480,7 +480,7 @@ void* MiscUtilLoadEngineInstance(char const* File, IFileSystem* /*Data*/, FAnimS
         {
             IFileSystem* Filesys = nullptr;
             DAEngine_create_filesystem(File, &Filesys, nullptr);
-            Scripts->Load(static_cast<FlULong>(reinterpret_cast<std::uintptr_t>(DALib::Anim->OpenScript(Filesys))));
+            Scripts->Load(static_cast<FlULong>(AnimScriptId(DALib::Anim->OpenScript(Filesys))));
             DAEngine_release_filesystem(&Filesys);
         }
         return Created;
@@ -516,12 +516,12 @@ void* MiscUtilLoadEngineInstance(char const* File, IFileSystem* /*Data*/, FAnimS
     // 0041c5ff..0041c62e: *OutHandle, Engine +0x5c (Handle, 0), +0x3c.
     if (OutHandle != nullptr)
         *OutHandle = Handle;
-    Instance = DALib::Engine->CreateInstance(reinterpret_cast<void*>(Handle), nullptr);
-    DALib::Engine->ReleaseHandle(reinterpret_cast<void*>(Handle));
+    Instance = DALib::Engine->CreateInstance(EngineHandleFromId(Handle), nullptr);
+    DALib::Engine->ReleaseHandle(EngineHandleFromId(Handle));
 
     // 0041c631..0041c64e: Anim +0xc on the file system into FUN_00555bf0.
     if (Scripts != nullptr)
-        Scripts->Load(static_cast<FlULong>(reinterpret_cast<std::uintptr_t>(DALib::Anim->OpenScript(Filesys))));
+        Scripts->Load(static_cast<FlULong>(AnimScriptId(DALib::Anim->OpenScript(Filesys))));
     // 0041c653..0041c658.
     DAEngine_release_filesystem(&Filesys);
 

@@ -236,7 +236,7 @@ namespace
     // carry the same instructions inlined.
     void EffectBakeInstance(FEffectBase* This)
     {
-        void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(This->EngineIndex));
+        void* const Instance = EngineHandleFromId(This->EngineIndex);
 
         // IEngine +0x80, then CObject vt+0x54 into a stack Vector, copied to +0x4c.
         float* const Velocity = reinterpret_cast<float*>(This->Pad4C);
@@ -262,8 +262,7 @@ namespace
         if (EffectWatchedObject(This) != nullptr && This->EngineIndex != -1)
         {
             FTransform const* const InstanceXform = reinterpret_cast<FTransform const*>(
-                DALib::Engine->GetInstanceTransform(
-                    reinterpret_cast<void*>(static_cast<intptr_t>(This->EngineIndex))));
+                DALib::Engine->GetInstanceTransform(EngineHandleFromId(This->EngineIndex)));
             EffectMathEngine()->MulTransform(Product, *InstanceXform, This->LocalXform);
             Source = &Product;
         }
@@ -329,8 +328,7 @@ void EffectGetWorldTransform(FEffectBase const* This, FTransform* Out)
     if (EffectWatchedObject(This) != nullptr && This->EngineIndex != -1)
     {
         FTransform const* const InstanceXform = reinterpret_cast<FTransform const*>(
-            DALib::Engine->GetInstanceTransform(
-                reinterpret_cast<void*>(static_cast<intptr_t>(This->EngineIndex))));
+            DALib::Engine->GetInstanceTransform(EngineHandleFromId(This->EngineIndex)));
         FTransform Product;
         EffectMathEngine()->MulTransform(Product, *InstanceXform, This->LocalXform);
         *Out = Product;

@@ -30,7 +30,7 @@ namespace
         FAnimScriptSet* Set = static_cast<FAnimScriptSet*>(Context);
         malloc_strcpy(&Set->Names[Set->FillCursor], Name);
         Set->Durations[Set->FillCursor] =
-            DALib::Anim->GetNamedDuration(reinterpret_cast<void*>(Set->LoadScript), Name);
+            DALib::Anim->GetNamedDuration(AnimScriptFromId(Set->LoadScript), Name);
         ++Set->FillCursor;
     }
 }
@@ -78,7 +78,8 @@ void FAnimScriptSet::Destroy()
     Count = 0;
     if (Script != 0xffffffffu)
     {
-        DALib::Anim->CloseScript(reinterpret_cast<void*>(Script));
+        DALib::Anim->CloseScript(AnimScriptFromId(Script));
+        AnimScriptForget(Script);
         Script = 0xffffffffu;
     }
     // 0x00555afe..0x00555b0d.
@@ -112,14 +113,14 @@ int FAnimScriptSet::Load(FlULong NewScript)
         // 0x00555c03..0x00555c1a: count the names.
         Count = 0;
         DALib::Anim->EnumScriptNames(reinterpret_cast<void*>(&CountScriptName),
-                                     reinterpret_cast<void*>(NewScript), this);
+                                     AnimScriptFromId(NewScript), this);
         // 0x00555c1d..0x00555c39: one pointer and one float per name.
         Names = static_cast<char**>(operator new(static_cast<size_t>(Count) * 4));
         Durations = static_cast<float*>(operator new(static_cast<size_t>(Count) * 4));
         FillCursor = 0;
         // 0x00555c40..0x00555c58: fill them.
         DALib::Anim->EnumScriptNames(reinterpret_cast<void*>(&FillScriptName),
-                                     reinterpret_cast<void*>(LoadScript), this);
+                                     AnimScriptFromId(LoadScript), this);
     }
     // 0x00555c5b..0x00555c64.
     int Result = Count;
@@ -131,8 +132,7 @@ int FAnimScriptSet::Load(FlULong NewScript)
 FlULong FAnimScriptSet::Play(void* Root, int Index)
 {
     // FUN_00555c70: Anim +0x24 (Script, Root, Names[Index], 0, 0).
-    return DALib::Anim->PlayScript(reinterpret_cast<void*>(Script), Root, Names[Index], nullptr,
-                                   nullptr);
+    return DALib::Anim->PlayScript(AnimScriptFromId(Script), Root, Names[Index], nullptr, nullptr);
 }
 
 void AnimScriptSetStopPlayback(FlULong* Playback)

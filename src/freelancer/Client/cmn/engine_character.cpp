@@ -285,9 +285,8 @@ void* FEngineCharacterAccessoryLink::Connect(FlLong Bone)
         FHardpointKey CharacterKey;
         CharacterKey.Name = CharacterHardpoint.Data;
         CharacterKey.Crc = DACOM_CRC::GetCRC32(CharacterHardpoint.Data);
-        bFailed = DALib::Hardpoint->ConnectHardpoints(reinterpret_cast<void*>(Hardpoint),
-                                                     &CharacterKey, Instance,
-                                                     &AccessoryKey) != 0;
+        bFailed = DALib::Hardpoint->ConnectHardpoints(EngineHandleFromId(Hardpoint), &CharacterKey,
+                                                      Instance, &AccessoryKey) != 0;
     }
     if (bFailed)
     {
@@ -374,7 +373,7 @@ FTransform* FEngineCharacterBody::GetRootTransform(FTransform* Out) const
     int Bone = -1;
     if (Deformable != nullptr)
         DALib::Deform->GetFirstBone(Deformable, &Bone);
-    float const* const Source = DALib::Engine->GetInstanceTransform(reinterpret_cast<void*>(Bone));
+    float const* const Source = DALib::Engine->GetInstanceTransform(EngineHandleFromId(Bone));
     memcpy(Out, Source, sizeof(FTransform));
     return Out;
 }
@@ -397,7 +396,7 @@ void FEngineCharacterBody::Advance(float Dt)
         DALib::Deform->GetFirstBone(Deformable, &Root);
     void* TimeArg = nullptr;
     memcpy(&TimeArg, &Scaled, sizeof(Scaled));
-    DALib::Engine->UpdateInstance(reinterpret_cast<void*>(Root), 0, TimeArg);
+    DALib::Engine->UpdateInstance(EngineHandleFromId(Root), 0, TimeArg);
 
     // 0x004cbae2..0x004cbb30: IDeformable slot 26 into a zeroed int; none left -> every slot
     // emptied (no id test here, unlike StopAnimations).

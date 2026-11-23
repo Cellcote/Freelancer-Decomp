@@ -16,6 +16,7 @@
 #include "../interface/win3d_render.h"    // Win3DApplyCamera (FUN_00422950)
 
 #include "DALib.h"
+#include "render/RenderPipeline.h" // PipelineTextureId / PipelineTextureFromId
 #include "dacom.h" // FDUMP
 #include "render/IRenderPipeline.h"
 #include "render/shading.h" // ITextureLibrary2
@@ -953,7 +954,7 @@ void FGateTunnel::EmitLayer(float T0, float T1, FGateTunnelLayer* Layer, int Lay
         Colour1[1] = static_cast<float>(Colour1[1] * Brightness1);
         Colour1[2] = static_cast<float>(Brightness1 * Colour1[2]);
 
-        Win3DBindTexture(reinterpret_cast<void*>(TextureFrame[0]));
+        Win3DBindTexture(PipelineTextureFromId(TextureFrame[0]));
         Win3DBegin(kWin3DTriangleStrip);
 
         // 0x005007ed..0x00500a2f: one strip around the ring, while the (unrounded) angle stays

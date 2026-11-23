@@ -24,6 +24,8 @@ void Win3DIdentityRotation3x3(float* Out9);
 // (DrawClouds 005518c6, the UI tables).
 void Win3DBindModelview(void* ObjectOrNull, float const* Matrix12);
 
+struct FTexShape;
+
 // Star-glow CacheString-ish record (0x50). Shape name: length@+0, chars@+4 (0x20).
 struct FStarGlowDesc
 {
@@ -34,7 +36,8 @@ struct FStarGlowDesc
     float OuterColor[3];     // +0x34
     float Alpha;             // +0x40
     unsigned Field44;        // +0x44
-    unsigned Field48;        // +0x48
+    // PORT(x64): the resolved shape, pointer-sized (a dword on Win32).
+    FTexShape const* Field48; // +0x48
     unsigned char Field4C;   // +0x4c
     unsigned char Pad4D[3];
 };

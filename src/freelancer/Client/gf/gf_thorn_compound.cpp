@@ -35,7 +35,7 @@ namespace
 
     void* InstancePointer(FlLong Instance)
     {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
+        return EngineHandleFromId(Instance);
     }
 
     FVector const& AsMathVector(Vector const& Value)

@@ -27,6 +27,7 @@
 #include "common_text.h"
 #include "common_tstring.h"    // TString<32> (FUN_00420750)
 #include "common_universe.h"   // Universe::get_system
+#include "handle_value.h" // HandleValue (the rows' data words)
 
 #include <stdint.h>            // intptr_t
 #include <stdlib.h>            // free
@@ -45,15 +46,16 @@ namespace
     // .rdata:005e2af4 -- L"-", the text of an empty value window.
     wchar_t const kDashText[] = L"-";
 
-    // The UIListBox rows carry the CharacterInfo* as their data word (0x0056b667 / 0x0056b685).
+    // The UIListBox rows carry the CharacterInfo* as their data word (0x0056b667 / 0x0056b685):
+    // a HandleValue id (handle_value.h), the pointer itself on Win32.
     int InfoToItemData(CCharacterSet::CharacterInfo* Info)
     {
-        return static_cast<int>(reinterpret_cast<intptr_t>(Info));
+        return static_cast<int>(HandleValue::Of(Info));
     }
 
     CCharacterSet::CharacterInfo* ItemDataToInfo(int Data)
     {
-        return reinterpret_cast<CCharacterSet::CharacterInfo*>(static_cast<intptr_t>(Data));
+        return HandleValue::To<CCharacterSet::CharacterInfo>(static_cast<FlULong>(Data));
     }
 
     void AppendStyle(UiRichTextWin* Win, unsigned short Style)

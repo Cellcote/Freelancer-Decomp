@@ -1052,8 +1052,7 @@ namespace
     {
         CEShield* const Shield = CEShield::cast(Equip);
         FlLong const Root = Shield->GetRootIndex();
-        return DALib::Engine->GetInstanceTransform(
-            reinterpret_cast<void*>(static_cast<intptr_t>(Root)));
+        return DALib::Engine->GetInstanceTransform(EngineHandleFromId(Root));
     }
 
     void FCliShieldEquipFx::notify(Event Code, void* Param)
@@ -1474,8 +1473,8 @@ namespace
             // 0x00528e05..0x00528e52: World = instance frame of the nozzle's part (DALib::Engine
             // vt+0xa0 with nozzle +8, no test) * hardpoint, through MulTransform (vt+0x1c),
             // copied by FUN_00406880.
-            float const* const Instance = DALib::Engine->GetInstanceTransform(
-                reinterpret_cast<void*>(static_cast<intptr_t>(Cur->ParentInstance)));
+            float const* const Instance =
+                DALib::Engine->GetInstanceTransform(EngineHandleFromId(Cur->ParentInstance));
             if (G_EngineNozzleMath == nullptr)
                 G_EngineNozzleMath = Acquire3DMathEngine();
             FTransform Combined;
@@ -1837,8 +1836,7 @@ namespace
     {
         float const Radians = Owner->SpinAngle * kTradeLaneDegToRad;
         int const Id = GetId();                                      // vtable +0x04
-        DALib::Engine->SetJointParams(reinterpret_cast<void*>(static_cast<intptr_t>(Id)), 0,
-                                      &Radians);
+        DALib::Engine->SetJointParams(EngineHandleFromId(Id), 0, &Radians);
     }
 
     int FTradeLaneRingChannel::GetId() const
@@ -1854,7 +1852,7 @@ namespace
         CEqObj* Owner = Wrapper->Equip->Owner;
         if (Owner == nullptr)
             return;
-        void* Root = reinterpret_cast<void*>(static_cast<ptrdiff_t>(Owner->EngineInstanceId));
+        void* Root = EngineHandleFromId(Owner->EngineInstanceId);
         void* Child = DALib::Engine->GetRelatedInstance(Root, 0, reinterpret_cast<void*>(-1));
         while (Child != nullptr && Child != G_InvalidEngineHandle &&
                reinterpret_cast<ptrdiff_t>(Child) != -1)
@@ -1864,7 +1862,7 @@ namespace
             char const* Text = "";
             if (Name != nullptr && Name->Text != nullptr)
                 Text = Name->Text;
-            int const ChildId = static_cast<int>(reinterpret_cast<ptrdiff_t>(Child));
+            int const ChildId = static_cast<int>(EngineIdFromHandle(Child));
             if (std::strcmp(Text, "TLR_Right") == 0)
             {
                 Wrapper->TlrRight.ChildIndex = ChildId;

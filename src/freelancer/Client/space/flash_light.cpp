@@ -15,6 +15,7 @@
 #include "common_goods.h"
 #include "common_misc.h"    // ICamera
 #include "DALib.h"
+#include "render/RenderPipeline.h" // PipelineTextureId / PipelineTextureFromId
 #include "dacom.h"          // DACOM_CRC::GetCRC32
 #include "render/shading.h" // ITextureLibrary2
 
@@ -474,7 +475,7 @@ void DrawFlashlightFlares(FFlashLight* const* Lights, int Count, ICamera* Camera
     // Retail's out buffer is uninitialised stack; the port zeroes it.
     FlULong ShineFrame[5] = {0, 0, 0, 0, 0};
     DALib::TextureLib->GetTextureFrame(G_FlashlightShineTexture, 0, ShineFrame);
-    Win3DBindTexture(reinterpret_cast<void*>(ShineFrame[0]));
+    Win3DBindTexture(PipelineTextureFromId(ShineFrame[0]));
     Win3DBegin(kWin3DQuads);
     // 0x005580c6..0x005580dd: FUN_005579b0 on every light.
     int Index = 0;
@@ -486,7 +487,7 @@ void DrawFlashlightFlares(FFlashLight* const* Lights, int Count, ICamera* Camera
     // 0x005580e4..0x0055810c: the same with the "bulb" record (DAT_006799c0).
     FlULong BulbFrame[5] = {0, 0, 0, 0, 0};
     DALib::TextureLib->GetTextureFrame(G_FlashlightBulbTexture, 0, BulbFrame);
-    Win3DBindTexture(reinterpret_cast<void*>(BulbFrame[0]));
+    Win3DBindTexture(PipelineTextureFromId(BulbFrame[0]));
     Win3DBegin(kWin3DQuads);
     // 0x00558114..0x0055812d: FUN_00557d70 on every light.
     for (Index = 0; Index < Count; ++Index)

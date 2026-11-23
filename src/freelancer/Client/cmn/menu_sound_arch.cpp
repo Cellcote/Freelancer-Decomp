@@ -832,7 +832,7 @@ namespace
         // the math engine; both arms return 0.
         if (Source3dId != -1)
         {
-            void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(Source3dId));
+            void* const Instance = EngineHandleFromId(Source3dId);
             FTransform const* const InstXform =
                 reinterpret_cast<FTransform const*>(DALib::Engine->GetInstanceTransform(Instance));
             // 0x00429d54..0x00429d62: DAT_00667c98 tested and filled.
@@ -861,7 +861,7 @@ namespace
         FVector const* const WorldPos = static_cast<FVector const*>(Arg);
         if (Source3dId != -1)
         {
-            void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(Source3dId));
+            void* const Instance = EngineHandleFromId(Source3dId);
             FTransform const* const InstXform =
                 reinterpret_cast<FTransform const*>(DALib::Engine->GetInstanceTransform(Instance));
             FVector Local;
@@ -925,7 +925,7 @@ namespace
             return kGrNoValue;
         if (Source3dId != -1)
         {
-            void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(Source3dId));
+            void* const Instance = EngineHandleFromId(Source3dId);
             FMatrix const* const Orient =
                 reinterpret_cast<FMatrix const*>(DALib::Engine->GetInstanceOrientation(Instance));
             // 0x00429fa8..0x00429fb6: DAT_00667c98 tested and filled.
@@ -962,7 +962,7 @@ namespace
         // user-data pointer is tested (0x00429e02).
         if (Source3dId != -1)
         {
-            void* const Instance = reinterpret_cast<void*>(static_cast<intptr_t>(Source3dId));
+            void* const Instance = EngineHandleFromId(Source3dId);
             CObject* const User = (CObject*)DALib::Engine->GetInstanceUserData(Instance);
             if (User == nullptr)
             {

@@ -388,8 +388,8 @@ unsigned char FBeamEffect::BuildGeometry(FSpaceCamera* Cam)
     if (Watched != nullptr && reinterpret_cast<uintptr_t>(Watched) - 8u != 0u &&
         This->EngineIndex != -1)
     {
-        float* const InstanceRaw = DALib::Engine->GetInstanceTransform(
-            reinterpret_cast<void*>(static_cast<intptr_t>(This->EngineIndex)));
+        float* const InstanceRaw =
+            DALib::Engine->GetInstanceTransform(EngineHandleFromId(This->EngineIndex));
         EffectMath()->MulTransform(StackXform, *reinterpret_cast<FTransform const*>(InstanceRaw),
                                    This->LocalXform);
         UseXform = &StackXform;

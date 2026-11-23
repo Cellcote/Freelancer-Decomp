@@ -392,7 +392,7 @@ FCharacterObject::~FCharacterObject()
     {
         if (AccessoryInstances[Index] != -1)
         {
-            DALib::Engine->DestroyInstance(reinterpret_cast<void*>(AccessoryInstances[Index]));
+            DALib::Engine->DestroyInstance(EngineHandleFromId(AccessoryInstances[Index]));
             AccessoryInstances[Index] = -1;
         }
         AccessoryHardpoints[Index].destroy();
@@ -531,7 +531,7 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
         void* const Instance = MiscUtilLoadEngineInstance(Found->Mesh.c_str(), DALib::Data,
                                                           nullptr, nullptr, &Paths,
                                                           &MaterialEntries, nullptr);
-        AccessoryInstances[Index] = static_cast<FlLong>(reinterpret_cast<std::intptr_t>(Instance));
+        AccessoryInstances[Index] = EngineIdFromHandle(Instance);
         AccessoryHardpoints[Index].analyze_instance(AccessoryInstances[Index]);
         if (AccessoryInstances[Index] != -1)
         {
@@ -547,10 +547,10 @@ void FCharacterObject::Load(FCharacterDesc const& Desc)
                 FHardpointKey CharacterKey;
                 CharacterKey.Name = CharacterHp;
                 CharacterKey.Crc = DACOM_CRC::GetCRC32(CharacterHp);
-                void* const AccessoryPart = reinterpret_cast<void*>(
-                    AccessoryHardpoints[Index].get_instance(AccessoryIndex));
+                void* const AccessoryPart =
+                    EngineHandleFromId(AccessoryHardpoints[Index].get_instance(AccessoryIndex));
                 void* const CharacterPart =
-                    reinterpret_cast<void*>(Hardpoints.get_instance(CharacterIndex));
+                    EngineHandleFromId(Hardpoints.get_instance(CharacterIndex));
                 DALib::Hardpoint->ConnectHardpoints(CharacterPart, &CharacterKey, AccessoryPart,
                                                     &AccessoryKey);
             }
@@ -628,7 +628,7 @@ void* FCharacterObject::GetEngineInstance()
     // LAB_00444970: IDeformable slot 18 into an int that starts at -1.
     int Bone = -1;
     DALib::Deform->GetFirstBone(Lod.Instance, &Bone);
-    return reinterpret_cast<void*>(static_cast<intptr_t>(Bone));
+    return EngineHandleFromId(Bone);
 }
 
 void FCharacterObject::SetFloat1C(float Value)
@@ -676,9 +676,7 @@ void FCharacterObject::Update(double DeltaSeconds)
     if (ActiveMotions != 0 || ActiveAims != 0 || bPoseDirty != 0)
     {
         float const Time = static_cast<float>(DeltaSeconds);
-        DALib::Anim->MixerWalk(static_cast<FlULong>(
-                                   reinterpret_cast<uintptr_t>(GetEngineInstance())),
-                               Time);
+        DALib::Anim->MixerWalk(static_cast<FlULong>(EngineIdFromHandle(GetEngineInstance())), Time);
         void* TimeArg = nullptr;
         memcpy(&TimeArg, &Time, sizeof(Time));
         DALib::Engine->UpdateInstance(GetEngineInstance(), 0, TimeArg);
@@ -840,8 +838,7 @@ void FCharacterObject::DrawOpaque(ICamera* Camera)
     float const Height = GetFloat1C();
     FlULong HeightBits = 0;
     memcpy(&HeightBits, &Height, sizeof(HeightBits));
-    RoomControlDrawShadow(Owner, static_cast<FlULong>(reinterpret_cast<uintptr_t>(Instance)),
-                          HeightBits, 1);
+    RoomControlDrawShadow(Owner, Instance, HeightBits, 1);
     // 0x00445242..0x00445246: FUN_0044ae80.
     RoomControlLightObject(Owner, this);
     // 0x0044524b..0x00445264: IDeformable slot 16 (camera, LODs, 0, &out, 0). The out int is
@@ -1149,8 +1146,8 @@ FlLong FCharacterObject::FindPart(char const* PartName)
     if (Unused < 0)
         Unused = 0;
 
-    FlLong const Part = CompoundInstanceFindFirstName(
-        static_cast<FlLong>(reinterpret_cast<intptr_t>(GetEngineInstance())), PartName);
+    FlLong const Part =
+        CompoundInstanceFindFirstName(EngineIdFromHandle(GetEngineInstance()), PartName);
     if (Part != -1)
     {
         FPartCacheEntry& Entry = Parts[Unused];

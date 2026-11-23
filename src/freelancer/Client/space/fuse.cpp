@@ -629,8 +629,8 @@ void StartEffectAction::Trigger(unsigned SourceId, unsigned short SubObjId)
         {
             // 0x0052bd72..0x0052bdc5: world transform = the engine instance's (DALib::Engine
             // vt+0xa0) * local (vt+0x1c MulTransform), copied (0xc dwords).
-            float* const InstanceRaw = DALib::Engine->GetInstanceTransform(
-                reinterpret_cast<void*>(static_cast<intptr_t>(EngineIndex)));
+            float* const InstanceRaw =
+                DALib::Engine->GetInstanceTransform(EngineHandleFromId(EngineIndex));
             FTransform World;
             FuseMath()->MulTransform(World, *reinterpret_cast<FTransform const*>(InstanceRaw),
                                      Local);

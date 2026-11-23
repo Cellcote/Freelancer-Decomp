@@ -19,6 +19,7 @@
 #include "common_misc.h"    // malloc_strcpy
 #include "common_newchar.h" // RtcSlider::is_enabled
 #include "dacom.h"
+#include "engine/engbase.h" // EngineIdFromHandle, AnimScriptFromId
 #include "gf_character_object.h"
 #include "gf_object_ship.h"
 #include "gf_thorn_camera.h"
@@ -632,8 +633,8 @@ void FGfScript::ResolveCompoundTarget(int Index, FRoomObject** OutObject, FlLong
             return;
         }
         *OutObject = Prop;
-        *OutInstance = static_cast<FlLong>(reinterpret_cast<intptr_t>(Prop->GetEngineInstance()));
-        *OutAnimScript = reinterpret_cast<void*>(static_cast<uintptr_t>(Prop->GetMainScript()));
+        *OutInstance = EngineIdFromHandle(Prop->GetEngineInstance());
+        *OutAnimScript = AnimScriptFromId(Prop->GetMainScript());
         *OutCategory = 6;
         *bOutUseScene = 0;
         return;
@@ -650,7 +651,7 @@ void FGfScript::ResolveCompoundTarget(int Index, FRoomObject** OutObject, FlLong
         // (slot 6), script -1, and the "HpMount" offset from the ship's hardpoint summary
         // (FUN_0043d940) against the instance (slot 6 again) through FUN_004478c0.
         *OutObject = Ship;
-        *OutInstance = static_cast<FlLong>(reinterpret_cast<intptr_t>(Ship->GetEngineInstance()));
+        *OutInstance = EngineIdFromHandle(Ship->GetEngineInstance());
         *OutAnimScript = reinterpret_cast<void*>(static_cast<intptr_t>(-1));
         void* const ShipInstance = Ship->GetEngineInstance();
         *OutOffset = GfShipMountOffset(Ship->GetHardpointSummary(), "HpMount", ShipInstance);
@@ -674,8 +675,8 @@ void FGfScript::ResolveCompoundTarget(int Index, FRoomObject** OutObject, FlLong
 
     FObjectProp* const Prop = new FObjectProp(Room, Data);
     *OutObject = Prop;
-    *OutInstance = static_cast<FlLong>(reinterpret_cast<intptr_t>(Prop->GetEngineInstance()));
-    *OutAnimScript = reinterpret_cast<void*>(static_cast<uintptr_t>(Prop->GetMainScript()));
+    *OutInstance = EngineIdFromHandle(Prop->GetEngineInstance());
+    *OutAnimScript = AnimScriptFromId(Prop->GetMainScript());
     *bOutUseScene = 1;
     if (bPropsToRoom == 0)
         Sequence->AddProp(Prop, Data.Name.c_str());

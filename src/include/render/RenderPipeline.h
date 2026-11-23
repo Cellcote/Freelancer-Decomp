@@ -71,12 +71,22 @@ inline GENRESULT PipelineGetTextureStageState(IRenderPipeline* Pipeline, FlULong
     return Result;
 }
 
-// Handle is a pipeline texture handle's 32-bit value (a LowArena block, x64_low_arena.h).
+// A pipeline texture handle as the 32-bit value retail keeps (a texture frame's [0], a batch
+// key), and back: a LowArena block (x64_low_arena.h), the plain casts on Windows.
+inline FlULong PipelineTextureId(const void* Handle)
+{
+    return static_cast<FlULong>(LowArena::Encode(Handle));
+}
+inline void* PipelineTextureFromId(FlULong Id)
+{
+    return LowArena::Decode<void>(static_cast<FlLong>(Id));
+}
+
+// Handle is a pipeline texture handle's 32-bit value (PipelineTextureId).
 inline GENRESULT PipelineSetTextureStageTexture(IRenderPipeline* Pipeline, FlULong Stage,
                                                  FlULong Handle)
 {
-    return Pipeline->SetTextureStageTexture(static_cast<int>(Stage),
-                                            LowArena::Decode<void>(static_cast<FlLong>(Handle)));
+    return Pipeline->SetTextureStageTexture(static_cast<int>(Stage), PipelineTextureFromId(Handle));
 }
 
 // Slot 64's second argument is the 4x4 UV matrix, not a flags dword: flmaterials.dll

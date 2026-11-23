@@ -519,8 +519,7 @@ void CliExplosionAttachLocalXform(void* ExplosionFx, int EngineIndex, FTransform
     std::memcpy(Base + 0xf0, LocalXform, sizeof(FTransform));
 
     // 0x005377e6..0x005377f1: DALib::Engine vt+0xa0 (GetInstanceTransform) on the index.
-    float* const InstRaw =
-        DALib::Engine->GetInstanceTransform(reinterpret_cast<void*>(static_cast<intptr_t>(EngineIndex)));
+    float* const InstRaw = DALib::Engine->GetInstanceTransform(EngineHandleFromId(EngineIndex));
 
     // 0x005377f9..0x00537807: DAT_006789c0, FUN_005b73e0 when still null.
     if (G_GameLightMath == nullptr)
@@ -2139,8 +2138,8 @@ namespace
             int const ScriptIndex = LaunchArch->AnimIndex;
             FlLong const RootIndex = Launch->GetRootIndex();
             Wrapper->AnimJointIndex.Value = static_cast<int>(DALib::Anim->PlayScript(
-                AsOpaqueDword(ScriptIndex), AsOpaqueDword(static_cast<int>(RootIndex)),
-                UseAnimation, nullptr, nullptr));
+                AnimScriptFromId(ScriptIndex), EngineHandleFromId(RootIndex), UseAnimation, nullptr,
+                nullptr));
         }
 
         // 0x0052c8cb..0x0052c91d: the launcher companion's dry_fire_sound (+0x80); non-empty ->

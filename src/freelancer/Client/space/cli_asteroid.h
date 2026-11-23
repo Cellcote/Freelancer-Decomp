@@ -24,6 +24,7 @@
 #include "../cmn/texture_shapes.h"
 
 #include <cstddef>
+#include <cstdint>
 
 struct IMaterial;
 
@@ -133,7 +134,7 @@ struct FCliAsteroid
     unsigned char FlagD1;
     unsigned char FlagD2;
     unsigned char FlagD3;                              // +0xD3  contains_fog_zone
-    unsigned ZeroD4;
+    std::uintptr_t ZeroD4; // +0xD4  the enclosing nebula (a dword on Win32)
     float FloatD8;
     Exclusion::AsteroidExclusionZoneMgr* ExclusionMgr; // +0xDC
     unsigned char ShapeDbE0[0x18];                     // +0xE0  the field's ShapeDB (FShapeDB in place)

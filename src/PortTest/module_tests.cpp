@@ -15,6 +15,7 @@
 #include "platform.h"
 #include "readfile.h"
 #include "render/IRenderPipeline.h"
+#include "render/RenderPipeline.h"
 #include "render/shading.h"
 
 #if defined(FL_TEST_RPGPU)
@@ -220,6 +221,13 @@ void TestEngine(ICOManager* Manager)
     if (bInstances)
     {
         Check(Engine->GetInstanceArchetype(Parent) == Archetype, "the instance's archetype");
+        // The client keeps instances and archetypes in 32-bit fields (engine/engbase.h).
+        Check(EngineHandleFromId(EngineIdFromHandle(Parent)) == Parent &&
+                  EngineHandleFromId(EngineIdFromHandle(Archetype)) == Archetype,
+              "an instance's and an archetype's 32-bit ids decode to them");
+        Check(EngineIdFromHandle(G_InvalidEngineHandle) == -1 &&
+                  EngineHandleFromId(-1) == G_InvalidEngineHandle,
+              "the invalid engine handle is -1 as an id");
         // A joint makes Parent a root: the root map holds it under its encoded key.
         FlULong const Payload[G_EngineJointPayloadDwords] = {};
         Check(Engine->CreateJoint(Parent, Child, Payload) == 1, "CreateJoint");
@@ -236,6 +244,18 @@ void TestEngine(ICOManager* Manager)
     if (Archetype != nullptr && Archetype != G_InvalidEngineHandle)
         Engine->ReleaseHandle(Archetype);
     Engine->Release();
+}
+
+// A pipeline texture handle (a LowArena block) as the 32-bit value a texture frame keeps, and
+// back (render/RenderPipeline.h).
+void TestPipelineTextureId()
+{
+    void* const Texture = LowArena::Allocate(32);
+    Check(PipelineTextureFromId(PipelineTextureId(Texture)) == Texture,
+          "a texture handle's 32-bit id decodes to it");
+    Check(PipelineTextureId(nullptr) == 0 && PipelineTextureFromId(0) == nullptr,
+          "no texture is 0");
+    LowArena::Free(Texture, 32);
 }
 
 // Whether a UDP socket can bind Port on every interface (DirectPlay's server binds so).
@@ -743,6 +763,7 @@ int main(int argc, char** argv)
         Check(Count == 1, "Deformable2's DllMain registered Deformable");
         if (EngBase != nullptr)
             TestEngine(Manager);
+        TestPipelineTextureId();
         if (Files != nullptr)
             TestReadFile(Manager);
 #if defined(FL_TEST_RPGPU)

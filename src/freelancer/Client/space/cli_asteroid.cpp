@@ -1823,8 +1823,8 @@ void CliAsteroidUpdate(FCliAsteroid* This, FSpaceCamera* Cam, float Dt)
     // cleared either way.
     if (This->Flag21C != 0 && This->Zone != nullptr)
     {
-        This->ZeroD4 = static_cast<unsigned>(reinterpret_cast<uintptr_t>(
-            StarSysFindNebula(&This->Zone->GetPos(), nullptr, nullptr)));
+        This->ZeroD4 =
+            reinterpret_cast<uintptr_t>(StarSysFindNebula(&This->Zone->GetPos(), nullptr, nullptr));
     }
     This->Flag21C = 0;
 
@@ -2162,7 +2162,7 @@ namespace
             void* const Controller = GetSpaceFieldController();
             if (Controller != nullptr && GetSpaceFieldEnclosure() != 0)
             {
-                Field->ZeroD4 = static_cast<unsigned>(reinterpret_cast<uintptr_t>(Controller));
+                Field->ZeroD4 = reinterpret_cast<uintptr_t>(Controller);
                 using FControllerFloatFn = float(__thiscall*)(void*);
                 FogFactor = ((FNebulaEffect*)Controller)->GetFloat294();
             }
@@ -2328,14 +2328,13 @@ namespace
                     // 0x0052162d..0x00521670: the LOD count (renderer vt+0x2c), the LOD clamped
                     // to [0, count - 1] and kept for the next archetype, then set (vt+0x34).
                     int LodCount = 0;
-                    DALib::Renderer->GetArchetypeLodCount(
-                        reinterpret_cast<void*>(static_cast<intptr_t>(EngineIndex)), &LodCount);
+                    DALib::Renderer->GetArchetypeLodCount(EngineHandleFromId(EngineIndex),
+                                                          &LodCount);
                     if (Lod + 1 > LodCount)
                         Lod = LodCount - 1;
                     if (Lod < 0)
                         Lod = 0;
-                    DALib::Renderer->SetArchetypeLod(
-                        reinterpret_cast<void*>(static_cast<intptr_t>(EngineIndex)), Lod);
+                    DALib::Renderer->SetArchetypeLod(EngineHandleFromId(EngineIndex), Lod);
 
                     // 0x00521673..0x005216b8: IRenderableMesh for the same index.
                     if (DALib::Engine->QueryEngineComponent(

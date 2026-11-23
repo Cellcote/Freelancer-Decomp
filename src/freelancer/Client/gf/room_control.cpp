@@ -2119,7 +2119,7 @@ FRoomRuntime* CreateRoomRuntime(RoomData* Room)
     Runtime->MainScript = 0xffffffffu;
     // 0x004496ef FUN_0044a030; 0x004496f4..0x004496fb RoomData::fixup(+0x44).
     RoomControlLoadProps(Runtime);
-    Room->fixup(static_cast<FlLong>(reinterpret_cast<std::intptr_t>(Runtime->MainInstance)));
+    Room->fixup(EngineIdFromHandle(Runtime->MainInstance));
     // 0x00449701..0x0044970c: FUN_00555bf0 on +0x4c with +0x48 unless -1.
     if (Runtime->MainScript != 0xffffffffu)
         Runtime->Scripts.Load(Runtime->MainScript);
@@ -2536,8 +2536,9 @@ void RoomControlDrawObject(FRoomRuntime* Room, FRoomObject* Object)
                     if (DALib::Engine->QueryInterface(Iids::FLAppearance,
                                                       reinterpret_cast<void**>(&Appearance)) >= 0)
                     {
-                        Appearance->SetInstanceValue(static_cast<int>(reinterpret_cast<intptr_t>(EnvInstance)),
-                                          const_cast<char*>("envmapbasic"));
+                        Appearance->SetInstanceValue(
+                            static_cast<int>(EngineIdFromHandle(EnvInstance)),
+                            const_cast<char*>("envmapbasic"));
                     }
                     if (Appearance != nullptr)
                         Appearance->Release();
@@ -2584,7 +2585,7 @@ void RoomControlDrawObject(FRoomRuntime* Room, FRoomObject* Object)
         Appearance->Release();
 }
 
-void RoomControlDrawShadow(FRoomRuntime* Room, FlULong A, FlULong B,
+void RoomControlDrawShadow(FRoomRuntime* Room, void* Instance, FlULong RadiusBits,
                            unsigned char bFlag)
 {
     // FUN_0044b370. 0x0044b389..0x0044b3be: the SHADOWS option (0x2b), "shadow_glare" and the
@@ -2599,15 +2600,20 @@ void RoomControlDrawShadow(FRoomRuntime* Room, FlULong A, FlULong B,
     if (DALib::Engine->QueryInterface(Iids::FLAppearance,
                                       reinterpret_cast<void**>(&Appearance)) >= 0)
     {
-        // 0x0044b3eb..0x0044b41f: {A, B} on the stack; slot 12 (+0x30) with bFlag, else
-        // slot 11 (+0x2c), both (camera, &pair, 1, -1).
-        FlULong Pair[2] = {A, B};
+        // 0x0044b3eb..0x0044b41f: {instance, radius} on the stack; slot 12 (+0x30) with bFlag,
+        // else slot 11 (+0x2c), both (camera, &pair, 1, -1). PORT(x64): the record flmaterials
+        // reads (a pointer-sized instance, then the radius), two dwords on Win32.
+        struct
+        {
+            void* Instance;
+            FlULong RadiusBits;
+        } Pair = {Instance, RadiusBits};
         if (bFlag != 0)
-            Appearance->DrawFixedShadows(Room->Camera, Pair, reinterpret_cast<void*>(1),
-                               reinterpret_cast<void*>(static_cast<intptr_t>(-1)));
+            Appearance->DrawFixedShadows(Room->Camera, &Pair, reinterpret_cast<void*>(1),
+                                         reinterpret_cast<void*>(static_cast<intptr_t>(-1)));
         else
-            Appearance->DrawFadingShadows(Room->Camera, Pair, reinterpret_cast<void*>(1),
-                               reinterpret_cast<void*>(static_cast<intptr_t>(-1)));
+            Appearance->DrawFadingShadows(Room->Camera, &Pair, reinterpret_cast<void*>(1),
+                                          reinterpret_cast<void*>(static_cast<intptr_t>(-1)));
     }
     if (Appearance != nullptr)
         Appearance->Release();
