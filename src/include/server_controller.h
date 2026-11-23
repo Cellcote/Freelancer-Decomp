@@ -9,7 +9,10 @@
 // Server.dll's controller (IDLL) API, used by Content.dll. Formerly common_server_controller.h.
 
 #include <cstdint>
+#include <cstdio>
 #include "server_exports.h"
+
+class INI_Reader;
 
 namespace pub {
 namespace Controller {
@@ -125,6 +128,20 @@ enum class EMessage : int
 struct CreateParms { virtual ~CreateParms() = default; };
 struct FStoryCreateParms final : CreateParms { unsigned int PlayerId; };
 struct TimerExpired { unsigned int Param1; unsigned int Param2; };
+// PlayerSave's payload (the save writer, 06d4dee1): the player and the open save file.
+// PlayerLoad's (the character load, 06d4b132; Content's Story, 06ea6abb): the player and the
+// open reader. One type each for sender and receivers: the pointer is the second member,
+// +0x04 on Win32 and +0x08 on 64-bit builds.
+struct PlayerSaveParms
+{
+    unsigned int PlayerId;
+    std::FILE* File;
+};
+struct PlayerLoadParms
+{
+    unsigned int PlayerId;
+    INI_Reader* Reader;
+};
 
 SERVER_API unsigned int __cdecl Create(const char* DllPath, const char* InstanceName, const CreateParms* Parms, PRIORITY Priority);
 SERVER_API void __cdecl Destroy(unsigned int Flid);

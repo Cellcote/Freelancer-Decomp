@@ -1903,13 +1903,9 @@ bool __cdecl PlayerData_SerializeToFile(PlayerSlot& Player, char const* FileName
     // Two cdecl arguments of the preceding fprintf are still on the stack, so
     // [ESP + 0x48] is the writer's FILE* at frame+0x28, not frame+0x30: the
     // record is {client_id, the open save file} at frame+0xd4.
-    struct FSaveWrittenEvent {
-        unsigned int ClientId;                  // PlayerData+0x348
-        FILE* File;                             // the writer's +0x04
-    };
-    FSaveWrittenEvent SaveEvent;
-    SaveEvent.ClientId = Player.client_id;
-    SaveEvent.File = Out;
+    pub::Controller::PlayerSaveParms SaveEvent;
+    SaveEvent.PlayerId = Player.client_id; // PlayerData+0x348
+    SaveEvent.File = Out; // the writer's +0x04
     Server_ControllerDispatch(0, pub::Controller::EMessage::PlayerSave, &SaveEvent);
 
     // .text:06d4dee9 .. .text:06d4def8 -- single player: FUN_06d447c0(&writer),

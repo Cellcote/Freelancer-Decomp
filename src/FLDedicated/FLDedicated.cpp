@@ -29,6 +29,12 @@
 #include <string>
 #include <vector>
 
+#if !defined(_WIN32)
+#include <csignal>
+
+#include <pthread.h>
+#endif
+
 #include "common_ini.h"           // INI_Reader, ILoadingScreen, RegisterLoadingScreen
 #include "common_net.h"           // SetIsMPServer
 #include "common_server_types.h"  // SStartupInfo, ServerStats
@@ -318,13 +324,25 @@ namespace
     // The game resolves DATA, DACOM libraries and INI files relative to bin\.
     bool EnterModuleDirectory(char (&ModulePath)[MAX_PATH])
     {
-        if (GetModuleFileNameA(nullptr, ModulePath, MAX_PATH) == 0)
+        // 0 is a failure, MAX_PATH a truncated path (GetModuleFileNameA's contract).
+        const DWORD Length = GetModuleFileNameA(nullptr, ModulePath, MAX_PATH);
+        if (Length == 0 || Length >= MAX_PATH)
         {
             return false;
         }
         char Directory[MAX_PATH];
         strcpy(Directory, ModulePath);
+#if defined(_WIN32)
         char* Slash = strrchr(Directory, '\\');
+        if (char* const Forward = strrchr(Directory, '/');
+            Forward != nullptr && (Slash == nullptr || Forward > Slash))
+        {
+            Slash = Forward;
+        }
+#else
+        // PORT(macOS): a native path: '/' is the only separator ('\\' is a filename character).
+        char* Slash = strrchr(Directory, '/');
+#endif
         if (Slash == nullptr)
         {
             return false;
@@ -363,13 +381,29 @@ namespace
 
     // FServerControl::SetIniPath (.text:004018e0): freelancer.ini and SrvLocal-freelancer.ini
     // in the directory of Path.
-    void MakeIniPaths(const char* Path, char (&IniPath)[0x104], char (&LocalIniPath)[0x104])
+    bool MakeIniPaths(const char* Path, char (&IniPath)[0x104], char (&LocalIniPath)[0x104])
     {
+#if defined(_WIN32)
         char Drive[3] = {};
         char Directory[0x100] = {};
         _splitpath(Path, Drive, Directory, nullptr, nullptr);
         _makepath(IniPath, Drive, Directory, "freelancer.ini", nullptr);
         _makepath(LocalIniPath, Drive, Directory, "SrvLocal-freelancer.ini", nullptr);
+        return true;
+#else
+        // PORT(macOS): a native path: the directory runs to the last '/', as EnterModuleDirectory
+        // takes it ('\\' is a filename character here, which _splitpath would split at).
+        const char* const Slash = strrchr(Path, '/');
+        const std::string Directory =
+            Slash != nullptr ? std::string(Path, Slash + 1) : std::string();
+        // A path that does not fit is refused rather than cut to another file's name.
+        const int IniLength =
+            snprintf(IniPath, sizeof(IniPath), "%sfreelancer.ini", Directory.c_str());
+        const int LocalLength = snprintf(LocalIniPath, sizeof(LocalIniPath),
+                                         "%sSrvLocal-freelancer.ini", Directory.c_str());
+        return IniLength >= 0 && static_cast<size_t>(IniLength) < sizeof(IniPath) &&
+               LocalLength >= 0 && static_cast<size_t>(LocalLength) < sizeof(LocalIniPath);
+#endif
     }
 
     bool CopyLimited(const std::wstring& Value, wchar_t* Out, size_t Capacity, const char* What, size_t Limit)
@@ -484,7 +518,13 @@ namespace
     // (src/ServerHost/server_host.cpp).
     bool IsServerRunning()
     {
+#if defined(_WIN32)
         return GServerRunning != 0;
+#else
+        // An atomic load, paired with StopServer's InterlockedExchange (a volatile read has no
+        // ordering with GCC or Clang).
+        return __atomic_load_n(&GServerRunning, __ATOMIC_SEQ_CST) != 0;
+#endif
     }
 
     // ApplyServerNews (.text:00413780).
@@ -600,6 +640,7 @@ namespace
         return 0;
     }
 
+#if defined(_WIN32)
     BOOL WINAPI ConsoleCtrlHandler(DWORD Type)
     {
         SetEvent(GStopEvent);
@@ -611,6 +652,34 @@ namespace
         }
         return TRUE;
     }
+#else
+    // PORT(macOS): the console handler's job on macOS and Linux. SIGINT, SIGTERM and SIGHUP are
+    // blocked in every thread (BlockStopSignals, before the first thread starts) and taken by
+    // this one with sigwait, which may set the stop event (a signal handler may not: it locks).
+    // The process then stops as from the "quit" command and saves the players.
+    sigset_t GStopSignals;
+
+    void BlockStopSignals()
+    {
+        sigemptyset(&GStopSignals);
+        sigaddset(&GStopSignals, SIGINT);
+        sigaddset(&GStopSignals, SIGTERM);
+        sigaddset(&GStopSignals, SIGHUP);
+        pthread_sigmask(SIG_BLOCK, &GStopSignals, nullptr);
+    }
+
+    DWORD WINAPI StopSignalThreadProc(LPVOID)
+    {
+        for (;;)
+        {
+            int Signal = 0;
+            if (sigwait(&GStopSignals, &Signal) == 0)
+            {
+                SetEvent(GStopEvent);
+            }
+        }
+    }
+#endif
 
     // FLServer's BeginShutdown (.text:0040b510) without the UI pumping: stop the server thread
     // (killed after 600 waits of 100 ms), then IServerImpl::Shutdown on its own thread.
@@ -624,7 +693,14 @@ namespace
                 if (WaitForSingleObject(GServerThread, 600 * 100) == WAIT_TIMEOUT)
                 {
                     LogStatus("The server thread does not stop; ending it.");
-                    TerminateThread(GServerThread, 0);
+                    if (TerminateThread(GServerThread, 0) == FALSE)
+                    {
+                        // No TerminateThread on macOS and Linux: Shutdown must not run beside
+                        // a server thread that is still running, so the process ends here.
+                        LogStatus("The server thread cannot be ended; exiting without shutdown.");
+                        std::fflush(nullptr);
+                        std::_Exit(3);
+                    }
                 }
                 CloseHandle(GServerThread);
                 GServerThread = nullptr;
@@ -672,7 +748,12 @@ namespace
 
         char IniPath[0x104];
         char LocalIniPath[0x104];
-        MakeIniPaths(ModulePath, IniPath, LocalIniPath);
+        if (!MakeIniPaths(ModulePath, IniPath, LocalIniPath))
+        {
+            fprintf(stderr, "FLDedicated: the path of freelancer.ini beside %s is too long\n",
+                    ModulePath);
+            return 1;
+        }
         strcpy(GStartupInfo.IniPath, IniPath);
         strcpy(GStartupInfo.ModulePath, "RemoteClient.dll");
 
@@ -761,6 +842,9 @@ namespace
 
 int wmain(int Argc, wchar_t** Argv)
 {
+#if !defined(_WIN32)
+    BlockStopSignals(); // before any thread starts, so that every thread inherits the mask
+#endif
     ReserveLowAddressSpaceIfRequested();
 
     if (!ParseOptions(Argc, Argv, GOptions))
@@ -792,7 +876,20 @@ int wmain(int Argc, wchar_t** Argv)
     // FLServer's console view routes DACOM's FDUMP into ServerLogf (CFLServerView ctor).
     FDUMP = (void(__cdecl*)(int, const char*, ...))ServerLog;
     CriticalWarningFn = CriticalWarning;
+#if defined(_WIN32)
     SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
+#else
+    // The stop signals are blocked in every thread; without this thread nothing takes them.
+    HANDLE const StopSignalThread =
+        CreateThread(nullptr, 0, StopSignalThreadProc, nullptr, 0, nullptr);
+    if (StopSignalThread == nullptr)
+    {
+        fprintf(stderr,
+                "FLDedicated: cannot start the thread that takes SIGINT, SIGTERM and SIGHUP\n");
+        return 1;
+    }
+    CloseHandle(StopSignalThread);
+#endif
 
     // AfxOleInit in InitInstance.
     const HRESULT ComResult = CoInitialize(nullptr);
@@ -810,3 +907,97 @@ int wmain(int Argc, wchar_t** Argv)
     SetEvent(GDoneEvent);
     return Result;
 }
+
+#if !defined(_WIN32)
+// PORT(macOS): no wmain outside Windows. The arguments are UTF-8 (macOS always passes them so,
+// and Linux in any UTF-8 locale), widened here to the UTF-16 the Windows console hands wmain.
+namespace
+{
+// UTF-8 to the UTF-16 units Windows' wmain gets: a character above U+FFFF becomes a surrogate
+// pair, so the length limits, FLServer.cfg and the wire see what they see on Windows. Overlong
+// forms, surrogate code points and values above U+10FFFF are not valid UTF-8: their first byte
+// is taken as itself (Latin-1) and decoding resumes after it.
+std::wstring WidenUtf8(const char* Text)
+{
+    std::wstring Out;
+    const unsigned char* Cursor = reinterpret_cast<const unsigned char*>(Text);
+    while (*Cursor != 0)
+    {
+        const unsigned char Lead = *Cursor;
+        int Extra = 0;
+        unsigned int Code = Lead;
+        unsigned int Minimum = 0;
+        if (Lead >= 0xC0 && Lead < 0xE0)
+        {
+            Extra = 1;
+            Code = Lead & 0x1Fu;
+            Minimum = 0x80;
+        }
+        else if (Lead >= 0xE0 && Lead < 0xF0)
+        {
+            Extra = 2;
+            Code = Lead & 0x0Fu;
+            Minimum = 0x800;
+        }
+        else if (Lead >= 0xF0 && Lead < 0xF8)
+        {
+            Extra = 3;
+            Code = Lead & 0x07u;
+            Minimum = 0x10000;
+        }
+        bool bValid = Lead < 0x80 || Extra != 0;
+        for (int Index = 1; bValid && Index <= Extra; ++Index)
+        {
+            if ((Cursor[Index] & 0xC0u) != 0x80u)
+            {
+                bValid = false;
+            }
+            else
+            {
+                Code = (Code << 6) | (Cursor[Index] & 0x3Fu);
+            }
+        }
+        if (bValid && Extra != 0 &&
+            (Code < Minimum || (Code >= 0xD800 && Code <= 0xDFFF) || Code > 0x10FFFF))
+        {
+            bValid = false;
+        }
+        if (!bValid)
+        {
+            Out += static_cast<wchar_t>(Lead);
+            Cursor += 1;
+            continue;
+        }
+        if (Code >= 0x10000)
+        {
+            Code -= 0x10000;
+            Out += static_cast<wchar_t>(0xD800 + (Code >> 10));
+            Out += static_cast<wchar_t>(0xDC00 + (Code & 0x3FFu));
+        }
+        else
+        {
+            Out += static_cast<wchar_t>(Code);
+        }
+        Cursor += 1 + Extra;
+    }
+    return Out;
+}
+}
+
+int main(int Argc, char** Argv)
+{
+    std::vector<std::wstring> Wide;
+    Wide.reserve(static_cast<size_t>(Argc));
+    for (int Index = 0; Index < Argc; ++Index)
+    {
+        Wide.push_back(WidenUtf8(Argv[Index]));
+    }
+    std::vector<wchar_t*> Pointers;
+    for (std::wstring& Text : Wide)
+    {
+        Pointers.push_back(&Text[0]);
+    }
+    Pointers.push_back(nullptr);
+    return wmain(Argc, Pointers.data());
+}
+#endif

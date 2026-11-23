@@ -1061,7 +1061,8 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         bBaseBody = false;
         if (Parms[0] != PlayerId || !pub::SinglePlayer())
             break;
-        FILE* File = reinterpret_cast<FILE*>(static_cast<uintptr_t>(Parms[1]));
+        // The pointer is the payload's second member, not a dword (server_controller.h).
+        FILE* File = static_cast<pub::Controller::PlayerSaveParms const*>(MessageParms)->File;
         fprintf(File, "\n[MissionState]\n");
         SaveMissionState(File);
         FMissionObject::HandleMissionMessage(MessageId, MessageParms);
@@ -1080,7 +1081,9 @@ void FMissionScript::HandleMissionMessage(EMessage MessageId, void const* Messag
         }
         else if (Parms[0] == PlayerId)
         {
-            INI_Reader* Reader = reinterpret_cast<INI_Reader*>(static_cast<uintptr_t>(Parms[1]));
+            // The pointer is the payload's second member, not a dword (server_controller.h).
+            INI_Reader* Reader =
+                static_cast<pub::Controller::PlayerLoadParms const*>(MessageParms)->Reader;
             INI_Reader::State SavedState;
             Reader->get_state(SavedState);
             Reader->reset();

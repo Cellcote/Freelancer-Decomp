@@ -58,6 +58,7 @@
 #include <mach-o/dyld.h>
 #include <stdio.h> // renamex_np
 #else
+#include <link.h>        // dl_iterate_phdr (ModulePath)
 #include <sys/syscall.h> // renameat2
 #endif
 
@@ -1156,6 +1157,19 @@ namespace Platform
         return Detail::As<Detail::FThread>(Thread) != nullptr;
     }
 
+    // GetExitCodeThread: the thread's result, or kStillActive while it runs. False for a handle
+    // that is not a thread.
+    constexpr FlULong kStillActive = 0x103;
+    inline bool ThreadExitCode(Handle Thread, FlULong* ExitCode)
+    {
+        Detail::FThread* const Object = Detail::As<Detail::FThread>(Thread);
+        if (Object == nullptr || ExitCode == nullptr)
+            return false;
+        std::lock_guard<std::mutex> Lock(Detail::WaitLock());
+        *ExitCode = Object->bDone ? Object->ExitCode : kStillActive;
+        return true;
+    }
+
     // TerminateThread: POSIX has no safe equivalent, so it fails.
     inline bool ThreadTerminate(Handle Thread, FlULong ExitCode)
     {
@@ -1318,26 +1332,90 @@ namespace Platform
 
     // GetModuleFileNameA for the executable (Library nullptr): the length written, 0 on failure.
     // Other modules are not named here yet.
+    namespace Detail
+    {
+    // Whether Name is the file the loader handed out Library for: reopening a loaded file
+    // with RTLD_NOLOAD gives the same handle and takes no new load.
+    inline bool IsModuleFile(Module Library, char const* Name)
+    {
+        if (Name == nullptr || Name[0] == 0)
+            return false;
+        void* const Handle = dlopen(Name, RTLD_LAZY | RTLD_NOLOAD);
+        if (Handle == nullptr)
+            return false;
+        dlclose(Handle);
+        return Handle == Library;
+    }
+
+#if !defined(__APPLE__)
+    // dl_iterate_phdr holds the loader's lock while it calls back, so the callback only
+    // collects the names; they are matched (dlopen) after the iteration.
+    inline int CollectModuleFile(dl_phdr_info* Info, std::size_t, void* Data)
+    {
+        if (Info->dlpi_name != nullptr && Info->dlpi_name[0] != 0)
+            static_cast<std::vector<std::string>*>(Data)->push_back(Info->dlpi_name);
+        return 0;
+    }
+#endif
+    }
+
+    // GetModuleFileNameA: the executable's path (Library nullptr) or a loaded module's. As
+    // Windows: the length copied; Size when the path does not fit (truncated, terminated); 0 on
+    // failure.
     inline FlULong ModulePath(Module Library, char* Path, FlULong Size)
     {
-        if (Library != nullptr || Path == nullptr || Size == 0)
+        if (Path == nullptr || Size == 0)
             return 0;
-        char Buffer[4096] = {};
+        std::string Found;
+        if (Library == nullptr)
+        {
+            char Buffer[4096] = {};
 #if defined(__APPLE__)
-        std::uint32_t Length = sizeof(Buffer);
-        if (_NSGetExecutablePath(Buffer, &Length) != 0)
-            return 0;
+            std::uint32_t Length = sizeof(Buffer);
+            if (_NSGetExecutablePath(Buffer, &Length) != 0)
+                return 0;
 #else
-        ssize_t const Length = readlink("/proc/self/exe", Buffer, sizeof(Buffer) - 1);
-        if (Length <= 0)
-            return 0;
-        Buffer[Length] = 0;
+            ssize_t const Length = readlink("/proc/self/exe", Buffer, sizeof(Buffer) - 1);
+            if (Length <= 0)
+                return 0;
+            Buffer[Length] = 0;
 #endif
-        std::size_t const Wanted = std::strlen(Buffer);
-        std::size_t const Copied = Wanted < Size ? Wanted : Size - 1;
-        std::memcpy(Path, Buffer, Copied);
-        Path[Copied] = 0;
-        return static_cast<FlULong>(Copied);
+            Found = Buffer;
+        }
+        else
+        {
+#if defined(__APPLE__)
+            for (std::uint32_t Index = 0, Count = _dyld_image_count(); Index < Count; ++Index)
+            {
+                if (Detail::IsModuleFile(Library, _dyld_get_image_name(Index)))
+                {
+                    Found = _dyld_get_image_name(Index);
+                    break;
+                }
+            }
+#else
+            std::vector<std::string> Names;
+            dl_iterate_phdr(&Detail::CollectModuleFile, &Names);
+            for (std::string const& Name : Names)
+            {
+                if (Detail::IsModuleFile(Library, Name.c_str()))
+                {
+                    Found = Name;
+                    break;
+                }
+            }
+#endif
+            if (Found.empty())
+                return 0;
+        }
+        if (Found.size() >= Size)
+        {
+            std::memcpy(Path, Found.data(), Size - 1);
+            Path[Size - 1] = 0;
+            return Size;
+        }
+        std::memcpy(Path, Found.c_str(), Found.size() + 1);
+        return static_cast<FlULong>(Found.size());
     }
 
     // ---------------------------------------------------------------------------------------

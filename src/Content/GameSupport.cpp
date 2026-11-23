@@ -49,17 +49,8 @@ namespace
         unsigned int PlayerId;
     };
 
-    struct FPlayerSaveMessage
-    {
-        unsigned int PlayerId;
-        FILE* File;
-    };
-
-    struct FPlayerLoadMessage
-    {
-        unsigned int PlayerId;
-        INI_Reader* Reader;
-    };
+    using FPlayerSaveMessage = pub::Controller::PlayerSaveParms;
+    using FPlayerLoadMessage = pub::Controller::PlayerLoadParms;
 
     struct FLocationMessage
     {

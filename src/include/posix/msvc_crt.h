@@ -488,6 +488,22 @@ inline unsigned int _controlfp(unsigned int New, unsigned int Mask)
 {
     return _control87(New, Mask);
 }
+// _clearfp: the x87 status word, cleared. None here: nothing was raised.
+#define _EM_INVALID 0x00000010
+#define _EM_DENORMAL 0x00080000
+#define _EM_ZERODIVIDE 0x00000008
+#define _EM_OVERFLOW 0x00000004
+#define _EM_UNDERFLOW 0x00000002
+#define _EM_INEXACT 0x00000001
+inline unsigned int _clearfp()
+{
+    return 0;
+}
+
+inline long long _wcstoi64(wchar_t const* Text, wchar_t** End, int Radix)
+{
+    return std::wcstoll(Text, End, Radix);
+}
 
 // _makepath_s: _makepath with the buffer's size. ERANGE (and an empty result) when the path
 // does not fit, as MSVC's does.
