@@ -694,17 +694,46 @@ jobs:
   # runs beside the builds instead of after them (it grows with every module the non-Windows
   # build takes in). Findings are reported on the run page, not fatal; a source clang-tidy
   # cannot parse fails the job.
+  #
+  # A pull request checks the sources it changes, and those that include a header it changes
+  # (.github/scripts/tidy_changed.py): every source takes minutes as the portable build grows. A
+  # push to master checks every source.
   portable-tidy:
     name: Portable modules (clang-tidy)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          # A pull request's merge commit and its first parent, the base: HEAD^1..HEAD is the PR.
+          fetch-depth: 2
 
       - name: Install Ninja
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ninja-build
 
-      - name: clang-tidy
+      - name: clang-tidy (the pull request's sources)
+        if: github.event_name == 'pull_request'
+        env:
+          CC: clang
+          CXX: clang++
+        run: |
+          pipx install clang-tidy==19.1.0
+          cmake --preset portable -B build/tidy
+          cmake --build build/tidy
+          # NUL-separated throughout: Git does not quote the names, and xargs keeps each one whole.
+          git diff --name-only -z HEAD^1 HEAD > changed.txt
+          python3 .github/scripts/tidy_changed.py build/tidy changed.txt > sources.txt
+          echo "$(tr -cd '\0' < sources.txt | wc -c) source(s) to check"
+          set -o pipefail
+          if [ -s sources.txt ]; then
+            xargs -0 -P "$(nproc)" -n 1 clang-tidy -p build/tidy --quiet < sources.txt 2>&1 | tee tidy.log
+          else
+            : > tidy.log
+          fi
+          python3 .github/scripts/warning_summary.py tidy.log "clang-tidy (portable modules, this pull request)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: clang-tidy (every source)
+        if: github.event_name != 'pull_request'
         env:
           CC: clang
           CXX: clang++
