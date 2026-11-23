@@ -248,8 +248,10 @@ namespace AlchemyImpl
 
             FLoadedInterfaceReference<IDAComponent> Created;
             FLoadedInterfaceReference<IGenericFx> Fx;
+            // The Size is retail's tag 8, which the node factories compare with
+            // (FComponentFactory::CreateInstance), not sizeof: AGGDESC is 0x10 bytes on 64-bit.
             AGGDESC Desc;
-            Desc.size = sizeof(Desc);
+            Desc.size = 8;
             Desc.interface_name = Name;
             Result = DACOM_Acquire()->CreateInstance(
                 &Desc, reinterpret_cast<void**>(&Created.Value));
