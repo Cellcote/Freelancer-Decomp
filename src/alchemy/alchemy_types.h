@@ -161,6 +161,11 @@ namespace AlchemyImpl
     FL_LAYOUT_ASSERT(sizeof(FPooledParticle) == 0x30,
                   "FPooledParticle must match Basic/Rect stride 0x30");
 
+    // Where a pool item's tail starts, after its FPooledParticle: retail's +0x30 (the perp and
+    // dust pools' three floats, the mesh and beam pools' component pointer). Larger on 64-bit,
+    // where the particle's three pointers are 8 bytes.
+    inline constexpr std::size_t kPoolTailOffset = sizeof(FPooledParticle);
+
     struct IAnimatedTransform;
     struct INestedSingleRamp;
     struct IRampColorRamp;

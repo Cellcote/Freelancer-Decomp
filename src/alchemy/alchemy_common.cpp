@@ -19,6 +19,7 @@
 // is a one-directional dependency at the .cpp level only. See
 // alchemy_common.h's FGenericFxObjectBase forward-declaration comment.
 #include "alchemy_genericfx.h"
+#include "alchemy_appearances.h" // FParticleAppRecord (the particle pool's record)
 
 // The concrete ramp classes the node-lib readers construct with `new`, as retail does
 // (FUN_06229eb0 / FUN_06229f00 children, the FUN_06227c70 IAnimatedSingle children).
@@ -221,15 +222,26 @@ namespace AlchemyImpl
     const FlULong kDefaultPoolSize = 1000;
     const FlULong kDefaultUseMaterialBatcher = 1;
 
-    // FUN_0623ebc0 element sizes (third arg) per appearance pool.
-    const FlULong kStrideBasic = 0x30;
-    const FlULong kStrideParticle = 0x74;
-    const FlULong kStrideRect = 0x30;
-    const FlULong kStridePerp = 0x3C;
-    const FlULong kStrideMesh = 0x34;
-    const FlULong kStrideOriented = 0x30;
-    const FlULong kStrideDust = 0x3C;
-    const FlULong kStrideBeam = 0x34;
+    // FUN_0623ebc0 element sizes (third arg) per appearance pool: the pooled particle, with a
+    // float triple (perp, dust) or a component pointer (mesh, beam) after it, or the particle
+    // record. Retail's 0x30 / 0x74 / 0x3c / 0x34 on Win32 (the asserts below); on 64-bit the
+    // same records with 8-byte pointers, rounded up so every item's pointers stay aligned.
+    constexpr FlULong PoolStride(std::size_t Bytes)
+    {
+        return static_cast<FlULong>((Bytes + alignof(void*) - 1) & ~(alignof(void*) - 1));
+    }
+    const FlULong kStrideBasic = PoolStride(sizeof(FPooledParticle));
+    const FlULong kStrideParticle = PoolStride(sizeof(FParticleAppRecord));
+    const FlULong kStrideRect = PoolStride(sizeof(FPooledParticle));
+    const FlULong kStridePerp = PoolStride(kPoolTailOffset + 3 * sizeof(float));
+    const FlULong kStrideMesh = PoolStride(kPoolTailOffset + sizeof(void*));
+    const FlULong kStrideOriented = PoolStride(sizeof(FPooledParticle));
+    const FlULong kStrideDust = PoolStride(kPoolTailOffset + 3 * sizeof(float));
+    const FlULong kStrideBeam = PoolStride(kPoolTailOffset + sizeof(void*));
+    FL_LAYOUT_ASSERT(PoolStride(sizeof(FPooledParticle)) == 0x30, "basic / rect / oriented stride");
+    FL_LAYOUT_ASSERT(PoolStride(sizeof(FParticleAppRecord)) == 0x74, "particle stride");
+    FL_LAYOUT_ASSERT(PoolStride(kPoolTailOffset + 3 * sizeof(float)) == 0x3C, "perp / dust stride");
+    FL_LAYOUT_ASSERT(PoolStride(kPoolTailOffset + sizeof(void*)) == 0x34, "mesh / beam stride");
 
     const char kCharsetValue[] = "0123456789truefalsynoxTRUEFALSYNOX+-";
     const char kCharsetDigits[] = "0123456789+-";
@@ -654,7 +666,7 @@ namespace AlchemyImpl
     FPooledParticle* ParticleFromUsedLink(FAppearancePool* Pool, FPoolLink* Link)
     {
         if (Pool == nullptr || Link == nullptr || Pool->Items == nullptr ||
-            Pool->FreeNodes == nullptr || Pool->Stride < 0x30)
+            Pool->FreeNodes == nullptr || Pool->Stride < kStrideBasic)
             return nullptr;
         const FlULong Index = static_cast<FlULong>(Link - Pool->FreeNodes);
         if (Index >= Pool->Capacity)
@@ -706,13 +718,13 @@ namespace AlchemyImpl
         // "fix": kept as one shared branch rather than duplicated per pool.
         if (Pool->Stride == kStridePerp)
         {
-            float* Axis = reinterpret_cast<float*>(Item + 0x30);
+            float* Axis = reinterpret_cast<float*>(Item + kPoolTailOffset);
             Axis[0] = 0.0f;
             Axis[1] = 0.0f;
             Axis[2] = 0.0f;
         }
-        else if (Pool->Stride >= 0x34)
-            AssignComPtr(reinterpret_cast<IDAComponent**>(Item + 0x30), nullptr);
+        else if (Pool->Stride >= kStrideMesh)
+            AssignComPtr(reinterpret_cast<IDAComponent**>(Item + kPoolTailOffset), nullptr);
         return Particle;
     }
 
@@ -1027,7 +1039,9 @@ namespace AlchemyImpl
         const FlULong LinkOffset = static_cast<FlULong>(
             reinterpret_cast<std::uintptr_t>(Node) -
             reinterpret_cast<std::uintptr_t>(Pool->FreeNodes));
-        const FlULong ItemOffset = (LinkOffset >> 3) * Pool->Stride;
+        // Retail's `>> 3` is the link's index (8-byte links); the link's size here.
+        const FlULong ItemOffset =
+            (LinkOffset / static_cast<FlULong>(sizeof(FPoolLink))) * Pool->Stride;
         return reinterpret_cast<void*>(reinterpret_cast<std::uintptr_t>(Pool->Items) +
                                        ItemOffset);
     }
@@ -1071,21 +1085,22 @@ namespace AlchemyImpl
         unsigned char* const Bytes = static_cast<unsigned char*>(Item);
         if (Pool == &G_PoolMesh)
         {
-            IFxMesh** const MeshSlot = reinterpret_cast<IFxMesh**>(Bytes + 0x30);
+            IFxMesh** const MeshSlot = reinterpret_cast<IFxMesh**>(Bytes + kPoolTailOffset);
             FPoolComponentSlotOwner<IFxMesh> MeshOwner = {MeshSlot};
             if (*MeshSlot != nullptr)
                 (*MeshSlot)->Slot7();
             MeshOwner.Release();
         }
-        else if (Pool->Stride != kStridePerp && Pool->Stride >= 0x34 &&
+        else if (Pool->Stride != kStridePerp && Pool->Stride >= kStrideMesh &&
                  Pool != &G_PoolParticle)
         {
-            ReleaseComPtr(reinterpret_cast<IDAComponent**>(Bytes + 0x30));
+            ReleaseComPtr(reinterpret_cast<IDAComponent**>(Bytes + kPoolTailOffset));
         }
         if (Pool == &G_PoolParticle)
         {
-            IFxEffect** const Life = reinterpret_cast<IFxEffect**>(Bytes + 0x6c);
-            IFxEffect** const Death = reinterpret_cast<IFxEffect**>(Bytes + 0x70);
+            FParticleAppRecord* const Record = static_cast<FParticleAppRecord*>(Item);
+            IFxEffect** const Life = &Record->LifeEffect; // +0x6c
+            IFxEffect** const Death = &Record->DeathEffect; // +0x70
             FPoolComponentSlotOwner<IFxEffect> LifeOwner = {Life};
             FPoolComponentSlotOwner<IFxEffect> DeathOwner = {Death};
             if (*Life != nullptr)

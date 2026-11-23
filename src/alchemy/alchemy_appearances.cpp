@@ -2553,7 +2553,8 @@ namespace AlchemyImpl
             if (UnroundedHalfSize <= TinyLength || Alpha <= TinyLength)
                 continue;
 
-            float* const Axis = reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(Particle) + 0x30);
+            float* const Axis = reinterpret_cast<float*>(
+                reinterpret_cast<unsigned char*>(Particle) + kPoolTailOffset);
             FVector Velocity;
             std::memcpy(&Velocity, &Particle->VelX, sizeof(Velocity));
             FVector PreviousAxis;
@@ -3554,8 +3555,8 @@ namespace AlchemyImpl
             const float& V1 = FrameBlock[4];
             for (; Particle != nullptr; Particle = Particle->Next)
             {
-                float* LastView =
-                    reinterpret_cast<float*>(reinterpret_cast<unsigned char*>(Particle) + 0x30);
+                float* LastView = reinterpret_cast<float*>(
+                    reinterpret_cast<unsigned char*>(Particle) + kPoolTailOffset);
                 float C[3];
                 if (G_Dust3DMath == nullptr)
                     G_Dust3DMath = Create3DMath();
@@ -3810,7 +3811,8 @@ namespace AlchemyImpl
             Particle->Age = Age;
             Particle->Duration = Duration;
             Particle->InvDuration = 1.0f / Duration;
-            *reinterpret_cast<FlULong*>(reinterpret_cast<unsigned char*>(Particle) + 0x30) = 0;
+            *reinterpret_cast<void**>(reinterpret_cast<unsigned char*>(Particle) +
+                                      kPoolTailOffset) = nullptr;
             ++LiveInstanceCount_;
         }
         PrependParticleNode(&InstanceListHead_, &InstanceListTail_, Particle);
@@ -4968,7 +4970,7 @@ namespace AlchemyImpl
             Particle->Duration = Duration;
             Particle->Age = Age;
             AssignComPtr(reinterpret_cast<IDAComponent**>(
-                             reinterpret_cast<unsigned char*>(Particle) + 0x30),
+                             reinterpret_cast<unsigned char*>(Particle) + kPoolTailOffset),
                          LocalMesh);
             Particle->InvDuration = 1.0f / Particle->Duration;
         }
@@ -5046,7 +5048,7 @@ namespace AlchemyImpl
                 Particle->PosY += Step[1];
                 Particle->PosZ += Step[2];
                 IFxMesh* const ParticleMesh = *reinterpret_cast<IFxMesh**>(
-                    reinterpret_cast<unsigned char*>(Particle) + 0x30);
+                    reinterpret_cast<unsigned char*>(Particle) + kPoolTailOffset);
                 ParticleMesh->Slot5(reinterpret_cast<void*>(static_cast<std::uintptr_t>(DtBits)));
                 Particle = Particle->Next;
             }
@@ -5096,7 +5098,7 @@ namespace AlchemyImpl
         while (Item != nullptr)
         {
             IFxMesh* const Mesh = *reinterpret_cast<IFxMesh**>(
-                reinterpret_cast<unsigned char*>(Item) + 0x30);
+                reinterpret_cast<unsigned char*>(Item) + kPoolTailOffset);
             if (Mesh != nullptr)
             {
                 I3DMathEngine* const Math = Acquire3DMath();
@@ -5155,7 +5157,7 @@ namespace AlchemyImpl
         while (Item != nullptr)
         {
             IFxMesh* const Mesh = *reinterpret_cast<IFxMesh**>(
-                reinterpret_cast<unsigned char*>(Item) + 0x30);
+                reinterpret_cast<unsigned char*>(Item) + kPoolTailOffset);
             Mesh->Slot6(reinterpret_cast<void*>(static_cast<std::uintptr_t>(G_DrawCookie)));
             Item = Item->Next;
         }
