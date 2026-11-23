@@ -11,6 +11,7 @@
 #include "RpGpuDds.h"
 #include "readfile.h" // IFileSystem
 #include "render/rp8_semantics.h"
+#include "render/rp8_vertex_copy.h" // CopyVertexData
 #include "TexConvert.h"
 
 #include <algorithm>
@@ -446,12 +447,9 @@ GENRESULT DACOM_API FRpGpu::UnsupportedManagerOperation()
 GENRESULT DACOM_API FRpGpu::CopyVertexData(void* Dest, unsigned int Fvf, const FRpVertexSrcDesc* Source,
                                            unsigned int StartVertex, unsigned int Count)
 {
-    // RP8 converts the source streams into Dest. Nothing reads the vertices yet.
-    (void)Dest;
-    (void)Fvf;
-    (void)Source;
-    (void)StartVertex;
-    (void)Count;
+    // RP8's conversion (FUN_06d1f040): the source streams into Dest, a buffer of Fvf vertices
+    // (a pool buffer LockVertexMemory handed out). Always 0, as retail's slot 8.
+    Rp8CopyVertexData(Dest, Fvf, Source, StartVertex, Count);
     return GR_OK;
 }
 
