@@ -274,9 +274,9 @@ These are implemented in Common ([Common/equip/fuses.cpp:538](../../src/Common/e
 
 | Key | Type | Default | Meaning / allowed values | Source |
 |---|---|---|---|---|
-| `name` (`[fuse]`) | id (`str`) | empty | Fuse nickname (key of the database). | [Common/equip/fuses.cpp:550](../../src/Common/equip/fuses.cpp#L550) |
-| `lifetime` (`[fuse]`) | float | -1 | Duration in seconds; the burn progress advances by `dt / lifetime`. Not validated. | [Common/equip/fuses.cpp:552](../../src/Common/equip/fuses.cpp#L552) |
-| `death_fuse` (`[fuse]`) | bool | false | The fuse is a death fuse. | [Common/equip/fuses.cpp:554](../../src/Common/equip/fuses.cpp#L554) |
+| `name` (`[fuse]`) | id (`str`) | empty | Fuse nickname (key of the database). | [Common/equip/fuses.cpp:556](../../src/Common/equip/fuses.cpp#L556) |
+| `lifetime` (`[fuse]`) | float | -1 | Duration in seconds; the burn progress advances by `dt / lifetime`. Not validated. | [Common/equip/fuses.cpp:558](../../src/Common/equip/fuses.cpp#L558) |
+| `death_fuse` (`[fuse]`) | bool | false | The fuse is a death fuse. | [Common/equip/fuses.cpp:560](../../src/Common/equip/fuses.cpp#L560) |
 | `at_t` (every action) | float, optional second float | 0 | Trigger time. With a second value the time is a random choice in the range `[first, second]`. Handled before the action's own keys. | [Common/equip/fuses.cpp:453](../../src/Common/equip/fuses.cpp#L453) |
 
 ### 5.2 `[start_explosion]`

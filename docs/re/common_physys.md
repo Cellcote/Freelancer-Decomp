@@ -2,7 +2,7 @@
 
 In retail, physics is performed by Ipion Virtual Physics (IVP), statically linked into `Common.dll`; `PhySys`
 is a thin layer between game objects (`CObject`/`CShip`/`CBeam`/...) and IVP. In the port `PhySys` lives in
-`src/Common/common_physys*.cpp`, the world in `Common/physics/physicalsystem.cpp`, and IVP itself is a separate tree
+`src/Common/physics/physys*.cpp`, the world in `Common/physics/physicalsystem.cpp`, and IVP itself is a separate tree
 `src/IVP/` (linked into `Common.dll`). The document describes the structure of the layer and its contracts; the status of
 individual functions is in decomp-tracker.
 
