@@ -163,3 +163,8 @@ are not part of the published repository.
   that MSVCRT silently accepted; checks cannot be disabled globally nor everything moved to `_s` variants.
 - `clock` became monotonic (QPC), `time_t` is 64-bit: units and serialisation must be checked at the consumer,
   not by restoring the VC6 layout.
+- POSIX `rand`: glibc's and macOS's run to `RAND_MAX` = 0x7fffffff and use another generator,
+  where MSVC's stops at 0x7fff. About a hundred sources scale `rand()` by 1/32768 or `* n >> 15`
+  and expect 15 bits. Off Windows these get values out of range (the intro base pick is masked to
+  15 bits for now, `dataconfig_progress.cpp`). The port needs MSVC's generator in one place that
+  every module shares, as they share the CRT's on Windows.
