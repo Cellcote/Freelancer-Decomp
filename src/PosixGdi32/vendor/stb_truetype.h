@@ -1478,10 +1478,16 @@ static int stbtt_InitFont_internal(stbtt_fontinfo *info, unsigned char *data, in
    // find a cmap encoding table we understand *now* to avoid searching
    // later. (todo: could make this installable)
    // the same regardless of glyph.
+   // Freelancer Decomp: of the Unicode maps, a full one (format 12 / 13) is taken before a BMP
+   // one (format 4) whatever the records' order, the later record on a tie as upstream; a format
+   // 14 subtable (variation sequences) is no base map.
    numTables = ttUSHORT(data + cmap + 2);
    info->index_map = 0;
+   {
+   int best_rank = 0;
    for (i=0; i < numTables; ++i) {
       stbtt_uint32 encoding_record = cmap + 4 + 8 * i;
+      stbtt_uint32 subtable = 0;
       // find an encoding we understand:
       switch(ttUSHORT(data+encoding_record)) {
          case STBTT_PLATFORM_ID_MICROSOFT:
@@ -1489,18 +1495,25 @@ static int stbtt_InitFont_internal(stbtt_fontinfo *info, unsigned char *data, in
                case STBTT_MS_EID_UNICODE_BMP:
                case STBTT_MS_EID_UNICODE_FULL:
                   // MS/Unicode
-                  info->index_map = cmap + ttULONG(data+encoding_record+4);
+                  subtable = cmap + ttULONG(data+encoding_record+4);
                   break;
             }
             break;
         case STBTT_PLATFORM_ID_UNICODE:
             // Mac/iOS has these
             // all the encodingIDs are unicode, so we don't bother to check it
-            // Freelancer Decomp: but a format 14 subtable (variation sequences) is no base map.
-            if (ttUSHORT(data + cmap + ttULONG(data+encoding_record+4)) != 14)
-               info->index_map = cmap + ttULONG(data+encoding_record+4);
+            subtable = cmap + ttULONG(data+encoding_record+4);
             break;
       }
+      if (subtable) {
+         stbtt_uint16 format = ttUSHORT(data + subtable);
+         int rank = (format == 12 || format == 13) ? 3 : format == 4 ? 2 : format == 14 ? 0 : 1;
+         if (rank > 0 && rank >= best_rank) {
+            info->index_map = subtable;
+            best_rank = rank;
+         }
+      }
+   }
    }
    if (info->index_map == 0)
       return 0;
@@ -1796,7 +1809,11 @@ static int stbtt__GetGlyphShapeTT(const stbtt_fontinfo *info, int glyph_index, s
                // where we can start, and we need to save some state for when we wraparound.
                scx = x;
                scy = y;
-               if (!(vertices[off+i+1].type & 1)) {
+               // Freelancer Decomp: an off-curve point that is the glyph's last has no next point.
+               if (i + 1 >= n) {
+                  sx = x;
+                  sy = y;
+               } else if (!(vertices[off+i+1].type & 1)) {
                   // next point is also a curve point, so interpolate an on-point curve
                   sx = (x + (stbtt_int32) vertices[off+i+1].x) >> 1;
                   sy = (y + (stbtt_int32) vertices[off+i+1].y) >> 1;
@@ -2332,10 +2349,11 @@ STBTT_DEF void stbtt_GetGlyphHMetrics(const stbtt_fontinfo *info, int glyph_inde
 {
    stbtt_uint16 numOfLongHorMetrics = ttUSHORT(info->data+info->hhea + 34);
    if (glyph_index < numOfLongHorMetrics) {
-      if (advanceWidth)     *advanceWidth    = ttSHORT(info->data + info->hmtx + 4*glyph_index);
+      // Freelancer Decomp: advances are uint16 (upstream: ttSHORT), bearings int16.
+      if (advanceWidth)     *advanceWidth    = ttUSHORT(info->data + info->hmtx + 4*glyph_index);
       if (leftSideBearing)  *leftSideBearing = ttSHORT(info->data + info->hmtx + 4*glyph_index + 2);
    } else {
-      if (advanceWidth)     *advanceWidth    = ttSHORT(info->data + info->hmtx + 4*(numOfLongHorMetrics-1));
+      if (advanceWidth)     *advanceWidth    = ttUSHORT(info->data + info->hmtx + 4*(numOfLongHorMetrics-1));
       if (leftSideBearing)  *leftSideBearing = ttSHORT(info->data + info->hmtx + 4*numOfLongHorMetrics + 2*(glyph_index - numOfLongHorMetrics));
    }
 }

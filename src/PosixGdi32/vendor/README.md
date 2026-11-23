@@ -5,8 +5,12 @@ the file). gdi32.cpp compiles its implementation (STB_TRUETYPE_IMPLEMENTATION, S
 Local changes, each marked "Freelancer Decomp" in the source:
 
 - The CFF buffer ends where the `CFF ` table does (stbtt__find_table_length), not 512 MB on.
-- A Unicode-platform cmap record of format 14 (variation sequences) does not replace the base map.
+- Of the Unicode cmap subtables, a full one (format 12 / 13) is taken before a BMP one (format 4)
+  whatever the records' order; a format 14 subtable (variation sequences) is never the base map.
+- hmtx advances are read unsigned (uint16), as the spec has them.
 - A nonzero format 4 glyph-array entry takes the segment's idDelta (modulo 65536), as the spec says.
+- A contour that starts with an off-curve point at the glyph's last point starts there, rather
+  than reading the point after the last.
 - A failed allocation of CFF vertices or of the rasterizer's scanline draws nothing, and a failed
   second CFF pass frees its vertices.
 

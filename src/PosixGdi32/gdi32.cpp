@@ -43,6 +43,7 @@
 #pragma GCC diagnostic pop
 
 #include <algorithm>
+#include <cerrno>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -112,11 +113,11 @@ struct FRegion : FObject
     RECT Rect;
 };
 
-// A font file in memory (mapped), one per file and face index.
+// A font file in memory, one per file and face index. Its bytes are a copy the face owns, so what
+// was checked stays as it was whatever happens to the file afterwards.
 struct FFace
 {
-    void* Mapping = nullptr;
-    std::size_t Size = 0;
+    std::vector<unsigned char> Bytes;
     stbtt_fontinfo Info = {};
     int UnitsPerEm = 2048;
     int WinAscent = 0;
@@ -165,6 +166,7 @@ struct FDc : FObject
     UINT Align = TA_LEFT | TA_TOP;
     bool bClip = false;
     RECT Clip = {};
+    bool bScreen = false; // GetDC's: no bitmap, and none may be selected
 };
 
 struct FState
@@ -289,31 +291,41 @@ int FacesInFile(const unsigned char* Data, std::size_t Size)
 }
 
 // Whether the cmap subtable stb_truetype chose (Map) can be read for any character: its format
-// one stb_truetype maps, its arrays, format 4's binary search and glyph arrays inside the cmap.
+// one stb_truetype maps, its declared length inside the cmap table, and every array a lookup
+// reads (format 4's binary search and glyph arrays too) inside that length. Format 4's 16-bit
+// length wraps for a subtable of 64 KiB or more: it is taken as the length plus the multiple of
+// 65536 the arrays need, when that much of the cmap table follows.
 bool ValidCharacterMap(const unsigned char* Data, FTable Cmap, std::uint32_t Map)
 {
     std::uint64_t const End = static_cast<std::uint64_t>(Cmap.Offset) + Cmap.Length;
-    if (Map < Cmap.Offset || static_cast<std::uint64_t>(Map) + 2 > End)
+    if (Map < Cmap.Offset || static_cast<std::uint64_t>(Map) + 8 > End)
         return false;
     std::uint64_t const Available = End - Map;
     const unsigned char* const Table = Data + Map;
+    std::uint64_t const Length = ReadU16(Table + 2);
     switch (ReadU16(Table))
     {
     case 0:
-        return Available >= 6 && static_cast<std::uint64_t>(ReadU16(Table + 2)) <= Available;
+        return Length >= 6 && Length <= Available;
     case 6:
-        return Available >= 10 &&
-               10 + 2 * static_cast<std::uint64_t>(ReadU16(Table + 8)) <= Available;
+        return Length >= 10 && Length <= Available &&
+               10 + 2 * static_cast<std::uint64_t>(ReadU16(Table + 8)) <= Length;
     case 12:
     case 13:
-        return Available >= 16 &&
-               16 + 12 * static_cast<std::uint64_t>(ReadU32(Table + 12)) <= Available;
+    {
+        if (Available < 16)
+            return false;
+        std::uint64_t const LongLength = ReadU32(Table + 4);
+        return LongLength <= Available &&
+               16 + 12 * static_cast<std::uint64_t>(ReadU32(Table + 12)) <= LongLength;
+    }
     case 4:
     {
         if (Available < 14)
             return false;
         int const Segments = ReadU16(Table + 6) >> 1;
-        if (Segments == 0 || 16 + 8 * static_cast<std::uint64_t>(Segments) > Available)
+        std::uint64_t Required = 16 + 8 * static_cast<std::uint64_t>(Segments);
+        if (Segments == 0 || Required > Available)
             return false;
         // The furthest segment stbtt_FindGlyphIndex's binary search can land on, from the
         // header's searchRange / entrySelector / rangeShift as it uses them.
@@ -334,12 +346,14 @@ bool ValidCharacterMap(const unsigned char* Data, FTable Cmap, std::uint32_t Map
             int const Last = ReadU16(Table + 14 + 2 * Segment);
             int const First = ReadU16(Table + 16 + 2 * Segments + 2 * Segment);
             int const RangeOffset = ReadU16(Table + RangeOffsetAt);
-            if (RangeOffset != 0 && First <= Last &&
-                RangeOffsetAt + RangeOffset + 2 * static_cast<std::uint64_t>(Last - First) + 2 >
-                    Available)
-                return false;
+            if (RangeOffset != 0 && First <= Last)
+                Required = std::max(Required, RangeOffsetAt + RangeOffset +
+                                                  2 * static_cast<std::uint64_t>(Last - First) + 2);
         }
-        return true;
+        std::uint64_t Bound = Length;
+        while (Bound < Required && Bound + 0x10000 <= Available)
+            Bound += 0x10000;
+        return Required <= Bound && Bound <= Available;
     }
     default:
         return false; // format 2 and others: stb_truetype maps nothing with them
@@ -431,13 +445,23 @@ int GlyphOf(const FFace& Face, std::uint32_t Character)
     return Glyph > 0 && Glyph < Face.Info.numGlyphs ? Glyph : 0;
 }
 
-bool GlyphReadable(FFace& Face, int Glyph, int Depth = 0);
+// What one glyph's outline may cost stb_truetype, its components included: each component is
+// read and expanded again wherever it is used, under the GDI lock. Generous for real fonts
+// (composites are a few components of a few hundred points).
+struct FOutlineBudget
+{
+    int Components = 256; // glyphs visited
+    std::int64_t Vertices = 1 << 16; // vertices stb_truetype allocates for them
+};
 
 // Whether a TrueType outline lies inside its loca span, walked as stbtt__GetGlyphShapeTT reads
 // it: a simple glyph's end points (rising), instructions, flags and coordinates; a composite's
-// records, each with an x/y offset (stb_truetype does not read point matching), and their glyphs.
-bool CheckOutline(FFace& Face, int Glyph, int Depth)
+// records, each with an x/y offset (stb_truetype does not read point matching), and their
+// glyphs, to a depth of 8 (which also ends a composite that contains itself) and within Budget.
+bool CheckOutline(FFace& Face, int Glyph, int Depth, FOutlineBudget& Budget)
 {
+    if (--Budget.Components < 0)
+        return false;
     const stbtt_fontinfo& Info = Face.Info;
     const unsigned char* const Loca = Info.data + Info.loca;
     std::uint64_t const From =
@@ -464,6 +488,10 @@ bool CheckOutline(FFace& Face, int Glyph, int Depth)
                 return false;
             Last = End;
         }
+        // stbtt__GetGlyphShapeTT allocates points + 2 per contour.
+        Budget.Vertices -= Last + 1 + 2 * static_cast<std::int64_t>(Contours);
+        if (Budget.Vertices < 0)
+            return false;
         Position += ReadU16(Outline + 10 + 2 * Contours);
         std::uint64_t Coordinates = 0;
         int Flags = 0;
@@ -511,7 +539,7 @@ bool CheckOutline(FFace& Face, int Glyph, int Depth)
                 return false;
             // stb_truetype draws nothing for a component past the glyph count.
             if (Component < Info.numGlyphs &&
-                (Depth >= 8 || !GlyphReadable(Face, Component, Depth + 1)))
+                (Depth >= 8 || !CheckOutline(Face, Component, Depth + 1, Budget)))
                 return false;
             bMore = (Flags & 0x20) != 0;
         }
@@ -519,22 +547,21 @@ bool CheckOutline(FFace& Face, int Glyph, int Depth)
     return true;
 }
 
-// Whether stb_truetype may read a glyph's outline: a CFF font's it reads through bounded buffers,
-// a TrueType one's is checked (once, from the top). Components nest at most 8 deep, which also
-// ends a composite that contains itself.
-bool GlyphReadable(FFace& Face, int Glyph, int Depth)
+// Whether stb_truetype may read a glyph's outline: a CFF font's it reads through bounded buffers
+// (its subroutines nest at most 10 deep), a TrueType one's is checked once (CheckOutline).
+bool GlyphReadable(FFace& Face, int Glyph)
 {
     if (Glyph < 0 || Glyph >= Face.Info.numGlyphs)
         return false;
     if (Face.Info.cff.size != 0)
         return true;
     std::int8_t& Known = Face.Readable[static_cast<std::size_t>(Glyph)];
-    if (Depth == 0 && Known != 0)
-        return Known > 0;
-    bool const bReadable = CheckOutline(Face, Glyph, Depth);
-    if (Depth == 0)
-        Known = bReadable ? 1 : -1;
-    return bReadable;
+    if (Known == 0)
+    {
+        FOutlineBudget Budget;
+        Known = CheckOutline(Face, Glyph, 0, Budget) ? 1 : -1;
+    }
+    return Known > 0;
 }
 
 // A name-table string (UTF-16BE for the Windows platform, Mac Roman for the Macintosh one) as
@@ -587,6 +614,34 @@ FMapped MapFile(const std::string& Path)
     }
     close(File);
     return Out;
+}
+
+// A regular file read whole into memory, opened as MapFile opens it; false when it cannot be read
+// or does not read to the size it had when opened.
+bool ReadWhole(const std::string& Path, std::vector<unsigned char>& Out)
+{
+    int const File = open(Path.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
+    if (File < 0)
+        return false;
+    struct stat Info;
+    bool bRead = false;
+    if (fstat(File, &Info) == 0 && S_ISREG(Info.st_mode) && Info.st_size > 0)
+    {
+        Out.resize(static_cast<std::size_t>(Info.st_size));
+        std::size_t Done = 0;
+        while (Done < Out.size())
+        {
+            ssize_t const Got = read(File, Out.data() + Done, Out.size() - Done);
+            if (Got < 0 && errno == EINTR)
+                continue;
+            if (Got <= 0)
+                break;
+            Done += static_cast<std::size_t>(Got);
+        }
+        bRead = Done == Out.size();
+    }
+    close(File);
+    return bRead;
 }
 
 bool HasFontExtension(const std::string& Name)
@@ -740,20 +795,13 @@ std::shared_ptr<FFace> OpenFace(const std::string& Path, int Index)
     auto const Key = std::make_pair(Path, Index);
     if (std::shared_ptr<FFace> const Cached = S.Faces[Key].lock())
         return Cached;
-    FMapped const File = MapFile(Path);
-    if (File.Data == nullptr)
+    // Read, not mapped: a file truncated or rewritten later cannot change (or fault) what the
+    // face reads. The catalogue scan maps files, for the moment it reads their names.
+    auto Face = std::make_shared<FFace>();
+    if (!ReadWhole(Path, Face->Bytes))
         return nullptr;
-    std::shared_ptr<FFace> Face(new FFace(),
-                                [](FFace* Gone)
-                                {
-                                    if (Gone->Mapping != nullptr)
-                                        munmap(Gone->Mapping, Gone->Size);
-                                    delete Gone;
-                                });
-    Face->Mapping = File.Data;
-    Face->Size = File.Size;
-    const unsigned char* const Data = static_cast<const unsigned char*>(File.Data);
-    if (!InitFace(Face->Info, Data, File.Size, Index))
+    const unsigned char* const Data = Face->Bytes.data();
+    if (!InitFace(Face->Info, Data, Face->Bytes.size(), Index))
         return nullptr;
     stbtt_fontinfo& Info = Face->Info;
     auto const Start = static_cast<std::uint32_t>(Info.fontstart);
@@ -1278,9 +1326,18 @@ FBrush* StockBrush(int Index)
     return S.StockBrushes[Index];
 }
 
-FDc* MakeDc()
+// A memory DC starts with the stock 1x1 bitmap; a screen DC (GetDC) has no surface: it measures
+// text, makes compatible DCs and bitmaps, and draws nowhere.
+FDc* MakeDc(bool bScreen)
 {
     FState& S = State();
+    if (bScreen)
+    {
+        FDc* const Screen = Register(new FDc());
+        Screen->bScreen = true;
+        Screen->Brush = StockBrush(WHITE_BRUSH);
+        return Screen;
+    }
     if (S.DefaultBitmap == nullptr)
     {
         S.DefaultBitmap = Register(new FBitmap(1, 1));
@@ -1323,25 +1380,35 @@ BOOL Blit(FDc& Target, int X, int Y, int Width, int Height, FDc& Source, int Sou
     const std::vector<std::uint32_t>& FromPixels = &From == &To ? Snapshot : From.Pixels;
     // A negative extent runs its rectangle left (or up) from its origin. The destination's n-th
     // column from its origin samples the source's n-th scaled column from the source's origin,
-    // inside the source rectangle; signs that differ mirror the image.
-    std::int64_t const Columns = std::abs(Width);
-    std::int64_t const Rows = std::abs(Height);
-    std::int64_t const SourceColumns = std::abs(SourceWidth);
-    std::int64_t const SourceRows = std::abs(SourceHeight);
-    for (std::int64_t Row = 0; Row < Rows; ++Row)
+    // inside the source rectangle; signs that differ mirror the image. Extents are widened
+    // before their magnitude is taken (INT_MIN's is no int).
+    std::int64_t const Columns = std::abs(static_cast<std::int64_t>(Width));
+    std::int64_t const Rows = std::abs(static_cast<std::int64_t>(Height));
+    std::int64_t const SourceColumns = std::abs(static_cast<std::int64_t>(SourceWidth));
+    std::int64_t const SourceRows = std::abs(static_cast<std::int64_t>(SourceHeight));
+    // Only the steps whose destination lies in the drawable area are visited: [First, Last).
+    auto const Visible = [](std::int64_t Origin, bool bForward, std::int64_t Count, LONG Low,
+                            LONG High, std::int64_t* First, std::int64_t* Last)
+    {
+        *First = std::max<std::int64_t>(0, bForward ? Low - Origin : Origin - High + 1);
+        *Last = std::min<std::int64_t>(Count, bForward ? High - Origin : Origin - Low + 1);
+    };
+    std::int64_t FirstRow = 0;
+    std::int64_t LastRow = 0;
+    std::int64_t FirstColumn = 0;
+    std::int64_t LastColumn = 0;
+    Visible(Y, Height > 0, Rows, Area.top, Area.bottom, &FirstRow, &LastRow);
+    Visible(X, Width > 0, Columns, Area.left, Area.right, &FirstColumn, &LastColumn);
+    for (std::int64_t Row = FirstRow; Row < LastRow; ++Row)
     {
         std::int64_t const ToY = Y + (Height > 0 ? Row : -Row);
-        if (ToY < Area.top || ToY >= Area.bottom)
-            continue;
         std::int64_t const RowOffset = Row * SourceRows / Rows;
         std::int64_t const FromY = SourceY + (SourceHeight > 0 ? RowOffset : -RowOffset);
         if (FromY < 0 || FromY >= From.Height)
             continue;
-        for (std::int64_t Column = 0; Column < Columns; ++Column)
+        for (std::int64_t Column = FirstColumn; Column < LastColumn; ++Column)
         {
             std::int64_t const ToX = X + (Width > 0 ? Column : -Column);
-            if (ToX < Area.left || ToX >= Area.right)
-                continue;
             std::int64_t const ColumnOffset = Column * SourceColumns / Columns;
             std::int64_t const FromX = SourceX + (SourceWidth > 0 ? ColumnOffset : -ColumnOffset);
             if (FromX < 0 || FromX >= From.Width)
@@ -1361,7 +1428,7 @@ BOOL Blit(FDc& Target, int X, int Y, int Width, int Height, FDc& Source, int Sou
 HDC GetDC(HWND)
 {
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-    return reinterpret_cast<HDC>(MakeDc());
+    return reinterpret_cast<HDC>(MakeDc(true));
 }
 
 int ReleaseDC(HWND, HDC Dc)
@@ -1372,7 +1439,7 @@ int ReleaseDC(HWND, HDC Dc)
 HDC CreateCompatibleDC(HDC)
 {
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-    return reinterpret_cast<HDC>(MakeDc());
+    return reinterpret_cast<HDC>(MakeDc(false));
 }
 
 BOOL DeleteDC(HDC Handle)
@@ -1398,7 +1465,10 @@ HGDIOBJ SelectObject(HDC Handle, HGDIOBJ Object)
     {
     case EKind::Bitmap:
     {
-        // A bitmap is selected into one DC at a time (the stock 1x1 one into any).
+        // A bitmap is selected into one DC at a time (the stock 1x1 one into any memory DC), and
+        // never into a screen DC.
+        if (Dc->bScreen)
+            return nullptr;
         if (!Selected->bStock && Selected != Dc->Bitmap && IsSelected(Selected))
             return nullptr;
         FBitmap* const Previous = Dc->Bitmap;
@@ -1634,12 +1704,17 @@ BOOL GetTextExtentExPointW(HDC Handle, const wchar_t* Text, int Count, int MaxEx
                   Size);
 }
 
+constexpr UINT kMaxTextCount = 8192;
+
 BOOL ExtTextOutW(HDC Handle, int X, int Y, UINT Options, const RECT* Rect, const wchar_t* Text,
                  UINT Count, const int* Dx)
 {
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
     FDc* const Dc = As<FDc>(Handle, EKind::Dc);
-    if (Dc == nullptr)
+    // GDI draws at most 8192 characters a call; a larger count is refused before it becomes an
+    // int (a negative one would read the text to a terminator). A zero count still fills an
+    // ETO_OPAQUE rectangle.
+    if (Dc == nullptr || Count > kMaxTextCount)
         return FALSE;
     return DrawText(*Dc, X, Y, Options, Rect, Characters(Text, static_cast<int>(Count)), Dx);
 }
@@ -1649,7 +1724,10 @@ BOOL ExtTextOutA(HDC Handle, int X, int Y, UINT Options, const RECT* Rect, LPCST
 {
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
     FDc* const Dc = As<FDc>(Handle, EKind::Dc);
-    if (Dc == nullptr)
+    // GDI draws at most 8192 characters a call; a larger count is refused before it becomes an
+    // int (a negative one would read the text to a terminator). A zero count still fills an
+    // ETO_OPAQUE rectangle.
+    if (Dc == nullptr || Count > kMaxTextCount)
         return FALSE;
     return DrawText(*Dc, X, Y, Options, Rect, Characters(Text, static_cast<int>(Count)), Dx);
 }
@@ -1694,15 +1772,20 @@ int GetDIBits(HDC, HBITMAP Handle, UINT Start, UINT Lines, LPVOID Bits, BITMAPIN
     int const BitCount = Header.biBitCount;
     if (BitCount != 32 && BitCount != 24 && BitCount != 16)
         return 0;
-    int const Width = std::min<int>(Bitmap->Width, std::abs(Header.biWidth));
-    int const Rows = std::abs(Header.biHeight);
+    // A DIB's width is positive and its height nonzero (negative for top-down). The height's
+    // magnitude is taken widened (LONG is 32 bits: LONG_MIN's is no LONG).
+    std::int64_t const DibWidth = Header.biWidth;
+    std::int64_t const DibHeight = Header.biHeight;
+    if (DibWidth <= 0 || DibHeight == 0)
+        return 0;
+    int const Width = static_cast<int>(std::min<std::int64_t>(Bitmap->Width, DibWidth));
+    std::int64_t const Rows = DibHeight < 0 ? -DibHeight : DibHeight;
     // Scan lines past the DIB's rows are none: Start is checked before it becomes an index.
     if (Start >= static_cast<UINT>(Rows))
         return 0;
     Lines = std::min<UINT>(Lines, static_cast<UINT>(Rows) - Start);
     bool const bTopDown = Header.biHeight < 0;
-    std::size_t const Stride =
-        ((static_cast<std::size_t>(std::abs(Header.biWidth)) * BitCount + 31) / 32) * 4;
+    std::size_t const Stride = ((static_cast<std::size_t>(DibWidth) * BitCount + 31) / 32) * 4;
     DWORD Masks[3] = {0x7C00, 0x03E0, 0x001F};
     if (BitCount == 16 && Header.biCompression == BI_BITFIELDS)
         std::memcpy(Masks, Info->bmiColors, sizeof(Masks));
@@ -1716,7 +1799,7 @@ int GetDIBits(HDC, HBITMAP Handle, UINT Start, UINT Lines, LPVOID Bits, BITMAPIN
     {
         int const DibRow = static_cast<int>(Start + Line);
         // The DIB's row DibRow is the bitmap's row from the top (top-down) or bottom.
-        int const SourceRow = bTopDown ? DibRow : Rows - 1 - DibRow;
+        std::int64_t const SourceRow = bTopDown ? DibRow : Rows - 1 - DibRow;
         unsigned char* const Row = Out + static_cast<std::size_t>(Line) * Stride;
         std::memset(Row, 0, Stride);
         if (SourceRow >= 0 && SourceRow < Bitmap->Height)
@@ -1788,24 +1871,25 @@ int FillRect(HDC Handle, const RECT* Rect, HBRUSH BrushHandle)
     return 1;
 }
 
+// Only SRCCOPY is drawn (all the game uses); any other raster operation fails and changes nothing.
 BOOL BitBlt(HDC Target, int X, int Y, int Width, int Height, HDC Source, int SourceX, int SourceY,
-            DWORD)
+            DWORD Rop)
 {
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
     FDc* const To = As<FDc>(Target, EKind::Dc);
     FDc* const From = As<FDc>(Source, EKind::Dc);
-    if (To == nullptr || From == nullptr)
+    if (To == nullptr || From == nullptr || Rop != SRCCOPY)
         return FALSE;
     return Blit(*To, X, Y, Width, Height, *From, SourceX, SourceY, Width, Height);
 }
 
 BOOL StretchBlt(HDC Target, int X, int Y, int Width, int Height, HDC Source, int SourceX,
-                int SourceY, int SourceWidth, int SourceHeight, DWORD)
+                int SourceY, int SourceWidth, int SourceHeight, DWORD Rop)
 {
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
     FDc* const To = As<FDc>(Target, EKind::Dc);
     FDc* const From = As<FDc>(Source, EKind::Dc);
-    if (To == nullptr || From == nullptr)
+    if (To == nullptr || From == nullptr || Rop != SRCCOPY)
         return FALSE;
     return Blit(*To, X, Y, Width, Height, *From, SourceX, SourceY, SourceWidth, SourceHeight);
 }

@@ -5,12 +5,14 @@
 // fonts found by face name and their GDI metrics, ExtTextOutW's alignment, background and
 // clipping, GetDIBits' formats, blits, brushes and regions, the selection rules, and font
 // folders holding files that are not fonts. Not part of retail; built only by the non-Windows
-// build, with ctest. The checks of Windows' exact Arial metrics run on macOS, whose Arial is a
-// known face (with VDMX); the others hold for whichever face the fallbacks find.
+// build, with ctest. Font folder checks use fonts the test builds; the checks of Windows' exact
+// Arial metrics run on macOS, on a copy of its Arial (a known face, with VDMX); the others hold
+// for whichever face the fallbacks find.
 
 #include <windows.h>
 
 #include <algorithm>
+#include <climits>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -74,39 +76,202 @@ void Plot(HDC Dc, int X, int Y, COLORREF Color)
     DeleteObject(Brush);
 }
 
-// A font file on this system and its family name, for the font-folder checks; null when none of
-// these is installed.
-struct FKnownFont
+void Put16(std::vector<char>& Out, unsigned Value)
 {
-    const char* Path;
-    const char* Family;
-};
-
-const FKnownFont* FindKnownFont()
-{
-    static const FKnownFont kFonts[] = {
-        {"/System/Library/Fonts/Supplemental/Arial.ttf", "Arial"},
-        {"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "DejaVu Sans"},
-        {"/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", "Liberation Sans"},
-        {"/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf", "Liberation Sans"},
-    };
-    for (const FKnownFont& Font : kFonts)
-        if (access(Font.Path, R_OK) == 0)
-            return &Font;
-    return nullptr;
+    Out.push_back(static_cast<char>((Value >> 8) & 0xFF));
+    Out.push_back(static_cast<char>(Value & 0xFF));
 }
 
+void Put32(std::vector<char>& Out, unsigned Value)
+{
+    Put16(Out, Value >> 16);
+    Put16(Out, Value & 0xFFFF);
+}
+
+// A minimal TrueType font: 1000 units per em; 'A' maps to glyph 1, U+1D49C (with FullMap) to
+// glyph 2, a 500 x 700 square with an advance of 800 units.
+struct FFontSpec
+{
+    const char* Family;
+    unsigned Advance = 600; // glyph 1's
+    // Glyph 1: 0 the square; -1 a single off-curve point (its contour starts on the glyph's last
+    // point); n > 0 a composite of n references to glyph 2.
+    int Glyph = 0;
+    bool bShortCmap = false; // the format 4 subtable's length 2 bytes short of its arrays
+    bool bFullMap = false; // a format 12 subtable recorded before the format 4 one
+};
+
+void PutSquare(std::vector<char>& Glyf)
+{
+    Put16(Glyf, 1), Put16(Glyf, 0), Put16(Glyf, 0), Put16(Glyf, 500), Put16(Glyf, 700);
+    Put16(Glyf, 3), Put16(Glyf, 0);
+    for (int Point = 0; Point < 4; ++Point)
+        Glyf.push_back(1); // on-curve, two-byte x and y
+    for (unsigned Delta : {0u, 500u, 0u, 0x10000u - 500u})
+        Put16(Glyf, Delta);
+    for (unsigned Delta : {0u, 0u, 700u, 0u})
+        Put16(Glyf, Delta);
+}
+
+std::vector<char> BuildFont(const FFontSpec& Spec)
+{
+    std::vector<char> Head(54, 0);
+    Head[1] = 1; // version 1.0
+    Head[12] = 0x5F, Head[13] = 0x0F, Head[14] = 0x3C, Head[15] = 0xF5; // magic
+    Head[18] = 1000 >> 8, Head[19] = static_cast<char>(1000 & 0xFF); // unitsPerEm
+    std::vector<char> Hhea;
+    Put32(Hhea, 0x00010000);
+    Put16(Hhea, 800); // ascender
+    Put16(Hhea, 0x10000 - 200); // descender
+    Put16(Hhea, 0); // lineGap
+    Put16(Hhea, std::max(Spec.Advance, 800u)); // advanceWidthMax
+    Hhea.resize(34, 0);
+    Put16(Hhea, 3); // numberOfHMetrics
+    std::vector<char> Maxp;
+    Put32(Maxp, 0x00005000);
+    Put16(Maxp, 3);
+    std::vector<char> Hmtx;
+    for (unsigned Advance : {500u, Spec.Advance, 800u})
+        Put16(Hmtx, Advance), Put16(Hmtx, 0);
+    std::vector<char> Format4;
+    for (unsigned Value : {4u, Spec.bShortCmap ? 30u : 32u, 0u, 4u, 4u, 1u, 0u, 0x41u, 0xFFFFu, 0u,
+                           0x41u, 0xFFFFu, (1u - 0x41u) & 0xFFFFu, 1u, 0u, 0u})
+        Put16(Format4, Value);
+    std::vector<char> Cmap;
+    Put16(Cmap, 0);
+    if (Spec.bFullMap)
+    {
+        Put16(Cmap, 2);
+        Put16(Cmap, 0), Put16(Cmap, 4), Put32(Cmap, 20); // Unicode full: format 12, first
+        Put16(Cmap, 3), Put16(Cmap, 1), Put32(Cmap, 60); // Windows BMP: format 4, last
+        Put16(Cmap, 12), Put16(Cmap, 0), Put32(Cmap, 40), Put32(Cmap, 0), Put32(Cmap, 2);
+        for (unsigned Value : {0x41u, 0x41u, 1u, 0x1D49Cu, 0x1D49Cu, 2u})
+            Put32(Cmap, Value);
+    }
+    else
+    {
+        Put16(Cmap, 1);
+        Put16(Cmap, 3), Put16(Cmap, 1), Put32(Cmap, 12);
+    }
+    Cmap.insert(Cmap.end(), Format4.begin(), Format4.end());
+    std::vector<char> Glyf;
+    if (Spec.Glyph < 0)
+    {
+        Put16(Glyf, 1), Put16(Glyf, 0), Put16(Glyf, 0), Put16(Glyf, 500), Put16(Glyf, 700);
+        Put16(Glyf, 0), Put16(Glyf, 0); // one point; no instructions
+        Glyf.push_back(0); // off-curve, two-byte x and y
+        Put16(Glyf, 250), Put16(Glyf, 350);
+        Glyf.push_back(0);
+    }
+    else if (Spec.Glyph > 0)
+    {
+        Put16(Glyf, 0xFFFF), Put16(Glyf, 0), Put16(Glyf, 0), Put16(Glyf, 500), Put16(Glyf, 700);
+        for (int Component = 0; Component < Spec.Glyph; ++Component)
+        {
+            Put16(Glyf, 0x0002 | (Component + 1 < Spec.Glyph ? 0x0020 : 0)); // x/y bytes, more
+            Put16(Glyf, 2);
+            Put16(Glyf, 0);
+        }
+    }
+    else
+        PutSquare(Glyf);
+    std::size_t const Second = Glyf.size();
+    PutSquare(Glyf);
+    std::vector<char> Loca;
+    for (std::size_t Offset : {std::size_t{0}, std::size_t{0}, Second, Glyf.size()})
+        Put16(Loca, static_cast<unsigned>(Offset / 2));
+    std::vector<char> Name;
+    std::size_t const Length = std::strlen(Spec.Family) * 2;
+    Put16(Name, 0), Put16(Name, 1), Put16(Name, 18);
+    for (unsigned Value : {3u, 1u, 0x409u, 1u, static_cast<unsigned>(Length), 0u})
+        Put16(Name, Value);
+    for (const char* Character = Spec.Family; *Character != 0; ++Character)
+        Put16(Name, static_cast<unsigned char>(*Character));
+    std::vector<std::pair<const char*, std::vector<char>>> const Tables = {
+        {"cmap", Cmap}, {"glyf", Glyf}, {"head", Head}, {"hhea", Hhea},
+        {"hmtx", Hmtx}, {"loca", Loca}, {"maxp", Maxp}, {"name", Name}};
+    std::vector<char> Out;
+    Put32(Out, 0x00010000);
+    Put16(Out, static_cast<unsigned>(Tables.size()));
+    Put16(Out, 0), Put16(Out, 0), Put16(Out, 0);
+    std::size_t Offset = 12 + 16 * Tables.size();
+    for (const auto& Table : Tables)
+    {
+        Out.insert(Out.end(), Table.first, Table.first + 4);
+        Put32(Out, 0);
+        Put32(Out, static_cast<unsigned>(Offset));
+        Put32(Out, static_cast<unsigned>(Table.second.size()));
+        Offset += (Table.second.size() + 3) & ~std::size_t{3};
+    }
+    for (const auto& Table : Tables)
+    {
+        Out.insert(Out.end(), Table.second.begin(), Table.second.end());
+        Out.resize((Out.size() + 3) & ~std::size_t{3}, 0);
+    }
+    return Out;
+}
+
+#if defined(__APPLE__)
 std::vector<char> ReadFile(const char* Path)
 {
     std::ifstream File(Path, std::ios::binary);
     return std::vector<char>(std::istreambuf_iterator<char>(File),
                              std::istreambuf_iterator<char>());
 }
+#endif
 
-void WriteFile(const std::string& Path, const char* Data, std::size_t Size)
+bool WriteFile(const std::string& Path, const std::vector<char>& Data, std::size_t Size)
 {
     std::ofstream File(Path, std::ios::binary);
-    File.write(Data, static_cast<std::streamsize>(Size));
+    File.write(Data.data(), static_cast<std::streamsize>(std::min(Size, Data.size())));
+    File.close();
+    return !Data.empty() && File.good();
+}
+
+// The extent of a string in a font.
+LONG ExtentIn(HFONT Font, const wchar_t* Text, int Count)
+{
+    HDC const Probe = CreateCompatibleDC(nullptr);
+    HGDIOBJ const Previous = SelectObject(Probe, Font);
+    SIZE Size = {};
+    GetTextExtentPoint32W(Probe, Text, Count, &Size);
+    SelectObject(Probe, Previous);
+    DeleteDC(Probe);
+    return Size.cx;
+}
+
+LONG AdvanceOfA(HFONT Font)
+{
+    return ExtentIn(Font, L"A", 1);
+}
+
+// Whether drawing 'A' in a font lights any pixel.
+bool DrawsA(HFONT Font)
+{
+    HDC const Probe = CreateCompatibleDC(nullptr);
+    HBITMAP const Target = CreateCompatibleBitmap(nullptr, 128, 128);
+    HGDIOBJ const PreviousBitmap = SelectObject(Probe, Target);
+    HGDIOBJ const PreviousFont = SelectObject(Probe, Font);
+    SetBkMode(Probe, TRANSPARENT);
+    SetTextColor(Probe, RGB(255, 255, 255));
+    ExtTextOutW(Probe, 0, 0, 0, nullptr, L"A", 1, nullptr);
+    bool bLit = false;
+    BITMAPINFO Info = {};
+    Info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    Info.bmiHeader.biWidth = 128;
+    Info.bmiHeader.biHeight = -128;
+    Info.bmiHeader.biPlanes = 1;
+    Info.bmiHeader.biBitCount = 32;
+    Info.bmiHeader.biCompression = BI_RGB;
+    std::vector<unsigned> Image(128 * 128);
+    GetDIBits(Probe, Target, 0, 128, Image.data(), &Info, DIB_RGB_COLORS);
+    for (unsigned Pixel : Image)
+        bLit = bLit || (Pixel & 0xFFFFFF) != 0;
+    SelectObject(Probe, PreviousFont);
+    SelectObject(Probe, PreviousBitmap);
+    DeleteObject(Target);
+    DeleteDC(Probe);
+    return bLit;
 }
 
 // Whether any pixel inside / outside a rectangle is lit.
@@ -126,41 +291,102 @@ bool AnyLit(const std::vector<unsigned>& Image, int Width, const RECT& Area, boo
 
 int main()
 {
-    // Before any font is made (the catalogue is built once): a font folder, searched first,
-    // with a FIFO named like a font (no writer: opening it blocks), a font cut short, and a copy
-    // of an installed font that goes away after the catalogue lists it.
-    const FKnownFont* const Known = FindKnownFont();
+    // Before any font is made (the catalogue is built once), three font folders searched first,
+    // in order, holding only fonts this test builds (and, on macOS, a copy of the system's
+    // Arial): First has a FIFO named like a font (no writer: opening it blocks), a font cut
+    // short, and a face that goes away after the catalogue lists it; Second the same family's
+    // other file, and faces made to check the outline, cmap and hmtx rules.
     char FolderTemplate[] = "/tmp/gdi32_tests.XXXXXX";
     std::string const Folder = mkdtemp(FolderTemplate) != nullptr ? FolderTemplate : "";
-    std::string const Copy = Folder + "/Gone.ttf";
-    if (!Folder.empty())
+    if (Folder.empty())
     {
-        setenv("FL_GDI32_FONT_PATH", Folder.c_str(), 1);
-        mkfifo((Folder + "/Pipe.ttf").c_str(), 0600);
-        if (Known != nullptr)
-        {
-            std::vector<char> const Data = ReadFile(Known->Path);
-            WriteFile(Folder + "/Broken.ttf", Data.data(),
-                      std::min<std::size_t>(Data.size(), 2048));
-            WriteFile(Copy, Data.data(), Data.size());
-        }
+        std::printf("FAIL: no temporary folder\n");
+        return 1;
     }
-    if (Known != nullptr && !Folder.empty())
+    std::string const First = Folder + "/first";
+    std::string const Second = Folder + "/second";
+    std::string const Third = Folder + "/third";
+    std::vector<std::string> const Files = {
+        First + "/Pipe.ttf",  First + "/Broken.ttf", First + "/Gone.ttf", Second + "/Kept.ttf",
+        Second + "/Bad.ttf",  Second + "/Many.ttf",  Second + "/Few.ttf", Second + "/Short.ttf",
+        Second + "/Wide.ttf", Second + "/Full.ttf",  Third + "/Arial.ttf"};
+    // Each step of the setup must hold, or what the checks below find is not what they test.
+    bool bSetUp =
+        mkdir(First.c_str(), 0700) == 0 && mkdir(Second.c_str(), 0700) == 0 &&
+        mkdir(Third.c_str(), 0700) == 0 &&
+        setenv("FL_GDI32_FONT_PATH", (First + ":" + Second + ":" + Third).c_str(), 1) == 0 &&
+        mkfifo(Files[0].c_str(), 0600) == 0;
+    std::vector<char> const Gone = BuildFont({"Gdi Test Face", 600});
+    bSetUp = bSetUp && WriteFile(Files[1], Gone, 200) && WriteFile(Files[2], Gone, Gone.size());
+    std::vector<std::pair<std::string, FFontSpec>> const Fixtures = {
+        {Files[3], {"Gdi Test Face", 700}},
+        {Files[4], {"Gdi Test Bad", 500, -1}},
+        {Files[5], {"Gdi Test Many", 500, 300}},
+        {Files[6], {"Gdi Test Few", 500, 4}},
+        {Files[7], {"Gdi Test Short", 500, 0, true}},
+        {Files[8], {"Gdi Test Wide", 40000}},
+        {Files[9], {"Gdi Test Full", 500, 0, false, true}}};
+    for (const auto& Fixture : Fixtures)
     {
-        HFONT const First = MakeFont(Known->Family, -16);
-        Check(First != nullptr, "the catalogue skips a FIFO and a cut-short font");
-        DeleteObject(First);
-        std::remove(Copy.c_str());
+        std::vector<char> const Data = BuildFont(Fixture.second);
+        bSetUp = bSetUp && WriteFile(Fixture.first, Data, Data.size());
+    }
+#if defined(__APPLE__)
+    // macOS's Arial (Supplemental/Arial.ttf) is a known face with a VDMX table, as Windows' is;
+    // this copy is found before any other Arial.
+    std::vector<char> const Arial = ReadFile("/System/Library/Fonts/Supplemental/Arial.ttf");
+    bSetUp = bSetUp && WriteFile(Files[10], Arial, Arial.size());
+#endif
+    Check(bSetUp, "the font folders are set up (folders, FL_GDI32_FONT_PATH, FIFO, font files)");
+
+    HFONT const Before = MakeFont("Gdi Test Face", -100);
+    Check(Before != nullptr && AdvanceOfA(Before) == 60,
+          "the catalogue skips a FIFO and a cut-short font, and takes the first folder's face");
+    DeleteObject(Before);
+    Check(std::remove(Files[2].c_str()) == 0, "the first folder's face is removed");
+    {
         HDC const Probe = CreateCompatibleDC(nullptr);
-        HFONT const Again = MakeFont(Known->Family, -16);
+        HFONT const After = MakeFont("Gdi Test Face", -100);
         char Name[LF_FACESIZE] = {};
-        HGDIOBJ const Previous = SelectObject(Probe, Again);
-        Check(Again != nullptr && GetTextFaceA(Probe, LF_FACESIZE, Name) > 0 &&
-                  std::strcmp(Name, Known->Family) == 0,
+        HGDIOBJ const Previous = SelectObject(Probe, After);
+        Check(After != nullptr && GetTextFaceA(Probe, LF_FACESIZE, Name) > 0 &&
+                  std::strcmp(Name, "Gdi Test Face") == 0 && AdvanceOfA(After) == 70,
               "a catalogued face whose file is gone gives way to the next one of its family");
         SelectObject(Probe, Previous);
-        DeleteObject(Again);
+        DeleteObject(After);
         DeleteDC(Probe);
+    }
+    {
+        // Drawn, the glyph is read to its last point and no further (ASan checks).
+        HFONT const Odd = MakeFont("Gdi Test Bad", -100);
+        DrawsA(Odd);
+        Check(Odd != nullptr,
+              "a contour that starts on the glyph's last, off-curve point is drawn");
+        DeleteObject(Odd);
+        HFONT const Many = MakeFont("Gdi Test Many", -100);
+        HFONT const Few = MakeFont("Gdi Test Few", -100);
+        Check(!DrawsA(Many) && DrawsA(Few),
+              "a composite past the outline budget draws nothing; a small one draws");
+        DeleteObject(Many);
+        DeleteObject(Few);
+        HDC const Probe = CreateCompatibleDC(nullptr);
+        HFONT const Short = MakeFont("Gdi Test Short", -100);
+        HGDIOBJ const Previous = SelectObject(Probe, Short);
+        char Name[LF_FACESIZE] = {};
+        GetTextFaceA(Probe, LF_FACESIZE, Name);
+        Check(std::strcmp(Name, "Gdi Test Short") != 0,
+              "a face whose cmap arrays run past the subtable's length is not used");
+        SelectObject(Probe, Previous);
+        DeleteObject(Short);
+        DeleteDC(Probe);
+        HFONT const Wide = MakeFont("Gdi Test Wide", -100);
+        Check(AdvanceOfA(Wide) == 4000, "an advance past 32767 units is unsigned");
+        DeleteObject(Wide);
+        HFONT const Full = MakeFont("Gdi Test Full", -100);
+        wchar_t const Script[] = {0xD835, 0xDC9C};
+        Check(ExtentIn(Full, Script, 2) == 80 && AdvanceOfA(Full) == 50,
+              "a full Unicode map is used before a BMP one recorded after it");
+        DeleteObject(Full);
     }
 
     HDC const Screen = GetDC(nullptr);
@@ -190,7 +416,7 @@ int main()
     char FaceName[LF_FACESIZE] = {};
     Check(GetTextFaceA(Dc, LF_FACESIZE, FaceName) > 1, "GetTextFaceA names the realized face");
 #if defined(__APPLE__)
-    // macOS's Arial (Supplemental/Arial.ttf) has a VDMX table, as Windows' has.
+    // The copy of macOS's Arial in the third folder.
     Check(std::strcmp(FaceName, "Arial") == 0, "Arial is found by name on macOS");
     Check(Metrics.tmHeight == 18 && Metrics.tmAscent == 15 && Metrics.tmDescent == 3 &&
               Metrics.tmInternalLeading == 2,
@@ -249,9 +475,11 @@ int main()
     SetTextAlign(Dc, TA_LEFT | TA_TOP);
     SetBkMode(Dc, TRANSPARENT);
     SetTextColor(Dc, RGB(255, 255, 255));
+    SIZE HiSize = {};
+    Check(GetTextExtentPoint32W(Dc, L"Hi", 2, &HiSize) && HiSize.cx > 0, "\"Hi\" is measured");
     Check(ExtTextOutW(Dc, 4, 4, 0, nullptr, L"Hi", 2, nullptr), "ExtTextOutW draws");
     std::vector<unsigned> Image = Pixels(Dc, Bitmap, 128, 64);
-    RECT const Cell = {4, 4, 4 + Size.cx, 4 + Metrics.tmHeight};
+    RECT const Cell = {4, 4, 4 + HiSize.cx, 4 + Metrics.tmHeight};
     Check(AnyLit(Image, 128, Cell, true) && !AnyLit(Image, 128, Cell, false),
           "the glyphs are inside the text's cell and nothing outside it");
 
@@ -334,6 +562,44 @@ int main()
                   Untouched[0] == 1,
               "GetDIBits copies no scan line from past the bitmap");
 
+        // Only SRCCOPY is drawn; another raster operation fails and changes nothing.
+        Check(!BitBlt(Strip, 0, 0, 4, 1, Strip, 0, 0, BLACKNESS) &&
+                  Pixels(Strip, Four, 4, 1) == std::vector<unsigned>{R, G, B, W},
+              "BitBlt refuses a raster operation it does not draw");
+        // Extents of INT_MIN, and a blit far wider than the bitmap, end at once.
+        StretchBlt(Strip, 0, 0, INT_MIN, INT_MIN, Strip, 0, 0, INT_MIN, INT_MIN, SRCCOPY);
+        StretchBlt(Strip, 0, 0, INT_MAX, 1, Strip, 0, 0, 1, 1, SRCCOPY);
+        Check(Pixels(Strip, Four, 4, 1) == std::vector<unsigned>{R, R, R, R},
+              "extreme blit extents are clipped to the bitmap");
+        Paint();
+        // A screen DC has no surface: it fills nothing and takes no bitmap.
+        HDC const ScreenDc = GetDC(nullptr);
+        RECT const Everything = {0, 0, 4, 1};
+        Check(FillRect(ScreenDc, &Everything, Brush) == 0 &&
+                  SelectObject(ScreenDc, Four) == nullptr,
+              "a screen DC draws nowhere and takes no bitmap");
+        ReleaseDC(nullptr, ScreenDc);
+        // ExtTextOut counts: past 8192 refused; zero still fills an ETO_OPAQUE rectangle.
+        SetBkColor(Strip, RGB(0, 0, 255));
+        Check(!ExtTextOutW(Strip, 0, 0, 0, nullptr, L"A", 0x80000000u, nullptr),
+              "ExtTextOutW refuses a count past 8192");
+        Check(ExtTextOutW(Strip, 0, 0, ETO_OPAQUE, &Everything, L"", 0, nullptr) &&
+                  Pixels(Strip, Four, 4, 1) == std::vector<unsigned>{B, B, B, B},
+              "ExtTextOutW with no text fills its ETO_OPAQUE rectangle");
+        Paint();
+        // DIB sizes: a zero width or height copies nothing; INT_MIN's height is 2^31 rows.
+        Line.bmiHeader.biWidth = 0;
+        Check(GetDIBits(Strip, Four, 0, 1, Untouched, &Line, DIB_RGB_COLORS) == 0,
+              "GetDIBits refuses a zero width");
+        Line.bmiHeader.biWidth = 4;
+        Line.bmiHeader.biHeight = 0;
+        Check(GetDIBits(Strip, Four, 0, 1, Untouched, &Line, DIB_RGB_COLORS) == 0,
+              "GetDIBits refuses a zero height");
+        Line.bmiHeader.biHeight = static_cast<LONG>(INT_MIN);
+        Check(GetDIBits(Strip, Four, 0, 1, Untouched, &Line, DIB_RGB_COLORS) == 1 &&
+                  Untouched[0] == R,
+              "GetDIBits takes INT_MIN as a top-down height");
+
         Check(SelectObject(Other, Four) == nullptr,
               "a bitmap selected into one DC is not selected into another");
         Check(SelectObject(Strip, Four) == Four, "it may be selected again into its own DC");
@@ -366,12 +632,12 @@ int main()
     Check(Missing != nullptr, "a face that is not installed falls back to a lookalike");
     DeleteObject(Missing);
 
-    if (!Folder.empty())
-    {
-        std::remove((Folder + "/Pipe.ttf").c_str());
-        std::remove((Folder + "/Broken.ttf").c_str());
-        rmdir(Folder.c_str());
-    }
+    for (const std::string& File : Files)
+        std::remove(File.c_str());
+    rmdir(First.c_str());
+    rmdir(Second.c_str());
+    rmdir(Third.c_str());
+    rmdir(Folder.c_str());
 
     std::printf("%d failure(s)\n", GFailures);
     return GFailures == 0 ? 0 : 1;
