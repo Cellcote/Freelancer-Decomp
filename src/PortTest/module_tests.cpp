@@ -827,6 +827,49 @@ int main(int argc, char** argv)
               SphereVolume(0.0f, 1.0f, 5.0f) == 4.1887903f,
           "Common's GetSphereIntersectVol");
 
+    // MarshalBuffer's wide strings are UTF-16 units on the wire, as Windows' wchar_t: a
+    // character above U+FFFF goes as a surrogate pair, and reads back as one wchar_t.
+    {
+        using FCtor = void (*)(void*);
+        using FUseWrite = void (*)(void*, unsigned char*, int);
+        using FUseRead = void (*)(void*, unsigned char const*, int);
+        using FPutWide = void (*)(void*, wchar_t const*);
+        using FGetWide = wchar_t* (*)(void*);
+        auto const Ctor =
+            reinterpret_cast<FCtor>(Platform::ModuleSymbol(Common, "_ZN13MarshalBufferC1Ev"));
+        auto const UseWrite = reinterpret_cast<FUseWrite>(
+            Platform::ModuleSymbol(Common, "_ZN13MarshalBuffer16use_write_bufferEPhi"));
+        auto const UseRead = reinterpret_cast<FUseRead>(
+            Platform::ModuleSymbol(Common, "_ZN13MarshalBuffer15use_read_bufferEPKhi"));
+        auto const PutWide = reinterpret_cast<FPutWide>(
+            Platform::ModuleSymbol(Common, "_ZN13MarshalBuffer11put_wstringEPKw"));
+        auto const GetWide = reinterpret_cast<FGetWide>(
+            Platform::ModuleSymbol(Common, "_ZN13MarshalBuffer11get_wstringEv"));
+        Check(Ctor != nullptr && UseWrite != nullptr && UseRead != nullptr && PutWide != nullptr &&
+                  GetWide != nullptr,
+              "Common exports MarshalBuffer's wide string calls");
+        if (Ctor != nullptr && UseWrite != nullptr && UseRead != nullptr && PutWide != nullptr &&
+            GetWide != nullptr)
+        {
+            alignas(std::max_align_t) unsigned char Buffer[256] = {};
+            alignas(std::max_align_t) unsigned char Wire[64] = {};
+            Ctor(Buffer);
+            UseWrite(Buffer, Wire, sizeof(Wire));
+            wchar_t const Text[] = {L'A', static_cast<wchar_t>(0x1F600), 0};
+            PutWide(Buffer, Text);
+            unsigned char const Expected[] = {3, 0, 0, 0, 'A', 0, 0x3D, 0xD8, 0x00, 0xDE};
+            Check(std::memcmp(Wire, Expected, sizeof(Expected)) == 0,
+                  "MarshalBuffer::put_wstring writes UTF-16 units");
+            Ctor(Buffer);
+            UseRead(Buffer, Wire, sizeof(Expected));
+            wchar_t* const Read = GetWide(Buffer);
+            Check(Read != nullptr && Read[0] == L'A' && Read[1] == static_cast<wchar_t>(0x1F600) &&
+                      Read[2] == 0,
+                  "MarshalBuffer::get_wstring reads them back");
+            free(Read);
+        }
+    }
+
     // Server loads (on dacom, DALib and Common) and runs: destroying a phantom it never made
     // reports -2, as retail's does.
     Platform::Module const Server = Platform::ModuleLoad((Folder + "Server.dll").c_str());
