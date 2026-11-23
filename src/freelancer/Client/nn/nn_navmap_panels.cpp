@@ -99,7 +99,8 @@ void NeuroNetNavMap::AddJumpLink(FNavMapItem* From, FNavMapItem* To)
     }
 
     // 00497727..00497749
-    FNavMapJumpLink* const Link = static_cast<FNavMapJumpLink*>(operator new(0x10));
+    FNavMapJumpLink* const Link =
+        static_cast<FNavMapJumpLink*>(operator new(sizeof(FNavMapJumpLink)));
     Link->From = From;
     Link->To = To;
     Link->Field_0x08 = 1;

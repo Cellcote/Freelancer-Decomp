@@ -1301,8 +1301,7 @@ namespace
     // CurrentFreeCount 0}, stored by the static initializer LAB_005374b0. FUN_00537a90 and
     // FUN_00537af0 allocate from it, FUN_005375a0 returns every deleted GameLight to it, and
     // FUN_00537ab0 shrinks it.
-    Heap G_GameLightHeap(0x12cu, -1);
-
+    Heap G_GameLightHeap(sizeof(FGameLight), -1); // 0x12c on Win32 (engine_light.h asserts)
 }
 
 FGameLight* GameLightConstruct(FGameLight* Light)
@@ -1745,7 +1744,7 @@ void* GameLightHeapAlloc(size_t Size)
 {
     // FUN_00537a90 — GameLight::operator new: size==0x12c → Heap::Malloc(DAT_006789a4); else
     // malloc.
-    if (Size != 0x12c)
+    if (Size != sizeof(FGameLight))
         return malloc(Size);
     return G_GameLightHeap.Malloc();
 }

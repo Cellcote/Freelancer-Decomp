@@ -362,7 +362,7 @@ void FGateTunnel::EnterState1()
 
     // 0x0050112f..0x00501153: a GameLight (operator new FUN_00537a90 + FUN_005374e0); the
     // pointer is used below without a test.
-    void* const Memory = GameLightHeapAlloc(0x12c);
+    void* const Memory = GameLightHeapAlloc(sizeof(FGameLight));
     Light = Memory != nullptr ? GameLightConstruct(static_cast<FGameLight*>(Memory)) : nullptr;
 
     // Directional, at the origin, white, range 500000.

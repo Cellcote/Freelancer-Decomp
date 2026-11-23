@@ -55,6 +55,7 @@ struct FNebulaCloudsListNode
     FNebulaCloudsListNode* Prev;
     FNebulaClouds* Clouds;
 };
+FL_LAYOUT_ASSERT(sizeof(FNebulaCloudsListNode) == 0xc, "retail list node is operator new(0xc)");
 
 struct FNebulaZoneShell;
 typedef std::map<unsigned, FNebulaZoneShell*> FNebulaZoneShellMap;

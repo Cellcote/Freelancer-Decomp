@@ -142,19 +142,18 @@ static void InitGlowDescDefaults(FStarGlowDesc* Desc, unsigned char OwnerTag)
 // +0x38 / +0x3c. The rest of the inline name (+0x15..+0x33) is not written.
 static FStarFxChild40* AllocChild40(float Field38, float Field3C)
     {
-        FStarFxChild40* Child = static_cast<FStarFxChild40*>(operator new(0x40));
+        FStarFxChild40* Child = static_cast<FStarFxChild40*>(operator new(sizeof(FStarFxChild40)));
         if (Child == nullptr)
             return nullptr;
-        unsigned char* const Raw = Child->Raw;
-        Raw[0] = 0;
-        *reinterpret_cast<unsigned*>(Raw + 0x04) = 0;
-        *reinterpret_cast<unsigned*>(Raw + 0x08) = 0;
-        *reinterpret_cast<unsigned*>(Raw + 0x0c) = 0;
-        *reinterpret_cast<unsigned*>(Raw + 0x10) = 0;
-        Raw[0x14] = 0;
-        *reinterpret_cast<unsigned*>(Raw + 0x34) = 0;
-        *reinterpret_cast<float*>(Raw + 0x38) = Field38;
-        *reinterpret_cast<float*>(Raw + 0x3c) = Field3C;
+        Child->Allocator = 0;
+        Child->Begin = nullptr;
+        Child->End = nullptr;
+        Child->Cap = nullptr;
+        Child->ShapeLen = 0;
+        Child->ShapeName[0] = 0;
+        Child->Shape = nullptr;
+        Child->ScaleMin = Field38;
+        Child->ScaleMax = Field3C;
         return Child;
     }
 
@@ -316,7 +315,7 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
         if (Body == nullptr)
             return 0.0f;
         unsigned char* const Base = Body->Raw;
-        int const Lod = *reinterpret_cast<int*>(Base + 0x2b0);
+        int const Lod = Body->Lod;
         float const Center = *reinterpret_cast<float*>(Base + 0x10);
         if (Lod == 0)
             return Center;
@@ -582,8 +581,8 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
         ICamera* const Camera = static_cast<ICamera*>(Cam);
 
         // 0x0050da26..0x0050da55: both steps spilled to float locals.
-        float const StepUp = Dt / *reinterpret_cast<float*>(Base + 0x2e8);
-        float const StepDown = Dt / *reinterpret_cast<float*>(Base + 0x2ec);
+        float const StepUp = Dt / Body->FadeInTime;
+        float const StepDown = Dt / Body->FadeOutTime;
 
         // 0x0050da59..0x0050da9a: viewport (slot 5) W = r - l + 1, H = b - t + 1; the sphere's
         // screen X/Y (+0x7c/+0x80) and pixel scale (+0x88) copied.
@@ -605,7 +604,7 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
 
         // 0x0050dac0..0x0050db58: LOD = the first k whose int threshold (+0x2f8 + 4k, FILD) is
         // an ordered "greater" than the pixel scale, else 5.
-        int const* const Thresholds = reinterpret_cast<int const*>(Base + 0x2f8);
+        int const* const Thresholds = Body->LodThresholds;
         int Lod = 5;
         if (static_cast<double>(Thresholds[0]) > PixelScale)
             Lod = 0;
@@ -618,17 +617,16 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
         else if (static_cast<double>(Thresholds[4]) > PixelScale)
             Lod = 4;
         // 0x0050db62..0x0050db88: minus +0x2b8 (0 when below it, JGE signed), capped at +0x2b4.
-        int* const LodSlot = reinterpret_cast<int*>(Base + 0x2b0);
-        int const LodMin = *reinterpret_cast<int*>(Base + 0x2b8);
+        int* const LodSlot = &Body->Lod;
+        int const LodMin = Body->LodBias;
         *LodSlot = (Lod >= LodMin) ? Lod - LodMin : 0;
-        int const LodCap = *reinterpret_cast<int*>(Base + 0x2b4);
+        int const LodCap = Body->MaxLod;
         if (*LodSlot > LodCap)
             *LodSlot = LodCap;
 
         // 0x0050db8e..0x0050dba9: margin R = +0x88 * +0x2ac, stored as float; the unrounded
         // value against 50.0f (DAT_005d440c), only an ordered R < 50 becomes 50.
-        double const MarginExt =
-            static_cast<double>(PixelScale) * *reinterpret_cast<float*>(Base + 0x2ac);
+        double const MarginExt = static_cast<double>(PixelScale) * Body->RadiusScale;
         float Margin = static_cast<float>(MarginExt);
         if (MarginExt < 50.0)
             Margin = 50.0f;
@@ -704,7 +702,7 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
         if (LodNow > 2)
         {
             float const Mul = static_cast<float>((static_cast<double>(*MainAlpha) + 1.0) * 0.5);
-            float const Spread = *reinterpret_cast<float*>(Base + 0x2f4);
+            float const Spread = Body->InteriorRayTween;
             unsigned char* Slot = Base + 0x138;
             for (int I = 0; I < 12; I += StrideOuter)
             {
@@ -882,9 +880,9 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
     {
         // 0x0050e6f0: `this` (ESI) is used at once -- retail tests neither it nor the sphere.
         unsigned char* const Base = Body->Raw;
-        FTexShape const** ShapeSlot = reinterpret_cast<FTexShape const**>(Base + 0x2e0);
-        unsigned char* AlphaFlag = Base + 0x2e4;
-        char const* ShapeName = reinterpret_cast<char const*>(Base + 0x2c0);
+        FTexShape const** ShapeSlot = &Body->Shape;
+        unsigned char* AlphaFlag = &Body->bShapeHasAlpha;
+        char const* ShapeName = Body->ShapeName;
         FTexShape const* Shape = ResolveNamedShape(ShapeName, ShapeSlot, AlphaFlag);
         if (Shape == nullptr)
             return;
@@ -897,14 +895,14 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
 
         // 0x0050e83b..0x0050e874: scale = (float)(+0x2ac * sphere +0x88); the sun's screen
         // position (sphere +0x7c..+0x84) copied; the lod +0x2b0.
-        float const Scale = static_cast<float>(
-            static_cast<double>(*reinterpret_cast<float*>(Base + 0x2ac)) * Sphere->PixelScale);
+        float const Scale =
+            static_cast<float>(static_cast<double>(Body->RadiusScale) * Sphere->PixelScale);
         float const Cx = Sphere->ScreenX;
         float const Cy = Sphere->ScreenY;
-        int const Lod = *reinterpret_cast<int*>(Base + 0x2b0);
-        float const* const CenterRgb = reinterpret_cast<float*>(Base + 0x288);
-        float const* const MidRgb = reinterpret_cast<float*>(Base + 0x294);
-        float const* const OuterRgb = reinterpret_cast<float*>(Base + 0x2a0);
+        int const Lod = Body->Lod;
+        float const* const CenterRgb = Body->CenterColor;
+        float const* const MidRgb = Body->MidColor;
+        float const* const OuterRgb = Body->OuterColor;
         // Slot {x, y, u, v, alpha} (stride 0x18): the centre at +0x00, the ring slots k = 1..12
         // at k * 0x18, the mid ring slots i = 0..11 at 0x138 + i * 0x18.
         float const* const Centre = reinterpret_cast<float*>(Base);
@@ -941,7 +939,7 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
                 float const* const MidA = Centre + (0x138 / 4) + SlotA * 6;
                 float const* const RingB = Centre + SlotB * 6;
                 float const* const RingC = Centre + SlotC * 6;
-                int* const EdgeFlag = reinterpret_cast<int*>(Base + 0x258) + Index;
+                int* const EdgeFlag = &Body->EdgeFlags[Index];
 
                 // 0x0050ea8f..0x0050ebf2: alpha bands (above 0.999f -> 1, TEST AH,0x41 / JNZ;
                 // below 0.001f -> -1, TEST AH,5 / JP; else and unordered 0) of mid i and mid A;
@@ -1024,9 +1022,8 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
     {
         // 0x0050f857..0x0050f8e5: the shape cached at +0x34; a miss looks the inline name at
         // +0x14 up in DAT_006750a0 as it is (ShapeDB.h:0xf2 warning and 0 when absent).
-        unsigned char* const Base = Flare->Raw;
-        FTexShape const** const ShapeSlot = reinterpret_cast<FTexShape const**>(Base + 0x34);
-        ResolveNamedShape(reinterpret_cast<char const*>(Base + 0x14), ShapeSlot, nullptr);
+        FTexShape const** const ShapeSlot = &Flare->Shape;
+        ResolveNamedShape(Flare->ShapeName, ShapeSlot, nullptr);
 
         // 0x0050f8e8..0x0050f939: the viewport (slot 5), the sun's screen x / y / z
         // (+0x7c..+0x84) copied, the viewport middle (l + r) * 0.5 and (t + b) * 0.5 (double
@@ -1047,10 +1044,10 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
         // JNZ keeps not-greater and unordered) -> +0x3c, else below +0x38 (TEST AH,5 / JP keeps
         // greater, equal and unordered) -> +0x38.
         float Scale = Sphere->PixelScale;
-        if (Scale > *reinterpret_cast<float*>(Base + 0x3c))
-            Scale = *reinterpret_cast<float*>(Base + 0x3c);
-        else if (Scale < *reinterpret_cast<float*>(Base + 0x38))
-            Scale = *reinterpret_cast<float*>(Base + 0x38);
+        if (Scale > Flare->ScaleMax)
+            Scale = Flare->ScaleMax;
+        else if (Scale < Flare->ScaleMin)
+            Scale = Flare->ScaleMin;
 
         // 0x0050f976..0x0050f98a: the half-size base scale * brightness * intensity argument,
         // through a float.
@@ -1087,8 +1084,8 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
         // colour (+8, +0xc, +0x10, fade * +0x14); centre sun + axis * +0 (the y product through
         // a float first); half size base * +4; the quad (u,v) (0,0) (1,0) (1,1) (0,1) at
         // (x-h,y-h) (x+h,y-h) (x+h,y+h) (x-h,y+h), z 0.
-        float** It = *reinterpret_cast<float***>(Base + 0x04);
-        while (It != *reinterpret_cast<float***>(Base + 0x08))
+        float** It = reinterpret_cast<float**>(Flare->Begin);
+        while (It != reinterpret_cast<float**>(Flare->End))
         {
             float const* const Elem = *It;
             Win3DColor4f(Elem[2], Elem[3], Elem[4],
@@ -1262,9 +1259,8 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
         // 0x00510175..0x005101e6: cache test at +0x34, key = the inline chars at +0x14 with no
         // length test, FUN_00512660 (the out-of-line copy of the same cached find); a null
         // shape leaves through LAB_00510982.
-        unsigned char* const Base = Spines->Raw;
-        FTexShape const** ShapeSlot = reinterpret_cast<FTexShape const**>(Base + 0x34);
-        char const* const Name = reinterpret_cast<char const*>(Base + 0x14);
+        FTexShape const** ShapeSlot = &Spines->Shape;
+        char const* const Name = Spines->ShapeName;
         FTexShape const* Shape = ResolveNamedShape(Name, ShapeSlot, nullptr);
         if (Shape == nullptr)
             return;
@@ -1273,10 +1269,10 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
         // JNZ keeps not-greater and unordered) -> +0x3c, else below +0x38 (TEST AH,5 / JP keeps
         // greater, equal and unordered) -> +0x38.
         float Scale = Sphere->PixelScale;
-        if (Scale > *reinterpret_cast<float*>(Base + 0x3c))
-            Scale = *reinterpret_cast<float*>(Base + 0x3c);
-        else if (Scale < *reinterpret_cast<float*>(Base + 0x38))
-            Scale = *reinterpret_cast<float*>(Base + 0x38);
+        if (Scale > Spines->ScaleMax)
+            Scale = Spines->ScaleMax;
+        else if (Scale < Spines->ScaleMin)
+            Scale = Spines->ScaleMin;
 
         // 0x00510229..0x0051027f: the sun's screen x / y (+0x7c / +0x80); from the SunEffect body
         // (+0x14): inner radius (float)(+0x2f0 * +0x2ac * scale), outer radius
@@ -1285,9 +1281,8 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
         float const SunX = Sphere->ScreenX;
         float const SunY = Sphere->ScreenY;
         unsigned char const* const Body = Sphere->SunBody->Raw;
-        double const Tween = static_cast<double>(*reinterpret_cast<float const*>(Body + 0x2f0));
-        double const BodyScale =
-            static_cast<double>(*reinterpret_cast<float const*>(Body + 0x2ac));
+        double const Tween = static_cast<double>(Sphere->SunBody->InteriorTween);
+        double const BodyScale = static_cast<double>(Sphere->SunBody->RadiusScale);
         float const InnerR = static_cast<float>(Tween * BodyScale * Scale);
         float const OuterR =
             static_cast<float>(static_cast<double>(Scale) * BodyScale * (Tween + 1.0) * 0.5);
@@ -1295,10 +1290,8 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
 
         // 0x00510272..0x005102a1: element count (+8 - +4) / 0x2c, 0 when +4 is null.
         int Count = 0;
-        if (*reinterpret_cast<unsigned char* const*>(Base + 0x04) != nullptr)
-            Count = static_cast<int>(*reinterpret_cast<unsigned char* const*>(Base + 0x08) -
-                                     *reinterpret_cast<unsigned char* const*>(Base + 0x04)) /
-                    0x2c;
+        if (Spines->Begin != nullptr)
+            Count = static_cast<int>(Spines->End - Spines->Begin) / 0x2c;
 
         // 0x005102a5..0x005102b3: the shape's texture (FUN_00425640, frame 0) bound, Begin(8) --
         // before the count test, so End always follows.
@@ -1310,8 +1303,7 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
         // inner radius -> outer radius -> tip.
         for (int Index = 0; Index < Count; ++Index)
         {
-            float const* const Elem = reinterpret_cast<float const*>(
-                *reinterpret_cast<unsigned char* const*>(Base + 0x04) + Index * 0x2c);
+            float const* const Elem = reinterpret_cast<float const*>(Spines->Begin + Index * 0x2c);
             double const Cos = static_cast<double>(Elem[0]);
             double const Sin = static_cast<double>(Elem[1]);
 
@@ -1887,8 +1879,8 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
             // spilled to float, and the Draw returns.
             if (!(this->Field38 < 1.0f))
                 return;
-            float const StepUp = this->Dt / *reinterpret_cast<float*>(Body->Raw + 0x2e8);
-            float const StepDown = this->Dt / *reinterpret_cast<float*>(Body->Raw + 0x2ec);
+            float const StepUp = this->Dt / Body->FadeInTime;
+            float const StepDown = this->Dt / Body->FadeOutTime;
             unsigned char* Slot = Body->Raw;
             for (int I = 0; I < 13; ++I)
             {
@@ -1937,8 +1929,7 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
         // the compare against 50.0f DAT_005d440c uses the unrounded value, and only an ordered
         // R < 50 becomes 50). On screen = X > -R, W + R > X, Y > -R, H + R > Y, each an
         // ordered "greater" (TEST AH,0x41 / JNZ).
-        double const BodyExtent =
-            static_cast<double>(*reinterpret_cast<float*>(Body->Raw + 0x2ac)) * this->PixelScale * 2.0;
+        double const BodyExtent = static_cast<double>(Body->RadiusScale) * this->PixelScale * 2.0;
         float BodyR = static_cast<float>(BodyExtent);
         if (BodyExtent < 50.0)
             BodyR = 50.0f;
@@ -1952,14 +1943,13 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
         // (begin +0x04, end +0x08, stride 0x2c), walked while begin is non-null and the index
         // is below the element count. A new value replaces the running maximum unless the
         // maximum is strictly greater (TEST AH,0x41 / JZ), so NaN replaces it.
-        unsigned char* const SpinesRaw = this->Spines->Raw;
         double SpinesMax = 0.0;
         for (unsigned Index = 0;; ++Index)
         {
-            unsigned char* const Begin = *reinterpret_cast<unsigned char**>(SpinesRaw + 0x04);
+            unsigned char* const Begin = this->Spines->Begin;
             if (Begin == nullptr)
                 break;
-            unsigned char* const End = *reinterpret_cast<unsigned char**>(SpinesRaw + 0x08);
+            unsigned char* const End = this->Spines->End;
             int const Count = static_cast<int>((End - Begin) / 0x2c);
             if (Index >= static_cast<unsigned>(Count))
                 break;
@@ -1988,8 +1978,8 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
             // 5.0f / +0x2ec down, both kept on the FPU, and the Draw returns without drawing.
             if (!(this->Field38 < 1.0f))
                 return;
-            double const StepUp = 5.0 / *reinterpret_cast<float*>(Body->Raw + 0x2e8);
-            double const StepDown = 5.0 / *reinterpret_cast<float*>(Body->Raw + 0x2ec);
+            double const StepUp = 5.0 / Body->FadeInTime;
+            double const StepDown = 5.0 / Body->FadeOutTime;
             FadeCoronaSlotsToZero(Body, StepUp, StepDown);
             return;
         }
@@ -2000,9 +1990,8 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
             // (kept on the FPU) down; then the draw.
             if (this->Field38 < 1.0f)
             {
-                float const StepUp = this->Dt / *reinterpret_cast<float*>(Body->Raw + 0x2e8);
-                double const StepDown =
-                    static_cast<double>(this->Dt) / *reinterpret_cast<float*>(Body->Raw + 0x2ec);
+                float const StepUp = this->Dt / Body->FadeInTime;
+                double const StepDown = static_cast<double>(this->Dt) / Body->FadeOutTime;
                 FadeCoronaSlotsToZero(Body, StepUp, StepDown);
             }
         }
@@ -2192,38 +2181,34 @@ FSunEffectBody* SunEffectBodyInit(FSunEffectBody* Body)
         Pu += 6;
     }
     // +600 (0x258): twelve uint 1s.
-    Pu = Words + (600 / 4);
     for (int I = 0; I < 12; ++I)
-    {
-        *Pu = 1;
-        ++Pu;
-    }
-    *reinterpret_cast<unsigned*>(Body->Raw + 700) = 0;
-    Body->Raw[0x2c0] = 0;
-    *reinterpret_cast<float*>(Body->Raw + 0x288) = 1.0f;
-    *reinterpret_cast<float*>(Body->Raw + 0x28c) = 1.0f;
-    *reinterpret_cast<float*>(Body->Raw + 0x290) = 1.0f;
-    *reinterpret_cast<float*>(Body->Raw + 0x294) = 1.0f;
-    *reinterpret_cast<float*>(Body->Raw + 0x298) = 1.0f;
-    *reinterpret_cast<float*>(Body->Raw + 0x29c) = 1.0f;
-    *reinterpret_cast<float*>(Body->Raw + 0x2a0) = 1.0f;
-    *reinterpret_cast<float*>(Body->Raw + 0x2a4) = 1.0f;
-    *reinterpret_cast<float*>(Body->Raw + 0x2a8) = 1.0f;
-    *reinterpret_cast<float*>(Body->Raw + 0x2f4) = 1.0f;
-    *reinterpret_cast<float*>(Body->Raw + 0x2e8) = 0.25f; // 0x3e800000
-    *reinterpret_cast<float*>(Body->Raw + 0x2ec) = 0.25f;
-    Body->Raw[0x2e4] = 0;
-    *reinterpret_cast<unsigned*>(Body->Raw + 0x2e0) = 0;
-    *reinterpret_cast<unsigned*>(Body->Raw + 0x2b0) = 0;
-    *reinterpret_cast<unsigned*>(Body->Raw + 0x2b8) = 0;
-    *reinterpret_cast<float*>(Body->Raw + 0x2f0) = 0.5f; // 0x3f000000
-    *reinterpret_cast<float*>(Body->Raw + 0x2ac) = 2.0f;  // 0x40000000
-    *reinterpret_cast<unsigned*>(Body->Raw + 0x2b4) = 5;
-    *reinterpret_cast<unsigned*>(Body->Raw + 0x2f8) = 8;
-    *reinterpret_cast<unsigned*>(Body->Raw + 0x2fc) = 0xf;
-    *reinterpret_cast<unsigned*>(Body->Raw + 0x300) = 0x19;
-    *reinterpret_cast<unsigned*>(Body->Raw + 0x304) = 0x28;
-    *reinterpret_cast<unsigned*>(Body->Raw + 0x308) = 0x3c;
+        Body->EdgeFlags[I] = 1;
+    Body->ShapeLen = 0;
+    Body->ShapeName[0] = 0;
+    Body->CenterColor[0] = 1.0f;
+    Body->CenterColor[1] = 1.0f;
+    Body->CenterColor[2] = 1.0f;
+    Body->MidColor[0] = 1.0f;
+    Body->MidColor[1] = 1.0f;
+    Body->MidColor[2] = 1.0f;
+    Body->OuterColor[0] = 1.0f;
+    Body->OuterColor[1] = 1.0f;
+    Body->OuterColor[2] = 1.0f;
+    Body->InteriorRayTween = 1.0f;
+    Body->FadeInTime = 0.25f; // 0x3e800000
+    Body->FadeOutTime = 0.25f;
+    Body->bShapeHasAlpha = 0;
+    Body->Shape = 0;
+    Body->Lod = 0;
+    Body->LodBias = 0;
+    Body->InteriorTween = 0.5f; // 0x3f000000
+    Body->RadiusScale = 2.0f; // 0x40000000
+    Body->MaxLod = 5;
+    Body->LodThresholds[0] = 8;
+    Body->LodThresholds[1] = 0xf;
+    Body->LodThresholds[2] = 0x19;
+    Body->LodThresholds[3] = 0x28;
+    Body->LodThresholds[4] = 0x3c;
     return Body;
 }
 
@@ -2341,59 +2326,57 @@ int LensGlowLoadFromIni(FSunEffectBody* Body, char const* IniPath, char const* N
                 char const* Shape = Reader.get_value_string();
                 if (Shape == nullptr)
                 {
-                    *reinterpret_cast<unsigned*>(Base + 0x2bc) = 0;
-                    Base[0x2c0] = 0;
+                    Body->ShapeLen = 0;
+                    Body->ShapeName[0] = 0;
                 }
                 else
                 {
                     // FUN_00417c50 into +0x2c0; length at +0x2bc.
-                    unsigned const Len =
-                        CopyBoundedString(reinterpret_cast<char*>(Base + 0x2c0), 0x20, Shape);
-                    *reinterpret_cast<unsigned*>(Base + 0x2bc) = Len;
+                    unsigned const Len = CopyBoundedString(Body->ShapeName, 0x20, Shape);
+                    Body->ShapeLen = Len;
                 }
             }
             else if (Reader.is_value("radius_scale"))
             {
-                *reinterpret_cast<float*>(Base + 0x2ac) = Reader.get_value_float(0);
+                Body->RadiusScale = Reader.get_value_float(0);
             }
             else if (Reader.is_value("inner_color"))
             {
                 float const G = Reader.get_value_float(1);
                 float const R = Reader.get_value_float(0);
                 float const B = Reader.get_value_float(2);
-                *reinterpret_cast<float*>(Base + 0x288) = R;
-                *reinterpret_cast<float*>(Base + 0x28c) = G;
-                *reinterpret_cast<float*>(Base + 0x290) = B;
+                Body->CenterColor[0] = R;
+                Body->CenterColor[1] = G;
+                Body->CenterColor[2] = B;
             }
             else if (Reader.is_value("outer_color"))
             {
                 float const G = Reader.get_value_float(1);
                 float const R = Reader.get_value_float(0);
                 float const B = Reader.get_value_float(2);
-                *reinterpret_cast<float*>(Base + 0x2a0) = R;
-                *reinterpret_cast<float*>(Base + 0x2a4) = G;
-                *reinterpret_cast<float*>(Base + 0x2a8) = B;
+                Body->OuterColor[0] = R;
+                Body->OuterColor[1] = G;
+                Body->OuterColor[2] = B;
             }
             else if (Reader.is_value("glow_fade_in_seconds"))
             {
-                *reinterpret_cast<float*>(Base + 0x2e8) = Reader.get_value_float(0);
+                Body->FadeInTime = Reader.get_value_float(0);
             }
             else if (Reader.is_value("glow_fade_out_seconds"))
             {
-                *reinterpret_cast<float*>(Base + 0x2ec) = Reader.get_value_float(0);
+                Body->FadeOutTime = Reader.get_value_float(0);
             }
             else if (Reader.is_value("interior_tween"))
             {
-                *reinterpret_cast<float*>(Base + 0x2f0) = Reader.get_value_float(0);
+                Body->InteriorTween = Reader.get_value_float(0);
             }
             else if (Reader.is_value("interior_ray_tween"))
             {
-                *reinterpret_cast<float*>(Base + 0x2f4) = Reader.get_value_float(0);
+                Body->InteriorRayTween = Reader.get_value_float(0);
             }
             else if (Reader.is_value("max_LOD"))
             {
-                *reinterpret_cast<unsigned*>(Base + 0x2b4) =
-                    static_cast<unsigned>(Reader.get_value_float(0));
+                Body->MaxLod = static_cast<unsigned>(Reader.get_value_float(0));
             }
         }
         break;
@@ -2403,17 +2386,11 @@ int LensGlowLoadFromIni(FSunEffectBody* Body, char const* IniPath, char const* N
     if (bFound)
     {
         // Post-parse lerp of blended colour at +0x294..+0x29c (listing 0050d6f7).
-        float const T = *reinterpret_cast<float*>(Base + 0x2f0);
+        float const T = Body->InteriorTween;
         float const OneMinus = 1.0f - T;
-        *reinterpret_cast<float*>(Base + 0x294) =
-            OneMinus * *reinterpret_cast<float*>(Base + 0x288) +
-            T * *reinterpret_cast<float*>(Base + 0x2a0);
-        *reinterpret_cast<float*>(Base + 0x298) =
-            OneMinus * *reinterpret_cast<float*>(Base + 0x28c) +
-            T * *reinterpret_cast<float*>(Base + 0x2a4);
-        *reinterpret_cast<float*>(Base + 0x29c) =
-            OneMinus * *reinterpret_cast<float*>(Base + 0x290) +
-            T * *reinterpret_cast<float*>(Base + 0x2a8);
+        Body->MidColor[0] = OneMinus * Body->CenterColor[0] + T * Body->OuterColor[0];
+        Body->MidColor[1] = OneMinus * Body->CenterColor[1] + T * Body->OuterColor[1];
+        Body->MidColor[2] = OneMinus * Body->CenterColor[2] + T * Body->OuterColor[2];
     }
     return bFound ? 0 : 1;
 }
@@ -2425,9 +2402,8 @@ static void LensFlareFree(FStarFxChild40* Flare)
     // FUN_0050f340 — free bead pointers then the pointer array.
     if (Flare == nullptr)
         return;
-    unsigned char* const Base = Flare->Raw;
-    float** Begin = *reinterpret_cast<float***>(Base + 0x04);
-    float** End = *reinterpret_cast<float***>(Base + 0x08);
+    float** Begin = reinterpret_cast<float**>(Flare->Begin);
+    float** End = reinterpret_cast<float**>(Flare->End);
     if (Begin != nullptr)
     {
         for (float** It = Begin; It != End; ++It)
@@ -2437,10 +2413,10 @@ static void LensFlareFree(FStarFxChild40* Flare)
         }
         operator delete(Begin);
     }
-    *reinterpret_cast<void**>(Base + 0x04) = nullptr;
-    *reinterpret_cast<void**>(Base + 0x08) = nullptr;
-    *reinterpret_cast<void**>(Base + 0x0c) = nullptr;
-    *reinterpret_cast<void**>(Base + 0x34) = nullptr;
+    Flare->Begin = nullptr;
+    Flare->End = nullptr;
+    Flare->Cap = nullptr;
+    Flare->Shape = nullptr;
 }
 
 static void SpinesFree(FStarFxChild40* Spines)
@@ -2448,26 +2424,24 @@ static void SpinesFree(FStarFxChild40* Spines)
     // FUN_0050fb50 — contiguous 0x2c array; reset end=begin, clear shape.
     if (Spines == nullptr)
         return;
-    unsigned char* const Base = Spines->Raw;
-    *reinterpret_cast<void**>(Base + 0x08) = *reinterpret_cast<void**>(Base + 0x04);
-    *reinterpret_cast<void**>(Base + 0x34) = nullptr;
-    *reinterpret_cast<unsigned*>(Base + 0x10) = 0;
-    Base[0x14] = 0;
-    void* const Begin = *reinterpret_cast<void**>(Base + 0x04);
+    Spines->End = Spines->Begin;
+    Spines->Shape = nullptr;
+    Spines->ShapeLen = 0;
+    Spines->ShapeName[0] = 0;
+    void* const Begin = Spines->Begin;
     if (Begin != nullptr)
         operator delete(Begin);
-    *reinterpret_cast<void**>(Base + 0x04) = nullptr;
-    *reinterpret_cast<void**>(Base + 0x08) = nullptr;
-    *reinterpret_cast<void**>(Base + 0x0c) = nullptr;
+    Spines->Begin = nullptr;
+    Spines->End = nullptr;
+    Spines->Cap = nullptr;
 }
 
 static void FlarePushBead(FStarFxChild40* Flare, float const Values[6])
 {
     // FUN_00537260 — push float[6]* into [+4,+8) pointer vector.
-    unsigned char* const Base = Flare->Raw;
-    float** Begin = *reinterpret_cast<float***>(Base + 0x04);
-    float** End = *reinterpret_cast<float***>(Base + 0x08);
-    float** Cap = *reinterpret_cast<float***>(Base + 0x0c);
+    float** Begin = reinterpret_cast<float**>(Flare->Begin);
+    float** End = reinterpret_cast<float**>(Flare->End);
+    float** Cap = reinterpret_cast<float**>(Flare->Cap);
     if (End == Cap)
     {
         int const OldCount = (Begin != nullptr) ? static_cast<int>(End - Begin) : 0;
@@ -2482,8 +2456,8 @@ static void FlarePushBead(FStarFxChild40* Flare, float const Values[6])
         Begin = NewBegin;
         End = Begin + OldCount;
         Cap = Begin + NewCap;
-        *reinterpret_cast<float***>(Base + 0x04) = Begin;
-        *reinterpret_cast<float***>(Base + 0x0c) = Cap;
+        Flare->Begin = reinterpret_cast<unsigned char*>(Begin);
+        Flare->Cap = reinterpret_cast<unsigned char*>(Cap);
     }
     float* Elem = static_cast<float*>(operator new(sizeof(float) * 6));
     if (Elem == nullptr)
@@ -2492,16 +2466,15 @@ static void FlarePushBead(FStarFxChild40* Flare, float const Values[6])
         Elem[I] = Values[I];
     *End = Elem;
     ++End;
-    *reinterpret_cast<float***>(Base + 0x08) = End;
+    Flare->End = reinterpret_cast<unsigned char*>(End);
 }
 
 static void SpinesPushElem(FStarFxChild40* Spines, float const Elem[11])
 {
     // FUN_005126f0 — append one 0x2c record.
-    unsigned char* const Base = Spines->Raw;
-    unsigned char* Begin = *reinterpret_cast<unsigned char**>(Base + 0x04);
-    unsigned char* End = *reinterpret_cast<unsigned char**>(Base + 0x08);
-    unsigned char* Cap = *reinterpret_cast<unsigned char**>(Base + 0x0c);
+    unsigned char* Begin = Spines->Begin;
+    unsigned char* End = Spines->End;
+    unsigned char* Cap = Spines->Cap;
     int const Stride = 0x2c;
     if (End == Cap)
     {
@@ -2519,12 +2492,12 @@ static void SpinesPushElem(FStarFxChild40* Spines, float const Elem[11])
         Begin = NewBegin;
         End = Begin + OldCount * Stride;
         Cap = Begin + NewCap * Stride;
-        *reinterpret_cast<unsigned char**>(Base + 0x04) = Begin;
-        *reinterpret_cast<unsigned char**>(Base + 0x0c) = Cap;
+        Spines->Begin = Begin;
+        Spines->Cap = Cap;
     }
     memcpy(End, Elem, Stride);
     End += Stride;
-    *reinterpret_cast<unsigned char**>(Base + 0x08) = End;
+    Spines->End = End;
 }
 
 // -------------------------------------------------------------------- FUN_0050f3a0
@@ -2535,7 +2508,6 @@ int LensFlareLoadFromIni(FStarFxChild40* Flare, char const* IniPath, char const*
         return 1;
 
     LensFlareFree(Flare);
-    unsigned char* const Base = Flare->Raw;
 
     INI_Reader Reader;
     if (!Reader.open(IniPath, false))
@@ -2570,27 +2542,26 @@ int LensFlareLoadFromIni(FStarFxChild40* Flare, char const* IniPath, char const*
             }
             else if (Reader.is_value("min_radius"))
             {
-                *reinterpret_cast<float*>(Base + 0x38) = Reader.get_value_float(0);
+                Flare->ScaleMin = Reader.get_value_float(0);
             }
             else if (Reader.is_value("max_radius"))
             {
-                *reinterpret_cast<float*>(Base + 0x3c) = Reader.get_value_float(0);
+                Flare->ScaleMax = Reader.get_value_float(0);
             }
             else if (Reader.is_value("shape"))
             {
                 char const* Shape = Reader.get_value_string();
                 if (Shape == nullptr)
                 {
-                    *reinterpret_cast<unsigned*>(Base + 0x10) = 0;
-                    Base[0x14] = 0;
+                    Flare->ShapeLen = 0;
+                    Flare->ShapeName[0] = 0;
                 }
                 else
                 {
                     // FUN_0050f3a0 inlines FUN_00417c50 here (0050f588..0050f5bf: REPNE SCASB,
                     // clamp to 0x1f, MOVSD/MOVSB, terminator, length to +0x10) - same semantics.
-                    unsigned const Len =
-                        CopyBoundedString(reinterpret_cast<char*>(Base + 0x14), 0x20, Shape);
-                    *reinterpret_cast<unsigned*>(Base + 0x10) = Len;
+                    unsigned const Len = CopyBoundedString(Flare->ShapeName, 0x20, Shape);
+                    Flare->ShapeLen = Len;
                 }
             }
         }
@@ -2600,8 +2571,8 @@ int LensFlareLoadFromIni(FStarFxChild40* Flare, char const* IniPath, char const*
     // FUN_00512b00 / 00512a40 / 00512b70 — sort bead pointer vector by pointer address
     // (MSVC insertion/introsort on uint*). Count ≤16 → insertion; else introsort-equivalent.
     {
-        float** Begin = *reinterpret_cast<float***>(Base + 0x04);
-        float** End = *reinterpret_cast<float***>(Base + 0x08);
+        float** Begin = reinterpret_cast<float**>(Flare->Begin);
+        float** End = reinterpret_cast<float**>(Flare->End);
         if (Begin != nullptr && End != nullptr && End > Begin)
         {
             int const Count = static_cast<int>(End - Begin);
@@ -2624,7 +2595,6 @@ int SpinesLoadFromIni(FStarFxChild40* Spines, char const* IniPath, char const* N
         return 1;
 
     SpinesFree(Spines);
-    unsigned char* const Base = Spines->Raw;
     float RadiusScale = 1.0f;
 
     INI_Reader Reader;
@@ -2660,24 +2630,23 @@ int SpinesLoadFromIni(FStarFxChild40* Spines, char const* IniPath, char const* N
                 char const* Shape = Reader.get_value_string();
                 if (Shape == nullptr)
                 {
-                    *reinterpret_cast<unsigned*>(Base + 0x10) = 0;
-                    Base[0x14] = 0;
+                    Spines->ShapeLen = 0;
+                    Spines->ShapeName[0] = 0;
                 }
                 else
                 {
                     // FUN_0050fba0: CALL FUN_00417c50(this+0x14, 0x20, value) at 0050fce0.
-                    unsigned const Len =
-                        CopyBoundedString(reinterpret_cast<char*>(Base + 0x14), 0x20, Shape);
-                    *reinterpret_cast<unsigned*>(Base + 0x10) = Len;
+                    unsigned const Len = CopyBoundedString(Spines->ShapeName, 0x20, Shape);
+                    Spines->ShapeLen = Len;
                 }
             }
             else if (Reader.is_value("min_radius"))
             {
-                *reinterpret_cast<float*>(Base + 0x38) = Reader.get_value_float(0);
+                Spines->ScaleMin = Reader.get_value_float(0);
             }
             else if (Reader.is_value("max_radius"))
             {
-                *reinterpret_cast<float*>(Base + 0x3c) = Reader.get_value_float(0);
+                Spines->ScaleMax = Reader.get_value_float(0);
             }
             else if (Reader.is_value("spine"))
             {
@@ -2693,8 +2662,8 @@ int SpinesLoadFromIni(FStarFxChild40* Spines, char const* IniPath, char const* N
     }
     Reader.close();
 
-    unsigned char* Begin = *reinterpret_cast<unsigned char**>(Base + 0x04);
-    unsigned char* End = *reinterpret_cast<unsigned char**>(Base + 0x08);
+    unsigned char* Begin = Spines->Begin;
+    unsigned char* End = Spines->End;
     int Count = 0;
     if (Begin != nullptr)
         Count = static_cast<int>(End - Begin) / 0x2c;
@@ -2742,7 +2711,7 @@ int SunBodyBakeCorona(FSunEffectBody* Body)
         Pf[1] = 0.5f - S * 0.5f;
         Pf += 6;
     }
-    float const Tween = F[0xbc]; // +0x2f0 interior_tween
+    float const Tween = Body->InteriorTween; // +0x2f0
     float const OneMinus = 1.0f - Tween;
     Pf = F + 0x4e;
     for (int I = 0; I < 12; ++I)
@@ -2799,7 +2768,7 @@ FStarSphere::FStarSphere(IObjInspect* InOwner)
     Owner = InOwner;
     Radius = 1000.0f; // 0x447a0000
 
-    FSunEffectBody* Body = static_cast<FSunEffectBody*>(operator new(0x30c));
+    FSunEffectBody* Body = static_cast<FSunEffectBody*>(operator new(sizeof(FSunEffectBody)));
     if (Body != nullptr)
         SunEffectBodyInit(Body);
     SunBody = Body;
@@ -2828,11 +2797,10 @@ FStarSphere::FStarSphere(IObjInspect* InOwner)
     // + 0.5f) (FLD / FSUBR [005c75dc] / FIMUL / FADD [005c75e0] / ftol). SunBody is read
     // back from this+0x14 with no null check.
     {
-        unsigned char* const BodyRaw = SunBody->Raw;
-        int const MaxLod = *reinterpret_cast<int*>(BodyRaw + 0x2b4);
+        int const MaxLod = SunBody->MaxLod;
         double const Scaled =
             (1.0 - static_cast<double>(G_SunEffectQuality)) * static_cast<double>(MaxLod) + 0.5;
-        *reinterpret_cast<int*>(BodyRaw + 0x2b8) = static_cast<int>(Scaled);
+        SunBody->LodBias = static_cast<int>(Scaled);
     }
 }
 

@@ -183,6 +183,10 @@ namespace
         unsigned LodWord;       // +0x0c  piece index
     };
     FL_LAYOUT_ASSERT(sizeof(FZItemPlanetRing) == 0x10, "ZItemPlanetRing sizeof 0x10");
+    // The 0x10 pool holds all three on every build.
+    static_assert(sizeof(FZItemAsteroidField) == sizeof(FZItemGameObject) &&
+                      sizeof(FZItemPlanetRing) == sizeof(FZItemGameObject),
+                  "the 0x10 ZItems share one pool element");
 
     struct FDrawBucket
     {
@@ -191,8 +195,10 @@ namespace
 
     // DAT_00675350 / DAT_00675340 -- Heap {ElementSize 0x10 / 0xc, FreeList 0, MaxFreeCount -1,
     // CurrentFreeCount 0}, set by the static initializers LAB_0051ec20 / LAB_0051ec50.
-    Heap G_DrawNodeHeap(0x10u, -1);
-    Heap G_DrawNodeHeap12(0xcu, -1);
+    // Each pool's element is its items' size: 0x10 / 0xc on Win32 (the layout asserts), larger
+    // on 64-bit, where an item holds a vtable and an object pointer.
+    Heap G_DrawNodeHeap(sizeof(FZItemGameObject), -1);
+    Heap G_DrawNodeHeap12(sizeof(FZItemNebula), -1);
     // DAT_006752f0..0x0067533f -- five 0x10-byte vectors (LAB_0051ecb0 constructs them).
     FDrawBucket G_Buckets[kDrawBucketCount];
 
@@ -200,9 +206,9 @@ namespace
     // malloc (all three as tail jumps). Every caller passes 0xc or 0x10.
     void* ZItemAlloc(size_t Size)
     {
-        if (Size == 0xc)
+        if (Size == sizeof(FZItemNebula))
             return G_DrawNodeHeap12.Malloc();
-        if (Size == 0x10)
+        if (Size == sizeof(FZItemGameObject))
             return G_DrawNodeHeap.Malloc();
         return malloc(Size);
     }
@@ -315,7 +321,7 @@ namespace
     // to bucket 2 through FUN_0051f140.
     void PushNebulaZItem(float Score, void* Nebula)
     {
-        void* const Mem = ZItemAlloc(0xc);
+        void* const Mem = ZItemAlloc(sizeof(FZItemNebula));
         FZItem* Node = nullptr;
         if (Mem != nullptr)
         {
@@ -1097,7 +1103,7 @@ namespace
     void PushTypedNode(unsigned Bucket, EDrawNodeKind Kind, void* Object, float DistSq,
                        unsigned PieceOrLod)
     {
-        void* const Mem = ZItemAlloc(0x10);
+        void* const Mem = ZItemAlloc(sizeof(FZItemGameObject));
         FZItem* Node = nullptr;
         if (Mem != nullptr)
         {

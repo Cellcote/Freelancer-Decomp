@@ -190,6 +190,7 @@ struct FNavMapJumpLink
     int Kind;                   // +0x0c 0; 1 = both ends on the waypoint route, 2 = both on
                                 //       the best path (or the player's system)
 };
+FL_LAYOUT_ASSERT(sizeof(FNavMapJumpLink) == 0x10, "retail jump link is operator new(0x10)");
 
 class NeuroNetNavMap : public WinControl, public EventHandler, public ButtonMover
 {

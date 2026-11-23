@@ -3552,12 +3552,28 @@ unsigned int Server_ControllerCreate(const char* dll_path, const char* instance_
     Platform::ModulePath(node->ModuleHandle, ModuleName, 0x104);
     FControllerCreateInstanceFn CreateInstance =
         (FControllerCreateInstanceFn)Platform::ModuleSymbol(node->ModuleHandle, "CreateInstance");
+#if defined(_WIN32)
     node->InterfacePtr = CreateInstance(flid, instance_name, parms);
+#else
+    // PORT(macOS): retail calls GetProcAddress's results untested, so a DLL that failed to load
+    // (or lacks CreateInstance or DestroyInstance) faults on a null call, now or when the
+    // controller is destroyed. Off Windows a module without both is not created: it takes the
+    // not-created path below, which removes the record and returns 0.
+    bool const bHasExports =
+        CreateInstance != nullptr &&
+        Platform::ModuleSymbol(node->ModuleHandle, "DestroyInstance") != nullptr;
+    node->InterfacePtr = bHasExports ? CreateInstance(flid, instance_name, parms) : nullptr;
+#endif
     if (node->InterfacePtr != nullptr) return flid;
 
     FControllerDestroyInstanceFn DestroyInstance =
         (FControllerDestroyInstanceFn)Platform::ModuleSymbol(node->ModuleHandle, "DestroyInstance");
+#if defined(_WIN32)
     DestroyInstance(node->InterfacePtr);
+#else
+    if (DestroyInstance != nullptr)
+        DestroyInstance(node->InterfacePtr);
+#endif
     Platform::ModulePath(node->ModuleHandle, ModuleName, 0x104);
     Platform::ModuleFree(node->ModuleHandle);
     ListRemove(node);

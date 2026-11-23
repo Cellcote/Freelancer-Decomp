@@ -2490,7 +2490,8 @@ namespace
         if (Arch->SndEffect != nullptr)
             Companion[1] = CreateClientSoundSource3D();
         if (Arch->LgtRadius > 0.0f)
-            Companion[3] = GameLightConstruct(static_cast<FGameLight*>(GameLightHeapAlloc(0x12c)));
+            Companion[3] = GameLightConstruct(
+                static_cast<FGameLight*>(GameLightHeapAlloc(sizeof(FGameLight))));
 
         if (Companion[2] != nullptr)
             ParticleEffectAttach(static_cast<FParticleEffect*>(Companion[2]), Go, EngineIndex,

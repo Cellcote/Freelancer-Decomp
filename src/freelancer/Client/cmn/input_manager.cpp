@@ -871,7 +871,8 @@ namespace
                 continue;
 
             char const* const Nickname = Reader.get_value_string(0);
-            FMouseCursor* const Cursor = static_cast<FMouseCursor*>(operator new(0x90));
+            FMouseCursor* const Cursor =
+                static_cast<FMouseCursor*>(operator new(sizeof(FMouseCursor)));
             CursorConstruct(Cursor);
             Cursor->Name = Nickname; // FUN_00420750
 

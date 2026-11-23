@@ -52,6 +52,17 @@ bool FLightsCameraParticles::Create(FVisEffectArch* InVis)
             bCreated = true;
             bFailed = false;
         }
+#if !defined(_WIN32)
+        // PORT(macOS): retail keeps the effect CreateEffect hands back even when its Initialize
+        // failed (FFxEffectLibrary::CreateEffect stores it whatever the result), and Draw then
+        // calls into its missing nodes. Off Windows a failed effect is released here, so Draw
+        // and Destroy see none.
+        else if (Effect != nullptr)
+        {
+            static_cast<IDAComponent*>(Effect)->Release();
+            Effect = nullptr;
+        }
+#endif
     }
     if (bFailed)
     {

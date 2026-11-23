@@ -375,6 +375,9 @@ struct FGameLight : FEngineLight
 FL_LAYOUT_ASSERT(offsetof(FGameLight, RefCount) == 0xD0, "GameLight RefCount +0xD0");
 FL_LAYOUT_ASSERT(offsetof(FGameLight, Anim) == 0xD4, "GameLight Anim +0xD4");
 FL_LAYOUT_ASSERT(offsetof(FGameLight, Anim.Def) == 0xDC, "Anim.Def +0xDC");
+FL_LAYOUT_ASSERT(offsetof(FGameLight, EngineIndex) == 0xEC, "GameLight EngineIndex +0xEC");
+FL_LAYOUT_ASSERT(offsetof(FGameLight, LocalXform) == 0xF0, "GameLight LocalXform +0xF0");
+FL_LAYOUT_ASSERT(offsetof(FGameLight, Field120) == 0x120, "GameLight +0x120");
 FL_LAYOUT_ASSERT(sizeof(FGameLight) == 0x12C, "GameLight 300 bytes");
 
 // A GameLight's vtable slot 2 (+8), the shape of every retail disable site

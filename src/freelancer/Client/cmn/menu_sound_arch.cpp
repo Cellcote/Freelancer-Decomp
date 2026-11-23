@@ -250,14 +250,6 @@ namespace
     // (0x0060f144 LAB_004278a0, then 0x0060f148 / 0x0060f14c / 0x0060f150).
     FPlayingSourceList G_PlayingSources;
 
-    // The three Common.dll Heap pools of Sound.cpp, {element size, 0, -1, 0} each, built by
-    // the static initializers LAB_00428ef0 / LAB_00428f20 / LAB_00428f50 (the Heap ctor
-    // inlined). FUN_00428f80 / FUN_00428fc0 dispatch on the element size; FUN_004284f0 shrinks
-    // all three.
-    Heap G_SourceHeap(0x30u, -1);   // DAT_00667a44 -- Sound::Source
-    Heap G_Source3DHeap(0x64u, -1); // DAT_00667a34 -- Sound::Source3D
-    Heap G_StreamedHeap(0x40u, -1); // DAT_00667a24 -- Sound::StreamedSource
-
     // DAT_00667cbc — live Sound::Source instance count (ctor INC / dtor DEC; FUN_004284f0 warns if != 0).
     int G_AliveSoundSourceCount = 0;
 
@@ -390,6 +382,16 @@ namespace
     FL_LAYOUT_ASSERT(offsetof(FSpatialSource, Spatial) == 0x30, "3d block @ +0x30");
     FL_LAYOUT_ASSERT(offsetof(FSpatialSource, Source3dId) == 0x60, "attach @ +0x60");
     FL_LAYOUT_ASSERT(sizeof(FSpatialSource) == 0x64, "Sound::Source3D is 0x64 (pool DAT_00667a34)");
+
+    // The three Common.dll Heap pools of Sound.cpp, {element size, 0, -1, 0} each, built by
+    // the static initializers LAB_00428ef0 / LAB_00428f20 / LAB_00428f50 (the Heap ctor
+    // inlined). FUN_00428f80 / FUN_00428fc0 dispatch on the element size; FUN_004284f0 shrinks
+    // all three. Each element is its source's sizeof: retail's 0x30 / 0x64 / 0x40 on Win32 (the
+    // layout asserts), larger on 64-bit, where the sources hold 8-byte pointers. Defined after
+    // the three sources, and still after DAT_00667c70, so they are built in retail's order.
+    Heap G_SourceHeap(sizeof(FSoundSource), -1); // DAT_00667a44 -- Sound::Source
+    Heap G_Source3DHeap(sizeof(FSpatialSource), -1); // DAT_00667a34 -- Sound::Source3D
+    Heap G_StreamedHeap(sizeof(FStreamedSource), -1); // DAT_00667a24 -- Sound::StreamedSource
 
     // --- Sound.cpp globals ---
 
@@ -1784,38 +1786,39 @@ namespace
     // bits, and neither the pools nor malloc clear memory.
     unsigned char BlockFlagByte(void const* Block)
     {
-        return static_cast<unsigned char const*>(Block)[0xc];
+        return static_cast<unsigned char const*>(Block)[offsetof(FSoundSource, Flags)];
     }
 
     // FUN_00428f80 (cdecl) -- the sources' operator new: 0x30 / 0x40 / 0x64 bytes come from
     // their Heap pool (DAT_00667a44 / DAT_00667a24 / DAT_00667a34, JMP Heap::Malloc), any
-    // other size from malloc (the 0x50 CliThrusterSound and the 0x68 engine emitter).
-    void* SoundSourceAlloc(unsigned Size)
+    // other size from malloc (the 0x50 CliThrusterSound and the 0x68 engine emitter). Callers
+    // pass the source's sizeof, which is retail's size on Win32 (the layout asserts).
+    void* SoundSourceAlloc(std::size_t Size)
     {
-        if (Size == 0x30u)
+        if (Size == sizeof(FSoundSource))
             return G_SourceHeap.Malloc();
-        if (Size == 0x40u)
+        if (Size == sizeof(FStreamedSource))
             return G_StreamedHeap.Malloc();
-        if (Size == 0x64u)
+        if (Size == sizeof(FSpatialSource))
             return G_Source3DHeap.Malloc();
         return malloc(Size);
     }
 
     // FUN_00428fc0 (cdecl Ptr, Size) -- the matching operator delete: Heap::Free on the pool of
     // that size, free() for any other.
-    void SoundSourceFree(void* Ptr, unsigned Size)
+    void SoundSourceFree(void* Ptr, std::size_t Size)
     {
-        if (Size == 0x30u)
+        if (Size == sizeof(FSoundSource))
         {
             G_SourceHeap.Free(Ptr);
             return;
         }
-        if (Size == 0x40u)
+        if (Size == sizeof(FStreamedSource))
         {
             G_StreamedHeap.Free(Ptr);
             return;
         }
-        if (Size == 0x64u)
+        if (Size == sizeof(FSpatialSource))
         {
             G_Source3DHeap.Free(Ptr);
             return;
@@ -2433,7 +2436,7 @@ namespace
             SourceTeardown(this);
             void* const Self = this;
             if ((bDelete & 1) != 0)
-                SoundSourceFree(Self, 0x68u);
+                SoundSourceFree(Self, sizeof(FEquipSoundEmitter));
             return Self;
         }
 
@@ -2505,7 +2508,7 @@ namespace
             SourceTeardown(this);
             void* const Self = this;
             if ((bDelete & 1) != 0)
-                SoundSourceFree(Self, 0x50u);
+                SoundSourceFree(Self, sizeof(FThrusterSoundSource));
             return Self;
         }
 
@@ -2568,7 +2571,7 @@ ISoundSource* CreateClientThrusterSound(FClientEquippedObj* Ship)
 {
     // 0x00545535..0x0054554f: FUN_00428f80(0x50) (malloc), null -> null; else
     // FUN_0052efb0(Ship).
-    void* const Block = SoundSourceAlloc(0x50u);
+    void* const Block = SoundSourceAlloc(sizeof(FThrusterSoundSource));
     if (Block == nullptr)
         return nullptr;
 
@@ -2915,7 +2918,7 @@ void* CreateClientSoundSource3D()
 {
     // LAB_00503420: FUN_00428f80(0x64) (the pool DAT_00667a34); null -> null, else
     // FUN_00428790 (JMP) on the block.
-    void* const Block = SoundSourceAlloc(0x64u);
+    void* const Block = SoundSourceAlloc(sizeof(FSpatialSource));
     if (Block == nullptr)
         return nullptr;
     return static_cast<ISoundSource*>(new (Block) FSpatialSource(BlockFlagByte(Block)));
@@ -2925,7 +2928,7 @@ void* CreateClientSoundSource()
 {
     // LAB_00513460: FUN_00428f80(0x30) (the pool DAT_00667a44); null -> null, else
     // FUN_00429040(1) on the block.
-    void* const Block = SoundSourceAlloc(0x30u);
+    void* const Block = SoundSourceAlloc(sizeof(FSoundSource));
     if (Block == nullptr)
         return nullptr;
     return static_cast<ISoundSource*>(new (Block) FSoundSource(1, BlockFlagByte(Block)));
@@ -2936,7 +2939,7 @@ void* CreateClientEquipSoundEmitter(void* Arch)
     // The caller's FUN_00428f80(0x68) (malloc) with its null test (e.g. 0x00529086..
     // 0x00529092): a failed allocation gives a null emitter and the constructor is not run.
     // Every caller passes a found archetype (FUN_0042ae40 tested non-null).
-    void* const Block = SoundSourceAlloc(0x68u);
+    void* const Block = SoundSourceAlloc(sizeof(FEquipSoundEmitter));
     if (Block == nullptr)
         return nullptr;
     FEquipSoundEmitter* const Emitter = new (Block)
