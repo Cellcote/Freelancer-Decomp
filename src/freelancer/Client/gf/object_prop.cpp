@@ -124,7 +124,7 @@ void FObjectProp::Update(double DeltaSeconds)
     if (Flag14 != 0)
         Flashlights.Update(Hardpoints, Delta);
     // 0x00446a7f..0x00446a9b: Anim +0x6c (Instance, Delta).
-    DALib::Anim->MixerWalk(static_cast<FlULong>(reinterpret_cast<std::uintptr_t>(Instance)), Delta);
+    DALib::Anim->MixerWalk(static_cast<FlULong>(EngineIdFromHandle(Instance)), Delta);
     // 0x00446a9e..0x00446ab0: Engine +0x6c (Instance, 2, Delta).
     DALib::Engine->UpdateInstance(Instance, 2, AsOpaqueDword(Delta));
 }
@@ -147,8 +147,7 @@ void FObjectProp::DrawOpaque(ICamera* /*Camera*/)
     // slot-6 instance, 0, 0).
     if (Type == 5)
     {
-        RoomControlDrawShadow(Owner, static_cast<FlULong>(reinterpret_cast<std::uintptr_t>(GetEngineInstance())), 0,
-                              0);
+        RoomControlDrawShadow(Owner, GetEngineInstance(), 0, 0);
     }
     // 0x00446b2c..0x00446b30: FUN_0044af60.
     RoomControlDrawObject(Owner, this);
@@ -341,7 +340,7 @@ void FObjectProp::LoadLoadout(char const* LoadoutName)
 
     // 0x00446815..0x00446854: +0x64 = a new summary, then analyze_instance(+0x30).
     Hardpoints = new FObjectPropHardpoints();
-    Hardpoints->analyze_instance(static_cast<FlLong>(reinterpret_cast<std::intptr_t>(Instance)));
+    Hardpoints->analyze_instance(EngineIdFromHandle(Instance));
 
     // 0x0044685a..0x00446876: FUN_004468f0 on every item with +0x64.
     std::vector<EquipDesc>::const_iterator It = LoadoutMap->Items.begin();
@@ -381,8 +380,8 @@ void FObjectProp::AttachEquipment(void const* ItemPtr, HardpointSummary* Summary
     // 0x004469bd..0x004469e4: Engine +0x64 (the instance's archetype) into FUN_00406cd0, then
     // Engine +0x3c on it.
     void* ArchHandle = DALib::Engine->GetInstanceArchetype(Child);
-    Archetype::CliObjRecomputeLodPickExplicit(Companion, static_cast<FlLong>(reinterpret_cast<std::intptr_t>(ArchHandle)),
-                                              nullptr, false);
+    Archetype::CliObjRecomputeLodPickExplicit(Companion, EngineIdFromHandle(ArchHandle), nullptr,
+                                              false);
     DALib::Engine->ReleaseHandle(ArchHandle);
 
     // 0x004469e7..0x00446a47: with both hardpoint names, connect the item's HP_child to the
@@ -400,6 +399,5 @@ void FObjectProp::AttachEquipment(void const* ItemPtr, HardpointSummary* Summary
     FHardpointKey ParentKey;
     ParentKey.Name = HpName;
     ParentKey.Crc = DACOM_CRC::GetCRC32(HpName);
-    DALib::Hardpoint->ConnectHardpoints(reinterpret_cast<void*>(Parent), &ParentKey, Child,
-                                        &ChildKey);
+    DALib::Hardpoint->ConnectHardpoints(EngineHandleFromId(Parent), &ParentKey, Child, &ChildKey);
 }

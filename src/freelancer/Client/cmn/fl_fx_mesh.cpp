@@ -306,7 +306,7 @@ namespace
         // FUN_00420d70(handle), FUN_00420fd0(Position), then DALib::Engine slot 15
         // ReleaseHandle on the archetype handle.
         *Out = Mesh;
-        void* const Loaded = reinterpret_cast<void*>(static_cast<ptrdiff_t>(ArchHandle));
+        void* const Loaded = EngineHandleFromId(ArchHandle);
         ClientMeshHolderSetMaterials(Mesh, Path.Text, nullptr);
         ClientMeshHolderBindInstance(Mesh, Loaded);
         ClientMeshHolderSetPosition(Mesh, Position);

@@ -58,9 +58,9 @@ namespace
         return reinterpret_cast<uintptr_t>(Pointer);
     }
 
-    int PointerField(void const* Pointer)
+    intptr_t PointerField(void const* Pointer)
     {
-        return static_cast<int>(reinterpret_cast<intptr_t>(Pointer));
+        return reinterpret_cast<intptr_t>(Pointer);
     }
 
     // Retail walks the circular VC6 list: from the first node, Steps times to ->next, where the

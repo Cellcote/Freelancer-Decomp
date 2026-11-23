@@ -23,6 +23,7 @@
 
 #include "common_misc.h"      // RandomVector
 #include "DALib.h"
+#include "render/RenderPipeline.h" // PipelineTextureId / PipelineTextureFromId
 #include "dacom.h"
 #include "../globals.h"
 #include "render/IRenderPipeline.h"
@@ -1206,7 +1207,7 @@ namespace
                        float const* Side)
     {
         float Corner[3];
-        Win3DBindTexture(reinterpret_cast<void*>(Handle));
+        Win3DBindTexture(PipelineTextureFromId(Handle));
         Win3DBegin(kWin3DQuads);
         Win3DTexCoord2f(0.0f, 0.0f);
         Win3DVec3Add(Corner, Mid, Along);

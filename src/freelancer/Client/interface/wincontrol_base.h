@@ -260,8 +260,10 @@ public:
     // it to ButtonMover as the slide start (0x0045ce55, 0x004e4188).
     float HomeOffset[3];
     float Field2e0[3];              // +0x2e0 -- ctor {0, 0, 10000.0f}
-    int Field2ec;                   // +0x2ec -- ctor 0
-    int Field2f0;                   // +0x2f0 -- ctor 0
+    // PORT(x64): pointer-sized (a dword on Win32): the trade list parks its row and list
+    // pointers here (trade_equip_list.cpp) and reads them back (nn_trade.cpp).
+    intptr_t Field2ec; // +0x2ec -- ctor 0
+    intptr_t Field2f0; // +0x2f0 -- ctor 0
     unsigned char PositionFlags;    // +0x2f4 -- bit0: instance position includes +0xa8
     unsigned char Pad2f5[3];        // +0x2f5
     float AttachOrientation[9];     // +0x2f8

@@ -158,8 +158,7 @@ void GameobjCreateOfClass(FClientGameobj* Self, CObject::Class ObjectClass,
     // caller does that afterwards.
     Self->Object = CObject::Alloc(ObjectClass);
     Arch->create_instance(static_cast<IEngineInstance*>(Self->Object));
-    DALib::Engine->UpdateInstance(reinterpret_cast<void*>(Self->Object->EngineInstanceId), 0u,
-                                  nullptr);
+    DALib::Engine->UpdateInstance(EngineHandleFromId(Self->Object->EngineInstanceId), 0u, nullptr);
     Self->advise(true);
 }
 
@@ -1975,8 +1974,7 @@ float FClientSolarGameobj::Slot178(Vector& Center)
     {
         float Radius = 0.0f;
         FlLong const Inst = get_index();
-        DALib::Engine->GetInstanceExtent(reinterpret_cast<void*>(static_cast<intptr_t>(Inst)), 0u,
-                                         &Radius, &Center.x);
+        DALib::Engine->GetInstanceExtent(EngineHandleFromId(Inst), 0u, &Radius, &Center.x);
         FTransform const& Xform = reinterpret_cast<FTransform const&>(get_orientation());
         if (G_SolarMath == nullptr)
             G_SolarMath = Acquire3DMathEngine();
@@ -2112,9 +2110,8 @@ unsigned* FClientSolarGameobj::Slot188(unsigned* OutLod, void* Camera, unsigned 
     ColorBytes[3] = static_cast<unsigned char>(
         static_cast<FlLong>(static_cast<double>(ColorBytes[3]) * Fade));
     FlLong const Inst = get_index();
-    int const Answer = SubmitWin3DMaterialEngineInstance(
-        Camera, reinterpret_cast<void*>(static_cast<intptr_t>(Inst)), 1, ColorBytes, 0, Size, 0,
-        0u);
+    int const Answer = SubmitWin3DMaterialEngineInstance(Camera, EngineHandleFromId(Inst), 1,
+                                                         ColorBytes, 0, Size, 0, 0u);
     Lod = 0xffff0000u | static_cast<unsigned short>(Answer);
 
     // 0x00548429..0x0054845c: an answer below 3 (unsigned) or a solar that is no longer a
@@ -2134,9 +2131,8 @@ unsigned* FClientSolarGameobj::Slot188(unsigned* OutLod, void* Camera, unsigned 
     Outline[2] = 0xff;
     Outline[3] = static_cast<unsigned char>(static_cast<FlLong>(static_cast<double>(Fade) * 255.0f));
     FlLong const OutlineInst = get_index();
-    SubmitWin3DTintedEngineInstanceWrapped(
-        Camera, reinterpret_cast<void*>(static_cast<intptr_t>(OutlineInst)), 1, Outline, 0, Size,
-        0u);
+    SubmitWin3DTintedEngineInstanceWrapped(Camera, EngineHandleFromId(OutlineInst), 1, Outline, 0,
+                                           Size, 0u);
     *OutLod = Lod;
     return OutLod;
 }
@@ -2857,7 +2853,7 @@ void FClientShipGameobj::AttachPilotMesh(ID_String const* PilotMesh)
     FlLong const Instance = Field_0x104->create_instance(nullptr);
     if (Instance == -1)
         return;
-    Field_0x108.EngineInstance = reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
+    Field_0x108.EngineInstance = EngineHandleFromId(Instance);
 
     // 0x00544410..0x00544426: "HpConnect" on the pilot mesh, into the same handle; the result
     // is not tested. Retail reads its stack HardpointInfo whether or not the lookup filled it;
@@ -5055,13 +5051,11 @@ void FClientGuidedGameobj::Slot1c0(Transform* Out)
     // IRenderer2 slot 4 (+0x10) the six extents and slot 5 (+0x14) the centre, both at LOD
     // 1.0; when both answer, the translation is {centre x, centre y, extents[4]}.
     float Extents[6];
-    void* const MeshId =
-        reinterpret_cast<void*>(static_cast<intptr_t>(Object->get_archetype()->EngineIndex));
+    void* const MeshId = EngineHandleFromId(Object->get_archetype()->EngineIndex);
     if (DALib::Renderer->GetBounds(MeshId, 1.0f, Extents) != 0)
     {
         float Center[3];
-        void* const MeshIdAgain =
-            reinterpret_cast<void*>(static_cast<intptr_t>(Object->get_archetype()->EngineIndex));
+        void* const MeshIdAgain = EngineHandleFromId(Object->get_archetype()->EngineIndex);
         if (DALib::Renderer->GetCentroid(MeshIdAgain, 1.0f, Center) != 0)
         {
             Local.Translation.x = Center[0];

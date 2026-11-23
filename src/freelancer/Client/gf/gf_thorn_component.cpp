@@ -53,12 +53,12 @@ namespace
 
     FlLong InstanceHandle(void* Instance)
     {
-        return static_cast<FlLong>(reinterpret_cast<intptr_t>(Instance));
+        return EngineIdFromHandle(Instance);
     }
 
     void* InstancePointer(FlLong Instance)
     {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
+        return EngineHandleFromId(Instance);
     }
 }
 

@@ -27,7 +27,7 @@ namespace
 
     void* InstancePointer(FlLong Instance)
     {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(Instance));
+        return EngineHandleFromId(Instance);
     }
 
     Vector InstancePosition(void* Instance)
@@ -358,7 +358,7 @@ GENRESULT DACOM_API FThornDeformable::StartIk(void* DescArg, float* Position, fl
     FlULong const EventFlags = static_cast<FlULong>(Desc->Common.EventFlags);
     FDeformAimDesc AimDesc;
     AimDesc.Name = "";
-    AimDesc.RootPart = static_cast<FlLong>(reinterpret_cast<intptr_t>(Root));
+    AimDesc.RootPart = EngineIdFromHandle(Root);
     AimDesc.EndPart = EndPart;
     AimDesc.Flags = EventFlags;
     AimDesc.TargetPos = &Aim.Target.Pos.x;

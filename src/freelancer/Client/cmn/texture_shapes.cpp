@@ -14,6 +14,7 @@
 #include "../globals.h"
 #include "readfile.h"
 #include "DALib.h"
+#include "render/RenderPipeline.h" // PipelineTextureId / PipelineTextureFromId
 #include "render/IRenderPipeline.h"
 #include "render/shading.h"
 
@@ -121,7 +122,7 @@ void* TexShapeGetGpuHandle(FTextureRef const* Ref, int Frame)
 
     FlULong FrameInfo[5];
     DALib::TextureLib->GetTextureFrame(Ref->Texture, Frame, FrameInfo);
-    return reinterpret_cast<void*>(FrameInfo[0]);
+    return PipelineTextureFromId(FrameInfo[0]);
 }
 
 // -------------------------------------------------------------------- FUN_00425680
@@ -153,8 +154,7 @@ void TexShapeSetRect(FTexShape* Shape, float X, float Y, float W, float H, float
     unsigned int TexW = 0;
     unsigned int TexH = 0;
     int Levels = 0;
-    DALib::Pipeline
-        ->GetTextureDim(reinterpret_cast<void*>(Frame[0]), &TexW, &TexH, &Levels);
+    DALib::Pipeline->GetTextureDim(PipelineTextureFromId(Frame[0]), &TexW, &TexH, &Levels);
 
     // FILD of the {size, 0} qword: the sizes are unsigned.
     float const FTexW = static_cast<float>(TexW);

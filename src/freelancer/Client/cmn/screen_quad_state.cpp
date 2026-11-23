@@ -11,6 +11,7 @@
 
 #include "common_csys.h"
 #include "DALib.h"
+#include "render/RenderPipeline.h" // PipelineTextureId / PipelineTextureFromId
 #include "dacom.h"            // DACOM_CRC::GetCRC32
 #include "../globals.h"       // G_RenderSurfaceWidth / G_RenderSurfaceHeight (DAT_00610850 / 854)
 #include "render/IRenderPipeline.h"
@@ -374,7 +375,7 @@ namespace
     {
         for (int Index = 0; Index < 5; ++Index)
             C->MatKey[Index] = static_cast<unsigned>(Frame[Index]);
-        void* const Texture = reinterpret_cast<void*>(static_cast<uintptr_t>(C->MatKey[0]));
+        void* const Texture = PipelineTextureFromId(C->MatKey[0]);
         if (C->Current != nullptr && C->Current->TextureHandle != Texture)
         {
             if (!bFind)
@@ -421,7 +422,7 @@ namespace
         // 0x00403091..0x004030ab: a new entry takes the default frame as its key.
         for (int Index = 0; Index < 5; ++Index)
             C->MatKey[Index] = static_cast<unsigned>(G_ScreenQuadDefaultFrame[Index]);
-        void* const Texture = reinterpret_cast<void*>(static_cast<uintptr_t>(C->MatKey[0]));
+        void* const Texture = PipelineTextureFromId(C->MatKey[0]);
 
         // 0x004030ad..0x004030cf: a current node of another texture is replaced by the first
         // live node of this one (a new entry has neither).
@@ -1244,7 +1245,7 @@ void __cdecl ScreenQuadDrawBigImageTile(void* TextureHandle, FlULong PackedColor
     // 0x00404a2a..0x00404a53: the frame {handle, UvQuad[0], UvQuad[7], UvQuad[6], UvQuad[1]}
     // (u0, v0, u1, v1), copied as dwords.
     FlULong Frame[5];
-    Frame[0] = static_cast<FlULong>(reinterpret_cast<uintptr_t>(TextureHandle));
+    Frame[0] = PipelineTextureId(TextureHandle);
     memcpy(&Frame[1], &UvQuad[0], sizeof(FlULong));
     memcpy(&Frame[2], &UvQuad[7], sizeof(FlULong));
     memcpy(&Frame[3], &UvQuad[6], sizeof(FlULong));

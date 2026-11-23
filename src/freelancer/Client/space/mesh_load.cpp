@@ -30,14 +30,14 @@ namespace
     // FUN_0059ec80: IEngine vt+0x7c SetInstanceUserData(Instance, Context), nothing else.
     void __cdecl MeshAnalyzeSetUserData(FlLong Instance, void* Context)
     {
-        DALib::Engine->SetInstanceUserData(reinterpret_cast<void*>(Instance), Context);
+        DALib::Engine->SetInstanceUserData(EngineHandleFromId(Instance), Context);
     }
 
     // FUN_0059ec80 0x0059ecd9..0x0059ecec (and its two copies): analyze the bound instance
     // with the holder's floats +0x14 as the context.
     void AnalyzeBoundInstance(FClientMeshHolder* Holder)
     {
-        FlLong const Inst = static_cast<FlLong>(reinterpret_cast<ptrdiff_t>(Holder->EngineInstance));
+        FlLong const Inst = EngineIdFromHandle(Holder->EngineInstance);
         CompoundInstanceAnalyze(Inst, MeshAnalyzeSetUserData, Holder->UserFloats);
     }
 
@@ -132,8 +132,8 @@ bool ArchetypeLoadFromPath(IEngine* Engine, char const* RelPath, void** OutHandl
     while (TryIndex < TryCount)
     {
         EngineIndex = -1;
-        if (Archetype::Load(TryPaths[TryIndex], &EngineIndex, nullptr)
-            && IsValidArchetypeHandle(reinterpret_cast<void*>(EngineIndex)))
+        if (Archetype::Load(TryPaths[TryIndex], &EngineIndex, nullptr) &&
+            IsValidArchetypeHandle(EngineHandleFromId(EngineIndex)))
         {
             LoadedPath = TryPaths[TryIndex];
             break;
@@ -141,11 +141,11 @@ bool ArchetypeLoadFromPath(IEngine* Engine, char const* RelPath, void** OutHandl
         EngineIndex = -1;
         TryIndex += 1;
     }
-    if (EngineIndex == -1 || !IsValidArchetypeHandle(reinterpret_cast<void*>(EngineIndex)))
+    if (EngineIndex == -1 || !IsValidArchetypeHandle(EngineHandleFromId(EngineIndex)))
         return false;
     (void)LoadedPath;
 
-    void* Handle = reinterpret_cast<void*>(EngineIndex);
+    void* Handle = EngineHandleFromId(EngineIndex);
     if (OutHandle != nullptr)
         *OutHandle = Handle;
 
@@ -223,7 +223,8 @@ void ClientUiMeshHolderRelease(FClientMeshHolder* Holder)
 {
     if (Holder->AnimOrArchIndex != -1)
     {
-        DALib::Anim->CloseScript(reinterpret_cast<void*>(Holder->AnimOrArchIndex));
+        DALib::Anim->CloseScript(AnimScriptFromId(Holder->AnimOrArchIndex));
+        AnimScriptForget(Holder->AnimOrArchIndex);
         Holder->AnimOrArchIndex = -1;
     }
     if (ClientMeshHolderHasInstance(Holder))
@@ -272,7 +273,7 @@ bool ClientMeshHolderLoad(FMeshHolder* Holder, char const* Path, char const* Aux
                 Archetype::ReleaseMaterialEntrySlot(&Holder->AuxMaterialEntry);
             }
             // 00420ede: CreateInstance(Handle, 0), then ReleaseHandle(Handle).
-            void* const HandlePtr = reinterpret_cast<void*>(static_cast<ptrdiff_t>(Handle));
+            void* const HandlePtr = EngineHandleFromId(Handle);
             Holder->EngineInstance = DALib::Engine->CreateInstance(HandlePtr, nullptr);
             DALib::Engine->ReleaseHandle(HandlePtr);
         }
@@ -435,7 +436,7 @@ bool ClientMeshLoadFromPath(FClientMeshHolder* Holder, char const* RelPath,
             // unless already there -- and NOT released here (FUN_0059e8d0 does that).
             if (Archetype::Load(static_cast<IFileSystem*>(FsOut), &LoadedHandle, AnimIndex))
             {
-                void* const Loaded = reinterpret_cast<void*>(static_cast<ptrdiff_t>(LoadedHandle));
+                void* const Loaded = EngineHandleFromId(LoadedHandle);
                 if (FindModelCacheEntry(Loaded) == nullptr)
                     AppendModelCacheEntry(Loaded); // 0x0059ee0d..0x0059ee29 FUN_0059f5b0
                 if (ClientMeshHolderBindInstance(Holder, Loaded))
@@ -447,7 +448,7 @@ bool ClientMeshLoadFromPath(FClientMeshHolder* Holder, char const* RelPath,
             // 0x0059ee56..0x0059eea6: bind, analyze on success, then release the handle.
             if (Archetype::Load(static_cast<IFileSystem*>(FsOut), &LoadedHandle, AnimIndex))
             {
-                void* const Loaded = reinterpret_cast<void*>(static_cast<ptrdiff_t>(LoadedHandle));
+                void* const Loaded = EngineHandleFromId(LoadedHandle);
                 if (ClientMeshHolderBindInstance(Holder, Loaded))
                     AnalyzeBoundInstance(Holder);
                 DALib::Engine->ReleaseHandle(Loaded);
@@ -507,7 +508,7 @@ bool Win3DModelCachePreload(char const* Path, char const* AuxPath)
         int AnimIndex = -1;
         if (Archetype::Load(Filesys, &LoadedHandle, &AnimIndex))
         {
-            void* const Loaded = reinterpret_cast<void*>(static_cast<ptrdiff_t>(LoadedHandle));
+            void* const Loaded = EngineHandleFromId(LoadedHandle);
             // 0x0059eb0e..0x0059eb67: append {handle, 0, 0} when not cached (FUN_0059ebf0 +
             // FUN_0059f5b0).
             if (FindModelCacheEntry(Loaded) == nullptr)

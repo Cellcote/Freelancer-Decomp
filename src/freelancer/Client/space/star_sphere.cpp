@@ -132,7 +132,7 @@ static void InitGlowDescDefaults(FStarGlowDesc* Desc, unsigned char OwnerTag)
         Desc->Alpha = 1.0f;
         Desc->Field44 = 0;
         Desc->Field4C = 0;
-        Desc->Field48 = 0;
+        Desc->Field48 = nullptr;
     }
 
 // The lens-flare / spines 0x40 shell, inlined twice in the StarSphere ctor (0x00510d61..
@@ -211,8 +211,7 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
         // LAB_00511690 mid-body, once per descriptor: when +0x48 is still 0, look +0x04 up,
         // store the shape at +0x48 and the alpha probe at +0x4c. The caller decides which
         // descriptors get here (StarGlow untested, StarCenter behind a null test).
-        ResolveNamedShape(Desc->ShapeName, reinterpret_cast<FTexShape const**>(&Desc->Field48),
-                          &Desc->Field4C);
+        ResolveNamedShape(Desc->ShapeName, &Desc->Field48, &Desc->Field4C);
     }
 
     float ApproachFloat(float Current, float Target, float StepUp, float StepDown)
@@ -1454,7 +1453,7 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
     {
         // 0x0050cd59..0x0050cd5e: the only test is the shape (+0x48); no null tests on the
         // arguments and no shape lookup here (UpdateIntensity LAB_00511690 resolves it).
-        FTexShape const* Shape = reinterpret_cast<FTexShape const*>(Desc->Field48);
+        FTexShape const* Shape = Desc->Field48;
         if (Shape == nullptr)
             return;
 
@@ -1613,7 +1612,8 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
                         // whatever +0x0c holds; a non-zero result frees it and zeroes +0x0c.
                         if (this->StarCenter != nullptr)
                             operator delete(this->StarCenter);
-                        FStarGlowDesc* Center = static_cast<FStarGlowDesc*>(operator new(0x50));
+                        FStarGlowDesc* Center =
+                            static_cast<FStarGlowDesc*>(operator new(sizeof(FStarGlowDesc)));
                         if (Center != nullptr)
                             InitGlowDescDefaults(Center, 0);
                         this->StarCenter = Center;
@@ -1779,7 +1779,7 @@ static FStarFxChild40* AllocChild40(float Field38, float Field3C)
 #ifdef FREELANCER_RP9
         // PORT(rp9): the Direct3D 9 volumetric nebula composites after this sprite, which has no
         // depth; it is told where the glow is (space/nebula_volume.cpp). A no-op while inactive.
-        if (this->StarGlow->Field48 != 0)
+        if (this->StarGlow->Field48 != nullptr)
         {
             float GlowScale = this->StarGlow->Scale;
             if (this->StarCenter != nullptr && this->StarCenter->Scale > GlowScale)
@@ -2814,7 +2814,7 @@ FStarSphere::FStarSphere(IObjInspect* InOwner)
     ZoneOcclusionFadeOut = 2.0f;
     Field30 = kPi;
 
-    FStarGlowDesc* Glow = static_cast<FStarGlowDesc*>(operator new(0x50));
+    FStarGlowDesc* Glow = static_cast<FStarGlowDesc*>(operator new(sizeof(FStarGlowDesc)));
     if (Glow != nullptr)
         InitGlowDescDefaults(Glow, 0);
     // 0x00510e99..0x00510ea8: +0x10, then +0x0c = 0, +0x38 = 0, +0x34 = 0, +0x64 = 1.0f.

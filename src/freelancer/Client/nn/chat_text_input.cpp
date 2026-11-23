@@ -20,6 +20,7 @@
 #include "../interface/win_factory.h"
 
 #include "DALib.h"                 // DALib::TextureLib
+#include "render/RenderPipeline.h" // PipelineTextureId / PipelineTextureFromId
 #include "server_pub.h"         // IChatServer
 #include "dacom.h"                 // FDUMP, DACOM_CRC::GetCRC32
 #include "render/shading.h"        // ITextureLibrary2
@@ -207,7 +208,7 @@ bool FChatBackground::Draw(float const* Orientation, float Width, float Height)
     // the handle (out[0]) goes to stage 0 (Pipeline slot 66).
     FlULong Frame[5];
     if (DALib::TextureLib->GetTextureFrame(TextureId, 0, Frame) == 0)
-        DALib::Pipeline->SetTextureStageTexture(0, reinterpret_cast<void*>(Frame[0]));
+        DALib::Pipeline->SetTextureStageTexture(0, PipelineTextureFromId(Frame[0]));
 
     // 0x0045e608..0x0045e617: Pipeline slot 31 with the control's orientation.
     DALib::Pipeline->SetModelview(Orientation);

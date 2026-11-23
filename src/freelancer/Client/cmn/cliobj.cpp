@@ -1165,7 +1165,7 @@ namespace Archetype
 
                 void* MatHook = nullptr;
                 GENRESULT const Qi = DALib::Engine->QueryEngineComponent(
-                    static_cast<int>(reinterpret_cast<ptrdiff_t>(Handle)),
+                    static_cast<int>(EngineIdFromHandle(Handle)),
                     const_cast<char*>(Iids::MatHookUp), &MatHook);
                 if (Qi >= 0)
                 {
@@ -1182,7 +1182,7 @@ namespace Archetype
         // the argument itself. No test of the argument or of the DALib globals.
         void UnloadEngineComponents(FlLong EngineIndex)
         {
-            void* const Handle = reinterpret_cast<void*>(EngineIndex);
+            void* const Handle = EngineHandleFromId(EngineIndex);
             if (DALib::Engine->IsCompoundArchetype(Handle) != 0)
             {
                 DALib::Engine->EnumerateArchetypeChildren(
@@ -1424,7 +1424,7 @@ namespace Archetype
             // 0x0040224f..0x00402297: a compound archetype (Engine slot 19, +0x4c) runs
             // FUN_00401ed0 over its children (slot 21, +0x54); otherwise FUN_00401ed0(-1, it, 0,
             // &context) directly. The answer is the context's maximum.
-            void* const Handle = reinterpret_cast<void*>(EngineIndex);
+            void* const Handle = EngineHandleFromId(EngineIndex);
             if (DALib::Engine->IsCompoundArchetype(Handle) != 0)
             {
                 DALib::Engine->EnumerateArchetypeChildren(Handle, ApplyArchLodRanges, &Ctx);
@@ -1435,12 +1435,11 @@ namespace Archetype
         }
 
         // FUN_004022f0 — cdecl thunk: (EngineIndex, LodHead, BlendSource, bSolarOrShip).
-        float ComputeLodPick(FlLong EngineIndex, FLodNode* LodHead, int BlendSource,
+        // PORT(x64): BlendSource is a pointer (a dword on Win32), not an int.
+        float ComputeLodPick(FlLong EngineIndex, FLodNode* LodHead, float const* BlendSource,
                              bool bSolarOrShip)
         {
-            float const* Blend = reinterpret_cast<float const*>(
-                static_cast<ptrdiff_t>(BlendSource));
-            return ComputeLodPickThis(LodHead, EngineIndex, Blend, bSolarOrShip);
+            return ComputeLodPickThis(LodHead, EngineIndex, BlendSource, bSolarOrShip);
         }
 
         // FUN_00402580 is BindRendererLods (cmn/part_cache.h); this file has no caller of it.
@@ -2060,7 +2059,7 @@ namespace Archetype
 
             AClassType ClassType = BoundRoot->get_class_type();
             bool bSolarOrShip = (ClassType == AClassShip || ClassType == AClassSolar);
-            LodPick = ComputeLodPick(BoundRoot->EngineIndex, LodHead, 0, bSolarOrShip);
+            LodPick = ComputeLodPick(BoundRoot->EngineIndex, LodHead, nullptr, bSolarOrShip);
         }
 
         void FCliObj::Bind(Root* Record)
@@ -2134,10 +2133,7 @@ namespace Archetype
                 return;
             }
 
-            int BlendArg = 0;
-            if (BlendSource != nullptr)
-                BlendArg = static_cast<int>(reinterpret_cast<ptrdiff_t>(BlendSource));
-            LodPick = ComputeLodPick(BoundRoot->EngineIndex, LodHead, BlendArg, bSolarOrShip);
+            LodPick = ComputeLodPick(BoundRoot->EngineIndex, LodHead, BlendSource, bSolarOrShip);
         }
 
         // FUN_00406cd0 — explicit-parameter overload (no Root::is_loaded gate).
@@ -2150,10 +2146,7 @@ namespace Archetype
                 return;
             }
 
-            int BlendArg = 0;
-            if (BlendSource != nullptr)
-                BlendArg = static_cast<int>(reinterpret_cast<ptrdiff_t>(BlendSource));
-            LodPick = ComputeLodPick(EngineIndex, LodHead, BlendArg, bSolarOrShip);
+            LodPick = ComputeLodPick(EngineIndex, LodHead, BlendSource, bSolarOrShip);
         }
 
         void FCliObj::PushResolvedEntry(FCliMaterialEntry* Entry)
@@ -2412,7 +2405,7 @@ namespace Archetype
                 return 1;
             }
 
-            LodPick = ComputeLodPick(BoundRoot->EngineIndex, LodHead, 0, bSolarOrShip);
+            LodPick = ComputeLodPick(BoundRoot->EngineIndex, LodHead, nullptr, bSolarOrShip);
             StateFlags = static_cast<unsigned char>(StateFlags | CliObjFlagLodPickDone);
             return 1;
         }
@@ -4681,7 +4674,7 @@ namespace Archetype
     void HookUpInstanceTreeMaterials(FlLong EngineIndex)
     {
         // FUN_00425480 (cdecl).
-        void* const Instance = reinterpret_cast<void*>(EngineIndex);
+        void* const Instance = EngineHandleFromId(EngineIndex);
         HookUpInstanceMaterials(Instance);
         // 0x0042550f / 0x004255a1: IEngine slot 54 (+0xd8) GetRelatedInstance(Instance, 1,
         // cursor), starting from -1 and ending at -1.

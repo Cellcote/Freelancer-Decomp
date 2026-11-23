@@ -438,7 +438,7 @@ void FObjectShip::RebuildModel()
         // 0x00447331..0x00447347: +0x13 = the companion's envmap material is not empty.
         bEnvMap = Archetype::CliObjEnvmapMaterial(Companion)[0] != '\0' ? 1 : 0;
         // 0x0044734a: FUN_00457f10 on +0x74 with the model.
-        Visuals.Populate(static_cast<FlLong>(reinterpret_cast<intptr_t>(Instance)));
+        Visuals.Populate(EngineIdFromHandle(Instance));
         // 0x0044734f..0x00447372: with "ship_loadouts", FUN_004581b0 and FUN_00458220 on +0x74
         // with the +0x6c list.
         if (RtcSlider::is_enabled("ship_loadouts"))
@@ -466,10 +466,8 @@ void FObjectShip::BuildHardpointArrays()
     int Index = 0;
     for (Index = 0; Index < HpCount; ++Index)
     {
-        LoopSounds[Index].Instance =
-            reinterpret_cast<void*>(static_cast<intptr_t>(Visuals.Summary->get_instance(Index)));
-        RumbleSounds[Index].Instance =
-            reinterpret_cast<void*>(static_cast<intptr_t>(Visuals.Summary->get_instance(Index)));
+        LoopSounds[Index].Instance = EngineHandleFromId(Visuals.Summary->get_instance(Index));
+        RumbleSounds[Index].Instance = EngineHandleFromId(Visuals.Summary->get_instance(Index));
     }
 }
 
@@ -507,7 +505,7 @@ void FObjectShip::Update(double DeltaSeconds)
     }
 
     // 0x004474b0..0x004474cc: Anim +0x6c (model, Delta).
-    DALib::Anim->MixerWalk(static_cast<FlULong>(reinterpret_cast<uintptr_t>(Instance)), Delta);
+    DALib::Anim->MixerWalk(static_cast<FlULong>(EngineIdFromHandle(Instance)), Delta);
     // 0x004474cf..0x004474e0: Engine +0x6c (model, 0, Delta).
     DALib::Engine->UpdateInstance(Instance, 0, AsOpaqueDword(Delta));
     // 0x004474e3..0x004474ef: FUN_004582c0 on +0x74 while +0x14.
@@ -541,8 +539,7 @@ void FObjectShip::DrawOpaque(ICamera* Camera)
         float const Height = GetFloat1C();
         FlULong HeightBits = 0;
         memcpy(&HeightBits, &Height, sizeof(HeightBits));
-        RoomControlDrawShadow(Owner, static_cast<FlULong>(reinterpret_cast<uintptr_t>(Instance)),
-                              HeightBits, 0);
+        RoomControlDrawShadow(Owner, Instance, HeightBits, 0);
     }
     // 0x0044755b..0x0044755f: FUN_0044af60.
     RoomControlDrawObject(Owner, this);
@@ -607,8 +604,7 @@ void FObjectShip::StartEngineEffects()
         // 0x00447e28..0x00447e92: FUN_00446ca0 on +0xa0[index] with the item, -1.0f, the
         // hardpoint's instance, position and orientation.
         HardpointInfo const& Info = Visuals.Summary->get_info(Index);
-        void* const HpInstance =
-            reinterpret_cast<void*>(static_cast<intptr_t>(Visuals.Summary->get_instance(Index)));
+        void* const HpInstance = EngineHandleFromId(Visuals.Summary->get_instance(Index));
         EngineFx[Index].Start(ArchId, -1.0f, HpInstance, Info.Position, Info.Orient);
     }
 }
@@ -916,7 +912,7 @@ void FDealerShipObject::Load(FDealerShipDesc const& Desc)
         bEnvMap = Archetype::CliObjEnvmapMaterial(Companion)[0] != '\0' ? 1 : 0;
         // 0x004439cc..0x004439dd: FUN_00457f10 with the model, FUN_004581b0 with the loadout
         // (no "ship_loadouts" test and no flashlights here, unlike the player's ship).
-        Visuals.Populate(static_cast<FlLong>(reinterpret_cast<intptr_t>(Instance)));
+        Visuals.Populate(EngineIdFromHandle(Instance));
         Visuals.AttachAll(Desc.Loadout);
     }
     // 0x004439e7..0x004439fc: +0x15 = 3, +0x16 = 0, +0x18 = 0, FUN_005595a0 (companion,
@@ -948,8 +944,7 @@ void FDealerShipObject::DrawOpaque(ICamera* /*Camera*/)
         float const Height = GetFloat1C();
         FlULong HeightBits = 0;
         memcpy(&HeightBits, &Height, sizeof(HeightBits));
-        RoomControlDrawShadow(Owner, static_cast<FlULong>(reinterpret_cast<uintptr_t>(Instance)),
-                              HeightBits, 0);
+        RoomControlDrawShadow(Owner, Instance, HeightBits, 0);
     }
     // 0x00443a51..0x00443a55: FUN_0044af60.
     RoomControlDrawObject(Owner, this);
@@ -962,7 +957,7 @@ void FDealerShipObject::DrawOpaque(ICamera* /*Camera*/)
 void GfShipApplyCollisionDamage(void* InstancePtr)
 {
     // FUN_004482b0. 0x004482cc..0x004482da: the player's ship archetype (FUN_004c3e10).
-    FlLong const Instance = static_cast<FlLong>(reinterpret_cast<intptr_t>(InstancePtr));
+    FlLong const Instance = EngineIdFromHandle(InstancePtr);
     Archetype::Ship* const Ship = Archetype::GetShip(GetPlayerShipArchetypeIdRetail());
     // 0x004482de..0x00448309: the player's collision groups (FUN_004c3f00) and every instance
     // of the compound.
@@ -982,7 +977,7 @@ void GfShipApplyCollisionDamage(void* InstancePtr)
         int PartIndex = 0;
         for (PartIndex = 0; PartIndex < PartCount; ++PartIndex)
         {
-            void* const Part = reinterpret_cast<void*>(static_cast<intptr_t>(Parts[PartIndex]));
+            void* const Part = EngineHandleFromId(Parts[PartIndex]);
             FEngineName NameOut;
             char const* Name = DALib::Engine->GetInstanceName(&NameOut, Part)->Text;
             if (Name == nullptr)
@@ -1024,8 +1019,8 @@ void GfShipApplyCollisionDamage(void* InstancePtr)
             ParentKey.Name = HpName;
             ParentKey.Crc = DACOM_CRC::GetCRC32(HpName);
             FlLong const Parent = Summary.find_name_instance(HpName);
-            DALib::Hardpoint->ConnectHardpoints(reinterpret_cast<void*>(static_cast<intptr_t>(Parent)),
-                                                &ParentKey, Child, &ChildKey);
+            DALib::Hardpoint->ConnectHardpoints(EngineHandleFromId(Parent), &ParentKey, Child,
+                                                &ChildKey);
         }
     }
 
@@ -1090,8 +1085,7 @@ Csys GfShipMountOffset(HardpointSummary const* Summary, char const* HpName, void
 
     // 0x00447921..0x0044797b: the hardpoint's instance and its 0x48-byte record; its local
     // frame {orientation, position} kept.
-    void* const HpInstance =
-        reinterpret_cast<void*>(static_cast<intptr_t>(Summary->get_instance(Index)));
+    void* const HpInstance = EngineHandleFromId(Summary->get_instance(Index));
     HardpointInfo const Info = Summary->get_info(Index);
     FMatrix LocalRotation;
     ToFMatrix(LocalRotation, Info.Orient);

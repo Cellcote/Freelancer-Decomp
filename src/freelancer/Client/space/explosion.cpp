@@ -424,7 +424,7 @@ void Action_Explode::CollectChildPieces(FlLong Instance, int MaxPieces,
 {
     // FUN_00536c20 (RET 0xc). `this` is not read.
     IEngine* const Engine = DALib::Engine;
-    void* const Inst = reinterpret_cast<void*>(Instance);
+    void* const Inst = EngineHandleFromId(Instance);
 
     // 0x00536c20..0x00536c7c: an instance with children -- each child is collected (which
     // detaches it) and the first child is asked for again until there is none.
@@ -433,7 +433,7 @@ void Action_Explode::CollectChildPieces(FlLong Instance, int MaxPieces,
     {
         do
         {
-            CollectChildPieces(static_cast<FlLong>(reinterpret_cast<std::intptr_t>(Child)), MaxPieces, Pieces);
+            CollectChildPieces(EngineIdFromHandle(Child), MaxPieces, Pieces);
             Child = Engine->GetRelatedInstance(Inst, 1u, G_InvalidEngineHandle);
         } while (Child != G_InvalidEngineHandle);
         return;

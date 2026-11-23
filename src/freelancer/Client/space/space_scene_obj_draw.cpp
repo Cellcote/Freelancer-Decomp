@@ -474,7 +474,8 @@ namespace
                 Ifl->Release();
             return false;
         }
-        bool const bOk = Ifl->SetInstanceValue(static_cast<int>(reinterpret_cast<intptr_t>(InstId)), ArchPath) >= 0;
+        bool const bOk =
+            Ifl->SetInstanceValue(static_cast<int>(EngineIdFromHandle(InstId)), ArchPath) >= 0;
         if (Ifl != nullptr)
             Ifl->Release();
         return bOk;
@@ -579,17 +580,28 @@ namespace
     }
 
     // FUN_00537d20 — insert light record into the XZ quadtree (thiscall on pool owner).
-    void LightGridInsert(FLightGridNode* Node, int const* Record5)
+    // The five-dword record FUN_00537c30 builds on the stack: {0, light, x, z, range}.
+    // PORT(x64): the light is a pointer (a dword on Win32).
+    struct FLightGridRecord
+    {
+        int Zero;
+        FEngineLight* Light;
+        int Ix;
+        int Iz;
+        int Range;
+    };
+
+    void LightGridInsert(FLightGridNode* Node, FLightGridRecord const* Record5)
     {
         if (Node == nullptr || Record5 == nullptr)
             return;
 
-        int Radius = Record5[4];
+        int Radius = Record5->Range;
         FLightGridNode* Cur = Node;
         while (Radius <= Cur->HalfSize)
         {
-            int RelX = Record5[2] - Cur->CellX;
-            int RelZ = Record5[3] - Cur->CellZ;
+            int RelX = Record5->Ix - Cur->CellX;
+            int RelZ = Record5->Iz - Cur->CellZ;
 
             if (RelX < Radius)
             {
@@ -662,7 +674,7 @@ namespace
                     Child->CellZ = Cur->CellZ + Half;
                     Cur->Child[2] = Child;
                 }
-                Radius = Record5[4];
+                Radius = Record5->Range;
                 Cur = Child;
             }
         }
@@ -671,12 +683,11 @@ namespace
         if (Payload == nullptr)
             return;
         Payload->Next = Cur->Payload;
-        Payload->Light = reinterpret_cast<FEngineLight*>(static_cast<uintptr_t>(
-            static_cast<unsigned>(Record5[1])));
-        Payload->Ix = Record5[2];
-        Payload->Iz = Record5[3];
-        Payload->Range = Record5[4];
-        // Listing copies 5 dwords then sets Next = old head — Light already from Record5[1].
+        Payload->Light = Record5->Light;
+        Payload->Ix = Record5->Ix;
+        Payload->Iz = Record5->Iz;
+        Payload->Range = Record5->Range;
+        // Listing copies 5 dwords then sets Next = old head — Light already from the record.
         Cur->Payload = Payload;
     }
 
@@ -692,13 +703,13 @@ namespace
         {
             if ((Light->Flags & 8u) == 0)
                 continue;
-            int Record[5];
-            Record[0] = 0;
-            Record[1] = static_cast<int>(reinterpret_cast<uintptr_t>(Light));
-            Record[2] = static_cast<int>(Light->Position[0]);
-            Record[3] = static_cast<int>(Light->Position[2]);
-            Record[4] = static_cast<int>(Light->D3d.Range);
-            LightGridInsert(&G_LightGridRoot, Record);
+            FLightGridRecord Record;
+            Record.Zero = 0;
+            Record.Light = Light;
+            Record.Ix = static_cast<int>(Light->Position[0]);
+            Record.Iz = static_cast<int>(Light->Position[2]);
+            Record.Range = static_cast<int>(Light->D3d.Range);
+            LightGridInsert(&G_LightGridRoot, &Record);
         }
     }
 } // namespace
@@ -2331,8 +2342,7 @@ unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* 
         }
         else
         {
-            BindRendererLods(reinterpret_cast<void*>(static_cast<intptr_t>(Self->get_index())), 1,
-                             nullptr);
+            BindRendererLods(EngineHandleFromId(Self->get_index()), 1, nullptr);
             Flags = 0x80u;
         }
     }
@@ -2372,15 +2382,14 @@ unsigned* GameobjSubmitDrawRetail(FClientGameobj* Self, unsigned* OutLod, void* 
             // 0x00539ad2..0x00539aec: FUN_00533930(4, &Extra); on success
             // FUN_00533880(Inst, name).
             if (GetAppearanceOverrideMaterial(4u, &Extra))
-                SetAppearanceInstanceValue(reinterpret_cast<void*>(static_cast<intptr_t>(Inst)),
-                                   const_cast<char*>(Envmap));
+                SetAppearanceInstanceValue(EngineHandleFromId(Inst), const_cast<char*>(Envmap));
         }
     }
 
     // 0x00539aef..0x00539b0f: DALib::Renderer vt+0x1c (Slot7)(Camera, Inst, 1.0f, Flags,
     // SubmitMatrix, Extra); no test of the renderer.
-    int const Result = DALib::Renderer->RenderInstance(Camera, reinterpret_cast<void*>(static_cast<intptr_t>(Inst)),
-                                              1.0f, Flags, SubmitMatrix, Extra);
+    int const Result = DALib::Renderer->RenderInstance(Camera, EngineHandleFromId(Inst), 1.0f,
+                                                       Flags, SubmitMatrix, Extra);
 
     // 0x00539b14..0x00539b27: 3 and up (CMP ESI,3 / JL, signed) -> MaterialBatcher +0x28
     // FlushAll(1).
@@ -2423,7 +2432,7 @@ unsigned* EquippedObjSubmitDrawRetail(FClientEquippedObj* Self, unsigned* OutLod
         FlLong const Inst = Self->get_index();
         void* OpacityBits = nullptr;
         memcpy(&OpacityBits, &Opacity, sizeof(float));
-        SetAppearanceInstanceValue(reinterpret_cast<void*>(static_cast<intptr_t>(Inst)), OpacityBits);
+        SetAppearanceInstanceValue(EngineHandleFromId(Inst), OpacityBits);
 
         // 0x005337e0..0x00533825: the CEqObj again; its archetype (+0x88) non-null and +0x80
         // (bNomad) clear -> FUN_00533930(3, &Extra), the result ignored.

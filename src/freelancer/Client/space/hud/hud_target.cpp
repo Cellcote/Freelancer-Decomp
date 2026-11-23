@@ -66,7 +66,7 @@ namespace
     // Engine instance handles travel as void*; a GetRootIndex / get_index long converts 1:1.
     void* InstanceFromIndex(FlLong Index)
     {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(Index));
+        return EngineHandleFromId(Index);
     }
 
     void* NoInstance()
@@ -259,7 +259,7 @@ bool FHudInstanceBounds::IsShieldPart(void* Instance) const
     // is_shield_part over the +0x68..+0x6c part map (no null test on the user data).
     CObject const* const Object = static_cast<CObject const*>(
         DALib::Engine->GetInstanceUserData(Instance));
-    FlLong const EngineInst = static_cast<FlLong>(reinterpret_cast<intptr_t>(Instance));
+    FlLong const EngineInst = EngineIdFromHandle(Instance);
     return Object->is_shield_part(Object->inst_to_part(EngineInst));
 }
 

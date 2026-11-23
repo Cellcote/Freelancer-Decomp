@@ -144,7 +144,7 @@ namespace
 
     void* InstanceFromIndex(FlLong Index)
     {
-        return reinterpret_cast<void*>(static_cast<intptr_t>(Index));
+        return EngineHandleFromId(Index);
     }
 
     void* NoInstance()

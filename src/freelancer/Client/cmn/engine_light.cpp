@@ -1613,8 +1613,8 @@ void GameLightTick(FGameLight* Light, float Dt)
     {
         // 0x0053787e..0x0053788b: DALib::Engine vt+0xa0 (GetInstanceTransform) on +0xec, no
         // null test on the engine or the result.
-        float* const InstRaw = DALib::Engine->GetInstanceTransform(
-            reinterpret_cast<void*>(static_cast<intptr_t>(Light->EngineIndex)));
+        float* const InstRaw =
+            DALib::Engine->GetInstanceTransform(EngineHandleFromId(Light->EngineIndex));
         // 0x00537893..0x005378a1: DAT_006789c0, FUN_005b73e0 when still null.
         if (G_GameLightMath == nullptr)
             G_GameLightMath = Acquire3DMathEngine();

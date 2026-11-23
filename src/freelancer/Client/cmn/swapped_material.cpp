@@ -156,7 +156,7 @@ bool FSwappedMaterial::CaptureOriginal()
             Material->GetParameterValue(Parameter, &Value); // slot 18 (+0x48)
             if (Value.Type == 7)
             {
-                malloc_strcpy(&OriginalTexture, reinterpret_cast<char const*>(Value.Payload0));
+                malloc_strcpy(&OriginalTexture, ShadingPayloadTo<char const>(Value.Payload0));
                 FindTextureRecord(OriginalTexture, &OriginalTexRecord);
                 bFound = true;
             }
@@ -200,7 +200,7 @@ void FSwappedMaterial::SetDtName(char const* TextureName)
             {
                 if (Value.Payload0 != 0)
                 {
-                    HeapFree(GetProcessHeap(), 0, reinterpret_cast<void*>(Value.Payload0));
+                    ShadingPayloadFreeString(Value.Payload0);
                     Value.Payload0 = 0;
                 }
                 if (TextureName != nullptr)
@@ -209,9 +209,8 @@ void FSwappedMaterial::SetDtName(char const* TextureName)
                     size_t const Size = strlen(TextureName) + 1;
                     char* const Copy = static_cast<char*>(HeapAlloc(GetProcessHeap(), 0, Size));
                     memcpy(Copy, TextureName, Size);
-                    // PORT(x64): the 32-bit cell keeps only the low half of the address; the
-                    // material parameter cells get their own fix (docs/x64-client-plan.md).
-                    Value.Payload0 = static_cast<FlULong>(reinterpret_cast<std::uintptr_t>(Copy));
+                    // PORT(x64): the 32-bit cell keeps the string as a payload id (shading.h).
+                    Value.Payload0 = ShadingPayloadOf(Copy);
                 }
                 Material->SetParameterValue(Parameter, &Value); // slot 19 (+0x4c)
                 bFound = true;

@@ -109,7 +109,7 @@ namespace
     {
         FEngineName Name;
         const char* Text =
-            DALib::Engine->GetInstanceName(&Name, reinterpret_cast<void*>(Instance))->Text;
+            DALib::Engine->GetInstanceName(&Name, EngineHandleFromId(Instance))->Text;
         if (Text == nullptr)
             Text = "";
         if (strstr(Text, "cam") != nullptr)
@@ -683,11 +683,11 @@ void FirstPersonCameraLoad(FFirstPersonCamera* Cam, const char* CockpitIniPath)
     // contains "cam"; only when one was found does the head transform come out of the engine
     // -- nine floats from IEngine slot 0x98 into +0x13c and three from slot 0x90 into +0x130.
     FlLong CameraPart = -1;
-    CompoundInstanceAnalyze(static_cast<FlLong>(reinterpret_cast<std::intptr_t>(Cam->Mesh.EngineInstance)),
-                            &FindCockpitCameraPart, &CameraPart);
+    CompoundInstanceAnalyze(EngineIdFromHandle(Cam->Mesh.EngineInstance), &FindCockpitCameraPart,
+                            &CameraPart);
     if (CameraPart != -1)
     {
-        void* const Part = reinterpret_cast<void*>(CameraPart);
+        void* const Part = EngineHandleFromId(CameraPart);
         memcpy(Cam->HeadOrientation, DALib::Engine->GetInstanceOrientation(Part),
                9 * sizeof(float));
         const float* const Position = DALib::Engine->GetInstancePosition(Part);
