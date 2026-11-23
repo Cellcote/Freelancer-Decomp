@@ -57,6 +57,24 @@ LRESULT CALLBACK TestProc(HWND Window, UINT Message, WPARAM WParam, LPARAM LPara
     }
 }
 
+// A subclass: SubclassBase installs SubclassProc in WM_NCCREATE; SubclassProc puts the base
+// back in WM_DESTROY.
+std::vector<UINT> GSubclassSaw;
+LRESULT CALLBACK SubclassBase(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam);
+LRESULT CALLBACK SubclassProc(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
+{
+    GSubclassSaw.push_back(Message);
+    if (Message == WM_DESTROY)
+        SetWindowLongPtrA(Window, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&SubclassBase));
+    return DefWindowProcA(Window, Message, WParam, LParam);
+}
+LRESULT CALLBACK SubclassBase(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
+{
+    if (Message == WM_NCCREATE)
+        SetWindowLongPtrA(Window, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&SubclassProc));
+    return DefWindowProcA(Window, Message, WParam, LParam);
+}
+
 bool Saw(UINT Message)
 {
     for (UINT Seen : GSeen.Messages)
@@ -72,6 +90,10 @@ void TestWindows()
     Class.lpszClassName = "TestClass";
     Check(RegisterClassA(&Class) != 0, "RegisterClassA registers a class");
     Check(RegisterClassA(&Class) == 0, "RegisterClassA refuses the same name twice");
+    WNDCLASSA Subclass = {};
+    Subclass.lpfnWndProc = &SubclassBase;
+    Subclass.lpszClassName = "SubclassClass";
+    RegisterClassA(&Subclass);
     Check(CreateWindowExA(0, "NoSuchClass", "", 0, 0, 0, 10, 10, nullptr, nullptr, nullptr,
                           nullptr) == nullptr,
           "CreateWindowExA fails for an unknown class");
@@ -155,9 +177,32 @@ void TestWindows()
                   "PostQuitMessage goes to the posting thread's queue");
         });
     Other.join();
+    // A thread that ended takes its queue with it: a new thread (which may get the same
+    // std::thread::id) starts empty.
+    std::thread([]() { PostQuitMessage(7); }).join();
+    std::thread(
+        []()
+        {
+            MSG Theirs = {};
+            Check(!PeekMessageA(&Theirs, nullptr, 0, 0, PM_REMOVE),
+                  "a new thread does not get an ended thread's messages");
+        })
+        .join();
     Check(PeekMessageA(&Message, nullptr, 0, 0, PM_REMOVE) && Message.message == WM_USER + 4 &&
               !PeekMessageA(&Message, nullptr, 0, 0, PM_NOREMOVE),
           "a window's message from another thread reaches the window's thread, without its quit");
+
+    // A procedure installed during WM_NCCREATE gets WM_CREATE; one restored during WM_DESTROY
+    // gets no WM_NCDESTROY.
+    GSubclassSaw.clear();
+    HWND const Subclassed = CreateWindowExA(0, "SubclassClass", "", 0, 0, 0, 10, 10, nullptr,
+                                            nullptr, nullptr, nullptr);
+    Check(Subclassed != nullptr && GSubclassSaw.size() == 1 && GSubclassSaw[0] == WM_CREATE,
+          "a procedure installed in WM_NCCREATE receives WM_CREATE");
+    GSubclassSaw.clear();
+    DestroyWindow(Subclassed);
+    Check(GSubclassSaw.size() == 1 && GSubclassSaw[0] == WM_DESTROY,
+          "a procedure restored in WM_DESTROY receives no WM_NCDESTROY");
 
     // Focus.
     Check(SetFocus(Window) == nullptr && GetFocus() == Window && Saw(WM_SETFOCUS),
@@ -180,8 +225,27 @@ void TestWindows()
     Check(Parent != nullptr, "CreateWindowExA takes a class atom");
     HWND const Child = CreateWindowExA(0, "SecondClass", "", WS_CHILD | WS_VISIBLE | WS_DISABLED,
                                        10, 20, 50, 40, Parent, nullptr, nullptr, nullptr);
+    GSeen.Messages.clear();
     Check(Child != nullptr && EnableWindow(Child, TRUE) == TRUE,
           "a window made WS_DISABLED reports it was disabled");
+    Check((static_cast<DWORD>(GetWindowLongA(Child, GWL_STYLE)) & WS_DISABLED) == 0 &&
+              Saw(WM_ENABLE),
+          "EnableWindow clears WS_DISABLED and sends WM_ENABLE");
+    GSeen.Messages.clear();
+    Check(EnableWindow(Child, TRUE) == FALSE && !Saw(WM_ENABLE),
+          "EnableWindow sends nothing when the state does not change");
+    // A message for the child passes a filter naming its parent.
+    PostMessageA(Child, WM_USER + 5, 0, 0);
+    MSG ChildMessage = {};
+    Check(PeekMessageA(&ChildMessage, Parent, 0, 0, PM_REMOVE) && ChildMessage.hwnd == Child,
+          "PeekMessageA with a window takes its child windows' messages too");
+    // An owned popup's position is the desktop's, not relative to its owner.
+    HWND const Popup = CreateWindowExA(0, "SecondClass", "", WS_POPUP, 10, 20, 30, 30, Parent,
+                                       nullptr, nullptr, nullptr);
+    POINT PopupOrigin = {0, 0};
+    Check(Popup != nullptr && ClientToScreen(Popup, &PopupOrigin) && PopupOrigin.x == 10 &&
+              PopupOrigin.y == 20,
+          "an owned popup is placed on the desktop");
     POINT Origin = {0, 0};
     Check(ClientToScreen(Child, &Origin) && Origin.x == 110 && Origin.y == 120,
           "a child's position is relative to its parent");

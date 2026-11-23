@@ -56,7 +56,7 @@ struct FWindow
     LONG_PTR UserData = 0;
     bool bEnabled = true;
     bool bDestroying = false; // DestroyWindow under way: a nested call does nothing
-    std::thread::id Owner;    // the thread whose queue takes the window's posted messages
+    std::uint64_t Owner = 0; // the thread (ThreadSerial) whose queue takes its posted messages
 };
 
 // A posted message, numbered so that a wait can tell input that arrived since the thread last
@@ -88,7 +88,8 @@ struct FState
     ATOM NextAtom = 0xC000;                 // class atoms, never reused
     std::map<std::uintptr_t, FWindow> Windows;
     std::uintptr_t NextWindow = kFirstWindow;
-    std::map<std::thread::id, FThreadQueue> Queues;
+    std::map<std::uint64_t, FThreadQueue> Queues; // by ThreadSerial, while the thread lives
+    std::uint64_t NextThread = 1;
     std::uint64_t NextSequence = 1;
     HWND Focus = nullptr;
     HWND Active = nullptr;
@@ -144,10 +145,52 @@ FClass* FindClass(LPCSTR Name)
     return Found != S.Classes.end() ? &Found->second : nullptr;
 }
 
+// A number for the calling thread, never reused by another (a std::thread::id can be, once its
+// thread has ended). Its queue exists from the thread's first use of user32 until the thread
+// ends, so a later thread never inherits a message left for an earlier one.
+struct FThreadQueueOwner
+{
+    std::uint64_t Serial = 0;
+    ~FThreadQueueOwner()
+    {
+        if (Serial == 0)
+            return;
+        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+        State().Queues.erase(Serial);
+    }
+};
+
+// The caller holds the lock.
+std::uint64_t ThreadSerial()
+{
+    static thread_local FThreadQueueOwner Owner;
+    if (Owner.Serial == 0)
+    {
+        Owner.Serial = State().NextThread++;
+        State().Queues[Owner.Serial];
+    }
+    return Owner.Serial;
+}
+
 // The calling thread's queue; the caller holds the lock.
 FThreadQueue& ThisQueue()
 {
-    return State().Queues[std::this_thread::get_id()];
+    return State().Queues[ThreadSerial()];
+}
+
+// Whether Window is Ancestor or one of its child windows; the caller holds the lock.
+bool IsSelfOrDescendant(HWND Window, HWND Ancestor)
+{
+    for (int Depth = 0; Window != nullptr && Depth < 64; ++Depth)
+    {
+        if (Window == Ancestor)
+            return true;
+        FWindow const* const Record = Find(Window);
+        if (Record == nullptr || (Record->Style & WS_CHILD) == 0)
+            return false;
+        Window = Record->Parent;
+    }
+    return false;
 }
 
 std::string Narrow(LPCWSTR Text)
@@ -199,7 +242,7 @@ int MessageBoxAnswer(UINT Type)
 bool Matches(const MSG& Message, HWND Window, UINT First, UINT Last)
 {
     // WM_QUIT passes every filter. A null window takes every message of the thread; (HWND)-1
-    // only those posted with no window.
+    // only those posted with no window; a window, its own and its child windows'.
     if (Message.message == WM_QUIT)
         return true;
     if (Window == reinterpret_cast<HWND>(static_cast<std::intptr_t>(-1)))
@@ -207,7 +250,7 @@ bool Matches(const MSG& Message, HWND Window, UINT First, UINT Last)
         if (Message.hwnd != nullptr)
             return false;
     }
-    else if (Window != nullptr && Message.hwnd != Window)
+    else if (Window != nullptr && !IsSelfOrDescendant(Message.hwnd, Window))
         return false;
     if (First == 0 && Last == 0)
         return true;
@@ -245,12 +288,17 @@ DWORD InputClass(UINT Message)
     return QS_POSTMESSAGE | QS_ALLPOSTMESSAGE;
 }
 
-// Queues a message on a thread's queue; the caller holds the lock.
-void Enqueue(std::thread::id Thread, const MSG& Message)
+// Queues a message on a thread's queue; false when that thread has ended. The caller holds the
+// lock.
+bool Enqueue(std::uint64_t Thread, const MSG& Message)
 {
     FState& S = State();
-    S.Queues[Thread].Messages.push_back(FQueued{Message, S.NextSequence++});
+    auto const Queue = S.Queues.find(Thread);
+    if (Queue == S.Queues.end())
+        return false;
+    Queue->second.Messages.push_back(FQueued{Message, S.NextSequence++});
     S.Posted.notify_all();
+    return true;
 }
 
 DWORD Ticks()
@@ -424,7 +472,7 @@ HWND CreateWindowExA(DWORD ExStyle, LPCSTR ClassName, LPCSTR Title, DWORD Style,
         Record.Style = Style;
         Record.ExStyle = ExStyle;
         Record.bEnabled = (Style & WS_DISABLED) == 0;
-        Record.Owner = std::this_thread::get_id();
+        Record.Owner = ThreadSerial();
         if (X == CW_USEDEFAULT)
             X = Y = 0;
         if (Width == CW_USEDEFAULT)
@@ -446,15 +494,18 @@ HWND CreateWindowExA(DWORD ExStyle, LPCSTR ClassName, LPCSTR Title, DWORD Style,
         Param, Instance,  Menu,   Parent, Height, Width, Y, X, static_cast<LONG>(Style),
         Title, ClassName, ExStyle};
     LPARAM const CreateParam = reinterpret_cast<LPARAM>(&Create);
-    if (Procedure(Window, WM_NCCREATE, 0, CreateParam) == 0 || !IsWindow(Window) ||
-        Procedure(Window, WM_CREATE, 0, CreateParam) == -1 || !IsWindow(Window))
+    // Each message through the window's current procedure: one WM_NCCREATE installs (a
+    // subclass) gets WM_CREATE.
+    (void)Procedure;
+    if (SendMessageA(Window, WM_NCCREATE, 0, CreateParam) == 0 || !IsWindow(Window) ||
+        SendMessageA(Window, WM_CREATE, 0, CreateParam) == -1 || !IsWindow(Window))
     {
         DestroyWindow(Window);
         return nullptr;
     }
     if ((Style & WS_VISIBLE) != 0)
     {
-        Procedure(Window, WM_SHOWWINDOW, TRUE, 0);
+        SendMessageA(Window, WM_SHOWWINDOW, TRUE, 0);
         if (!IsWindow(Window))
             return nullptr;
     }
@@ -465,18 +516,18 @@ HWND CreateWindowExA(DWORD ExStyle, LPCSTR ClassName, LPCSTR Title, DWORD Style,
 // for it go. A call for a window already being destroyed (from its own WM_DESTROY) does nothing.
 BOOL DestroyWindow(HWND Window)
 {
-    WNDPROC Procedure = nullptr;
-    std::thread::id Owner;
+    std::uint64_t Owner = 0;
     {
         std::lock_guard<std::recursive_mutex> Guard(State().Lock);
         FWindow* const Record = Find(Window);
         if (Record == nullptr || Record->bDestroying)
             return FALSE;
         Record->bDestroying = true;
-        Procedure = Record->Procedure;
         Owner = Record->Owner;
     }
-    Procedure(Window, WM_DESTROY, 0, 0);
+    // Both messages through the window's current procedure: a subclass that restores the
+    // original procedure in WM_DESTROY gets no WM_NCDESTROY.
+    SendMessageA(Window, WM_DESTROY, 0, 0);
     std::vector<HWND> Children;
     {
         std::lock_guard<std::recursive_mutex> Guard(State().Lock);
@@ -486,7 +537,7 @@ BOOL DestroyWindow(HWND Window)
     }
     for (HWND Child : Children)
         DestroyWindow(Child);
-    Procedure(Window, WM_NCDESTROY, 0, 0);
+    SendMessageA(Window, WM_NCDESTROY, 0, 0);
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
     FState& S = State();
     S.Windows.erase(Key(Window));
@@ -576,7 +627,13 @@ BOOL EnableWindow(HWND Window, BOOL Enable)
     if (Record == nullptr)
         return FALSE;
     bool const bWasDisabled = !Record->bEnabled;
-    Record->bEnabled = Enable != FALSE;
+    bool const bEnabled = Enable != FALSE;
+    if (bEnabled == Record->bEnabled)
+        return bWasDisabled ? TRUE : FALSE;
+    // The state, WS_DISABLED in the style, then WM_ENABLE, before returning.
+    Record->bEnabled = bEnabled;
+    Record->Style = bEnabled ? (Record->Style & ~WS_DISABLED) : (Record->Style | WS_DISABLED);
+    SendMessageA(Window, WM_ENABLE, bEnabled ? TRUE : FALSE, 0);
     return bWasDisabled ? TRUE : FALSE;
 }
 
@@ -627,8 +684,14 @@ BOOL GetWindowRect(HWND Window, LPRECT Rect)
     // coordinates add up the parents' origins (there are no frames, so the client area's
     // origin is the window's).
     *Rect = Record->Rect;
-    for (Record = Find(Record->Parent); Record != nullptr; Record = Find(Record->Parent))
+    // Only a WS_CHILD window is placed in its parent; an owned popup's position is the desktop's.
+    while ((Record->Style & WS_CHILD) != 0)
+    {
+        Record = Find(Record->Parent);
+        if (Record == nullptr)
+            break;
         OffsetRect(Rect, Record->Rect.left, Record->Rect.top);
+    }
     return TRUE;
 }
 
@@ -947,7 +1010,7 @@ LRESULT SendMessageW(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
 BOOL PostMessageA(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
 {
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-    std::thread::id Thread = std::this_thread::get_id();
+    std::uint64_t Thread = ThreadSerial();
     if (Window != nullptr)
     {
         FWindow const* const Record = Find(Window);
@@ -955,15 +1018,16 @@ BOOL PostMessageA(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
             return FALSE;
         Thread = Record->Owner;
     }
-    Enqueue(Thread, MSG{Window, Message, WParam, LParam, Ticks(), State().CursorPos});
-    return TRUE;
+    return Enqueue(Thread, MSG{Window, Message, WParam, LParam, Ticks(), State().CursorPos})
+               ? TRUE
+               : FALSE;
 }
 
 // To the calling thread's queue.
 void PostQuitMessage(int ExitCode)
 {
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-    Enqueue(std::this_thread::get_id(),
+    Enqueue(ThreadSerial(),
             MSG{nullptr, WM_QUIT, static_cast<WPARAM>(ExitCode), 0, Ticks(), State().CursorPos});
 }
 

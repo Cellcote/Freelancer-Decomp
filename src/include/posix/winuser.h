@@ -501,8 +501,15 @@ inline DWORD MsgWaitForMultipleObjects(DWORD Count, const HANDLE* Handles, BOOL 
         bool const bInput = PosixUser32HasInput(WakeMask);
         if (bInput && (WaitAll == FALSE || Count == 0))
             return WAIT_OBJECT_0 + (WaitAll == FALSE ? Count : 0);
-        if (bInput && Platform::WaitMany(Count, Handles, true, 0) != WAIT_TIMEOUT)
-            return WAIT_OBJECT_0;
+        if (bInput)
+        {
+            // A failed wait (WAIT_FAILED) is returned as it is, not as the handles' success.
+            DWORD const Result = Platform::WaitMany(Count, Handles, true, 0);
+            if (Result == WAIT_FAILED)
+                return WAIT_FAILED;
+            if (Result != WAIT_TIMEOUT)
+                return WAIT_OBJECT_0;
+        }
         DWORD Slice = 10;
         bool bLast = false;
         if (Milliseconds != INFINITE)
