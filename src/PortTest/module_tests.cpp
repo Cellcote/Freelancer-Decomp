@@ -165,7 +165,7 @@ const char* PayloadText(Platform::Module Dacom, FlULong Payload, bool bForget = 
 // are pointers and whose texture-name default is a string payload ("(None)").
 void TestFlMaterials(ICOManager* Manager, Platform::Module Dacom)
 {
-    FAGGDESC14 Desc = {sizeof(FAGGDESC14), "GlassMaterial", nullptr, nullptr, nullptr};
+    FAGGDESC14 Desc = {kAggDesc14Size, "GlassMaterial", nullptr, nullptr, nullptr};
     IMaterial* Material = nullptr;
     Check(Manager->CreateInstance((AGGDESC*)(&Desc), (void**)(&Material)) == GR_OK &&
               Material != nullptr,
@@ -719,6 +719,17 @@ int main(int argc, char** argv)
         int After = 0;
         Manager->EnumerateComponents(nullptr, &CountComponent, &After);
         Check(After > Before, "Shading's DllMain registered its components");
+        // A component descriptor's Size is retail's tag (0x14), also on 64-bit builds where the
+        // structure is larger: Shading's factories take it, as SystemContainer fills it.
+        {
+            FAGGDESC14 Desc = {kAggDesc14Size, "MaterialAnimation", nullptr, nullptr, nullptr};
+            IDAComponent* Animation = nullptr;
+            Check(Manager->CreateInstance((AGGDESC*)(&Desc), (void**)(&Animation)) == GR_OK &&
+                      Animation != nullptr,
+                  "Shading makes MaterialAnimation from a descriptor tagged 0x14");
+            if (Animation != nullptr)
+                Animation->Release();
+        }
         for (const char* Module : {"RendComp.dll", "alchemy.dll", "flmaterials.dll"})
         {
             Before = After;

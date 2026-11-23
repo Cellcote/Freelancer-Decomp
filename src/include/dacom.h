@@ -90,6 +90,13 @@ struct FAGGDESC18
 
 FL_LAYOUT_ASSERT(sizeof(FAGGDESC18) == 0x18, "retail AGGDESC size 0x18");
 
+// The Size field is a tag that names the descriptor's kind, retail's byte size: callers write
+// 0x14 / 0x18 (SystemContainer, EngBase, RendComp...) and factories compare against it. On a
+// 64-bit build the structures are larger than their tags, so a factory compares Size with these,
+// never with sizeof.
+inline constexpr FlULong kAggDesc14Size = 0x14;
+inline constexpr FlULong kAggDesc18Size = 0x18;
+
 // The FileSystem component's descriptor (0x30 or 0x34 for DOS and UTF, 0x40 for MEM).
 // DALib::OpenData / ReadFile.dll.c.
 struct FFileSystemDesc

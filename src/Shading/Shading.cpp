@@ -68,7 +68,7 @@ namespace
             if (Spec.Kind == KindMaterialAnimation)
             {
                 FAGGDESC14* AnimationDesc = (FAGGDESC14*)Desc;
-                if (AnimationDesc->Size != sizeof(FAGGDESC14) ||
+                if (AnimationDesc->Size != kAggDesc14Size ||
                     std::strcmp(AnimationDesc->Name, Spec.Name) != 0)
                 {
                     *Instance = nullptr;
@@ -91,7 +91,7 @@ namespace
             if (Spec.Kind == KindMaterialBatcher)
             {
                 FAGGDESC14* BatcherDesc = (FAGGDESC14*)Desc;
-                if (BatcherDesc->Size != sizeof(FAGGDESC14) ||
+                if (BatcherDesc->Size != kAggDesc14Size ||
                     std::strcmp(BatcherDesc->Name, Spec.Name) != 0)
                 {
                     *Instance = nullptr;
@@ -125,7 +125,7 @@ namespace
             if (Spec.Kind == KindMaterialLibrary)
             {
                 FAGGDESC14* LibraryDesc = (FAGGDESC14*)Desc;
-                if (LibraryDesc->Size != sizeof(FAGGDESC14) ||
+                if (LibraryDesc->Size != kAggDesc14Size ||
                     std::strcmp(LibraryDesc->Name, Spec.Name) != 0)
                 {
                     *Instance = nullptr;
@@ -158,7 +158,7 @@ namespace
             if (Spec.Kind == KindTextureLibrary)
             {
                 FAGGDESC14* TextureDesc = (FAGGDESC14*)Desc;
-                if (TextureDesc->Size != sizeof(FAGGDESC14) ||
+                if (TextureDesc->Size != kAggDesc14Size ||
                     std::strcmp(TextureDesc->Name, Spec.Name) != 0)
                 {
                     *Instance = nullptr;
@@ -192,7 +192,7 @@ namespace
             if (Spec.Kind == KindMaterialType)
             {
                 FAGGDESC14* MaterialDesc = (FAGGDESC14*)Desc;
-                if (MaterialDesc->Size != sizeof(FAGGDESC14) ||
+                if (MaterialDesc->Size != kAggDesc14Size ||
                     std::strcmp(MaterialDesc->Name, Spec.Name) != 0)
                 {
                     *Instance = nullptr;
@@ -223,7 +223,7 @@ namespace
             if (Spec.Kind == KindBatchedMaterial)
             {
                 FAGGDESC14* BatchedDesc = (FAGGDESC14*)Desc;
-                if (BatchedDesc->Size != sizeof(FAGGDESC14) ||
+                if (BatchedDesc->Size != kAggDesc14Size ||
                     std::strcmp(BatchedDesc->Name, Spec.Name) != 0)
                 {
                     *Instance = nullptr;
