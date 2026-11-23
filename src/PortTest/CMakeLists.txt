@@ -72,10 +72,21 @@ target_include_directories(user32_tests PRIVATE ${CMAKE_SOURCE_DIR}/src/include/
                            ${CMAKE_SOURCE_DIR}/src/include)
 target_compile_options(user32_tests PRIVATE -include ${CMAKE_SOURCE_DIR}/src/include/fl_layout.h
                        "-D__declspec(x)=" -D__cdecl= -D__stdcall= -Wall -Wextra -Wno-unknown-pragmas)
+# Where user32_sdl is built, the screen checks look at its SDL windows and queue SDL events
+# through user32_screen_probe (the same shared SDL), and fail if a window gets no screen.
+if(TARGET PosixUser32Sdl)
+  add_library(user32_screen_probe STATIC user32_screen_probe.cpp)
+  target_compile_features(user32_screen_probe PRIVATE cxx_std_20)
+  target_link_libraries(user32_screen_probe PUBLIC SDL3::SDL3-shared)
+  target_link_libraries(user32_tests PRIVATE user32_screen_probe)
+  target_compile_definitions(user32_tests PRIVATE FL_USER32_SCREEN_EXPECTED=1)
+  add_dependencies(user32_tests PosixUser32Sdl)
+endif()
 add_test(NAME user32_tests COMMAND user32_tests)
 # The stand-ins without a screen: windows stay records even where user32_sdl is built.
 set_tests_properties(user32_tests PROPERTIES ENVIRONMENT FL_USER32_HEADLESS=1)
-# The same stand-ins with a screen: SDL's dummy video driver, which needs no display (skipped
-# when user32_sdl is not built).
+# The same stand-ins with a screen: SDL's dummy video driver, which needs no display, whatever
+# FL_USER32_HEADLESS the shell has (skipped when user32_sdl is not built).
 add_test(NAME user32_screen_tests COMMAND user32_tests --screen)
-set_tests_properties(user32_screen_tests PROPERTIES ENVIRONMENT SDL_VIDEO_DRIVER=dummy)
+set_tests_properties(user32_screen_tests PROPERTIES ENVIRONMENT
+                     "SDL_VIDEO_DRIVER=dummy;FL_USER32_HEADLESS=0")

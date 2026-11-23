@@ -378,17 +378,16 @@ without the Windows API. Milestones:
   window procedure (an `HWND` is a small number), the message queue, focus, the cursor and the
   US keyboard's scan codes and key names. It uses none of the platform layer's shared state,
   since dacom, which holds that, links it; `MsgWaitForMultipleObjects` waits in the header for
-  that reason. A window has no screen yet (M3 gives it an SDL window, whose id becomes the
-  `HWND` RPGPU draws into), and dialog templates and string tables wait for the resource
-  reader, so `DialogBoxParamA` fails and `FindResourceExA` finds nothing. DirectInput 8 is a
-  stand-in with a working system mouse (`posix/dinput.h`): the client, as retail, does not
-  survive a failed `DirectInput8Create`; the window layer feeds it with M3. There is no IME
+  that reason. Dialog templates and string tables wait for the resource reader, so
+  `DialogBoxParamA` fails and `FindResourceExA` finds nothing. DirectInput 8 is a stand-in
+  with a working system mouse (`posix/dinput.h`): the client, as retail, does not survive a
+  failed `DirectInput8Create`. There is no IME
   (`posix/imm.h`: no layout is an IME, no window has an input context) and no structured
   exception handling (a `__try` body runs, its `__except` never does). `user32_tests` checks
   these stand-ins.
   The top-level windows get a screen from SDL3 (M3): user32 loads its backend, `user32_sdl`
   (`src/PosixUser32/user32_backend.h`), the first time one is made, so the dedicated server
-  never loads SDL, and a build without SDL3 (or `FL_USER32_HEADLESS=1`) keeps windows as
+  never loads SDL (desktop queries before that answer a 1024x768 desktop), and a build without SDL3 (or `FL_USER32_HEADLESS=1`) keeps windows as
   records. Such a window's `HWND` is its SDL window id, which RPGPU looks up. Its calls follow
   the screen (bounds, frame, title, show; a popup that covers the desktop is fullscreen, as the
   client lays out its fullscreen window), and the screen's events become messages inside

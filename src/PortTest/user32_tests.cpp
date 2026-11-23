@@ -14,6 +14,11 @@
 #include <process.h>
 #include <wrl/client.h>
 
+#if FL_USER32_SCREEN_EXPECTED
+#include "user32_screen_probe.h"
+#endif
+
+#include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <cwchar>
@@ -414,45 +419,266 @@ void TestComAndMisc()
     Check(bRan, "a __try body runs and its __except block does not");
 }
 // The screen (src/PosixUser32/user32_sdl, SDL3): run by ctest with SDL's dummy video driver,
-// which makes windows without a display. Skipped (passing) when the backend is not built.
-int TestScreen()
+// which makes windows without a display. Where user32_sdl is built (FL_USER32_SCREEN_EXPECTED),
+// a window without a screen fails; otherwise the checks are skipped (passing).
+#if FL_USER32_SCREEN_EXPECTED
+struct FScreenMessage
 {
-    WNDCLASSA Class = {};
-    Class.lpfnWndProc = &TestProc;
-    Class.lpszClassName = "ScreenClass";
-    RegisterClassA(&Class);
-    HWND const Window = CreateWindowExA(0, "ScreenClass", "Freelancer", 0x2CA0000, 10, 10, 640, 480,
-                                        nullptr, nullptr, nullptr, nullptr);
-    Check(Window != nullptr, "a top-level window is made");
-    if (reinterpret_cast<std::uintptr_t>(Window) >= 0x40000000)
-    {
-        std::printf("skip: no screen backend (user32_sdl) in this build\n");
-        DestroyWindow(Window);
-        return 0;
-    }
-    Check(reinterpret_cast<std::uintptr_t>(Window) < 0x40000000,
-          "a window with a screen is numbered by the backend (its SDL window id)");
-    Check(GetSystemMetrics(SM_CXSCREEN) > 0 && GetSystemMetrics(SM_CYSCREEN) > 0,
-          "the desktop has the display's size");
-    DEVMODEA Mode = {};
-    Mode.dmSize = sizeof(Mode);
-    Check(EnumDisplaySettingsA(nullptr, ENUM_CURRENT_SETTINGS, &Mode) && Mode.dmPelsWidth > 0,
-          "EnumDisplaySettingsA describes the display's mode");
-    SetWindowTextA(Window, "Freelancer (renamed)");
-    ShowWindow(Window, SW_SHOWNORMAL);
-    SetWindowPos(Window, nullptr, 0, 0, 800, 600, SWP_NOMOVE | SWP_NOZORDER);
+    UINT Message;
+    WPARAM WParam;
+    LPARAM LParam;
+};
+std::vector<FScreenMessage> GScreenSeen;
+bool GNestOnClose = false;
+int GNestedKeys = 0;
+
+std::uint32_t IdOf(HWND Window)
+{
+    return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(Window));
+}
+
+// Takes what the screen has, dispatching it.
+void DrainScreen()
+{
     MSG Message;
     for (int Pass = 0; Pass < 10; ++Pass)
         while (PeekMessageA(&Message, nullptr, 0, 0, PM_REMOVE))
             DispatchMessageA(&Message);
+}
+
+LRESULT CALLBACK ScreenProc(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
+{
+    GScreenSeen.push_back({Message, WParam, LParam});
+    if (Message == WM_SYSCOMMAND && (WParam & 0xFFF0) == SC_CLOSE)
+    {
+        // A close handler with a message loop of its own (a confirmation): it takes input
+        // that comes after the close request.
+        if (GNestOnClose)
+        {
+            GNestOnClose = false;
+            ScreenProbe::PushKeyA(IdOf(Window), true);
+            MSG Nested;
+            for (int Pass = 0; Pass < 20 && GNestedKeys == 0; ++Pass)
+                while (PeekMessageA(&Nested, nullptr, 0, 0, PM_REMOVE))
+                    if (Nested.message == WM_KEYDOWN && Nested.wParam == 'A')
+                        ++GNestedKeys;
+        }
+        return 0; // not closed: the checks go on with the window
+    }
+    return DefWindowProcA(Window, Message, WParam, LParam);
+}
+
+const FScreenMessage* FindScreen(UINT Message, std::size_t From = 0)
+{
+    for (std::size_t Index = From; Index < GScreenSeen.size(); ++Index)
+        if (GScreenSeen[Index].Message == Message)
+            return &GScreenSeen[Index];
+    return nullptr;
+}
+
+int CountScreen(UINT Message)
+{
+    int Count = 0;
+    for (const FScreenMessage& Seen : GScreenSeen)
+        Count += Seen.Message == Message ? 1 : 0;
+    return Count;
+}
+#endif
+
+int TestScreen()
+{
+#if !FL_USER32_SCREEN_EXPECTED
+    std::printf("skip: no screen backend (user32_sdl) in this build\n");
+    return 0;
+#else
+    // Before the first window: desktop queries answer without loading SDL.
+    DEVMODEA Mode = {};
+    Mode.dmSize = sizeof(Mode);
+    Check(GetSystemMetrics(SM_CXSCREEN) == 1024 &&
+              EnumDisplaySettingsA(nullptr, ENUM_CURRENT_SETTINGS, &Mode) &&
+              !ScreenProbe::VideoInitialized(),
+          "desktop queries before the first window do not start SDL");
+    Check(!EnumDisplaySettingsA(nullptr, 0x80000000u, &Mode),
+          "EnumDisplaySettingsA refuses a mode index past int's range");
+    Check(ShowCursor(FALSE) == -1, "ShowCursor counts before there is a screen");
+
+    WNDCLASSA Class = {};
+    Class.lpfnWndProc = &ScreenProc;
+    Class.lpszClassName = "ScreenClass";
+    RegisterClassA(&Class);
+    // WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_CLIPCHILDREN, as the client makes its window;
+    // "Caf\xE9": the title's bytes are characters (Latin-1), given to SDL in UTF-8.
+    HWND const Window = CreateWindowExA(0, "ScreenClass", "Caf\xE9", 0x2CA0000, 10, 10, 640, 480,
+                                        nullptr, nullptr, nullptr, nullptr);
+    Check(Window != nullptr && reinterpret_cast<std::uintptr_t>(Window) < 0x40000000,
+          "a window with a screen is numbered by the backend (its SDL window id)");
+    if (Window == nullptr || reinterpret_cast<std::uintptr_t>(Window) >= 0x40000000)
+        return 1;
+    std::uint32_t const Id = IdOf(Window);
+    Check(ScreenProbe::VideoInitialized(), "the first top-level window starts SDL");
+    Check(!ScreenProbe::CursorVisible(), "the first screen takes ShowCursor's earlier count");
+    Check(ShowCursor(TRUE) == 0 && ScreenProbe::CursorVisible(),
+          "ShowCursor crossing 0 shows the screen's cursor");
+    Check(ScreenProbe::WindowTitle(Id) == "Caf\xC3\xA9",
+          "the screen's title is the bytes in UTF-8");
+    SetWindowTextA(Window, "Caf\xE9 2");
+    Check(ScreenProbe::WindowTitle(Id) == "Caf\xC3\xA9 2", "SetWindowTextA encodes as creation");
+    Check(!ScreenProbe::IsResizable(Id), "a window without a sizing border cannot be resized");
+
+    Check(GetSystemMetrics(SM_CXSCREEN) > 0 && GetSystemMetrics(SM_CYSCREEN) > 0,
+          "the desktop has the display's size");
+    Check(EnumDisplaySettingsA(nullptr, ENUM_CURRENT_SETTINGS, &Mode) && Mode.dmPelsWidth > 0,
+          "EnumDisplaySettingsA describes the display's mode");
+    ShowWindow(Window, SW_SHOWNORMAL);
+    SetWindowPos(Window, nullptr, 0, 0, 800, 600, SWP_NOMOVE | SWP_NOZORDER);
+    DrainScreen();
     RECT Rect = {};
-    Check(GetClientRect(Window, &Rect) && Rect.right == 800 && Rect.bottom == 600,
+    int Width = 0;
+    int Height = 0;
+    Check(GetClientRect(Window, &Rect) && Rect.right == 800 && Rect.bottom == 600 &&
+              ScreenProbe::WindowSize(Id, &Width, &Height) && Width == 800 && Height == 600,
           "SetWindowPos resizes the screen's window, and its events keep the size");
-    Check(ShowCursor(FALSE) == -1 && ShowCursor(TRUE) == 0, "ShowCursor counts on the screen");
+    ShowWindow(Window, SW_MAXIMIZE);
+    Check((GetWindowLongA(Window, GWL_STYLE) & WS_MAXIMIZE) == 0,
+          "a maximize the screen refuses leaves the window unmaximized");
+
+    // Moves as each event had them, in order.
+    GScreenSeen.clear();
+    ScreenProbe::PushMoved(Id, 100, 50);
+    ScreenProbe::PushMoved(Id, 200, 50);
+    DrainScreen();
+    const FScreenMessage* const FirstMove = FindScreen(WM_MOVE);
+    const FScreenMessage* const SecondMove =
+        FirstMove != nullptr ? FindScreen(WM_MOVE, (FirstMove - GScreenSeen.data()) + 1) : nullptr;
+    Check(FirstMove != nullptr && LOWORD(FirstMove->LParam) == 100 && SecondMove != nullptr &&
+              LOWORD(SecondMove->LParam) == 200,
+          "each move is reported with its own position");
+    ScreenProbe::PushResized(Id, 640, 400);
+    DrainScreen();
+    Check(GetWindowRect(Window, &Rect) && Rect.left == 200 && Rect.right - Rect.left == 640 &&
+              Rect.bottom - Rect.top == 400,
+          "a resize keeps the position the moves before it gave");
+
+    // Mouse buttons with the state as of each event.
+    GScreenSeen.clear();
+    ScreenProbe::PushButton(Id, 1, true, 5.f, 6.f);
+    ScreenProbe::PushButton(Id, 1, false, 5.f, 6.f);
+    DrainScreen();
+    const FScreenMessage* const Down = FindScreen(WM_LBUTTONDOWN);
+    const FScreenMessage* const Up = FindScreen(WM_LBUTTONUP);
+    Check(Down != nullptr && (Down->WParam & MK_LBUTTON) != 0 && Up != nullptr &&
+              (Up->WParam & MK_LBUTTON) == 0 && LOWORD(Down->LParam) == 5,
+          "a press and release taken together keep MK_LBUTTON as each happened");
+
+    // The wheel: whole notches, at the event's position on the desktop.
+    GScreenSeen.clear();
+    ScreenProbe::PushWheel(Id, 0.5f, 10.f, 20.f);
+    ScreenProbe::PushWheel(Id, 0.5f, 10.f, 20.f);
+    DrainScreen();
+    const FScreenMessage* const Wheel = FindScreen(WM_MOUSEWHEEL);
+    Check(CountScreen(WM_MOUSEWHEEL) == 1 && Wheel != nullptr &&
+              static_cast<short>(HIWORD(Wheel->WParam)) == 120 && LOWORD(Wheel->LParam) == 210 &&
+              HIWORD(Wheel->LParam) == 70,
+          "two half notches make one WM_MOUSEWHEEL at the event's desktop position");
+
+    // DirectInput's relative motion keeps the fractions.
+    IDirectInput8A* Input = nullptr;
+    IDirectInputDevice8A* Mouse = nullptr;
+    DirectInput8Create(nullptr, DIRECTINPUT_VERSION, IID_IDirectInput8A,
+                       reinterpret_cast<void**>(&Input), nullptr);
+    if (Input != nullptr)
+        Input->CreateDevice(GUID_SysMouse, &Mouse, nullptr);
+    if (Mouse != nullptr)
+    {
+        Mouse->SetDataFormat(&c_dfDIMouse2);
+        Mouse->Acquire();
+        DIMOUSESTATE2 MouseState = {};
+        Mouse->GetDeviceState(sizeof(MouseState), &MouseState);
+        ScreenProbe::PushMotion(Id, 1.f, 1.f, 0.5f, 0.f);
+        ScreenProbe::PushMotion(Id, 1.f, 1.f, 0.5f, 0.f);
+        DrainScreen();
+        Check(Mouse->GetDeviceState(sizeof(MouseState), &MouseState) == DI_OK && MouseState.lX == 1,
+              "two half-unit motions reach DirectInput as one");
+        Mouse->Release();
+    }
+    if (Input != nullptr)
+        Input->Release();
+
+    // Left and right Shift each keep their state.
+    ScreenProbe::PushModifier(Id, ScreenProbe::EModifier::LeftShift, true);
+    ScreenProbe::PushModifier(Id, ScreenProbe::EModifier::RightShift, true);
+    ScreenProbe::PushModifier(Id, ScreenProbe::EModifier::LeftShift, false);
+    DrainScreen();
+    Check((GetKeyState(VK_SHIFT) & 0x8000) != 0 && (GetKeyState(VK_RSHIFT) & 0x8000) != 0 &&
+              (GetKeyState(VK_LSHIFT) & 0x8000) == 0,
+          "Shift stays down while the other Shift is held");
+    ScreenProbe::PushModifier(Id, ScreenProbe::EModifier::RightShift, false);
+    DrainScreen();
+    Check((GetKeyState(VK_SHIFT) & 0x8000) == 0, "Shift is up when both are");
+
+    // The application's Quit, and a close handler's nested message loop.
+    GScreenSeen.clear();
+    ScreenProbe::PushQuit();
+    DrainScreen();
+    const FScreenMessage* const Quit = FindScreen(WM_SYSCOMMAND);
+    Check(Quit != nullptr && (Quit->WParam & 0xFFF0) == SC_CLOSE && CountScreen(WM_SYSCOMMAND) == 1,
+          "the application's Quit is the close button's WM_SYSCOMMAND SC_CLOSE");
+    GScreenSeen.clear();
+    GNestOnClose = true;
+    ScreenProbe::PushCloseRequest(Id);
+    DrainScreen();
+    Check(GNestedKeys == 1 && CountScreen(WM_SYSCOMMAND) == 1,
+          "a nested message loop takes the screen's input, without the event it is handling");
+
+    // ClipCursor lets go of the window it clipped to after the focus went.
+    ScreenProbe::PushFocus(Id, true);
+    DrainScreen();
+    RECT Clip = {0, 0, 100, 100};
+    ClipCursor(&Clip);
+    Check(ScreenProbe::IsMouseGrabbed(Id), "ClipCursor keeps the cursor in the active window");
+    ScreenProbe::PushFocus(Id, false);
+    DrainScreen();
+    ClipCursor(nullptr);
+    Check(!ScreenProbe::IsMouseGrabbed(Id), "ClipCursor(nullptr) frees it after the focus went");
+
+    // A popup over the whole desktop is fullscreen from creation; one beside it is not.
+    int const DesktopWidth = GetSystemMetrics(SM_CXSCREEN);
+    int const DesktopHeight = GetSystemMetrics(SM_CYSCREEN);
+    HWND const Beside =
+        CreateWindowExA(0, "ScreenClass", "Beside", WS_POPUP | WS_VISIBLE, -100, 0, DesktopWidth,
+                        DesktopHeight, nullptr, nullptr, nullptr, nullptr);
+    Check(Beside != nullptr && !ScreenProbe::IsFullscreen(IdOf(Beside)),
+          "a popup that leaves part of the desktop uncovered is not fullscreen");
+    DestroyWindow(Beside);
+    HWND const Full =
+        CreateWindowExA(0, "ScreenClass", "Full", WS_POPUP | WS_VISIBLE, 0, 0, DesktopWidth,
+                        DesktopHeight, nullptr, nullptr, nullptr, nullptr);
+    Check(Full != nullptr && ScreenProbe::IsFullscreen(IdOf(Full)),
+          "a popup made over the desktop is fullscreen from creation");
+    // Back to a window, at the bounds asked for with the frame.
+    SetWindowLongA(Full, GWL_STYLE, static_cast<LONG>(0x2CA0000 | WS_VISIBLE));
+    SetWindowPos(Full, nullptr, 100, 100, 800, 600, SWP_NOZORDER | SWP_FRAMECHANGED);
+    DrainScreen();
+    int X = 0;
+    int Y = 0;
+    Check(!ScreenProbe::IsFullscreen(IdOf(Full)) &&
+              ScreenProbe::WindowSize(IdOf(Full), &Width, &Height) && Width == 800 &&
+              Height == 600 && ScreenProbe::WindowPosition(IdOf(Full), &X, &Y) && X == 100 &&
+              Y == 100,
+          "leaving fullscreen takes the windowed bounds asked for");
+    DestroyWindow(Full);
+    HWND const Sizable = CreateWindowExA(0, "ScreenClass", "Sizable", WS_OVERLAPPEDWINDOW, 0, 0,
+                                         320, 240, nullptr, nullptr, nullptr, nullptr);
+    Check(Sizable != nullptr && ScreenProbe::IsResizable(IdOf(Sizable)),
+          "a window with a sizing border can be resized and maximized");
+    DestroyWindow(Sizable);
+
     GSeen.Messages.clear();
-    Check(DestroyWindow(Window) && Saw(WM_DESTROY) && !IsWindow(Window),
+    GScreenSeen.clear();
+    Check(DestroyWindow(Window) && FindScreen(WM_DESTROY) != nullptr && !IsWindow(Window),
           "DestroyWindow closes the screen's window");
     return 0;
+#endif
 }
 } // namespace
 

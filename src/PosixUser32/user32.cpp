@@ -37,6 +37,7 @@
 #include <cwchar>
 #include <cwctype>
 #include <deque>
+#include <limits>
 #include <map>
 #include <mutex>
 #include <string>
@@ -118,7 +119,7 @@ struct FState
     const FUser32Backend* Backend = nullptr;
     bool bBackendLookedFor = false;
     std::thread::id ScreenThread;
-    bool bPumping = false;
+    HWND Grab = nullptr; // the screen window ClipCursor keeps the cursor in
     PosixDirectInput::FMouseQueue Mouse;
 };
 
@@ -396,32 +397,48 @@ HWND WindowOfId(std::uint32_t Id)
     return reinterpret_cast<HWND>(static_cast<std::uintptr_t>(Id));
 }
 
-// The desktop's size: the display's with a backend.
+// The desktop's size: the display's once the backend is loaded (by the first top-level window),
+// so that asking does not load SDL in a program that makes no window.
 POINT DesktopSize()
 {
     int Width = 0;
     int Height = 0;
     int Bits = 0;
     int Hz = 0;
-    if (const FUser32Backend* const Screen = Backend())
+    if (const FUser32Backend* const Screen = LoadedBackend())
         if (Screen->DisplayMode(-1, &Width, &Height, &Bits, &Hz))
             return {Width, Height};
     return {kHeadlessWidth, kHeadlessHeight};
 }
 
-// A frame (a caption), and fullscreen: a popup that covers the desktop, as the client lays out
-// its fullscreen window (ApplyGameWindowLayout).
+bool IsFramed(DWORD Style)
+{
+    return (Style & WS_CAPTION) == WS_CAPTION;
+}
+
+// A sizing border or a maximize box: the screen's window can be resized and maximized.
+bool IsResizable(DWORD Style)
+{
+    return (Style & (WS_THICKFRAME | WS_MAXIMIZEBOX)) != 0;
+}
+
+// Fullscreen: a popup without a frame that covers the desktop, as the client lays out its
+// fullscreen window (ApplyGameWindowLayout).
+bool CoversDesktop(DWORD Style, const RECT& Rect)
+{
+    POINT const Desktop = DesktopSize();
+    return !IsFramed(Style) && (Style & WS_POPUP) != 0 && Rect.left <= 0 && Rect.top <= 0 &&
+           Rect.right >= Desktop.x && Rect.bottom >= Desktop.y;
+}
+
+// The frame (a caption), whether it can be resized, and fullscreen.
 void ApplyFrame(HWND Window, DWORD Style, const RECT& Rect)
 {
     const FUser32Backend* const Screen = LoadedBackend();
     if (Screen == nullptr || !IsScreenWindow(Window))
         return;
-    bool const bFramed = (Style & WS_CAPTION) == WS_CAPTION;
-    POINT const Desktop = DesktopSize();
-    bool const bFullscreen = !bFramed && (Style & WS_POPUP) != 0 && Rect.left <= 0 &&
-                             Rect.top <= 0 && Rect.right - Rect.left >= Desktop.x &&
-                             Rect.bottom - Rect.top >= Desktop.y;
-    Screen->SetFrame(ScreenId(Window), bFramed, bFullscreen);
+    Screen->SetFrame(ScreenId(Window), IsFramed(Style), IsResizable(Style),
+                     CoversDesktop(Style, Rect));
 }
 
 // US-layout set-1 scan codes and key names, for MapVirtualKeyA and GetKeyNameTextW.
@@ -589,6 +606,10 @@ HWND CreateWindowExA(DWORD ExStyle, LPCSTR ClassName, LPCSTR Title, DWORD Style,
         Record.ExStyle = ExStyle;
         Record.bEnabled = (Style & WS_DISABLED) == 0;
         Record.Owner = ThreadSerial();
+        // A top-level window gets a screen when there is a backend (looked for now, so that
+        // its default size is the display's); its id is the HWND.
+        bool const bTopLevel = Parent == nullptr && (Style & WS_CHILD) == 0;
+        const FUser32Backend* const Screen = bTopLevel ? Backend() : nullptr;
         if (X == CW_USEDEFAULT)
             X = Y = 0;
         if (Width == CW_USEDEFAULT)
@@ -602,21 +623,28 @@ HWND CreateWindowExA(DWORD ExStyle, LPCSTR ClassName, LPCSTR Title, DWORD Style,
         if (Title != nullptr)
             for (const char* Cursor = Title; *Cursor != 0; ++Cursor)
                 Record.Text += static_cast<wchar_t>(static_cast<unsigned char>(*Cursor));
-        // A top-level window gets a screen when there is a backend; its id is the HWND.
+        // The title as SetWindowTextA gives it to the screen: its bytes as characters, in UTF-8.
         std::uint32_t ScreenWindow = 0;
-        const FUser32Backend* const Screen =
-            Parent == nullptr && (Style & WS_CHILD) == 0 ? Backend() : nullptr;
         if (Screen != nullptr &&
-            Screen->CreateWindow(Title, X, Y, Width, Height, (Style & WS_CAPTION) == WS_CAPTION,
-                                 (Style & WS_VISIBLE) != 0, &ScreenWindow))
+            Screen->CreateWindow(Narrow(Record.Text.c_str()).c_str(), X, Y, Width, Height,
+                                 IsFramed(Style), IsResizable(Style), (Style & WS_VISIBLE) != 0,
+                                 &ScreenWindow))
         {
             Window = WindowOfId(ScreenWindow);
             if (State().ScreenThread == std::thread::id())
+            {
                 State().ScreenThread = std::this_thread::get_id();
+                // The first screen: the cursor as ShowCursor left it before there was one.
+                if (State().CursorCount < 0)
+                    Screen->ShowCursor(false);
+            }
         }
         else
             Window = reinterpret_cast<HWND>(State().NextWindow++);
         State().Windows.emplace(Key(Window), Record);
+        // A popup made over the whole desktop is fullscreen from the start.
+        if (Screen != nullptr && CoversDesktop(Style, Record.Rect))
+            ApplyFrame(Window, Style, Record.Rect);
     }
 
     // The class name as the caller passed it (a string or an atom), as CREATESTRUCT carries it.
@@ -672,6 +700,8 @@ BOOL DestroyWindow(HWND Window)
         LoadedBackend()->DestroyWindow(ScreenId(Window));
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
     FState& S = State();
+    if (S.Grab == Window)
+        S.Grab = nullptr;
     S.Windows.erase(Key(Window));
     if (S.Focus == Window)
         S.Focus = nullptr;
@@ -737,8 +767,14 @@ BOOL ShowWindow(HWND Window, int Command)
             Record->Style |= WS_MAXIMIZE;
         Procedure = Record->Procedure;
     }
-    if (IsScreenWindow(Window))
-        LoadedBackend()->Show(ScreenId(Window), Command);
+    // A maximize the screen refuses (a window that cannot be resized) leaves it as it was.
+    if (IsScreenWindow(Window) && !LoadedBackend()->Show(ScreenId(Window), Command) &&
+        Command == SW_MAXIMIZE)
+    {
+        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+        if (FWindow* const Record = Find(Window))
+            Record->Style &= ~WS_MAXIMIZE;
+    }
     if (bWasVisible != bVisible)
         Procedure(Window, WM_SHOWWINDOW, bVisible ? TRUE : FALSE, 0);
     return bWasVisible ? TRUE : FALSE;
@@ -1096,7 +1132,10 @@ BOOL EnumDisplaySettingsA(LPCSTR, DWORD Mode, DEVMODEA* Settings)
     int Bits = 32;
     int Hz = 60;
     bool const bCurrent = Mode == ENUM_CURRENT_SETTINGS || Mode == ENUM_REGISTRY_SETTINGS;
-    if (const FUser32Backend* const Screen = Backend())
+    if (!bCurrent && Mode > static_cast<DWORD>(std::numeric_limits<int>::max()))
+        return FALSE;
+    // The display's modes once the backend is loaded (by the first top-level window).
+    if (const FUser32Backend* const Screen = LoadedBackend())
     {
         if (!Screen->DisplayMode(bCurrent ? -1 : static_cast<int>(Mode), &Width, &Height, &Bits,
                                  &Hz))
@@ -1218,24 +1257,66 @@ void SinkSend(std::uint32_t Window, unsigned Message, std::uintptr_t WParam, std
 // previous state and the transition. Alt, F10 and keys with Alt held are system keys. Enter,
 // Backspace, Tab and Esc also give WM_CHAR, as TranslateMessage makes them (typed text comes as
 // its own events).
-void SinkKey(std::uint32_t Window, unsigned VirtualKey, bool bExtended, bool bDown, bool bRepeat)
+void SetKeyState(SHORT& Key, bool bDown, bool bRepeat)
 {
-    if (VirtualKey == 0 || VirtualKey > 0xFF)
+    SHORT const Toggle = static_cast<SHORT>(Key & 1);
+    if (bDown)
+        Key = static_cast<SHORT>(0x8000 | (bRepeat ? Toggle : Toggle ^ 1));
+    else
+        Key = Toggle;
+}
+
+// The generic key of a modifier by side (VK_LSHIFT -> VK_SHIFT), and its other side; 0 for
+// other keys.
+UINT GenericModifier(UINT VirtualKey, UINT* OtherSide)
+{
+    switch (VirtualKey)
+    {
+    case VK_LSHIFT:
+    case VK_RSHIFT:
+        *OtherSide = VirtualKey == VK_LSHIFT ? VK_RSHIFT : VK_LSHIFT;
+        return VK_SHIFT;
+    case VK_LCONTROL:
+    case VK_RCONTROL:
+        *OtherSide = VirtualKey == VK_LCONTROL ? VK_RCONTROL : VK_LCONTROL;
+        return VK_CONTROL;
+    case VK_LMENU:
+    case VK_RMENU:
+        *OtherSide = VirtualKey == VK_LMENU ? VK_RMENU : VK_LMENU;
+        return VK_MENU;
+    default:
+        return 0;
+    }
+}
+
+void SinkKey(std::uint32_t Window, unsigned PhysicalKey, bool bExtended, bool bDown, bool bRepeat)
+{
+    if (PhysicalKey == 0 || PhysicalKey > 0xFF)
         return;
+    // A modifier keeps each side's state, and the generic key is down while either side is;
+    // its messages carry the generic key, with the side's scan code.
+    UINT OtherSide = 0;
+    UINT const Generic = GenericModifier(PhysicalKey, &OtherSide);
+    UINT const VirtualKey = Generic != 0 ? Generic : PhysicalKey;
     bool bWasDown = false;
     bool bAlt = false;
     {
         std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-        SHORT& Key = State().Keys[VirtualKey];
-        bWasDown = (Key & 0x8000) != 0;
-        SHORT const Toggle = static_cast<SHORT>(Key & 1);
-        if (bDown)
-            Key = static_cast<SHORT>(0x8000 | (bRepeat ? Toggle : Toggle ^ 1));
+        SHORT* const Keys = State().Keys;
+        bWasDown = (Keys[VirtualKey] & 0x8000) != 0;
+        if (Generic != 0)
+        {
+            SetKeyState(Keys[PhysicalKey], bDown, bRepeat);
+            bool const bEitherDown = bDown || (Keys[OtherSide] & 0x8000) != 0;
+            SHORT const Toggle = static_cast<SHORT>(Keys[Generic] & 1);
+            Keys[Generic] = static_cast<SHORT>((bEitherDown ? 0x8000 : 0) |
+                                               (bDown && !bRepeat ? Toggle ^ 1 : Toggle));
+        }
         else
-            Key = Toggle;
-        bAlt = (State().Keys[VK_MENU] & 0x8000) != 0;
+            SetKeyState(Keys[VirtualKey], bDown, bRepeat);
+        bAlt = (Keys[VK_MENU] & 0x8000) != 0;
     }
-    UINT const Scan = MapVirtualKeyA(VirtualKey, MAPVK_VK_TO_VSC);
+    UINT const Scan = MapVirtualKeyA(PhysicalKey, MAPVK_VK_TO_VSC);
     std::uint32_t LParam = 1u | ((Scan & 0xFFu) << 16);
     if (bExtended)
         LParam |= 1u << 24;
@@ -1323,22 +1404,20 @@ void SinkActivate(std::uint32_t Window, bool bActive)
 const FUser32Sink GSink = {&SinkPost,      &SinkSend,     &SinkKey,    &SinkChar,
                            &SinkMouseMove, &SinkMouseRaw, &SinkBounds, &SinkActivate};
 
-// Takes the screen's events, on the thread that made the screen's windows, once at a time (a
-// window procedure the sink calls may pump again).
+// Takes the screen's events, on the thread that made the screen's windows. A window procedure
+// the sink calls may pump again (a nested message loop): the backend then goes on with the
+// events after the one being handled.
 void PumpScreen()
 {
     const FUser32Backend* Screen = nullptr;
     {
         std::lock_guard<std::recursive_mutex> Guard(State().Lock);
         FState& S = State();
-        if (S.Backend == nullptr || S.bPumping || S.ScreenThread != std::this_thread::get_id())
+        if (S.Backend == nullptr || S.ScreenThread != std::this_thread::get_id())
             return;
-        S.bPumping = true;
         Screen = S.Backend;
     }
     Screen->Pump(&GSink);
-    std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-    State().bPumping = false;
 }
 
 // Whether this thread takes the screen's events.
@@ -1362,12 +1441,14 @@ BOOL PeekMessageA(LPMSG Message, HWND Window, UINT First, UINT Last, UINT Remove
 BOOL GetMessageA(LPMSG Message, HWND Window, UINT First, UINT Last)
 {
     MSG Taken;
+    // A window filter whose window is gone (destroyed while this waits, by the screen's events
+    // or another thread): -1, as for a window that never was.
+    bool const bWindowFilter =
+        Window != nullptr && Window != reinterpret_cast<HWND>(static_cast<std::intptr_t>(-1));
+    auto const Gone = [&] { return bWindowFilter && Find(Window) == nullptr; };
     {
         std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-        if (Message == nullptr ||
-            (Window != nullptr &&
-             Window != reinterpret_cast<HWND>(static_cast<std::intptr_t>(-1)) &&
-             Find(Window) == nullptr))
+        if (Message == nullptr || Gone())
             return -1;
     }
     for (;;)
@@ -1377,10 +1458,19 @@ BOOL GetMessageA(LPMSG Message, HWND Window, UINT First, UINT Last)
             std::unique_lock<std::recursive_mutex> Guard(State().Lock);
             if (TakeMessage(&Taken, Window, First, Last, true))
                 break;
+            if (Gone())
+                return -1;
             if (!OnScreenThread())
             {
+                bool bTaken = false;
                 State().Posted.wait(Guard,
-                                    [&] { return TakeMessage(&Taken, Window, First, Last, true); });
+                                    [&]
+                                    {
+                                        bTaken = TakeMessage(&Taken, Window, First, Last, true);
+                                        return bTaken || Gone();
+                                    });
+                if (!bTaken)
+                    return -1;
                 break;
             }
         }
@@ -1531,28 +1621,38 @@ BOOL SetCursorPos(int X, int Y)
 {
     POINT const Desktop = DesktopSize();
     HWND Active = nullptr;
+    POINT Client = {};
     {
         std::lock_guard<std::recursive_mutex> Guard(State().Lock);
         State().CursorPos = {std::clamp(X, 0, Desktop.x - 1), std::clamp(Y, 0, Desktop.y - 1)};
+        Client = State().CursorPos;
         Active = State().Active;
     }
-    POINT Client = {X, Y};
     if (Active != nullptr && IsScreenWindow(Active) && ScreenToClient(Active, &Client))
         LoadedBackend()->WarpMouse(ScreenId(Active), Client.x, Client.y);
     return TRUE;
 }
 
 // A rectangle keeps the cursor in the active window (the screen has no finer clip); nullptr
-// frees it.
+// frees it from the window that has it, active or not.
 BOOL ClipCursor(const RECT* Rect)
 {
-    HWND Active = nullptr;
+    HWND Release = nullptr;
+    HWND Clip = nullptr;
     {
         std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-        Active = State().Active;
+        FState& S = State();
+        HWND const Active = S.Active;
+        if (Rect != nullptr && Active != nullptr && IsScreenWindow(Active))
+            Clip = Active;
+        if (S.Grab != nullptr && S.Grab != Clip)
+            Release = S.Grab;
+        S.Grab = Clip;
     }
-    if (Active != nullptr && IsScreenWindow(Active))
-        LoadedBackend()->ClipCursor(ScreenId(Active), Rect != nullptr);
+    if (Release != nullptr && IsScreenWindow(Release))
+        LoadedBackend()->ClipCursor(ScreenId(Release), false);
+    if (Clip != nullptr)
+        LoadedBackend()->ClipCursor(ScreenId(Clip), true);
     return TRUE;
 }
 

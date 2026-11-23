@@ -27,8 +27,9 @@ struct FUser32Sink
                  std::intptr_t LParam);
     void (*Send)(std::uint32_t Window, unsigned Message, std::uintptr_t WParam,
                  std::intptr_t LParam);
-    // A key went down or up: its virtual key, whether it is an extended key, and whether it is
-    // a repeat. user32 keeps the key state and makes WM_(SYS)KEYDOWN / WM_(SYS)KEYUP.
+    // A key went down or up: its virtual key (the modifiers by side: VK_LSHIFT, VK_RCONTROL,
+    // ...), whether it is an extended key, and whether it is a repeat. user32 keeps the key
+    // state and makes WM_(SYS)KEYDOWN / WM_(SYS)KEYUP.
     void (*Key)(std::uint32_t Window, unsigned VirtualKey, bool bExtended, bool bDown,
                 bool bRepeat);
     // Typed text: one UTF-32 character, which user32 posts as WM_CHAR.
@@ -48,18 +49,24 @@ struct FUser32Backend
     // kUser32BackendVersion: user32 refuses a backend of another version.
     int Version;
     // A top-level window: its title (UTF-8), position and client size, whether it has a frame
-    // (a caption) and whether it starts shown. Its id, never 0, or false.
+    // (a caption), whether it can be resized and maximized (a sizing border or a maximize box)
+    // and whether it starts shown. Its id, never 0, or false.
     bool (*CreateWindow)(const char* Title, int X, int Y, int Width, int Height, bool bFramed,
-                         bool bVisible, std::uint32_t* OutId);
+                         bool bResizable, bool bVisible, std::uint32_t* OutId);
     void (*DestroyWindow)(std::uint32_t Window);
-    // Position (desktop) and client size.
+    // Position (desktop) and client size; a fullscreen window takes them when it leaves
+    // fullscreen.
     void (*SetBounds)(std::uint32_t Window, int X, int Y, int Width, int Height);
-    // The frame, and whether the window covers the display as its fullscreen window.
-    void (*SetFrame)(std::uint32_t Window, bool bFramed, bool bFullscreen);
-    // SW_ commands.
-    void (*Show)(std::uint32_t Window, int Command);
+    // The frame, whether it can be resized, and whether the window covers the display as its
+    // fullscreen window.
+    void (*SetFrame)(std::uint32_t Window, bool bFramed, bool bResizable, bool bFullscreen);
+    // SW_ commands; false when the screen refuses one (maximizing a window that cannot be
+    // resized).
+    bool (*Show)(std::uint32_t Window, int Command);
     void (*SetTitle)(std::uint32_t Window, const char* Title);
-    // Takes the screen's pending events, through Sink.
+    // Takes the screen's pending events, through Sink. A window procedure the sink calls may
+    // pump again (a nested message loop): that call goes on with the events after the one being
+    // handled.
     void (*Pump)(const FUser32Sink* Sink);
     // Waits up to Milliseconds for an event.
     void (*Wait)(int Milliseconds);

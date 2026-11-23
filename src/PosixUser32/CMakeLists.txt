@@ -12,8 +12,9 @@ fl_add_module(PosixUser32 DLL PORT OUTPUT_NAME user32
 # user32 loads it when the first top-level window is made, so it is not a link dependency of
 # anything: built when SDL3 is found (Homebrew's sdl3 on macOS, a system or source build on
 # Linux); without it windows stay records.
-find_package(SDL3 CONFIG QUIET)
-if(TARGET SDL3::SDL3-shared)
+# SDL 3.2 or later, as RPGPU takes it (the root CMakeLists.txt).
+find_package(SDL3 3.2 CONFIG QUIET COMPONENTS SDL3-shared)
+if(SDL3_FOUND AND TARGET SDL3::SDL3-shared)
   fl_add_module(PosixUser32Sdl DLL PORT PORTABLE OUTPUT_NAME user32_sdl
     SOURCES
       user32_sdl.cpp
