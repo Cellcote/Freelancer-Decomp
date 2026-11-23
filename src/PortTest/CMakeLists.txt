@@ -41,4 +41,11 @@ target_compile_options(module_tests PRIVATE -include ${CMAKE_SOURCE_DIR}/src/inc
 # Loaded at run time, by name, as the game loads them: built first, not linked.
 add_dependencies(module_tests dacom system x86math ReadFile zlib luaprofile Thorn EngBase
                  ximage Shading RendComp flmaterials alchemy Deformable2 DALib Common Server Content arena_probe_a arena_probe_b)
+# RPGPU when the build has it (FreelancerRpGpu, SDL3): module_tests loads it and, with SDL3 linked
+# as the client links it (one shared SDL), hands it an SDL window.
+if(TARGET RPGPU)
+  add_dependencies(module_tests RPGPU)
+  target_compile_definitions(module_tests PRIVATE FL_TEST_RPGPU)
+  target_link_libraries(module_tests PRIVATE SDL3::SDL3-shared)
+endif()
 add_test(NAME module_tests COMMAND module_tests $<TARGET_FILE_DIR:dacom>)

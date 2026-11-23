@@ -3,9 +3,10 @@
 # static initialisation.
 
 # RPGPU: the port-only SDL3 + SDL_GPU render pipeline (docs/re/rpgpu.md), built with
-# FreelancerRpGpu=1 (on by default on x64). SDL3 comes from the shared vcpkg manifest,
-# src/vcpkg.json (feature rpgpu), which the root CMakeLists.txt installs. Off, or without vcpkg,
-# RPGPU.dll is not built; nothing else depends on it.
+# FreelancerRpGpu=1 (on by default on x64, and on Linux and macOS when SDL3 is found). On Windows
+# SDL3 comes from the shared vcpkg manifest, src/vcpkg.json (feature rpgpu), which the root
+# CMakeLists.txt installs; elsewhere from the system. Off, or without vcpkg, RPGPU.dll is not
+# built; nothing else depends on it.
 if(NOT FreelancerRpGpu)
   return()
 endif()
@@ -31,6 +32,14 @@ fl_defines(RPGPU RP_PORT_TYPES NOMINMAX)
 fl_link(RPGPU
   LIBS dacom.lib TexConvert.lib
   REFERENCES TexConvert dacom)
+
+# Off Windows: the system's SDL3 (the root CMakeLists.txt found it), shared, so that RPGPU and the
+# client's window layer use one SDL: the client hands RPGPU an SDL window id as its HWND.
+if(NOT FL_WINDOWS)
+  find_package(SDL3 3.2 REQUIRED CONFIG COMPONENTS SDL3-shared)
+  target_link_libraries(RPGPU PRIVATE SDL3::SDL3-shared)
+  return()
+endif()
 
 # SDL3 after the module's own libraries, where vcpkg's MSBuild integration put it.
 fl_vcpkg_package(RPGPU SDL3 SDL3::SDL3)

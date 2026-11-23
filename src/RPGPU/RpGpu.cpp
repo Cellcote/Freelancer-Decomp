@@ -73,7 +73,8 @@ namespace
         PutU16(Header + 26, 1);              // planes
         PutU16(Header + 28, 24);             // bits per pixel
         PutU32(Header + 34, ImageBytes);
-        std::FILE* const File = std::fopen(FileName, "wb");
+        // Unqualified: posix/msvc_crt.h makes fopen resolve Windows paths as the platform layer does.
+        std::FILE* const File = fopen(FileName, "wb");
         if (File == nullptr)
             return false;
         bool bOk = std::fwrite(Header, sizeof(Header), 1, File) == 1;
@@ -843,3 +844,7 @@ BOOL APIENTRY DllMain(HMODULE Module, DWORD Reason, LPVOID /*Reserved*/)
     G_Factory->Release();
     return TRUE;
 }
+
+#if !defined(_WIN32)
+FL_POSIX_DLLMAIN(DllMain) // PORT(macOS): run as the module loads (posix/windows.h)
+#endif

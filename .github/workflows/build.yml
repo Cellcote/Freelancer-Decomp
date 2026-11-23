@@ -638,11 +638,15 @@ jobs:
 
   # The portable modules (cmake/Freelancer.cmake: the ones that use no Windows API, DPNet and
   # its tests among them), built with the root CMake build on Linux and macOS. Debug with
-  # AddressSanitizer and UndefinedBehaviorSanitizer, and Release.
+  # AddressSanitizer and UndefinedBehaviorSanitizer, and Release. RPGPU is required here
+  # (FreelancerRpGpu=1: a missing SDL3 fails the configure instead of skipping RPGPU).
   portable:
     name: Portable modules (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
+    env:
+      # RPGPU's SDL3 on Linux (built below); macOS takes Homebrew's.
+      SDL3_VERSION: 3.4.20
     strategy:
       fail-fast: false
       matrix:
@@ -663,21 +667,47 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Ninja
+      - name: Install Ninja (and SDL3 on macOS)
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
             sudo apt-get update -qq && sudo apt-get install -y -qq ninja-build
           else
-            brew install ninja
+            brew install ninja sdl3
           fi
+
+      # SDL3 for RPGPU (src/RPGPU): Ubuntu 24.04 has no SDL3 package, so it is built from source
+      # once, shared, without video back ends (RPGPU's tests need none: module_tests checks the
+      # SDL backend only where SDL has video and a GPU), and cached per runner image and version.
+      # One build serves GCC and Clang: SDL's interface is C.
+      - name: SDL3 (Linux, cached)
+        if: runner.os == 'Linux'
+        id: sdl3-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/sdl3
+          key: sdl3-${{ env.SDL3_VERSION }}-${{ runner.os }}-${{ runner.arch }}-${{ matrix.os }}
+
+      - name: Build SDL3 (Linux)
+        if: runner.os == 'Linux' && steps.sdl3-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "release-$SDL3_VERSION" https://github.com/libsdl-org/SDL.git "$RUNNER_TEMP/SDL"
+          cmake -S "$RUNNER_TEMP/SDL" -B "$RUNNER_TEMP/SDL/build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$HOME/sdl3" -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST_LIBRARY=OFF \
+            -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF -DSDL_X11=OFF -DSDL_WAYLAND=OFF -DSDL_KMSDRM=OFF
+          cmake --build "$RUNNER_TEMP/SDL/build"
+          cmake --install "$RUNNER_TEMP/SDL/build"
+
+      - name: SDL3 on the CMake search path (Linux)
+        if: runner.os == 'Linux'
+        run: echo "CMAKE_PREFIX_PATH=$HOME/sdl3" >> "$GITHUB_ENV"
 
       - name: Debug, ASan + UBSan
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
         run: |
-          cmake --preset portable-asan
+          cmake --preset portable-asan -DFreelancerRpGpu=1
           cmake --build --preset portable-asan
           ctest --preset portable-asan
 
@@ -686,7 +716,7 @@ jobs:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
         run: |
-          cmake --preset portable
+          cmake --preset portable -DFreelancerRpGpu=1
           cmake --build --preset portable
           ctest --preset portable
 

@@ -182,12 +182,25 @@ bool FRpGpuSdlBackend::Create(RpWindowHandle Hwnd, std::uint32_t Width, std::uin
             bSdlVideo_ = true;
         }
 
+#if defined(_WIN32)
         // The client's window, not a new one (SDL_PROP_WINDOW_CREATE_WIN32_HWND_POINTER).
         const SDL_PropertiesID Props = SDL_CreateProperties();
         SDL_SetPointerProperty(Props, SDL_PROP_WINDOW_CREATE_WIN32_HWND_POINTER, Hwnd);
         std::unique_ptr<SDL_Window, decltype(&SDL_DestroyWindow)> Window(
             SDL_CreateWindowWithProperties(Props), &SDL_DestroyWindow);
         SDL_DestroyProperties(Props);
+#else
+        // PORT(macOS): off Windows the client's window is an SDL window, made by the client
+        // with the same (shared) SDL, and its HWND is that window's id (docs/re/rpgpu.md,
+        // "The window"). The client owns it: RPGPU claims it for the device and never
+        // destroys it.
+        struct FKeepWindow
+        {
+            void operator()(SDL_Window*) const {}
+        };
+        std::unique_ptr<SDL_Window, FKeepWindow> Window(
+            SDL_GetWindowFromID(static_cast<SDL_WindowID>(reinterpret_cast<std::uintptr_t>(Hwnd))));
+#endif
         if (Window == nullptr)
             return false;
 
@@ -288,8 +301,11 @@ void FRpGpuSdlBackend::Destroy()
     }
     if (Window_ != nullptr)
     {
+#if defined(_WIN32)
         // A window made from an existing HWND: SDL lets go of it and leaves it to the client.
         SDL_DestroyWindow(Window_);
+#endif
+        // Off Windows it is the client's own SDL window: released from the device above, kept.
         Window_ = nullptr;
     }
     // After an abandoned device the video subsystem stays up: quitting it would tear down the
