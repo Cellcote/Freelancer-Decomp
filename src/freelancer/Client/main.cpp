@@ -514,6 +514,14 @@ namespace
     // counterpart for yet is named in place.
     void __cdecl ClientAtExitTeardown()
     {
+#if !defined(_WIN32)
+        // PORT(macOS): main runs this once WinMain returns (see there); the atexit call that
+        // follows finds it done.
+        static bool bTornDown = false;
+        if (bTornDown)
+            return;
+        bTornDown = true;
+#endif
         CGunWrapper::Shutdown();
         // 0x005b2195: FUN_005791c0 -- delete the loading screen's Image (DAT_0067c3bc) and its
         // progress bar tree (DAT_0067c3c0), set DAT_0067c3db.
@@ -850,7 +858,14 @@ int main(int Argc, char** Argv)
         if (bQuote)
             CommandLine += '"';
     }
-    return WinMain(static_cast<HINSTANCE>(Platform::ModuleFind(nullptr)), nullptr, &CommandLine[0],
-                   SW_SHOWNORMAL);
+    int const ExitCode = WinMain(static_cast<HINSTANCE>(Platform::ModuleFind(nullptr)), nullptr,
+                                 &CommandLine[0], SW_SHOWNORMAL);
+    // On Windows the atexit teardown runs before the DLLs' static objects are destroyed (at
+    // their detach, after the program's atexit calls). Here exit() destroys the statics of the
+    // modules DACOM loaded (dlopen) before it reaches a handler registered earlier, and the
+    // teardown then frees engine instances into destroyed maps (FLAppearance's). So it runs
+    // here, while every module is whole.
+    ClientAtExitTeardown();
+    return ExitCode;
 }
 #endif
