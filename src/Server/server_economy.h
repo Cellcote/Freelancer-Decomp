@@ -20,7 +20,7 @@
 // ordered channel). A refused request changes nothing, and the server sends the client its
 // real cash or equipment back, so the client's screens show the truth again.
 
-#include "common_server_playerdb.h"
+#include "server_playerdata.h"
 
 struct SGFGoodBuyInfo;
 struct SGFGoodSellInfo;
