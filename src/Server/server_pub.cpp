@@ -550,12 +550,26 @@ SERVER_API int __cdecl ReportFreeTerminal(unsigned int P1, int P2) {
 //             LoadLibraryA(full); on NULL FDUMP(0x100002, "...failed to load mission
 //             DLL '%s'", dlls.cpp, 0x1de, full); return the module.
 // DAT_06d8f654 is the [Initial * DLLs] `path` (GDllPath, IServerImpl.cpp).
+// PORT(macOS): off Windows a path from '/' is absolute too, and is taken as it is: Content's
+// StoryLauncher hands Server its own module path ("/.../Content.dylib"), which _makepath would
+// otherwise join under GDllPath. On Windows the test is retail's.
+static bool IsAbsoluteDllPath(const char* DllPath)
+{
+#if !defined(_WIN32)
+    if (DllPath[0] == '/')
+        return true;
+#endif
+    return DllPath[0] == '\\' || DllPath[1] == ':';
+}
 
 SERVER_API HINSTANCE __cdecl DLL_LoadLibrary(const char* DllPath) {
     char FullPath[0x104];
-    if (DllPath[0] == '\\' || DllPath[1] == ':') {
+    if (IsAbsoluteDllPath(DllPath))
+    {
         strcpy(FullPath, DllPath);
-    } else {
+    }
+    else
+    {
         char Joined[0x104];
         _makepath(Joined, nullptr, GDllPath, DllPath, nullptr);
         _fullpath(FullPath, Joined, 0x104);

@@ -3552,12 +3552,25 @@ unsigned int Server_ControllerCreate(const char* dll_path, const char* instance_
     Platform::ModulePath(node->ModuleHandle, ModuleName, 0x104);
     FControllerCreateInstanceFn CreateInstance =
         (FControllerCreateInstanceFn)Platform::ModuleSymbol(node->ModuleHandle, "CreateInstance");
+#if defined(_WIN32)
     node->InterfacePtr = CreateInstance(flid, instance_name, parms);
+#else
+    // PORT(macOS): retail calls GetProcAddress's result untested, so a DLL that failed to load
+    // (or exports no CreateInstance) faults on a null call. Off Windows that takes the
+    // not-created path below instead: the record is removed and 0 returned.
+    node->InterfacePtr =
+        CreateInstance != nullptr ? CreateInstance(flid, instance_name, parms) : nullptr;
+#endif
     if (node->InterfacePtr != nullptr) return flid;
 
     FControllerDestroyInstanceFn DestroyInstance =
         (FControllerDestroyInstanceFn)Platform::ModuleSymbol(node->ModuleHandle, "DestroyInstance");
+#if defined(_WIN32)
     DestroyInstance(node->InterfacePtr);
+#else
+    if (DestroyInstance != nullptr)
+        DestroyInstance(node->InterfacePtr);
+#endif
     Platform::ModulePath(node->ModuleHandle, ModuleName, 0x104);
     Platform::ModuleFree(node->ModuleHandle);
     ListRemove(node);

@@ -804,6 +804,25 @@ int main(int argc, char** argv)
     Check(PhantomDestroy != nullptr && PhantomDestroy(nullptr) == -2,
           "Server's pub::Phantom::Destroy");
 
+    // pub::DLL_LoadLibrary takes a path from '/' as it is (Content's StoryLauncher hands it its own
+    // module path), and gives nullptr for a file that is not there.
+    {
+        auto const LoadLibraryFn = reinterpret_cast<Platform::Module (*)(const char*)>(
+            Platform::ModuleSymbol(Server, "_ZN3pub15DLL_LoadLibraryEPKc"));
+        Check(LoadLibraryFn != nullptr, "Server exports pub::DLL_LoadLibrary");
+        char ServerPath[0x400] = {};
+        Platform::ModulePath(Server, ServerPath, sizeof(ServerPath));
+        if (LoadLibraryFn != nullptr)
+        {
+            Platform::Module const Again = LoadLibraryFn(ServerPath);
+            Check(ServerPath[0] == '/' && Again == Server,
+                  "pub::DLL_LoadLibrary loads an absolute POSIX path as it is");
+            Platform::ModuleFree(Again);
+            Check(LoadLibraryFn("/nonexistent/Missing.dll") == nullptr,
+                  "pub::DLL_LoadLibrary gives nullptr for a missing file");
+        }
+    }
+
     // ModulePath resolves a loaded module's handle to its file (GetModuleFileNameA), as
     // Content's StoryLauncher, rpclocal's Startup and DALib's DACOM.INI lookup ask of it.
     {
