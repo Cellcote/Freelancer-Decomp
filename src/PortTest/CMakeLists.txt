@@ -42,3 +42,14 @@ target_compile_options(module_tests PRIVATE -include ${CMAKE_SOURCE_DIR}/src/inc
 add_dependencies(module_tests dacom system x86math ReadFile zlib luaprofile Thorn EngBase
                  ximage Shading RendComp flmaterials alchemy Deformable2 DALib Common Server Content arena_probe_a arena_probe_b)
 add_test(NAME module_tests COMMAND module_tests $<TARGET_FILE_DIR:dacom>)
+
+# dalib_net_tests: DALib's CDPClient and CDPServer over loopback through DPNet (DPNetAdapter.cpp):
+# enumeration, connect, both ways, both ends disconnecting. It subclasses them, so it links DALib.
+add_executable(dalib_net_tests dalib_net_tests.cpp)
+target_compile_features(dalib_net_tests PRIVATE cxx_std_20)
+target_link_libraries(dalib_net_tests PRIVATE DALib dacom)
+target_include_directories(dalib_net_tests PRIVATE ${CMAKE_SOURCE_DIR}/src/include/posix
+                           ${CMAKE_SOURCE_DIR}/src/include)
+target_compile_options(dalib_net_tests PRIVATE -include ${CMAKE_SOURCE_DIR}/src/include/fl_layout.h
+                       "-D__declspec(x)=" -D__cdecl= -D__stdcall= -Wall -Wextra -Wno-unknown-pragmas)
+add_test(NAME dalib_net_tests COMMAND dalib_net_tests)

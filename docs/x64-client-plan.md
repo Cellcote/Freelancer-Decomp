@@ -339,7 +339,8 @@ without the Windows API. Milestones:
   values and vtable order, for DALib and DPNet's adapter, which are compiled from the same
   header), Winsock over BSD sockets (`posix/winsock2.h`, `ws2tcpip.h`, `mstcpip.h`) and the
   DirectSound interfaces the sound headers name (`posix/dsound.h`, declared only until M4).
-  `CDPClient`, the client's DirectPlay, has no DirectPlay class here yet.
+  `CDPClient`, the client's DirectPlay, connects through DPNet too (`DPNetAdapter::CreateClient`):
+  dalib_net_tests has it enumerate, join and talk to a `CDPServer` over loopback.
   Common keeps engine handles in retail's long / int fields: they go through
   `EngineIdFromHandle` / `EngineHandleFromId` (`engine/engbase.h`, LowArena), and an animation
   script id through `AnimScriptId` / `AnimScriptFromId` (a HandleValue id). Its stand-ins:
