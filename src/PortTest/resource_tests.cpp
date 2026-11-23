@@ -162,6 +162,10 @@ void TestFixture(std::string const& Fixture)
           "UTF-8 text and \\x escapes become UTF-16, one wchar_t a unit");
     Check(LoadStringW(Module, 31, Text, 64) == 11 && std::wcscmp(Text, L"Joined text") == 0,
           "adjacent strings are joined");
+    Check(LoadStringW(Module, 18, Text, 64) == 5 && std::wcscmp(Text, L"\u00a92001") == 0,
+          "\\x takes two digits in a narrow string");
+    Check(LoadStringW(Module, 33, Text, 64) == 3 && std::wcscmp(Text, L"Sum") == 0,
+          "an id 32+1 is 33");
 
     // The buffer: at most Size - 1 characters and a terminator.
     std::wmemset(Text, L'x', 64);
@@ -206,6 +210,7 @@ void TestFixture(std::string const& Fixture)
     Check(Resource(Module, MAKEINTRESOURCEA(24), MAKEINTRESOURCEA(5)).empty(), "a missing type");
     Check(FindResourceExA(Module, RT_STRING, "#", 0) == nullptr, "\"#\" names nothing");
     Check(FindResourceExA(Module, RT_STRING, "#99999", 0) == nullptr, "\"#99999\" names nothing");
+    Check(FindResourceExA(Module, RT_STRING, "#0", 0) == nullptr, "\"#0\" names nothing");
 
     // The executable and a made-up handle have no PE resources here.
     Check(FindResourceExA(nullptr, RT_STRING, MAKEINTRESOURCEA(1), 0) == nullptr,
@@ -258,6 +263,36 @@ void TestDamaged(std::string const& Fixture, std::string const& Scratch)
         }
     }
     unlink(Scratch.c_str());
+
+    // A string table block whose first length runs past the block: FindResource refuses it,
+    // since the game walks blocks without bounds.
+    {
+        HMODULE const Module = Platform::ResourceModuleLoad(Fixture.c_str());
+        HRSRC const Info = FindResourceExA(Module, RT_STRING, MAKEINTRESOURCEA(1), 0);
+        auto const* Block = static_cast<unsigned char const*>(LoadResource(Module, Info));
+        std::ptrdiff_t const At =
+            Block != nullptr ? Block - static_cast<unsigned char const*>(Module) : -1;
+        FreeLibrary(Module);
+        Check(At > 0, "the fixture's first string block is found");
+        if (At > 0)
+        {
+            std::vector<unsigned char> Bytes = Image;
+            Bytes[static_cast<std::size_t>(At)] = 0xFF;
+            Bytes[static_cast<std::size_t>(At) + 1] = 0xFF;
+            HMODULE const Damaged = WriteAll(Scratch, Bytes.data(), Bytes.size())
+                                        ? Platform::ResourceModuleLoad(Scratch.c_str())
+                                        : nullptr;
+            Check(Damaged != nullptr &&
+                      FindResourceExA(Damaged, RT_STRING, MAKEINTRESOURCEA(1), 0) == nullptr,
+                  "a string block whose lengths run past it is not found");
+            wchar_t Text[8] = L"x";
+            Check(Damaged != nullptr && LoadStringW(Damaged, 1, Text, 8) == 0 && Text[0] == L'x',
+                  "nor is its string");
+            if (Damaged != nullptr)
+                FreeLibrary(Damaged);
+            unlink(Scratch.c_str());
+        }
+    }
 
     Check(Platform::ResourceModuleLoad("/nonexistent/resources.dll") == nullptr,
           "a missing file does not load");

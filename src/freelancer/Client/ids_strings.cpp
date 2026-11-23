@@ -175,6 +175,12 @@ unsigned int GetIdsStringWWithRawFallback(unsigned int Ids, wchar_t* Dest, int D
     unsigned int RawWordCount = 0;
     if (!LoadRawTextResource(Module, Ids & 0xffffu, &RawData, &RawWordCount))
         return 0;
+#if !defined(_WIN32)
+    // PORT(macOS, Linux): a resource without even the leading word would make words - 1 wrap
+    // below and the copy read past it. Retail reads on; here such a resource gives nothing.
+    if (RawWordCount == 0)
+        return 0;
+#endif
 
     // 0x00434837..0x00434864: min(words - 1, count - 1), unsigned (JC keeps words - 1); the text
     // starts one word into the resource (ADD ESI,2); REP MOVS, then the terminator. Dest is

@@ -58,13 +58,13 @@ inline FName NameOf(char const* Value)
     }
     if (Value[0] == '#')
     {
-        // RtlCharToInteger's decimal digits; anything else names nothing (id 0 is not a valid
-        // "#" name either, as on Windows, which rejects it).
+        // RtlCharToInteger's decimal digits; anything else names nothing, and neither does
+        // "#0" (id 0 is not a valid "#" name, as on Windows, which rejects it).
         std::uint32_t Id = 0;
         char const* Digit = Value + 1;
         for (; *Digit >= '0' && *Digit <= '9' && Id <= 0xFFFF; ++Digit)
             Id = Id * 10 + static_cast<std::uint32_t>(*Digit - '0');
-        if (*Digit == 0 && Digit != Value + 1 && Id <= 0xFFFF)
+        if (*Digit == 0 && Digit != Value + 1 && Id != 0 && Id <= 0xFFFF)
         {
             Name.Id = static_cast<std::uint16_t>(Id);
             return Name;
@@ -292,15 +292,19 @@ inline bool Open(unsigned char const* Data, std::size_t Size, FImage& Image)
         if (Rva >= Address && Rva - Address < RawSize && Length > RawSize - (Rva - Address))
             Length = RawSize - (Rva - Address);
     }
+    // Nor more than the file holds after the root (a truncated image).
+    if (Length > Image.Size - Root)
+        Length = static_cast<std::uint32_t>(Image.Size - Root);
     Image.Root = Root;
     Image.RootSize = Length;
     return true;
 }
 
-// The data entry (IMAGE_RESOURCE_DATA_ENTRY) of a resource: its file offset, as Windows' HRSRC
-// points at it. False when there is no such resource.
-inline bool Find(FImage const& Image, FName const& Type, FName const& Name, std::uint16_t Language,
-                 std::uint32_t& DataEntry)
+namespace Detail
+{
+// The data entry of a resource, by the loader's lookup (see Find).
+inline bool FindEntry(FImage const& Image, FName const& Type, FName const& Name,
+                      std::uint16_t Language, std::uint32_t& DataEntry)
 {
     if (Image.Root == 0)
         return false;
@@ -350,6 +354,39 @@ inline bool Find(FImage const& Image, FName const& Type, FName const& Name, std:
     DataEntry = Image.Root + Target;
     return true;
 }
+} // namespace Detail
+
+inline bool Data(FImage const& Image, std::uint32_t DataEntry, std::uint32_t& Offset,
+                 std::uint32_t& Size);
+
+// The data entry (IMAGE_RESOURCE_DATA_ENTRY) of a resource: its file offset, as Windows' HRSRC
+// points at it. False when there is no such resource. A string table block (RT_STRING) is found
+// only when its 16 length-prefixed strings lie within its data, as every resource compiler
+// writes them: the game walks a block in place without bounds (GetIdsStringW, LoadIdsIntoRdl),
+// so a damaged one is refused here rather than read past.
+inline bool Find(FImage const& Image, FName const& Type, FName const& Name, std::uint16_t Language,
+                 std::uint32_t& DataEntry)
+{
+    if (!Detail::FindEntry(Image, Type, Name, Language, DataEntry))
+        return false;
+    if (Type.Text != nullptr || Type.Id != 6)
+        return true;
+    std::uint32_t Offset = 0, Size = 0;
+    if (!Data(Image, DataEntry, Offset, Size))
+        return false;
+    std::uint32_t const Units = Size / 2;
+    std::uint32_t Cursor = 0;
+    for (int Entry = 0; Entry < 16; ++Entry)
+    {
+        if (Cursor >= Units)
+            return false;
+        std::uint32_t const Length = Detail::Read16(Image, Offset + Cursor * 2);
+        if (Length > Units - Cursor - 1)
+            return false;
+        Cursor += Length + 1;
+    }
+    return true;
+}
 
 // A data entry's data: its file offset and size. False when the entry is not one of the
 // image's, its data is not all in the file, or it starts at an odd offset: the game reads
@@ -367,12 +404,15 @@ inline bool Data(FImage const& Image, std::uint32_t DataEntry, std::uint32_t& Of
 }
 
 // Calls Visit(DataOffset, Size) for every resource's data (type, name and language directories;
-// deeper trees are not resources and are skipped).
+// deeper trees are not resources and are skipped). A well-formed tree has at most RootSize / 8
+// entries, each visited once; the walk stops after that many, so a damaged tree whose entries
+// point back at their own directories cannot make it run longer.
 template <class TVisit>
 void ForEach(FImage const& Image, TVisit&& Visit)
 {
     if (Image.Root == 0)
         return;
+    std::uint32_t Budget = Image.RootSize / 8;
     auto Walk = [&](auto& Self, std::uint32_t Relative, int Level) -> void
     {
         std::uint32_t First = 0, Named = 0, Ids = 0;
@@ -380,6 +420,9 @@ void ForEach(FImage const& Image, TVisit&& Visit)
             return;
         for (std::uint32_t Index = 0; Index < Named + Ids; ++Index)
         {
+            if (Budget == 0)
+                return;
+            --Budget;
             std::uint32_t const Target = Detail::Read32(Image, First + Index * 8 + 4);
             if (Detail::IsDirectory(Target))
             {

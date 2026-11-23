@@ -172,9 +172,11 @@ def tokenize(text, path):
 
 def unquote(token, path, line):
     """The text of a string token, with rc.exe's escapes: "" for a quote, \\n \\t \\r \\a \\\\
-    \\" \\0, octal \\ooo and \\xhh (code points)."""
+    \\" \\0, octal \\ooo and \\x with two hex digits (four in an L"..." string), as code
+    points."""
     raw = token
-    if raw[0] in "Ll":
+    wide = raw[0] in "Ll"
+    if wide:
         raw = raw[1:]
     body = raw[1:-1]
     out = []
@@ -196,7 +198,8 @@ def unquote(token, path, line):
             out.append(simple[e])
         elif e in "xX":
             digits = ""
-            while i < len(body) and len(digits) < 4 and body[i] in "0123456789abcdefABCDEF":
+            while (i < len(body) and len(digits) < (4 if wide else 2) and
+                   body[i] in "0123456789abcdefABCDEF"):
                 digits += body[i]
                 i += 1
             if not digits:
@@ -216,18 +219,19 @@ def unquote(token, path, line):
 
 def number(word, path, line):
     """A numeric expression rc.exe accepts in these scripts: decimal or 0x hex, an L suffix, a
-    leading minus, and '|' / '+' between terms."""
-    total = 0
-    for part in word.replace("+", "|").split("|"):
+    leading minus, and '+' and '|' between terms ('+' binds tighter, as in C)."""
+    def term(part):
         part = part.strip()
-        if part.endswith(("L", "l")) and not part.lower().startswith("0x"):
-            part = part[:-1]
-        elif part.lower().startswith("0x") and part.endswith(("L", "l")):
+        if part.endswith(("L", "l")):
             part = part[:-1]
         try:
-            total |= int(part, 0) if part.lower().startswith("0x") else int(part, 10)
+            return int(part, 16) if part.lower().lstrip("-").startswith("0x") else int(part, 10)
         except ValueError:
             raise RcError("%s:%d: not a number: %s" % (path, line, word))
+
+    total = 0
+    for alternative in word.split("|"):
+        total |= sum(term(part) for part in alternative.split("+"))
     return total & 0xFFFF
 
 

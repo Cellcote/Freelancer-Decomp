@@ -12,8 +12,10 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
   1, 	"One"
   2, 	"Two ""quoted""\n"
   3, 	""
-  17, 	"Café ’ \x263A"
+  17, 	L"Café ’ \x263A"
+  18, 	"\xA92001"
   31, 	"Joined" " text"
+  32+1, 	"Sum"
 }
 
 STRINGTABLE
