@@ -11,9 +11,15 @@
 #include "dplay8.h"
 #include "dalib_net.h"
 #include "engine/engbase.h"
+#include "luaprofile.h"
 #include "platform.h"
 #include "readfile.h"
+#include "render/IRenderPipeline.h"
 #include "render/shading.h"
+
+#if defined(FL_TEST_RPGPU)
+#include <SDL3/SDL.h>
+#endif
 
 #include <intrin.h>
 #include <xmmintrin.h>
@@ -23,9 +29,11 @@
 #include <climits>
 #include <cstddef>
 #include <cstdio>
+#include <cstdint>
 #include <cstring>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -428,6 +436,223 @@ int __cdecl CountComponent(IDAComponent* Factory, const char* Name, void*, void*
 }
 }
 
+#if defined(FL_TEST_RPGPU)
+// RPGPU (docs/re/rpgpu.md): its component made as the client makes it, through dacom with RP8's
+// 0x14-byte aggregation record, reading the ini section that record names.
+IRenderPipeline* MakeRpGpu(ICOManager* Manager, const char* Section)
+{
+    struct
+    {
+        FlULong Size;
+        const char* Name;
+        IDAComponent* Outer;
+        IDAComponent** InnerOut;
+        const char* Section;
+    } Desc = {0x14, "SDLGPU", nullptr, nullptr, Section};
+    IRenderPipeline* Pipeline = nullptr;
+    if (Manager->CreateInstance((AGGDESC*)(&Desc), (void**)(&Pipeline)) != GR_OK)
+        return nullptr;
+    if (Pipeline != nullptr && Pipeline->Startup(nullptr) != GR_OK)
+    {
+        Pipeline->Release();
+        return nullptr;
+    }
+    return Pipeline;
+}
+
+// One frame cleared to Argb on Window, then the frame read back through PrintScreen's BMP: true
+// when every pixel is Argb's colour and the image is Width x Height (0: any size).
+bool ClearPresentReadBack(IRenderPipeline* Pipeline, RpWindow Window, int Width, int Height,
+                          std::uint32_t Argb, const std::string& Bmp, std::uint32_t* OutWidth,
+                          std::uint32_t* OutHeight)
+{
+    int Mode[10] = {};
+    Mode[2] = Width;
+    Mode[3] = Height;
+    Mode[4] = 32; // colour bits
+    Mode[8] = 1;  // buffer count; interval 0, windowed
+    int Out[10] = {};
+    if (Pipeline->CreateBuffers(Window, Mode, Out) != GR_OK)
+        return false;
+    Pipeline->SetPipelineState(8, static_cast<int>(Argb)); // the clear colour
+    bool bOk = Pipeline->BeginScene() == GR_OK && Pipeline->ClearBuffers(3, nullptr) == GR_OK &&
+               Pipeline->EndScene() == GR_OK && Pipeline->SwapBuffers() == GR_OK;
+    IRPTexture* Texture = nullptr;
+    bOk = bOk && Pipeline->QueryInterface(Iids::RPTexture, (void**)(&Texture)) == GR_OK &&
+          Texture != nullptr;
+    bOk = bOk && Texture->PrintScreen(nullptr, Bmp.c_str()) == GR_OK;
+    if (Texture != nullptr)
+        Texture->Release();
+    Pipeline->DestroyGpuResources();
+    if (!bOk)
+        return false;
+
+    // A bottom-up 24-bit BMP: 54-byte header, rows padded to four bytes.
+    std::vector<unsigned char> File;
+    if (FILE* const Handle = fopen(Bmp.c_str(), "rb"))
+    {
+        unsigned char Chunk[4096];
+        for (std::size_t Read; (Read = std::fread(Chunk, 1, sizeof(Chunk), Handle)) > 0;)
+            File.insert(File.end(), Chunk, Chunk + Read);
+        std::fclose(Handle);
+    }
+    std::remove(Bmp.c_str());
+    auto const U32 = [&File](std::size_t At)
+    {
+        return static_cast<std::uint32_t>(File[At] | File[At + 1] << 8 | File[At + 2] << 16 |
+                                          static_cast<std::uint32_t>(File[At + 3]) << 24);
+    };
+    if (File.size() < 54 || File[0] != 'B' || File[1] != 'M' || U32(10) != 54)
+        return false;
+    std::uint32_t const W = U32(18), H = U32(22);
+    std::size_t const RowBytes = (static_cast<std::size_t>(W) * 3 + 3) & ~std::size_t(3);
+    if (W == 0 || H == 0 ||
+        (Width != 0 && (W != std::uint32_t(Width) || H != std::uint32_t(Height))) ||
+        File.size() < 54 + RowBytes * H)
+        return false;
+    *OutWidth = W;
+    *OutHeight = H;
+    for (std::uint32_t Y = 0; Y < H; ++Y)
+        for (std::uint32_t X = 0; X < W; ++X)
+        {
+            const unsigned char* const Pixel = &File[54 + Y * RowBytes + X * 3];
+            if (Pixel[0] != (Argb & 0xFF) || Pixel[1] != ((Argb >> 8) & 0xFF) ||
+                Pixel[2] != ((Argb >> 16) & 0xFF))
+                return false;
+        }
+    return true;
+}
+
+// RPGPU without a device (NULL_DEVICE = 1), and, where SDL_GPU has a device that takes RPGPU's
+// shaders, its SDL backend on a hidden SDL window whose id is the HWND (the client's window
+// contract off Windows): a clear presents and reads back. Without a GPU (a headless Linux run,
+// a CI runner without one) the SDL check is skipped, with a message.
+void TestRpGpu(ICOManager* Manager, const std::string& Folder)
+{
+    int Count = 0;
+    Check(Platform::ModuleLoad((Folder + "RPGPU.dll").c_str()) != nullptr, "RPGPU.dll loads");
+    Manager->EnumerateComponents("SDLGPU", &CountComponent, &Count);
+    Check(Count == 1, "RPGPU's DllMain registered SDLGPU");
+
+    char Template[] = "/tmp/module_tests_rpgpu_XXXXXX";
+    if (mkdtemp(Template) == nullptr)
+    {
+        Check(false, "scratch folder for RPGPU");
+        return;
+    }
+    std::string const Root = Template;
+    std::string const Ini = Root + "/rpgpu.ini";
+    if (FILE* const File = fopen(Ini.c_str(), "wb"))
+    {
+        std::fputs("[RpGpuNull]\nNULL_DEVICE = 1\n[RpGpuSdl]\nNULL_DEVICE = 0\n", File);
+        std::fclose(File);
+    }
+    IProfileParser* const Parser = AcquireProfileParser();
+    Check(Parser != nullptr && Parser->LoadFile(Ini.c_str(), 0) == GR_OK,
+          "dacom reads RPGPU's ini");
+    if (Parser != nullptr)
+        Parser->Release();
+
+    if (IRenderPipeline* const Null = MakeRpGpu(Manager, "RpGpuNull"))
+    {
+        unsigned int Modes = 0;
+        Check(Null->GetDisplayModeCount(&Modes) == GR_OK && Modes > 0,
+              "RPGPU's Null backend lists display modes");
+        std::uint32_t W = 0, H = 0;
+        Check(ClearPresentReadBack(Null, reinterpret_cast<RpWindow>(std::uintptr_t(1)), 64, 32,
+                                   0xFF336699u, Root + "/null.bmp", &W, &H),
+              "RPGPU's Null backend presents a clear and reads it back");
+        Null->ShutdownPipeline();
+        Null->Release();
+    }
+    else
+        Check(false, "dacom makes RPGPU's SDLGPU component (Null backend)");
+
+    // The SDL backend: only where SDL has video and a GPU device for RPGPU's shader formats. On
+    // macOS that is Metal (MSL): the hint makes RPGPU's device a Metal one, as SDL is shared.
+#if defined(__APPLE__)
+    char const* const Driver = "metal";
+    SDL_GPUShaderFormat const Formats = SDL_GPU_SHADERFORMAT_MSL;
+    SDL_SetHint(SDL_HINT_GPU_DRIVER, Driver);
+#else
+    char const* const Driver = nullptr;
+    SDL_GPUShaderFormat const Formats =
+        SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_MSL;
+#endif
+    if (!SDL_InitSubSystem(SDL_INIT_VIDEO))
+        std::printf("module_tests: RPGPU's SDL backend not checked: no SDL video (%s)\n",
+                    SDL_GetError());
+    else
+    {
+        // A device of SDL's own first: SDL_GPUSupportsShaderFormats only says a driver is there,
+        // not that it finds a GPU it can use.
+        SDL_GPUDevice* const Probe = SDL_GPUSupportsShaderFormats(Formats, Driver)
+                                         ? SDL_CreateGPUDevice(Formats, false, Driver)
+                                         : nullptr;
+        if (Probe != nullptr)
+            SDL_DestroyGPUDevice(Probe);
+#if defined(__APPLE__)
+        // Metal hands out swap-chain images for a hidden window.
+        SDL_WindowFlags const WindowFlags = SDL_WINDOW_HIDDEN;
+#else
+        // Vulkan hands out none for a hidden window (no frame to read back): a shown one.
+        SDL_WindowFlags const WindowFlags = 0;
+#endif
+        if (Probe == nullptr)
+            std::printf("module_tests: RPGPU's SDL backend not checked: no SDL_GPU device\n");
+        else if (SDL_Window* const Window = SDL_CreateWindow("module_tests", 64, 32, WindowFlags))
+        {
+#if !defined(__APPLE__)
+            // Until the window is on screen (exposed), for at most a second.
+            bool bExposed = false;
+            for (Uint64 const Start = SDL_GetTicks(); !bExposed && SDL_GetTicks() - Start < 1000;)
+            {
+                SDL_Event Event;
+                while (SDL_PollEvent(&Event))
+                    bExposed = bExposed || Event.type == SDL_EVENT_WINDOW_EXPOSED;
+                SDL_Delay(10);
+            }
+#endif
+            // The client's contract off Windows: its HWND is the SDL window's id.
+            RpWindow const Hwnd =
+                reinterpret_cast<RpWindow>(std::uintptr_t(SDL_GetWindowID(Window)));
+            if (IRenderPipeline* const Gpu = MakeRpGpu(Manager, "RpGpuSdl"))
+            {
+                std::uint32_t W = 0, H = 0;
+                bool const bOk =
+                    ClearPresentReadBack(Gpu, Hwnd, 64, 32, 0xFF336699u, Root + "/sdl.bmp", &W, &H);
+                Check(bOk, "RPGPU's SDL backend presents a clear on the client's SDL window and "
+                           "reads it back");
+                int PixelW = 0, PixelH = 0;
+                SDL_GetWindowSizeInPixels(Window, &PixelW, &PixelH);
+                Check(!bOk || (W == std::uint32_t(PixelW) && H == std::uint32_t(PixelH)),
+                      "RPGPU's SDL frame is the window's size in pixels");
+                if (bOk)
+                    std::printf("module_tests: RPGPU's SDL backend (%s) cleared, presented and "
+                                "read back %ux%u\n",
+                                Driver != nullptr ? Driver : "SDL_GPU", W, H);
+                Gpu->ShutdownPipeline();
+                Gpu->Release();
+                // RPGPU let go of the window and left it to its owner.
+                Check(SDL_GetWindowFromID(SDL_GetWindowID(Window)) == Window,
+                      "RPGPU's shutdown leaves the client's SDL window alive");
+            }
+            else
+                Check(false, "dacom makes RPGPU's SDLGPU component (SDL backend)");
+            SDL_DestroyWindow(Window);
+        }
+        else
+            std::printf("module_tests: RPGPU's SDL backend not checked: no SDL window (%s)\n",
+                        SDL_GetError());
+        SDL_QuitSubSystem(SDL_INIT_VIDEO);
+    }
+#if defined(__APPLE__)
+    SDL_ResetHint(SDL_HINT_GPU_DRIVER);
+#endif
+    std::system(("rm -rf '" + Root + "'").c_str());
+}
+#endif
+
 int main(int argc, char** argv)
 {
     // The modules are next to this test (its folder is the first argument).
@@ -520,6 +745,9 @@ int main(int argc, char** argv)
             TestEngine(Manager);
         if (Files != nullptr)
             TestReadFile(Manager);
+#if defined(FL_TEST_RPGPU)
+        TestRpGpu(Manager, Folder);
+#endif
         Manager->Release();
     }
 

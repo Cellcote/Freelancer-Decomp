@@ -10,7 +10,8 @@ IID, so none of them change.
 
 RPGPU is the x64 client's renderer: RP8 cannot be built for x64, because D3DX8 has no 64-bit
 version. On Win32 it is an option next to RP8, which stays the default. See
-[x64-client-plan.md](../x64-client-plan.md), phase 5.
+[x64-client-plan.md](../x64-client-plan.md), phase 5. It is also the renderer on Linux and macOS
+(phase 6, M3), where it draws through Vulkan or Metal.
 
 ## Selecting it
 
@@ -49,6 +50,20 @@ client's next `CreateBuffers` brings the new one up.
 - CI builds RPGPU on both platforms with `FreelancerRpGpu=1` and `FreelancerRequireVcpkg=true`.
   It caches vcpkg's binary packages (`VCPKG_DEFAULT_BINARY_CACHE`) per triplet, runner image and
   manifest, so SDL3 is compiled once per compiler and manifest, not per run.
+- **Linux and macOS** (the non-Windows build, `FL_PROJECTS` in the root `CMakeLists.txt`): RPGPU
+  takes the system's SDL3 (3.2 or later) through `find_package(SDL3 CONFIG)`, as a shared library,
+  so that the process has one SDL, shared with the client's window layer. `FreelancerRpGpu`
+  defaults to 1 when SDL3 is found and to 0, with a message, when it is not; `-DFreelancerRpGpu=1`
+  without SDL3 fails the configure. macOS: `brew install sdl3`. Linux: a distribution's SDL3, or
+  one built from source (`-DCMAKE_PREFIX_PATH=<prefix>`). RPGPU is a PORT module there, compiled
+  against the stand-in `<windows.h>` of `src/include/posix`; its `DllMain` runs as it loads
+  (`FL_POSIX_DLLMAIN`). On macOS SDL_GPU draws through Metal, with the MSL shaders.
+- CI's portable job builds RPGPU with `FreelancerRpGpu=1` on Linux (GCC, Clang) and macOS:
+  Homebrew's sdl3 on macOS; on Ubuntu 24.04, which has no SDL3 package, SDL3 built from source
+  (pinned release, shared, no video back ends) and cached per runner image and version.
+  `src/PortTest/module_tests.cpp` loads `RPGPU.dll`, clears, presents and reads a frame back on
+  the Null backend, and does the same with the SDL backend on a hidden SDL window wherever SDL has
+  video and a GPU device (on macOS, a Metal one); without them it says so and skips that check.
 
 ## Structure
 
@@ -67,13 +82,26 @@ client's next `CreateBuffers` brings the new one up.
 - `backend/` is the seam between the pipeline and the screen:
   - `RpGpuBackend.h`: `IRpGpuBackend` brings the device and swap chain up, lists display modes,
     clears and presents, and reads the last frame back.
-  - `RpGpuSdlBackend.*` is the SDL backend and the only code that includes SDL. It wraps the
-    client's window in an SDL window (`SDL_PROP_WINDOW_CREATE_WIN32_HWND_POINTER`), creates the
-    SDL_GPU device, claims the window, draws each frame into its own colour target, blits that
-    to the swap-chain image and presents. SDL picks the GPU API: Direct3D 12, Vulkan or Metal.
-    It reads frames back by downloading the colour target ("Drawing").
+  - `RpGpuSdlBackend.*` is the SDL backend and the only code that includes SDL. It takes the
+    client's window as an SDL window ("The window"), creates the SDL_GPU device, claims the
+    window, draws each frame into its own colour target, blits that to the swap-chain image and
+    presents. SDL picks the GPU API: Direct3D 12, Vulkan or Metal. It reads frames back by
+    downloading the colour target ("Drawing").
   - `RpGpuNullBackend.cpp` is the Null backend (`NULL_DEVICE`). Its frame is the clear colour
     at the size `CreateBuffers` asked for, and it reads that back.
+
+## The window
+
+`CreateBuffers` gets the client's window as an `HWND`; the SDL backend makes an SDL window of it
+and claims that for the SDL_GPU device.
+
+- **Windows:** the `HWND` is a Win32 window. RPGPU wraps it in an SDL window
+  (`SDL_PROP_WINDOW_CREATE_WIN32_HWND_POINTER`); destroying that SDL window on teardown lets go
+  of the `HWND` and leaves it to the client.
+- **Linux and macOS:** the client's window is an SDL window, made by the client with the same
+  (shared) SDL, and its `HWND` is that window's id: `(HWND)(uintptr_t)SDL_GetWindowID(window)`.
+  RPGPU finds it with `SDL_GetWindowFromID`, claims it for the device, and on teardown releases it
+  from the device without destroying it: the client owns it.
 
 ## Status: 2D and lit 3D draws
 

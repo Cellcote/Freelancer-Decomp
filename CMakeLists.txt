@@ -94,10 +94,29 @@ if(FL_WINDOWS)
     FLRegress RpcCodecTest TexConvertTest DPNetInteropTest MemoryDiagnostics)
 else()
   # The modules that use no Windows API (fl_add_module's PORTABLE), DPNet with its tests, the
-  # client modules ported so far (M2: the stand-in <windows.h> of src/include/posix), and
-  # PortTest, the checks of the port's platform headers and of those modules (last: its
+  # client modules ported so far (M2: the stand-in <windows.h> of src/include/posix), RPGPU
+  # when SDL3 is there, and PortTest, the checks of the port's platform headers and of those modules (last: its
   # module_tests depend on them).
-  set(FL_PROJECTS qhull TexConvert DPNet dacom zlib DALib x86math system ReadFile luaprofile Thorn EngBase ximage Shading flmaterials RendComp alchemy Deformable2 Common Server rpclocal RemoteClient RpcCodecTest Content FLDedicated PortTest)
+  set(FL_PROJECTS qhull TexConvert DPNet dacom zlib DALib x86math system ReadFile luaprofile Thorn EngBase ximage Shading flmaterials RendComp alchemy Deformable2 Common Server rpclocal RemoteClient RpcCodecTest Content FLDedicated)
+  # PORT(rpgpu): RPGPU links the system's SDL3 here (Homebrew's sdl3 on macOS, a distribution
+  # package or a build from source on Linux), as a shared library: one SDL per process, which the
+  # client's window layer shares. FreelancerRpGpu defaults to 1 when SDL3 is found and to 0
+  # (with a message) when it is not; -DFreelancerRpGpu=1 without SDL3 fails the configure.
+  find_package(SDL3 3.2 CONFIG QUIET COMPONENTS SDL3-shared)
+  if(SDL3_FOUND)
+    set(_fl_rpgpu_default 1)
+  else()
+    set(_fl_rpgpu_default 0)
+  endif()
+  set(FreelancerRpGpu "${_fl_rpgpu_default}" CACHE STRING
+      "PORT(rpgpu): RPGPU, the SDL3 + SDL_GPU render pipeline (0 or 1; default 1 when SDL3 is found)")
+  if(FreelancerRpGpu)
+    list(APPEND FL_PROJECTS RPGPU)
+  elseif(NOT SDL3_FOUND)
+    message(STATUS "FreelancerRpGpu=0: SDL3 (3.2 or later, shared) not found, so RPGPU is not "
+                   "built (macOS: brew install sdl3; or set SDL3_DIR)")
+  endif()
+  list(APPEND FL_PROJECTS PortTest)
   enable_testing()
 endif()
 foreach(_project IN LISTS FL_PROJECTS)

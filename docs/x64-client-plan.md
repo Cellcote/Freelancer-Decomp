@@ -372,7 +372,13 @@ without the Windows API. Milestones:
   sigwait; TerminateThread has no POSIX equivalent, so a server thread that does not stop
   ends the process. Next: a client check on macOS and Linux (DPNet's FClient, as DPNetCheck
   does with Microsoft's DirectPlay on Windows), then a CI job that runs the server there.
-- **M3:** an SDL window to the main menu, drawn by RPGPU through Metal, without sound.
+- **M3:** an SDL window to the main menu, drawn by RPGPU through Metal, without sound. RPGPU
+  builds on Linux and macOS against the system's SDL3, shared (Homebrew's on macOS; on CI's
+  Ubuntu, a cached build from source), when SDL3 is found (`FreelancerRpGpu`). The client's
+  window there is an SDL window whose id is its `HWND`; RPGPU claims it and never destroys it
+  ([re/rpgpu.md](re/rpgpu.md), "The window"). module_tests loads RPGPU and checks a clear,
+  present and read-back on the Null backend, and on macOS through Metal on a hidden SDL window.
+  Next: the client's SDL window layer, which hands RPGPU that window.
 - **M4:** audio, input and gameplay.
 
 - An SDL3 implementation of `platform.h` (window, timers, threads, files, modules).
