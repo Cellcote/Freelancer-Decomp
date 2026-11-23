@@ -453,11 +453,35 @@ void TestRpGpu(ICOManager* Manager, const std::string& Folder)
                     SDL_GetError());
     else
     {
-        if (!SDL_GPUSupportsShaderFormats(Formats, Driver))
+        // A device of SDL's own first: SDL_GPUSupportsShaderFormats only says a driver is there,
+        // not that it finds a GPU it can use.
+        SDL_GPUDevice* const Probe = SDL_GPUSupportsShaderFormats(Formats, Driver)
+                                         ? SDL_CreateGPUDevice(Formats, false, Driver)
+                                         : nullptr;
+        if (Probe != nullptr)
+            SDL_DestroyGPUDevice(Probe);
+#if defined(__APPLE__)
+        // Metal hands out swap-chain images for a hidden window.
+        SDL_WindowFlags const WindowFlags = SDL_WINDOW_HIDDEN;
+#else
+        // Vulkan hands out none for a hidden window (no frame to read back): a shown one.
+        SDL_WindowFlags const WindowFlags = 0;
+#endif
+        if (Probe == nullptr)
             std::printf("module_tests: RPGPU's SDL backend not checked: no SDL_GPU device\n");
-        else if (SDL_Window* const Window =
-                     SDL_CreateWindow("module_tests", 64, 32, SDL_WINDOW_HIDDEN))
+        else if (SDL_Window* const Window = SDL_CreateWindow("module_tests", 64, 32, WindowFlags))
         {
+#if !defined(__APPLE__)
+            // Until the window is on screen (exposed), for at most a second.
+            bool bExposed = false;
+            for (Uint64 const Start = SDL_GetTicks(); !bExposed && SDL_GetTicks() - Start < 1000;)
+            {
+                SDL_Event Event;
+                while (SDL_PollEvent(&Event))
+                    bExposed = bExposed || Event.type == SDL_EVENT_WINDOW_EXPOSED;
+                SDL_Delay(10);
+            }
+#endif
             // The client's contract off Windows: its HWND is the SDL window's id.
             RpWindow const Hwnd =
                 reinterpret_cast<RpWindow>(std::uintptr_t(SDL_GetWindowID(Window)));

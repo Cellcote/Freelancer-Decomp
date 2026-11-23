@@ -237,11 +237,18 @@ bool FRpGpuSdlBackend::Create(RpWindowHandle Hwnd, std::uint32_t Width, std::uin
         Mode = SDL_GPU_PRESENTMODE_VSYNC;
     if (!SDL_SetGPUSwapchainParameters(Device_, Window_, SDL_GPU_SWAPCHAINCOMPOSITION_SDR, Mode))
     {
+#if defined(_WIN32)
         // Leaked on purpose: see bAbandoned_. Rare, and better than freeing twice.
         Device_ = nullptr;
         Window_ = nullptr;
         bAbandoned_ = true;
         Hwnd_ = nullptr;
+#else
+        // PORT(macOS): off Windows (Vulkan, Metal) the window stays claimed after the failure and
+        // is the client's: the claim is released and the device destroyed as usual, so the
+        // client's window is not left claimed by a device nobody holds.
+        Destroy();
+#endif
         return false;
     }
 

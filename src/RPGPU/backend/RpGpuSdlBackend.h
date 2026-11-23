@@ -147,7 +147,8 @@ private:
     // A failed swap-chain reconfiguration leaves SDL 3.4.18's D3D12 backend with records it has
     // already freed, and releasing the window would free them again. Such a device and window
     // are abandoned, not released, and the module stops creating devices: the flag is shared by
-    // every instance, so at most one device is ever leaked.
+    // every instance, so at most one device is ever leaked. Windows only: off Windows the
+    // window is the client's, and the device is released as usual.
     static inline bool bAbandoned_ = false;
     std::uint32_t ClearArgb_ = 0xFF000000u;
 

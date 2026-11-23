@@ -677,8 +677,9 @@ jobs:
           fi
 
       # SDL3 for RPGPU (src/RPGPU): Ubuntu 24.04 has no SDL3 package, so it is built from source
-      # once, shared, without video back ends (RPGPU's tests need none: module_tests checks the
-      # SDL backend only where SDL has video and a GPU), and cached per runner image and version.
+      # once, shared, without video back ends (SDL_UNIX_CONSOLE_BUILD allows that; RPGPU's tests
+      # need none: module_tests checks the SDL backend only where SDL has video and a GPU), and
+      # cached per runner image and version.
       # One build serves GCC and Clang: SDL's interface is C.
       - name: SDL3 (Linux, cached)
         if: runner.os == 'Linux'
@@ -694,7 +695,8 @@ jobs:
           git clone --depth 1 --branch "release-$SDL3_VERSION" https://github.com/libsdl-org/SDL.git "$RUNNER_TEMP/SDL"
           cmake -S "$RUNNER_TEMP/SDL" -B "$RUNNER_TEMP/SDL/build" -G Ninja -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$HOME/sdl3" -DSDL_SHARED=ON -DSDL_STATIC=OFF -DSDL_TEST_LIBRARY=OFF \
-            -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF -DSDL_X11=OFF -DSDL_WAYLAND=OFF -DSDL_KMSDRM=OFF
+            -DSDL_TESTS=OFF -DSDL_EXAMPLES=OFF -DSDL_X11=OFF -DSDL_WAYLAND=OFF -DSDL_KMSDRM=OFF \
+            -DSDL_UNIX_CONSOLE_BUILD=ON
           cmake --build "$RUNNER_TEMP/SDL/build"
           cmake --install "$RUNNER_TEMP/SDL/build"
 
