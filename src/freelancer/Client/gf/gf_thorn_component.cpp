@@ -31,15 +31,23 @@ namespace
 
     // The offsets are retail's on Win32 and the class layout's on x64 (facet_offset.h).
     FThornFacetEntry const G_ThornFacetTable[] = {
-        {Iids::CompoundControl, FL_FACET_OFFSET(0x00, FThornComponent, ICompoundControl)},
-        {Iids::SoundControl, FL_FACET_OFFSET(0x04, FThornComponent, ISoundControl)},
-        {Iids::IKControl, FL_FACET_OFFSET(0x08, FThornComponent, IIKControl)},
-        {Iids::GeoTransformControl, FL_FACET_OFFSET(0x0c, FThornComponent, IGeoTransformControl)},
-        {Iids::CameraControl, FL_FACET_OFFSET(0x10, FThornComponent, ICameraControl)},
-        {Iids::D3DLightControl, FL_FACET_OFFSET(0x14, FThornComponent, ID3DLightControl)},
-        {Iids::PSysControl, FL_FACET_OFFSET(0x18, FThornComponent, IPSysControl)},
-        {Iids::FogControl, FL_FACET_OFFSET(0x1c, FThornComponent, IFogControl)},
-        {Iids::ReverbControl, FL_FACET_OFFSET(0x20, FThornComponent, IReverbControl)},
+        {Iids::CompoundControl,
+         static_cast<FlULong>(FL_FACET_OFFSET(0x00, FThornComponent, ICompoundControl))},
+        {Iids::SoundControl,
+         static_cast<FlULong>(FL_FACET_OFFSET(0x04, FThornComponent, ISoundControl))},
+        {Iids::IKControl, static_cast<FlULong>(FL_FACET_OFFSET(0x08, FThornComponent, IIKControl))},
+        {Iids::GeoTransformControl,
+         static_cast<FlULong>(FL_FACET_OFFSET(0x0c, FThornComponent, IGeoTransformControl))},
+        {Iids::CameraControl,
+         static_cast<FlULong>(FL_FACET_OFFSET(0x10, FThornComponent, ICameraControl))},
+        {Iids::D3DLightControl,
+         static_cast<FlULong>(FL_FACET_OFFSET(0x14, FThornComponent, ID3DLightControl))},
+        {Iids::PSysControl,
+         static_cast<FlULong>(FL_FACET_OFFSET(0x18, FThornComponent, IPSysControl))},
+        {Iids::FogControl,
+         static_cast<FlULong>(FL_FACET_OFFSET(0x1c, FThornComponent, IFogControl))},
+        {Iids::ReverbControl,
+         static_cast<FlULong>(FL_FACET_OFFSET(0x20, FThornComponent, IReverbControl))},
         {nullptr, 0},
     };
 

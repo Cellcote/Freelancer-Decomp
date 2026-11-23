@@ -871,6 +871,18 @@ int main(int argc, char** argv)
         }
     }
 
+    // The client's modules: imeui, and RemoteServer, the client's in-process server, which
+    // exports the server interface the client asks for (rpclocal's Startup).
+    Check(Platform::ModuleLoad((Folder + "imeui.dll").c_str()) != nullptr, "imeui.dll loads");
+    {
+        Platform::Module const RemoteServer =
+            Platform::ModuleLoad((Folder + "remoteserver.dll").c_str());
+        Check(RemoteServer != nullptr, "remoteserver.dll loads");
+        Check(Platform::ModuleSymbol(RemoteServer, "GetServerInterface") != nullptr &&
+                  Platform::ModuleSymbol(RemoteServer, "Server") != nullptr,
+              "RemoteServer exports GetServerInterface and Server");
+    }
+
     using FEventCreate = Platform::Handle (*)();
     using FEventSet = bool (*)(Platform::Handle);
     using FEventWait = FlULong (*)(Platform::Handle);

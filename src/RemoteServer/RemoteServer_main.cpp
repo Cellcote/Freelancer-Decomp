@@ -31,6 +31,24 @@
 
 #include "rpc_iclient_args.h"
 
+#if !defined(_WIN32)
+// PORT(macOS): the executable's Client (freelancer_client.h), looked up in the program at load
+// time. A link-time reference cannot name it off Windows: on macOS the linker binds it to the
+// module that defines a Client at link time, which is rpclocal's FLocalClientProxy, not the
+// game's facade. In the namespace below, Client is this object, whose address is the program's
+// Client (the executable exports it, ENABLE_EXPORTS, and the program's symbols come first in the
+// lookup), or null in a program without one (a test).
+namespace {
+struct FProgramClient {
+    IClientImpl* operator&() const {
+        return static_cast<IClientImpl*>(
+            Platform::ModuleSymbol(Platform::ModuleFind(nullptr), "Client"));
+    }
+};
+const FProgramClient Client;
+} // namespace
+#endif
+
 namespace
 {
     IClient* GGameClient = static_cast<IClient*>(&Client);

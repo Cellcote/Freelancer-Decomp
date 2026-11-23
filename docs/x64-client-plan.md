@@ -305,7 +305,7 @@ without the Windows API. Milestones:
   Larger APIs go through `Platform::` at the call site. `FL_POSIX_DLLMAIN` runs a module's
   `DllMain` as it loads. So far: dacom, zlib, DALib, x86math, system, ReadFile, luaprofile, Thorn,
   EngBase, ximage, Shading, flmaterials, RendComp, alchemy, Deformable2, Common, Server,
-  rpclocal, RemoteClient and Content,
+  rpclocal, RemoteClient, Content, imeui and RemoteServer (the client, freelancer, builds and links),
   loaded and checked by `src/PortTest/module_tests.cpp`. The POSIX handles are small numbers in a table, as Windows
   kernel handles are, so a file handle survives retail's 32-bit fields there too
   (`Platform::HandleToValue` / `HandleFromValue`, as HandleToULong / LongToHandle). The kernel32
@@ -372,6 +372,20 @@ without the Windows API. Milestones:
   sigwait; TerminateThread has no POSIX equivalent, so a server thread that does not stop
   ends the process. Next: a client check on macOS and Linux (DPNet's FClient, as DPNetCheck
   does with Microsoft's DirectPlay on Windows), then a CI job that runs the server there.
+  The client builds and links there too: imeui, freelancer and RemoteServer. user32 is a
+  module of its own off Windows (`src/PosixUser32`, every module on the stand-in `<windows.h>`
+  links it, as MSVC links user32.lib by default): window classes, windows as records with their
+  window procedure (an `HWND` is a small number), the message queue, focus, the cursor and the
+  US keyboard's scan codes and key names. It uses none of the platform layer's shared state,
+  since dacom, which holds that, links it; `MsgWaitForMultipleObjects` waits in the header for
+  that reason. A window has no screen yet (M3 gives it an SDL window, whose id becomes the
+  `HWND` RPGPU draws into), and dialog templates and string tables wait for the resource
+  reader, so `DialogBoxParamA` fails and `FindResourceExA` finds nothing. DirectInput 8 is a
+  stand-in with a working system mouse (`posix/dinput.h`): the client, as retail, does not
+  survive a failed `DirectInput8Create`; the window layer feeds it with M3. There is no IME
+  (`posix/imm.h`: no layout is an IME, no window has an input context) and no structured
+  exception handling (a `__try` body runs, its `__except` never does). `user32_tests` checks
+  these stand-ins.
 - **M3:** an SDL window to the main menu, drawn by RPGPU through Metal, without sound. RPGPU
   builds on Linux and macOS against the system's SDL3, shared (Homebrew's on macOS; on CI's
   Ubuntu, a cached build from source), when SDL3 is found (`FreelancerRpGpu`). The client's

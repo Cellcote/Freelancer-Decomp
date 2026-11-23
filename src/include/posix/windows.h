@@ -106,6 +106,8 @@ typedef char const* PCSTR;
 typedef void* PVOID;
 typedef BYTE* PBYTE;
 typedef DWORD* PDWORD;
+typedef int* PINT;
+typedef UINT* PUINT;
 // Wide characters are the C library's wchar_t (32-bit here, 16-bit on Windows): the retail code
 // passes L"" literals and wchar_t arrays where the Windows API takes WCHAR.
 typedef wchar_t WCHAR;
@@ -232,10 +234,22 @@ typedef SIZE* LPSIZE;
     ((LONG)(((WORD)((DWORD_PTR)(Low) & 0xFFFF)) | ((DWORD)((WORD)((DWORD_PTR)(High) & 0xFFFF)))    \
                                                       << 16))
 
+// The wait results (WaitForSingleObject, MsgWaitForMultipleObjects).
+#define WAIT_OBJECT_0 0
+#define WAIT_ABANDONED 0x80
+#define WAIT_TIMEOUT 0x102
+#define WAIT_FAILED ((DWORD)0xFFFFFFFF)
+
 #include "posix/kernel32.h" // the file, mapping and memory calls (uses the types above)
 #include "posix/wingdi.h"  // GDI's text types and calls, which fail here (fonts come with M3)
 #include "posix/winreg.h"  // the registry: every key absent
 #include "posix/unknwn.h"   // COM's basics: GUID, IUnknown, the HRESULTs, CoCreateInstance
+#include "posix/winuser.h" // user32: windows, messages, the cursor and keyboard (src/PosixUser32)
+// The SDK's <windows.h> brings in winsock.h unless WIN32_LEAN_AND_MEAN: its address calls
+// (inet_addr, inet_ntoa, htons...) are the C library's here.
+#if !defined(WIN32_LEAN_AND_MEAN)
+#include <arpa/inet.h>
+#endif
 
 // ---------------------------------------------------------------------------------------------
 // Small Win32 calls
@@ -254,24 +268,6 @@ inline void OutputDebugStringA(LPCSTR Text)
 {
     if (Text != nullptr)
         std::fputs(Text, stderr);
-}
-
-// There is no message box yet (the window comes with SDL, M3): the text goes to stderr, and the
-// answer is the one that carries on (IDIGNORE for abort/retry/ignore, IDOK or IDYES otherwise).
-inline int MessageBoxA(HWND, LPCSTR Text, LPCSTR Caption, UINT Type)
-{
-    std::fprintf(stderr, "[%s] %s\n", Caption != nullptr ? Caption : "",
-                 Text != nullptr ? Text : "");
-    switch (Type & 0x0F)
-    {
-    case 0x02: // MB_ABORTRETRYIGNORE
-        return IDIGNORE;
-    case 0x03: // MB_YESNOCANCEL
-    case 0x04: // MB_YESNO
-        return IDYES;
-    default:
-        return IDOK;
-    }
 }
 
 // wsprintfA: user32's sprintf, which writes at most 1024 characters with the terminator (and
@@ -324,9 +320,14 @@ inline BOOL IsRectEmpty(const RECT* Rect)
 #define MB_TOPMOST 0x00040000L
 #define LANG_NEUTRAL 0x00
 #define LANG_ENGLISH 0x09
+#define LANG_CHINESE 0x04
+#define LANG_JAPANESE 0x11
+#define LANG_KOREAN 0x12
 #define SUBLANG_NEUTRAL 0x00
 #define SUBLANG_DEFAULT 0x01
 #define MAKELANGID(p, s) ((((WORD)(s)) << 10) | (WORD)(p))
+#define PRIMARYLANGID(LangId) ((WORD)(LangId) & 0x3ff)
+#define SUBLANGID(LangId) ((WORD)(LangId) >> 10)
 #define FORMAT_MESSAGE_ALLOCATE_BUFFER 0x00000100
 #define FORMAT_MESSAGE_IGNORE_INSERTS 0x00000200
 #define FORMAT_MESSAGE_FROM_STRING 0x00000400
@@ -361,9 +362,6 @@ inline DWORD FormatMessageA(DWORD Flags, LPCVOID, DWORD Code, DWORD, LPSTR Buffe
     std::memcpy(Buffer, Text, (size_t)Length + 1);
     return (DWORD)Length;
 }
-
-// No message loop yet (M3): nothing to post to.
-inline void PostQuitMessage(int) {}
 
 // Thread attach and detach calls are never made here, so there is nothing to turn off.
 inline BOOL DisableThreadLibraryCalls(HMODULE)
@@ -529,47 +527,6 @@ inline BOOL GetVersionExA(OSVERSIONINFOA* Info)
     Info->dwPlatformId = VER_PLATFORM_WIN32_NT;
     Info->szCSDVersion[0] = 0;
     return TRUE;
-}
-
-// The message loop: no window messages here yet (M3), so PeekMessageA finds none, and
-// MsgWaitForMultipleObjects waits on the handles only (as WaitForMultipleObjects).
-typedef struct tagMSG
-{
-    HWND hwnd;
-    UINT message;
-    WPARAM wParam;
-    LPARAM lParam;
-    DWORD time;
-    POINT pt;
-} MSG;
-#define PM_NOREMOVE 0x0000
-#define PM_REMOVE 0x0001
-#define WM_QUIT 0x0012
-#define WAIT_OBJECT_0 0
-#define WAIT_TIMEOUT 0x102
-#define WAIT_FAILED ((DWORD)0xFFFFFFFF)
-#define QS_ALLINPUT 0x04FF
-inline BOOL PeekMessageA(MSG*, HWND, UINT, UINT, UINT)
-{
-    return FALSE;
-}
-inline BOOL TranslateMessage(const MSG*)
-{
-    return FALSE;
-}
-inline LRESULT DispatchMessageA(const MSG*)
-{
-    return 0;
-}
-inline DWORD MsgWaitForMultipleObjects(DWORD Count, const HANDLE* Handles, BOOL WaitAll,
-                                       DWORD Milliseconds, DWORD)
-{
-    if (Count == 0)
-    {
-        Platform::SleepMs(Milliseconds == INFINITE ? 0 : Milliseconds);
-        return WAIT_TIMEOUT;
-    }
-    return Platform::WaitMany(Count, Handles, WaitAll != FALSE, Milliseconds);
 }
 
 // FileTimeToSystemTime (UTC), and GetTimeFormatA / GetDateFormatA for the flags the code passes:

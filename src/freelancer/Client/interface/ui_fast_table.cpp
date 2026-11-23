@@ -681,7 +681,16 @@ void UiFastTable::SetTipMode(int Mode)
         // resize(Count, prototype): FUN_00590500 inserts copies at the end, FUN_005908a0 erases
         // the tail. The vector is empty here, so only the insert can run.
         FUiFastTableTip const Prototype;
+#if defined(_WIN32)
         Tips.resize(Count, Prototype);
+#else
+        // PORT(macOS): the same Count copies, constructed one by one. libstdc++'s
+        // resize(n, value) instantiates element assignment (its fill-insert also shifts), which
+        // FUiFastTableTip deletes; the vector is empty here, so only copy construction runs.
+        Tips.reserve(Count);
+        for (unsigned Index = 0; Index < Count; ++Index)
+            Tips.push_back(Prototype);
+#endif
     }
 
     // 0x0058d896..0x0058d8c8: every record reset, keyed this + 1 + index, IdsAlt 0.

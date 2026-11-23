@@ -40,7 +40,8 @@ target_compile_options(module_tests PRIVATE -include ${CMAKE_SOURCE_DIR}/src/inc
                        "-D__declspec(x)=" -D__cdecl= -D__stdcall= -Wall -Wextra -Wno-unknown-pragmas)
 # Loaded at run time, by name, as the game loads them: built first, not linked.
 add_dependencies(module_tests dacom system x86math ReadFile zlib luaprofile Thorn EngBase
-                 ximage Shading RendComp flmaterials alchemy Deformable2 DALib Common Server Content arena_probe_a arena_probe_b)
+                 ximage Shading RendComp flmaterials alchemy Deformable2 DALib Common Server Content imeui
+                 RemoteServer arena_probe_a arena_probe_b)
 # RPGPU when the build has it (FreelancerRpGpu, SDL3): module_tests loads it and, with SDL3 linked
 # as the client links it (one shared SDL), hands it an SDL window.
 if(TARGET RPGPU)
@@ -60,3 +61,15 @@ target_include_directories(dalib_net_tests PRIVATE ${CMAKE_SOURCE_DIR}/src/inclu
 target_compile_options(dalib_net_tests PRIVATE -include ${CMAKE_SOURCE_DIR}/src/include/fl_layout.h
                        "-D__declspec(x)=" -D__cdecl= -D__stdcall= -Wall -Wextra -Wno-unknown-pragmas)
 add_test(NAME dalib_net_tests COMMAND dalib_net_tests)
+
+# user32_tests: the client's stand-ins (src/include/posix) and the user32 module
+# (src/PosixUser32), built and linked as a game module is: against the stand-in <windows.h>,
+# with user32 and dacom (the platform layer's state).
+add_executable(user32_tests user32_tests.cpp)
+target_compile_features(user32_tests PRIVATE cxx_std_20)
+target_link_libraries(user32_tests PRIVATE ${CMAKE_DL_LIBS} PosixUser32 dacom)
+target_include_directories(user32_tests PRIVATE ${CMAKE_SOURCE_DIR}/src/include/posix
+                           ${CMAKE_SOURCE_DIR}/src/include)
+target_compile_options(user32_tests PRIVATE -include ${CMAKE_SOURCE_DIR}/src/include/fl_layout.h
+                       "-D__declspec(x)=" -D__cdecl= -D__stdcall= -Wall -Wextra -Wno-unknown-pragmas)
+add_test(NAME user32_tests COMMAND user32_tests)

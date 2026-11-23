@@ -126,6 +126,22 @@ struct IClassFactory : public IUnknown
 };
 typedef IClassFactory* LPCLASSFACTORY;
 
+// __uuidof(Interface): MSVC reads the IID from the interface's __declspec(uuid). Here a stand-in
+// header names it with FL_POSIX_UUIDOF(Interface, the IID's parts), after the interface.
+template <class Interface>
+struct FPosixUuidOf;
+#define FL_POSIX_UUIDOF(Interface, Data1, Data2, Data3, ...)                                       \
+    template <>                                                                                    \
+    struct FPosixUuidOf<Interface>                                                                 \
+    {                                                                                              \
+        static constexpr IID Value = {Data1, Data2, Data3, __VA_ARGS__};                           \
+    };
+#define __uuidof(Interface) (FPosixUuidOf<Interface>::Value)
+FL_POSIX_UUIDOF(IUnknown, 0x00000000, 0x0000, 0x0000,
+                {0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46})
+FL_POSIX_UUIDOF(IClassFactory, 0x00000001, 0x0000, 0x0000,
+                {0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46})
+
 // ---------------------------------------------------------------------------------------------
 // The COM library
 // ---------------------------------------------------------------------------------------------
