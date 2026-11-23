@@ -100,8 +100,10 @@ namespace
         // 00564e5c..00564e97: the logo name, bounded at 0x3f chars, and its length.
         GIntroConfigState.Logo.Length =
             CopyBoundedString(GIntroConfigState.Logo.Text, 0x40, "FRONT_freelancerlogo.tga");
-        // 00564e9c..00564eb2: (rand() * 3) >> 15, i.e. 0, 1 or 2.
-        GIntroConfigState.IntroBasePick = (rand() * 3) / 0x8000;
+        // 00564e9c..00564eb2: (rand() * 3) >> 15, i.e. 0, 1 or 2. PORT(macOS): MSVC's rand()
+        // stops at 0x7fff; a POSIX C library's runs to RAND_MAX (0x7fffffff), so its value is
+        // masked to retail's 15 bits (which leaves MSVC's unchanged).
+        GIntroConfigState.IntroBasePick = ((rand() & 0x7fff) * 3) / 0x8000;
     }
 
     // One [Data] value of FUN_005b0c30 (0x005b0ce3..0x005b0ee9): an is_value chain in listing
