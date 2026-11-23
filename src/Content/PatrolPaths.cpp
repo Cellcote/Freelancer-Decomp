@@ -15,6 +15,8 @@
 #include "SystemInfo.h"
 #include "server_pub.h"
 
+#include <algorithm>
+
 namespace
 {
     // FUN_06f0bb80 (cdecl): Out = A + B, each component stored as a float.
@@ -61,12 +63,7 @@ namespace
     // FUN_06eb5f30 != end.
     bool ContainsIndex(std::vector<int> const& Indices, int Value)
     {
-        for (std::vector<int>::const_iterator It = Indices.begin(); It != Indices.end(); ++It)
-        {
-            if (*It == Value)
-                return true;
-        }
-        return false;
+        return std::ranges::contains(Indices, Value);
     }
 }
 

@@ -172,7 +172,7 @@ namespace
     {
         char Execute(unsigned int GroupId) override
         {
-            if (std::ranges::find(GFactionGroups, GroupId) == GFactionGroups.end())
+            if (!std::ranges::contains(GFactionGroups, GroupId))
             {
                 GFactionGroups.insert(GFactionGroups.end(), 1, GroupId);   // FUN_06f937c0
             }

@@ -756,7 +756,7 @@ bool FRpGpuSdlBackend::UploadFrame(SDL_GPUCommandBuffer* Commands, const FRpGpuF
     if (!Dropped.empty())
     {
         std::erase_if(PendingUploads_, [&Dropped](const FPendingUpload& Upload)
-                      { return std::ranges::find(Dropped, Upload.Key) != Dropped.end(); });
+                      { return std::ranges::contains(Dropped, Upload.Key); });
     }
 
     // Sizes in 64 bits first: SDL_GPU's buffers and offsets are 32-bit, so a frame whose uploads

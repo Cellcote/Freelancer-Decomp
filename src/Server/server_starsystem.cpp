@@ -1675,7 +1675,7 @@ void StarSystem::explode(ExplosionDamageEvent const& Blast)
             if (Id == Blast.ExplodingObjId)
                 continue;
             // .text:06d0b45c .. 06d0b473  linear search of Damaged; found -> next
-            if (std::ranges::find(Damaged, Id) != Damaged.end())
+            if (std::ranges::contains(Damaged, Id))
                 continue;
             // .text:06d0b479 .. 06d0b4b9  FUN_06d0f210 (find) misses, so
             // FUN_06d0f460 push_back and find again; the {iterator, bool} pair
@@ -1739,7 +1739,7 @@ void StarSystem::explode(ExplosionDamageEvent const& Blast)
             // (.text:06d0b696, pair {it, false}) falls into the same code as
             // the inserted arm (.text:06d0b677, pair {it, true}), so an object
             // whose several parts were in range is pushed once per part.
-            if (std::ranges::find(Pushed, Simple->Id) == Pushed.end())
+            if (!std::ranges::contains(Pushed, Simple->Id))
                 Pushed.push_back(Simple->Id);
 
             // .text:06d0b6ae .. 06d0b6df  CObject vt +0x68 get_center_of_mass,

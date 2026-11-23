@@ -146,8 +146,8 @@ cmake --preset portable && cmake --build --preset portable && ctest --preset por
 ```
 
 `portable-asan` builds the same in Debug with AddressSanitizer and UndefinedBehaviorSanitizer.
-Needs CMake 3.27 or later, Ninja and a C++23 compiler (GCC 13+, Clang 18+, Apple Clang 15+). CI
-builds both presets on Linux (GCC, Clang) and macOS.
+Needs CMake 3.27 or later, Ninja and a C++23 compiler (GCC 13+, Clang 18+, or Apple Clang 17+ from
+Xcode 16.3). CI builds both presets on Linux (GCC, Clang) and macOS.
 
 A module is portable when it uses no Windows API: `PORTABLE` in its `fl_add_module()`, and its
 folder in the non-Windows `FL_PROJECTS` of the root `CMakeLists.txt`. On these compilers
@@ -162,18 +162,19 @@ phase 6, M2): one that is in `FL_PROJECTS` without `PORTABLE` compiles against t
 ## C++23 in this code
 
 The code is C++23, but use only what every compiler CI builds with supports: MSVC 17.14
-(`/std:c++23preview`), GCC 13 with libstdc++ 13 and Clang 18 (Ubuntu 24.04), and Apple Clang
-15 with its libc++ (the oldest Xcode the macOS port builds with).
+(`/std:c++23preview`), GCC 13 with libstdc++ 13 and Clang 18 (Ubuntu 24.04), and the Apple Clang on
+GitHub's `macos-latest` image (Xcode 16, libc++ 19). Older Xcode versions (Apple Clang 15 and 16)
+do not build it.
 
 - **Available**: `std::expected`, `std::to_underlying`, `std::byteswap`, `std::unreachable`,
   `string::contains`, `if consteval`, and C++20's `std::bit_cast`, `<bit>`, `std::span`,
   `std::numbers`, `contains()` on associative containers, `std::erase`/`std::erase_if`, the
-  `std::ranges` algorithms (`std::ranges::find(Ids, Id)` over `std::find(Ids.begin(), Ids.end(),
-  Id)`) and the C++20 views (`filter`, `transform`, `reverse`, `iota`).
-- **Not yet**: `std::print` and `std::ranges::to` (libstdc++ 14), `std::ranges::contains`,
-  `fold_left`, `views::zip` and `views::enumerate` (libc++ 19), `std::flat_map`, deducing `this`
-  and `static constexpr` locals in `constexpr` functions (Apple Clang 15), `[[assume]]` (MSVC).
-  A local build on Apple Clang 15 fails on these, so they are easy to catch.
+  `std::ranges` algorithms, C++23's `std::ranges::contains` (in place of a hand-written search
+  loop or `std::find(...) != end()`) and the C++20 views (`filter`, `transform`, `reverse`, `iota`).
+- **Not yet**: `std::print`, `std::ranges::to` and `ranges::find_last` (libstdc++ 14),
+  `std::flat_map`, `[[assume]]` (MSVC). Check the rest of C++23 ranges (`fold_left`,
+  `views::zip`, `views::enumerate`) against libstdc++ 13 and libc++ 19 before using it; CI builds
+  with both.
 
 In retail code a standard replacement must give the same result for every input on x87, so
 some hand-written forms stay:

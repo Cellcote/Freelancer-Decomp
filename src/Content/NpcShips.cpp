@@ -87,9 +87,7 @@ void __cdecl LoadNpcShipArchs(INI_Reader* Reader, FNpcShipArchMap* Map)
                 for (unsigned int Index = 0; !Reader->is_value_empty(Index); ++Index)
                 {
                     unsigned int ClassId = CreateID(Reader->get_value_string(Index));
-                    std::vector<unsigned int>::iterator Found =
-                        std::ranges::find(Arch.NpcClasses, ClassId);
-                    if (Found == Arch.NpcClasses.end())
+                    if (!std::ranges::contains(Arch.NpcClasses, ClassId))
                         Arch.NpcClasses.push_back(ClassId);
                 }
             }

@@ -119,7 +119,7 @@ namespace
     // std::find over a class list (FUN_06eb5f30 against the vector's end).
     bool HasClass(std::vector<unsigned int> const& Classes, unsigned int ClassId)
     {
-        return std::ranges::find(Classes, ClassId) != Classes.end();
+        return std::ranges::contains(Classes, ClassId);
     }
 
     // The "(rand() * Count) >> 15" index idiom (IMUL, CDQ, AND EDX,0x7fff, ADD, SAR 0xf).

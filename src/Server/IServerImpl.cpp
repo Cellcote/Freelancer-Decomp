@@ -34,6 +34,7 @@
 #include "common_animdb.h"     // AnimDB::Update (FUN_06d10320)
 #include "server_createinfo.h" // FShipCreateRequest, Server_Acquire3DMathEngine (PlayerLaunch)
 #include "x86math.h"           // I3DMathEngine (PlayerLaunch)
+#include <algorithm>
 #include <windows.h>
 #include <mmsystem.h>
 #include "../include/platform.h"
@@ -4389,15 +4390,7 @@ static void Server_StepSystems(float dt) {
     {
         const unsigned int SysId = Player->system_id;
 
-        bool bAlready = false;
-        for (size_t i = 0; i < SteppedSystems.size(); ++i)
-        {
-            if (SteppedSystems[i] == SysId)
-            {
-                bAlready = true;
-                break;
-            }
-        }
+        bool const bAlready = std::ranges::contains(SteppedSystems, SysId);
 
         if (!bAlready)
         {
@@ -4407,15 +4400,7 @@ static void Server_StepSystems(float dt) {
                 StarSystem_Update(&It->second, dt);
             }
 
-            bool bPresent = false;
-            for (size_t i = 0; i < SteppedSystems.size(); ++i)
-            {
-                if (SteppedSystems[i] == SysId)
-                {
-                    bPresent = true;
-                    break;
-                }
-            }
+            bool const bPresent = std::ranges::contains(SteppedSystems, SysId);
             if (!bPresent)
                 SteppedSystems.push_back(SysId);
         }

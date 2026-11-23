@@ -1195,15 +1195,7 @@ int FSystemInfo::BuildPatrolPaths(std::vector<FZonePathLabel>* Labels)
             if (Zone == nullptr || Zone->Path == nullptr)
                 continue;
             FPatrolPath* Path = Zone->GetPath();                          // FUN_06fa8130
-            bool bKnown = false;
-            for (std::vector<FPatrolPath*>::iterator It = NearPaths.begin(); It != NearPaths.end(); ++It)
-            {
-                if (*It == Path)
-                {
-                    bKnown = true;
-                    break;
-                }
-            }
+            bool const bKnown = std::ranges::contains(NearPaths, Path);
             if (!bKnown)
                 NearPaths.insert(NearPaths.end(), Path);                  // FUN_06eb5770
         }

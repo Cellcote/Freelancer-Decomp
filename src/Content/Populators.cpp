@@ -934,7 +934,7 @@ namespace
                 {
                     // FUN_06f7b0f0 (map::find), not tested.
                     std::vector<unsigned int> const& Rooms = Base->Npcs.find(*Id)->second.Rooms;
-                    if (!Rooms.empty() && std::ranges::find(Rooms, RoomId) == Rooms.end())
+                    if (!Rooms.empty() && !std::ranges::contains(Rooms, RoomId))
                         Id = Faction->Npcs.erase(Id);                       // FUN_06f69a10
                     else
                         ++Id;

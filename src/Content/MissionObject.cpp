@@ -1783,7 +1783,7 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
             }
         }
         // 06f0f844-06f0f864: nothing more for a player in +0xdc.
-        if (std::ranges::find(DeadPlayerIds, Parms[3]) != DeadPlayerIds.end())
+        if (std::ranges::contains(DeadPlayerIds, Parms[3]))
             break;
         if (FindContentPlayerState(PlayerId) == nullptr)
             break;

@@ -389,8 +389,7 @@ bool FuseAction::IsTriggered(unsigned short SubObjId) const
     // .text:062bd6f0: false while the flag is clear; otherwise a linear find of SubObjId.
     if (!bTriggered)
         return false;
-    std::vector<unsigned short>::const_iterator It = std::ranges::find(TriggeredSubObjs, SubObjId);
-    return It != TriggeredSubObjs.end();
+    return std::ranges::contains(TriggeredSubObjs, SubObjId);
 }
 
 void FuseAction::Trigger(unsigned SourceId, unsigned short SubObjId)

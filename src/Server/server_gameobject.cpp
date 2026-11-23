@@ -22,6 +22,7 @@
 #include "x86math.h"          // I3DMathEngine::MatrixToQuaternion
 #include "common_physys.h"   // PhySys::RCBegin/RCEnd, Collision::CalcCollisionDamage
 #include "common_universe.h" // Universe::IZone (CSimple::ZoneAtA4)
+#include <algorithm>
 #include <cmath>
 #include <concepts>
 #include <type_traits>
@@ -146,12 +147,7 @@ void GameObject::mark_for_player(unsigned int PlayerId, int MarkType)
 //   .text:06cef46d  0f95c0    SETNZ  AL                   ; "not end()" == found
 bool GameObject::is_marked_by(unsigned int PlayerId) const
 {
-    for (std::list<unsigned int>::const_iterator It = MarkedByPlayers.begin();
-         It != MarkedByPlayers.end(); ++It) {
-        if (*It == PlayerId)
-            return true;
-    }
-    return false;
+    return std::ranges::contains(MarkedByPlayers, PlayerId);
 }
 
 // Retail inlines this guard at every single call site: load CBase::Object and

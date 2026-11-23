@@ -32,6 +32,7 @@
 #include "render/rendcomp.h"
 #include "x86math.h"
 
+#include <algorithm>
 #include <numbers>
 #include <math.h>
 #include <string.h>
@@ -1371,12 +1372,7 @@ intptr_t ShipViewControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 bool ShipViewControl::HasHpType(int HpType) const
 {
     // FUN_00586510 (RET 4).
-    for (size_t Index = 0; Index < HpTypes.size(); ++Index)
-    {
-        if (HpTypes[Index] == HpType)
-            return true;
-    }
-    return false;
+    return std::ranges::contains(HpTypes, HpType);
 }
 
 void ShipViewControl::CollectHpTypes(char const* HpName)

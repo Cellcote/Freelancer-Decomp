@@ -184,7 +184,7 @@ int __cdecl ServerLogf(ErrorCode Code, const char* Format, ...)
 	if (Level != 0)
 	{
 		int Category = (int)Code.Value >> 4;
-        if (std::ranges::find(Control.LogCategories, Category) == Control.LogCategories.end())
+        if (!std::ranges::contains(Control.LogCategories, Category))
         {
 			ReleaseMutex(GLogMutex);
 			return 0;

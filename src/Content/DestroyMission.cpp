@@ -166,7 +166,7 @@ namespace
     // FUN_06eb5f30 + FUN_06eb5770: appended when absent (the second find is not read).
     void DmAppendUnique(std::vector<unsigned int>* Ids, unsigned int Id)
     {
-        if (std::ranges::find(*Ids, Id) == Ids->end())
+        if (!std::ranges::contains(*Ids, Id))
             Ids->insert(Ids->end(), Id);
     }
 }
@@ -301,7 +301,7 @@ void FDestroyMission::CreateRuntimeMachines()
         // get_id of null + 0x10.
         unsigned int const Id = static_cast<MessageHandler*>(Machine)->get_id();
         add_state_machine(Machine);
-        if (std::ranges::find(PendingMachines, Id) == PendingMachines.end())
+        if (!std::ranges::contains(PendingMachines, Id))
             PendingMachines.push_back(Id);
     }
 }
@@ -609,7 +609,7 @@ void FRandomMissionData::LoadValue(INI_Reader* Reader)
     if (Reader->is_value("objective_zone"))
     {
         ObjectiveZone = static_cast<unsigned int>(Reader->get_value_int(0));
-        if (std::ranges::find(GRmObjectiveZones, ObjectiveZone) == GRmObjectiveZones.end())
+        if (!std::ranges::contains(GRmObjectiveZones, ObjectiveZone))
             GRmObjectiveZones.insert(GRmObjectiveZones.end(), ObjectiveZone);
         return;
     }
@@ -747,7 +747,7 @@ bool FRandomMissionLoader::IsRouteBlocked(unsigned int FromSystem, unsigned int 
             bBlocked = true;
             break;
         }
-        if (std::ranges::find(LockedGates, Connection) != LockedGates.end())
+        if (std::ranges::contains(LockedGates, Connection))
         {
             bBlocked = true;
             break;
@@ -973,7 +973,7 @@ unsigned int FRandomMissionLoader::PickObjectiveZone(unsigned int PlayerId, FSys
         unsigned int ZoneSystemId = pub::Zone::GetSystem(*It);
         FSystemZone* Zone = FindSystemInfo(&ZoneSystemId)->FindZone(*It);
         bool bKeep = false;
-        if (std::ranges::find(GRmObjectiveZones, *It) == GRmObjectiveZones.end())
+        if (!std::ranges::contains(GRmObjectiveZones, *It))
         {
             // 06ef16a3-06ef16f3: TU48 FUN_06f50650(&OfferGroup) (no null test), read twice.
             unsigned int OfferGroupId = static_cast<unsigned int>(Mission->OfferGroup);

@@ -229,8 +229,7 @@ FRmKillableSolar* __cdecl PickKillableSolar(unsigned int Faction, int SolarType,
          It != GRmKillableSolars.end(); ++It)
     {
         FRmKillableSolar& Entry = It->second;
-        if (!Entry.bAnyFaction &&
-            std::ranges::find(Entry.Factions, Faction) == Entry.Factions.end())
+        if (!Entry.bAnyFaction && !std::ranges::contains(Entry.Factions, Faction))
             continue;
         if (Entry.SolarType != SolarType)
             continue;
@@ -338,9 +337,9 @@ FRmCriticalLoot* __cdecl PickCriticalLoot(unsigned int Faction, unsigned int Typ
     for (std::vector<FRmCriticalLoot>::iterator It = GRmCriticalLoot.begin();
          It != GRmCriticalLoot.end(); ++It)
     {
-        if (!It->bAnyFaction && std::ranges::find(It->Factions, Faction) == It->Factions.end())
+        if (!It->bAnyFaction && !std::ranges::contains(It->Factions, Faction))
             continue;
-        if (std::ranges::find(It->Types, Type) == It->Types.end())
+        if (!std::ranges::contains(It->Types, Type))
             continue;
         Candidates.insert(Candidates.end(), &*It);               // FUN_06f937c0(end, 1, &p)
     }
@@ -1034,7 +1033,7 @@ bool FRandEncTLPopulator::Accept(FRandEncParams* Params, pub::Controller::EMessa
                     for (std::vector<unsigned int>::iterator It = Factions.begin();
                          It != Factions.end(); ++It)
                     {
-                        if (std::ranges::find(ClassFactions, *It) == ClassFactions.end())
+                        if (!std::ranges::contains(ClassFactions, *It))
                             ClassFactions.insert(ClassFactions.end(), *It);
                     }
                 }
@@ -1049,7 +1048,7 @@ bool FRandEncTLPopulator::Accept(FRandEncParams* Params, pub::Controller::EMessa
                          PopulationCopy.Items.begin();
                      It != PopulationCopy.Items.end(); ++It)
                 {
-                    if (std::ranges::find(ClassFactions, It->first) != ClassFactions.end())
+                    if (std::ranges::contains(ClassFactions, It->first))
                         Populated.push_back(*It);
                 }
             }
@@ -1396,7 +1395,7 @@ bool FRandEncSPPopulator::Accept(FRandEncParams* Params, pub::Controller::EMessa
             for (std::vector<unsigned int>::iterator It = Factions.begin(); It != Factions.end();
                  ++It)
             {
-                if (std::ranges::find(ClassFactions, *It) == ClassFactions.end())
+                if (!std::ranges::contains(ClassFactions, *It))
                     ClassFactions.insert(ClassFactions.end(), 1, *It);
             }
         }
@@ -1412,7 +1411,7 @@ bool FRandEncSPPopulator::Accept(FRandEncParams* Params, pub::Controller::EMessa
                  PopulationCopy.Items.begin();
              It != PopulationCopy.Items.end(); ++It)
         {
-            if (std::ranges::find(ClassFactions, It->first) != ClassFactions.end())
+            if (std::ranges::contains(ClassFactions, It->first))
                 Populated.push_back(*It);
         }
     }

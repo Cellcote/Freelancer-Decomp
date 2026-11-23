@@ -149,7 +149,7 @@ bool CAttachedEquip::Connect(char const* HpName)
     // 062932d6..062932f6: a parent part (+0x58) whose hardpoint id list (std::find over the
     // vector at part+0x24/+0x28) holds the CRC makes this a non-physical attachment.
     PhyArch::Part const* const Part = Parent->PhyPart;
-    if (Part != nullptr && std::ranges::find(Part->HardpointIds, HpCrc) != Part->HardpointIds.end())
+    if (Part != nullptr && std::ranges::contains(Part->HardpointIds, HpCrc))
     {
         Attachment = new CNonPhysAttachment();                               // 062932f8..0629331e
     }

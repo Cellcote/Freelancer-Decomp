@@ -48,7 +48,7 @@ namespace
     // Retail's inline find over a vector<uint> (FUN_06eb5f30 and the open-coded loops).
     bool ContainsId(std::vector<unsigned int> const& Ids, unsigned int Id)
     {
-        return std::ranges::find(Ids, Id) != Ids.end();
+        return std::ranges::contains(Ids, Id);
     }
 
     // Every member's id not yet in Ids appended (FUN_06eb5770); retail then looks the id up
