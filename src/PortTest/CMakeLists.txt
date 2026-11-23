@@ -2,7 +2,7 @@
 # of retail. Built only by the non-Windows build (CMakeLists.txt), with ctest.
 
 add_executable(port_tests port_tests.cpp)
-target_compile_features(port_tests PRIVATE cxx_std_20)
+target_compile_features(port_tests PRIVATE cxx_std_23)
 # dlopen / dlsym are in libdl before glibc 2.34.
 target_link_libraries(port_tests PRIVATE ${CMAKE_DL_LIBS})
 target_include_directories(port_tests PRIVATE ${CMAKE_SOURCE_DIR}/src/include)
@@ -16,7 +16,7 @@ add_test(NAME port_tests COMMAND port_tests)
 foreach(_probe a b)
   add_library(arena_probe_${_probe} SHARED arena_probe.cpp)
   set_target_properties(arena_probe_${_probe} PROPERTIES PREFIX "" LIBRARY_OUTPUT_DIRECTORY "${FL_BIN_DIR}")
-  target_compile_features(arena_probe_${_probe} PRIVATE cxx_std_20)
+  target_compile_features(arena_probe_${_probe} PRIVATE cxx_std_23)
   target_include_directories(arena_probe_${_probe} PRIVATE ${CMAKE_SOURCE_DIR}/src/include)
   target_compile_definitions(arena_probe_${_probe} PRIVATE FL_PROBE_PREFIX=Probe_${_probe}_)
   target_compile_options(arena_probe_${_probe} PRIVATE
@@ -30,7 +30,7 @@ endforeach()
 # module_tests: loads the client modules this build makes and checks that their DllMains ran,
 # and ReadFile's DOS file system on this disk. Built against the stand-in <windows.h> (src/include/posix), as they are.
 add_executable(module_tests module_tests.cpp)
-target_compile_features(module_tests PRIVATE cxx_std_20)
+target_compile_features(module_tests PRIVATE cxx_std_23)
 # dacom at load time too: it holds the process's platform state (FlPlatformShared), which the
 # test uses before it loads the other modules, so test and modules share one.
 target_link_libraries(module_tests PRIVATE ${CMAKE_DL_LIBS} dacom)

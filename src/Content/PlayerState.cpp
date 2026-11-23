@@ -139,12 +139,12 @@ void FContentPlayerShip::OnTargetChanged(unsigned int const* NewTargetId)
     // 06f474ba-06f4757b: the hole and its jump target, each once, into holes_visited.
     std::vector<unsigned int>& Holes = Owner->Stats.HolesVisited;
     unsigned int Hole = *NewTargetId;
-    if (std::find(Holes.begin(), Holes.end(), Hole) == Holes.end())
+    if (!std::ranges::contains(Holes, Hole))
         Holes.insert(Holes.end(), Hole);                                      // FUN_06eb5770
     unsigned int JumpSystem = 0;
     unsigned int JumpObject = 0;
     pub::SpaceObj::GetJumpTarget(*NewTargetId, JumpSystem, JumpObject);
-    if (std::find(Holes.begin(), Holes.end(), JumpObject) == Holes.end())
+    if (!std::ranges::contains(Holes, JumpObject))
         Holes.insert(Holes.end(), JumpObject);                                // FUN_06eb5770
 }
 

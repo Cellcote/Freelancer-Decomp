@@ -35,6 +35,7 @@
 #include "../interface/win3d_render.h"
 #include "x86math.h"
 
+#include <numbers>
 #include <list>
 #include <math.h>
 #include <stdio.h>
@@ -3284,7 +3285,7 @@ namespace
 
         // count = ftol(((sx+sz)*π) / (aspect*height) + 0.5) * vert_increase
         float const CountF =
-            ((SizeX + SizeZ) * 3.14159274f) / (Aspect * Height) + 0.5f;
+            ((SizeX + SizeZ) * std::numbers::pi_v<float>) / (Aspect * Height) + 0.5f;
         int PointCount = FloatToIntTrunc(CountF) * VertInc;
         *BandU(Blob, 0x11) = static_cast<unsigned>(PointCount); // +0x44
 

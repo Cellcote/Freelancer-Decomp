@@ -650,7 +650,7 @@ namespace DPNet
         Out.resize(Base + Total);
         for (FPacked* P : Order)
             if (!P->Bytes.empty())
-                std::copy(P->Bytes.begin(), P->Bytes.end(), Out.begin() + (ptrdiff_t)(Base + 4 + P->Offset));
+                std::ranges::copy(P->Bytes, Out.begin() + (ptrdiff_t)(Base + 4 + P->Offset));
     }
 
     bool FSendConnectInfo::Read(const uint8_t* Data, size_t Size, FSendConnectInfo& Out)

@@ -158,7 +158,7 @@ namespace
     // element equal to Id, if any.
     void DmEraseFirst(std::vector<unsigned int>* Ids, unsigned int Id)
     {
-        std::vector<unsigned int>::iterator It = std::find(Ids->begin(), Ids->end(), Id);
+        std::vector<unsigned int>::iterator It = std::ranges::find(*Ids, Id);
         if (It != Ids->end())
             Ids->erase(It);
     }
@@ -166,7 +166,7 @@ namespace
     // FUN_06eb5f30 + FUN_06eb5770: appended when absent (the second find is not read).
     void DmAppendUnique(std::vector<unsigned int>* Ids, unsigned int Id)
     {
-        if (std::find(Ids->begin(), Ids->end(), Id) == Ids->end())
+        if (!std::ranges::contains(*Ids, Id))
             Ids->insert(Ids->end(), Id);
     }
 }
@@ -301,8 +301,7 @@ void FDestroyMission::CreateRuntimeMachines()
         // get_id of null + 0x10.
         unsigned int const Id = static_cast<MessageHandler*>(Machine)->get_id();
         add_state_machine(Machine);
-        if (std::find(PendingMachines.begin(), PendingMachines.end(), Id) ==
-            PendingMachines.end())
+        if (!std::ranges::contains(PendingMachines, Id))
             PendingMachines.push_back(Id);
     }
 }
@@ -562,7 +561,7 @@ FRandomMissionData::~FRandomMissionData()
     if (ObjectiveZone != 0)
     {
         std::vector<unsigned int>::iterator It =
-            std::find(GRmObjectiveZones.begin(), GRmObjectiveZones.end(), ObjectiveZone);
+            std::ranges::find(GRmObjectiveZones, ObjectiveZone);
         if (It != GRmObjectiveZones.end())
             GRmObjectiveZones.erase(It);
     }
@@ -610,8 +609,7 @@ void FRandomMissionData::LoadValue(INI_Reader* Reader)
     if (Reader->is_value("objective_zone"))
     {
         ObjectiveZone = static_cast<unsigned int>(Reader->get_value_int(0));
-        if (std::find(GRmObjectiveZones.begin(), GRmObjectiveZones.end(), ObjectiveZone) ==
-            GRmObjectiveZones.end())
+        if (!std::ranges::contains(GRmObjectiveZones, ObjectiveZone))
             GRmObjectiveZones.insert(GRmObjectiveZones.end(), ObjectiveZone);
         return;
     }
@@ -749,7 +747,7 @@ bool FRandomMissionLoader::IsRouteBlocked(unsigned int FromSystem, unsigned int 
             bBlocked = true;
             break;
         }
-        if (std::find(LockedGates.begin(), LockedGates.end(), Connection) != LockedGates.end())
+        if (std::ranges::contains(LockedGates, Connection))
         {
             bBlocked = true;
             break;
@@ -975,8 +973,7 @@ unsigned int FRandomMissionLoader::PickObjectiveZone(unsigned int PlayerId, FSys
         unsigned int ZoneSystemId = pub::Zone::GetSystem(*It);
         FSystemZone* Zone = FindSystemInfo(&ZoneSystemId)->FindZone(*It);
         bool bKeep = false;
-        if (std::find(GRmObjectiveZones.begin(), GRmObjectiveZones.end(), *It) ==
-            GRmObjectiveZones.end())
+        if (!std::ranges::contains(GRmObjectiveZones, *It))
         {
             // 06ef16a3-06ef16f3: TU48 FUN_06f50650(&OfferGroup) (no null test), read twice.
             unsigned int OfferGroupId = static_cast<unsigned int>(Mission->OfferGroup);

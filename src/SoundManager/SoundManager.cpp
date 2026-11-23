@@ -64,7 +64,7 @@ namespace
             if (It == Nodes.end())
                 return;
             std::vector<TNode*>& Holders = It->second;
-            typename std::vector<TNode*>::iterator Pos = std::find(Holders.begin(), Holders.end(), Node);
+            typename std::vector<TNode*>::iterator Pos = std::ranges::find(Holders, Node);
             if (Pos != Holders.end())
                 Holders.erase(Pos);
             if (Holders.empty())

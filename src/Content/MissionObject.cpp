@@ -1569,8 +1569,7 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
     {
         // 06f0f209-06f0f2f0 (player gone): slot 5 on the id, the id out of +0xdc.
         RemovePlayerById(Parms[0]);
-        std::vector<unsigned int>::iterator Dead =
-            std::find(DeadPlayerIds.begin(), DeadPlayerIds.end(), Parms[0]);
+        std::vector<unsigned int>::iterator Dead = std::ranges::find(DeadPlayerIds, Parms[0]);
         if (Dead != DeadPlayerIds.end())
             DeadPlayerIds.erase(Dead);
         bool bFail = false;
@@ -1667,8 +1666,7 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
         // 06f0f4f0-06f0f5ae: parms[1] leaves +0xdc; for the mission's player in single player,
         // the respawn keeps the hit points unless parms[2] (low 30 bits set) is an object of type
         // 0x20 or 0x100, then FUN_06f145d0 and FUN_06f12c10.
-        std::vector<unsigned int>::iterator Dead =
-            std::find(DeadPlayerIds.begin(), DeadPlayerIds.end(), Parms[1]);
+        std::vector<unsigned int>::iterator Dead = std::ranges::find(DeadPlayerIds, Parms[1]);
         if (Dead != DeadPlayerIds.end())
             DeadPlayerIds.erase(Dead);
         if (Parms[1] != PlayerId)
@@ -1785,7 +1783,7 @@ void FMissionObject::HandleMissionMessage(pub::Controller::EMessage MessageId,
             }
         }
         // 06f0f844-06f0f864: nothing more for a player in +0xdc.
-        if (std::find(DeadPlayerIds.begin(), DeadPlayerIds.end(), Parms[3]) != DeadPlayerIds.end())
+        if (std::ranges::contains(DeadPlayerIds, Parms[3]))
             break;
         if (FindContentPlayerState(PlayerId) == nullptr)
             break;
@@ -2596,7 +2594,7 @@ void FMissionObject::RemoveRandEncMember(unsigned int const* ObjId)
         for (; ArmIt != EncIt->Arms.end(); ++ArmIt)
         {
             std::list<unsigned int>::iterator MemberIt =
-                std::find(ArmIt->MemberIds.begin(), ArmIt->MemberIds.end(), *ObjId);
+                std::ranges::find(ArmIt->MemberIds, *ObjId);
             if (MemberIt == ArmIt->MemberIds.end())
                 continue;
             ArmIt->MemberIds.erase(MemberIt);

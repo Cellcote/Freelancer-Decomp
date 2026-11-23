@@ -18,6 +18,7 @@
 #include "common_misc.h"          // FastInvSqrt
 #include "x86math.h"              // I3DMathEngine::TransformXform
 
+#include <bit>
 #include <cmath>
 #include <cstring>
 
@@ -484,11 +485,9 @@ namespace
     double FastInvSqrtX87(float X)
     {
         double const Half = (double)X * 0.5f;
-        unsigned Bits;
-        std::memcpy(&Bits, &X, sizeof(Bits));
+        unsigned Bits = std::bit_cast<unsigned>(X);
         Bits = 0x5f3759dfu - (Bits >> 1);
-        float Y;
-        std::memcpy(&Y, &Bits, sizeof(Y));
+        float Y = std::bit_cast<float>(Bits);
         return 1.5f * (double)Y - (Half * Y) * ((double)Y * Y);
     }
 }

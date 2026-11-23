@@ -14,6 +14,7 @@
 #include "common_misc.h"           // SUBOBJ_ID_NONE
 #include "common_systemmanager.h"  // SystemManager -- what NavHelperPtr24 points at
 
+#include <bit>
 #include <cstring>
 
 // LootBehavior -- see ai/lootbehavior.h. Every method re-ported from
@@ -66,11 +67,9 @@ namespace
         double const Dz = static_cast<double>(A.z) - B.z;
         double const DistSq = (Dz * Dz + Dx * Dx) + Dy * Dy;
         float const DistSqF = static_cast<float>(DistSq);
-        int Bits;
-        std::memcpy(&Bits, &DistSqF, sizeof(Bits));
+        int Bits = std::bit_cast<int>(DistSqF);
         int const SeedBits = 0x5f3759df - (Bits >> 1);
-        float Seed;
-        std::memcpy(&Seed, &SeedBits, sizeof(Seed));
+        float Seed = std::bit_cast<float>(SeedBits);
         return ((1.5f - ((static_cast<double>(Seed) * Seed) * DistSq) * 0.5f) * Seed) * DistSq;
     }
 

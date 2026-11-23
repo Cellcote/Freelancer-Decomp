@@ -35,7 +35,7 @@ The specifications are at
 | `tests/dpnet_tests.cpp` | The tests (below). |
 | `CMakeLists.txt` | Standalone build of the library and its tests. |
 
-The code is portable C++20 with no operating-system headers. It has no sockets, clocks or
+The code is portable C++23 with no operating-system headers. It has no sockets, clocks or
 threads of its own. The owner feeds in each received datagram with its sender's address, calls
 `Tick` every 10–20 ms with a millisecond clock, and sends what comes out through `ITransport`.
 That keeps the protocol deterministic and testable.

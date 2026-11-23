@@ -10,6 +10,7 @@
 #include "ThornX87.h"
 #endif
 
+#include <bit>
 #include <cmath>
 #include <cstring>
 #include <iterator>
@@ -379,8 +380,7 @@ namespace
     {
         if (Destination == nullptr)
             return;
-        unsigned int Word;
-        std::memcpy(&Word, &Source->Value, sizeof(Word));
+        unsigned int Word = std::bit_cast<unsigned int>(Source->Value);
         std::memcpy(&Destination->Value, &Word, sizeof(Word));
         std::memcpy(&Word, &Source->T, sizeof(Word));
         std::memcpy(&Destination->T, &Word, sizeof(Word));
@@ -412,8 +412,7 @@ namespace
             mov dword ptr [eax + 0ch], edx
         }
 #else
-        unsigned int Word;
-        std::memcpy(&Word, &Source->Value, sizeof(Word));
+        unsigned int Word = std::bit_cast<unsigned int>(Source->Value);
         std::memcpy(&Destination->Value, &Word, sizeof(Word));
         std::memcpy(&Word, &Source->T, sizeof(Word));
         std::memcpy(&Destination->T, &Word, sizeof(Word));
@@ -522,8 +521,7 @@ namespace
         const double D = static_cast<double>(B.T) - static_cast<double>(A.T);
         // FSTP dword into the scratch argument: the one float rounding.
         S = static_cast<float>((static_cast<double>(S) - static_cast<double>(A.T)) / D);
-        unsigned int MOutBits;
-        std::memcpy(&MOutBits, &A.MOut, sizeof(MOutBits));
+        unsigned int MOutBits = std::bit_cast<unsigned int>(A.MOut);
         if (MOutBits == 0xffffffffu)
         {
             ThornStoreExtended(Output, static_cast<double>(A.Value));
@@ -1233,8 +1231,7 @@ namespace
             if (Key == nullptr)
                 return 0;
             // Sequential raw reads, including output aliasing a later field.
-            unsigned int Word;
-            std::memcpy(&Word, &Key->T, sizeof(Word));
+            unsigned int Word = std::bit_cast<unsigned int>(Key->T);
             std::memcpy(Out0, &Word, sizeof(Word));
             std::memcpy(&Word, &Key->Value, sizeof(Word));
             std::memcpy(Out1, &Word, sizeof(Word));
@@ -1501,8 +1498,7 @@ namespace
                 const unsigned int CountBits = Knots_ == nullptr ? 0u : static_cast<unsigned int>(KnotCount_);
                 const unsigned int Growth = CountBits <= 1u ? 1u : CountBits;
                 const unsigned int NewCapacityBits = CountBits + Growth;
-                int NewCapacity;
-                std::memcpy(&NewCapacity, &NewCapacityBits, sizeof(NewCapacity));
+                int NewCapacity = std::bit_cast<int>(NewCapacityBits);
                 // 3033f..3034e: signed-negative -> zero, then wrapping SHL4.
                 const unsigned int AllocationBytes = (NewCapacity < 0 ? 0u : NewCapacityBits) << 4;
                 std::unique_ptr<FHermiteKnot, FParamHermiteDeleter> Grown(

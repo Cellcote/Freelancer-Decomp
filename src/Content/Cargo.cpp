@@ -23,18 +23,14 @@
 #include "server_pub.h"      // pub::Reputation::GetReputation, pub::GetCargoHoldSize
 #include "server_cobject.h"     // pub::SpaceObj::CargoDesc
 
+#include <algorithm>
 #include <cstdlib>
 
 namespace
 {
     bool ContainsId(std::vector<unsigned int> const& Ids, unsigned int Id)
     {
-        for (std::vector<unsigned int>::const_iterator It = Ids.begin(); It != Ids.end(); ++It)
-        {
-            if (*It == Id)
-                return true;
-        }
-        return false;
+        return std::ranges::contains(Ids, Id);
     }
 
     // The unique append of FUN_06f35310 / FUN_06f35540 (06f353b2-06f353f1): a linear find,

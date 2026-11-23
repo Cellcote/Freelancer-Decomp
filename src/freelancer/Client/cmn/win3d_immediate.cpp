@@ -30,6 +30,7 @@
 #include "render/shading.h"   // ITextureLibrary2::GetTextureFrame
 #include "x86math.h"
 
+#include <numbers>
 #include <math.h>
 #include <string.h>
 
@@ -1033,8 +1034,8 @@ void Win3DBuildSpherePoints(float* OutPoints, float Radius, int Cols, int Rows)
     // 0x00422ff5..0x0042301b: FILD (Rows - 1), FDIVR float DAT_005c8a5c (pi as 0x40490fdb) ->
     // FSTP float; FILD Cols, FDIVR double DAT_005c97f8 (0x401921fb60000000, 2 pi widened from
     // float) -> FSTP float.
-    const float PhiStep =
-        static_cast<float>(static_cast<double>(3.1415927f) / static_cast<double>(Rows - 1));
+    const float PhiStep = static_cast<float>(static_cast<double>(std::numbers::pi_v<float>) /
+                                             static_cast<double>(Rows - 1));
     const float ThetaStep =
         static_cast<float>(static_cast<double>(6.2831855f) / static_cast<double>(Cols));
 

@@ -20,6 +20,7 @@
 #include "common_iface.h"         // IObjInspect
 #include "common_systemmanager.h" // SystemManager
 
+#include <bit>
 #include <algorithm>
 #include <cstring>
 
@@ -32,11 +33,9 @@ namespace CmnAiSteer
     inline double InlineFastLength(double LenSq)
     {
         float const LenSqImage = static_cast<float>(LenSq);
-        int Bits;
-        std::memcpy(&Bits, &LenSqImage, sizeof(Bits));
+        int Bits = std::bit_cast<int>(LenSqImage);
         Bits = 0x5f3759df - (Bits >> 1);
-        float Guess;
-        std::memcpy(&Guess, &Bits, sizeof(Guess));
+        float Guess = std::bit_cast<float>(Bits);
         double const Refined = (1.5f - static_cast<double>(Guess) * Guess * LenSq * 0.5f) * Guess;
         return Refined * LenSq;
     }

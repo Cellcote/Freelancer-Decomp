@@ -389,9 +389,7 @@ bool FuseAction::IsTriggered(unsigned short SubObjId) const
     // .text:062bd6f0: false while the flag is clear; otherwise a linear find of SubObjId.
     if (!bTriggered)
         return false;
-    std::vector<unsigned short>::const_iterator It =
-        std::find(TriggeredSubObjs.begin(), TriggeredSubObjs.end(), SubObjId);
-    return It != TriggeredSubObjs.end();
+    return std::ranges::contains(TriggeredSubObjs, SubObjId);
 }
 
 void FuseAction::Trigger(unsigned SourceId, unsigned short SubObjId)
@@ -401,8 +399,7 @@ void FuseAction::Trigger(unsigned SourceId, unsigned short SubObjId)
     // (062bd768-062bd781) has no side effect.
     (void)SourceId;
     bTriggered = true;
-    std::vector<unsigned short>::iterator It =
-        std::find(TriggeredSubObjs.begin(), TriggeredSubObjs.end(), SubObjId);
+    std::vector<unsigned short>::iterator It = std::ranges::find(TriggeredSubObjs, SubObjId);
     if (It == TriggeredSubObjs.end())
         TriggeredSubObjs.insert(TriggeredSubObjs.end(), 1, SubObjId);
 }
@@ -411,8 +408,7 @@ void FuseAction::UnTrigger(unsigned short SubObjId)
 {
     // .text:062bd790: find SubObjId and erase it (shift the tail down, _Last -= 2). The flag at
     // +0x10 is left alone.
-    std::vector<unsigned short>::iterator It =
-        std::find(TriggeredSubObjs.begin(), TriggeredSubObjs.end(), SubObjId);
+    std::vector<unsigned short>::iterator It = std::ranges::find(TriggeredSubObjs, SubObjId);
     if (It != TriggeredSubObjs.end())
         TriggeredSubObjs.erase(It);
 }

@@ -160,8 +160,7 @@ void ClientFuseAction::UnTriggerAndSettle(unsigned short SubObjId)
 {
     // LAB_0052b430: find SubObjId, erase it (shift the tail down, _Last -= 2); then when the
     // vector has no storage or is empty, clear bTriggered.
-    std::vector<unsigned short>::iterator It =
-        std::find(TriggeredSubObjs.begin(), TriggeredSubObjs.end(), SubObjId);
+    std::vector<unsigned short>::iterator It = std::ranges::find(TriggeredSubObjs, SubObjId);
     if (It != TriggeredSubObjs.end())
         TriggeredSubObjs.erase(It);
     if (TriggeredSubObjs.empty())
@@ -654,8 +653,7 @@ void StartEffectAction::UnTrigger(unsigned short SubObjId)
 {
     // FUN_0052be90 (RET 4). 0x0052be95..0x0052bed1: find SubObjId, erase it (tail shifted down,
     // _Last -= 2).
-    std::vector<unsigned short>::iterator It =
-        std::find(TriggeredSubObjs.begin(), TriggeredSubObjs.end(), SubObjId);
+    std::vector<unsigned short>::iterator It = std::ranges::find(TriggeredSubObjs, SubObjId);
     if (It != TriggeredSubObjs.end())
         TriggeredSubObjs.erase(It);
     // 0x0052bed5..0x0052bee7: only once the list has no storage or is empty.

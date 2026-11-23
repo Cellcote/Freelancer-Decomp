@@ -21,6 +21,7 @@
 #include "common_cobjdb.h"     // IObjDB::FindById (AppendSystemManagerTimerListEntry)
 #include "dacom.h"             // DACOM_API
 
+#include <bit>
 #include <cmath>
 #include <cstring>
 #include <cstdlib>
@@ -212,8 +213,7 @@ void ThrustManager::SetAxisThrottle(Vector const& Wanted)
 
     // Epsilon = DAT_063a07e4 raw bits (~1.049e-6f).
     unsigned int const EpsilonBits = 0x358637BEu;
-    float Epsilon;
-    std::memcpy(&Epsilon, &EpsilonBits, sizeof(Epsilon));
+    float Epsilon = std::bit_cast<float>(EpsilonBits);
 
     // 062e8c5c-062e8ca3: each difference and its square stay on the FPU (double); `FCOMP
     // float eps; TEST AH,0x41; JP` -- greater or unordered counts as moved.

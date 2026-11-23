@@ -26,6 +26,7 @@
 #include "common_systemmanager.h" // SystemManager::ExternalIface
 #include "x87_trig.h"             // retail's inline FSIN / FCOS
 
+#include <numbers>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -1300,7 +1301,7 @@ Vector TurnHelper::get_angular_throttle(Matrix const& A, Matrix const& B, float*
     // 062e2b47-062e2bc7: Angle2 FCOM pi (DAT_0639d208) + TEST AH,0x41 + JNZ: greater negates
     // the result and takes 2pi - Angle2 (DAT_0639c9e8); else FCOM -pi (DAT_0639d2a0) + TEST
     // AH,0x5 + JP: only "less" negates and takes Angle2 + 2pi.
-    float const Pi = 3.14159274f;
+    float const Pi = std::numbers::pi_v<float>;
     float const TwoPi = 6.28318548f;
     if (Angle2 > Pi)
     {

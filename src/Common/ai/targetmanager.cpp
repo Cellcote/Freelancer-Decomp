@@ -23,6 +23,7 @@
 #include "common_misc.h"          // FastInvSqrt, SUBOBJ_ID_NONE
 #include "common_universe.h"      // Universe::ISystem::Slot08, Geometry::Sphere
 
+#include <bit>
 #include <cstdlib>
 #include <cstring>
 
@@ -1324,8 +1325,7 @@ void TargetManager::UpdateAttackTargetOverride()
         (aggressionTierSel >= 0 && aggressionTierSel <= 4)
             ? kAggressionThresholdBits[aggressionTierSel]
             : kAggressionThresholdDefaultBits;
-    float aggressionThreshold;
-    std::memcpy(&aggressionThreshold, &aggressionThresholdBits, sizeof(float));
+    float aggressionThreshold = std::bit_cast<float>(aggressionThresholdBits);
 
     // .text:062edba9 `MOV ECX,ESI; CALL FUN_062ee390` -- ESI is this TargetManager.
     // 062edbae-062edbc7: the ratio stays in ST0; FST float stores the rounded copy, the two

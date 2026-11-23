@@ -11,6 +11,7 @@
 #include "readfile.h"
 #include "x64_low_arena.h"
 
+#include <numbers>
 #include <algorithm>
 #include <cmath>
 #include <cstdarg>
@@ -1512,8 +1513,8 @@ static FlULong DACOM_API TypedWrapLerpType2(FScalarTypedChannel* This, float* Ou
     if (This->JointType == 2)
     {
         const double Delta = Right - Left;
-        const double NegPi = (double)(-3.14159274f);
-        const double Pi = (double)(3.14159274f);
+        const double NegPi = (double)(-std::numbers::pi_v<float>);
+        const double Pi = (double)(std::numbers::pi_v<float>);
         const double TwoPi = (double)(6.28318548f);
         double Target = Right;
         if (Delta < NegPi)
@@ -4038,7 +4039,7 @@ static void ChannelDecompressFrames(FChannelArchetypeObject* Channel)
             if (Sum > 0.0)
             {
                 const double Length = std::sqrt(Sum);
-                const double Sine = std::sin((double)(3.1415927f) * Length * 0.5);
+                const double Sine = std::sin((double)(std::numbers::pi_v<float>)*Length * 0.5);
                 const float SineStored = (float)Sine;
                 const float Scale = (float)(Sine / Length);
                 const double W = std::sqrt(1.0 - (double)SineStored *
@@ -4615,7 +4616,7 @@ static FlULong PlaybackEvalTyped(FAnimPlayback* Playback, FlULong Flags, float S
     Header[5] = P5;
     Header[6] = P6;
     FlULong Result = 0;
-    if ((Flags & 1) != 0 && Playback->Typed.size() != 0)      // 0661273d..57
+    if ((Flags & 1) != 0 && !Playback->Typed.empty()) // 0661273d..57
         Result = PlaybackDurationsDiffer(Playback);
     return PlaybackBindAll(Playback, (float*)Header, Result);
 }
@@ -5409,7 +5410,7 @@ static FlULong DACOM_API EngineIsCompoundArchetype(FEngineObject* This,
     (void)This;
     if (Handle == G_InvalidArchetype || Handle == nullptr)
         return 0;
-    return Handle->Children.size() != 0 ? 1 : 0;
+    return !Handle->Children.empty() ? 1 : 0;
 }
 
 // Packed 3x3 orientation followed by translation (12 floats).
@@ -6067,7 +6068,7 @@ static FEngineInstance* DACOM_API EngineCreateInstance(FEngineObject* This,
     if (Handle == G_InvalidArchetype || Handle == nullptr)
         return G_InvalidInstance;
     IInstanceTransform* Xf = (IInstanceTransform*)Transform;
-    if (Handle->Children.size() != 0)
+    if (!Handle->Children.empty())
     {
         FEngineInstance* Root = EngineCreateInstanceTree(This, Handle, Xf);
         if (Root == G_InvalidInstance)
@@ -6880,7 +6881,7 @@ static FArchetypeHandle* DACOM_API EngineDuplicateArchetype(FEngineObject* This,
 {
     if (ArchIn == G_InvalidArchetype)
         return G_InvalidArchetype;
-    if (ArchIn != nullptr && ArchIn->Children.size() != 0) // 066212d6..fb
+    if (ArchIn != nullptr && !ArchIn->Children.empty()) // 066212d6..fb
     {
         EngBaseFdump(kFdumpWarning, G_FdumpFileEngine, 0x42A, "WARNING",
                      "Engine: duplicate_archetype: arch_index is a compound archetype (not valid).");

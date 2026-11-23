@@ -162,7 +162,7 @@ bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl
 
     for (;;) // LAB_06326854
     {
-        if (Frames.size() == 0 && Node == nullptr && Line.size() == 0)
+        if (Frames.empty() && Node == nullptr && Line.empty())
         {
             break;
         }
@@ -171,7 +171,7 @@ bool __cdecl LayoutRichText(TextRenderContext& Ctx, RenderDisplayList const& Rdl
 
         if (Node == nullptr)
         {
-            if (Frames.size() == 0)
+            if (Frames.empty())
             {
                 bFlush = true;            // 0632687e
             }

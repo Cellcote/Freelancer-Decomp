@@ -11,6 +11,7 @@
 #include "x86math.h"              // I3DMathEngine::TransformMatrix, FVector, FMatrix
 #include "common_pathfind.h"      // PathfindManager::IsCruiseUnobstructed (FUN_062de160)
 
+#include <numbers>
 #include <cmath>
 #include <cstdint>
 #include <cstring> // std::memcpy -- the GotoOp copy in Slot10 (LAB_062fe670)
@@ -963,7 +964,7 @@ void GotoBehavior::Slot3()
     SubObjectA.SetMode((Flag368 != 0 && CruiseResult == 0) ? 2 : 0);    // FUN_062d5980
     Flag365 = 1;                                                    // 062fd95f
     Flag36c = 1;                                                    // 062fd966
-    SubObjectA.SetAngle38(3.14159274f);                             // 062fd96d, 0x40490fdb
+    SubObjectA.SetAngle38(std::numbers::pi_v<float>); // 062fd96d, 0x40490fdb
     Field2e4 = Field360;                                            // 062fd97a
     Flag2ea = 0;                                                    // 062fd984
     Flag2ec = 0;                                                    // 062fd98b
@@ -1403,7 +1404,7 @@ int GotoBehavior::Update()
             // 062fe2f4-062fe31e: MoveIdea angle pi (`PUSH 0x40490fdb`), Throttle clamped down to
             // the envelope's (`TEST AH,0x5; JP` -> assign only when strictly less), MoveIdea
             // scale = Throttle.
-            SubObjectA.SetAngle38(3.14159274f);
+            SubObjectA.SetAngle38(std::numbers::pi_v<float>);
             if (Envelope.Throttle < Throttle)
                 Throttle = Envelope.Throttle;
             SubObjectA.SetScale40(Throttle);

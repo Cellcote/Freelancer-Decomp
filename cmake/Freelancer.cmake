@@ -69,7 +69,7 @@ if(NOT FL_WINDOWS)
   if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Release or Debug" FORCE)
   endif()
-  set(CMAKE_CXX_STANDARD 20)
+  set(CMAKE_CXX_STANDARD 23)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
   set(CMAKE_CXX_EXTENSIONS OFF)
   set(FL_BIN_DIR "${CMAKE_BINARY_DIR}/bin")
@@ -239,6 +239,11 @@ endif()
 if(CMAKE_GENERATOR MATCHES "^Visual Studio")
   message(FATAL_ERROR "Use the Ninja generator (see CMakePresets.json): the Visual Studio "
                       "generators hand the flags back to MSBuild, which adds its own defaults.")
+endif()
+# /std:c++23preview (below) first shipped in Visual Studio 2022 17.13, whose toolset is 19.43.
+if(MSVC_VERSION LESS 1943)
+  message(FATAL_ERROR "Freelancer builds as C++23, which needs Visual Studio 2022 17.13 or later "
+                      "(MSVC 19.43, for /std:c++23preview); this toolset is ${CMAKE_CXX_COMPILER_VERSION}.")
 endif()
 
 get_property(_fl_multi GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
@@ -724,8 +729,8 @@ function(fl_add_module name kind)
   target_compile_definitions(${name} PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:${_defs}>")
 
   # The rest of the cl options MSBuild passes (the per-item ones come from _fl_finalize).
-  # Directory.Build.props: /std:c++20 with /permissive (ConformanceMode false; /std:c++20 alone
-  # implies /permissive-), fl_layout.h forced into every source (FL_LAYOUT_ASSERT, the retail
+  # /std:c++23preview (MSVC's C++23 switch; it has no plain /std:c++23 yet) with /permissive (the
+  # /std switches alone imply /permissive-), fl_layout.h forced into every source (FL_LAYOUT_ASSERT, the retail
   # struct size and offset checks; per source, in _fl_finalize), C4251 / C4275 off (exported classes hold STL members and
   # derive from non-exported bases; their consumers do not need the dll-interface).
   # Warnings: /W4 by default and never errors (/WX-); CI summarises them per warning and per
@@ -736,7 +741,7 @@ function(fl_add_module name kind)
     /W${A_WARNING_LEVEL} /WX- /diagnostics:column /Gm- /EHsc
     "$<${_fl_cfg_asan}:/fsanitize=address>"
     /GS /Zc:wchar_t /Zc:forScope /Zc:inline
-    /std:c++20 /permissive
+    /std:c++23preview /permissive
     /external:anglebrackets /external:W0 /Gd /FC /wd4251 /wd4275)
   if(FL_WIN32)
     # MSBuild passes these two for Win32 only.

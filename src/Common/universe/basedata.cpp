@@ -230,7 +230,7 @@ void BaseData::read_Room_block(INI_Reader* Reader)
                   kBaseDataSource, 0xb5, Reader->get_file_name());
         }
     }
-    if (Nickname.length() != 0 && File.length() != 0)
+    if (!Nickname.empty() && !File.empty())
     {
         // 0626501a-06265058: sprintf "%X_%s", CreateID, then
         // RoomData::init(BaseData+0, room id, nickname, file) -- init malloc_strcpy's both

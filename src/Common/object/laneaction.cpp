@@ -21,6 +21,7 @@
 #include "ivp_physics/ivp_controller.h"  // IVP_Event_Sim (do_simulation_controller)
 #include "x87_trig.h"        // retail's inline FSIN / FCOS (BuildRingTransform, 062c19d0)
 
+#include <bit>
 #include <math.h>
 #include <string.h>
 
@@ -220,11 +221,9 @@ void LaneAction::InitializeApproach()
         // `FST float` image (062c154d) seeds the guess (SAR 1, 0x5f3759df - bits).
         double const SpeedSq = ((double)Vel.x * Vel.x + (double)Vel.y * Vel.y) + (double)Vel.z * Vel.z;
         float const SpeedSqImage = (float)SpeedSq;
-        int Bits;
-        memcpy(&Bits, &SpeedSqImage, sizeof(Bits));
+        int Bits = std::bit_cast<int>(SpeedSqImage);
         Bits = 0x5f3759df - (Bits >> 1);
-        float Guess;
-        memcpy(&Guess, &Bits, sizeof(Guess));
+        float Guess = std::bit_cast<float>(Bits);
         // 062c155d-062c157d: 1.5f (DAT_0639e6d0) - g*g*S*0.5f (DAT_0639c13c); S / 2500.0f
         // (DAT_0639f3cc) times that, times g -- all on the FPU, rounded once by FST +0xf0 and
         // FSTP +0xec.

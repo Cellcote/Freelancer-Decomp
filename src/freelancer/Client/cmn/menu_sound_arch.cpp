@@ -32,6 +32,7 @@
 #include "sound_archetype.h"
 #include "vc6_sort.h"        // Vc6Sort::Sort (MixerSortRanked)
 
+#include <bit>
 #include <cstdint>
 #include <float.h>
 #include <math.h>
@@ -1470,11 +1471,9 @@ namespace
         float MinRange;
         if (GetMinDistance(&MinRange) != GR_OK)
             MinRange = 1.f;
-        unsigned Bits;
-        memcpy(&Bits, &DistSq, sizeof(Bits));
+        unsigned Bits = std::bit_cast<unsigned>(DistSq);
         Bits = 0x5f3759dfu - ((Bits >> 1) | (Bits & 0x80000000u));
-        float Guess;
-        memcpy(&Guess, &Bits, sizeof(Guess));
+        float Guess = std::bit_cast<float>(Bits);
         float const Half = 0.5f;
         float const ThreeHalves = 1.5f;
         double const Ten = 10.0;

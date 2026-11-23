@@ -20,6 +20,8 @@
 #include "common_cobject.h"    // CEqObj::EquipManager / get_behavior_interface (ScanAutoTurretTargets)
 #include "common_cequip.h"     // CELauncher::cast / GetBarrelPosWS (ScanAutoTurretTargets)
 
+#include <numbers>
+#include <bit>
 #include <cmath>
 #include <cstring>
 #include <cstdlib>
@@ -105,7 +107,7 @@ void ConstructSystemManagerGunGroupManager(SystemManagerGunGroupManager* Self)
     Self->GunFireBurstIntervalTime = 4.0f;
     Self->AutoTurretBurstIntervalTime = 4.0f;
     Self->MissileLaunchIntervalTime = 3.0f;
-    Self->MissileLaunchConeAngle = 3.14159274f;
+    Self->MissileLaunchConeAngle = std::numbers::pi_v<float>;
     Self->MineLaunchInterval = 5.0f;
     Self->MineLaunchConeAngle = 0.3926991f;
     Self->GunFireAccuracyConeAngle = 0.05f;
@@ -252,8 +254,7 @@ int SystemManagerGunGroupManager::PopulateSlots(unsigned short const* SourceIds,
             int const Result = OwnShip()->get_equipment_val(Val, Slot->HardpointId, EquipValMunitionKind, 0.0f);
             if (Result == 0)
             {
-                int Classify;
-                std::memcpy(&Classify, &Val, sizeof(Classify));
+                int Classify = std::bit_cast<int>(Val.Value);
                 int NewKind = -1;
                 switch (Classify)
                 {

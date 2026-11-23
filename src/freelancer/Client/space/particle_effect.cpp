@@ -29,6 +29,7 @@
 #include "dacom.h"
 #include "soundmanager.h"
 
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -390,8 +391,7 @@ void FParticleEffect::SetIntensity(float Intensity)
     IFxEffect* const Fx = This->FxEffect;
     if (Fx == nullptr)
         return;
-    float Value;
-    std::memcpy(&Value, &Intensity, sizeof(Value));
+    float Value = std::bit_cast<float>(Intensity);
     if (Value < 0.0f)
         std::memcpy(&Value, &GEffectFloatZero, sizeof(Value));
     else if (Value > 1.0f)
@@ -652,8 +652,7 @@ void FParticleEffect::SetLod(float Lod)
               "Trying to set LOD on effect that does not exist - ADO");
         return;
     }
-    float Value;
-    std::memcpy(&Value, &Lod, sizeof(Value));
+    float Value = std::bit_cast<float>(Lod);
     if (Value < 0.0f)
         std::memcpy(&Value, &GEffectFloatZero, sizeof(Value));
     else if (Value > 1.0f)
@@ -697,8 +696,7 @@ void FParticleEffectCruise::SetIntensity(float Scale)
     IFxEffect* const Fx = This->FxEffect;
     if (Fx == nullptr)
         return;
-    float Value;
-    std::memcpy(&Value, &Scale, sizeof(Value));
+    float Value = std::bit_cast<float>(Scale);
     if (Value < 0.0f)
         std::memcpy(&Value, &GEffectFloatZero, sizeof(Value));
     else if (Value > 1.0f)

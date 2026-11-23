@@ -26,6 +26,7 @@
 #include "server_pub.h"
 #include "server_cobject.h"     // pub::SpaceObj::Destroy, DESTROY_NORMAL
 
+#include <bit>
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -1194,15 +1195,7 @@ int FSystemInfo::BuildPatrolPaths(std::vector<FZonePathLabel>* Labels)
             if (Zone == nullptr || Zone->Path == nullptr)
                 continue;
             FPatrolPath* Path = Zone->GetPath();                          // FUN_06fa8130
-            bool bKnown = false;
-            for (std::vector<FPatrolPath*>::iterator It = NearPaths.begin(); It != NearPaths.end(); ++It)
-            {
-                if (*It == Path)
-                {
-                    bKnown = true;
-                    break;
-                }
-            }
+            bool const bKnown = std::ranges::contains(NearPaths, Path);
             if (!bKnown)
                 NearPaths.insert(NearPaths.end(), Path);                  // FUN_06eb5770
         }
@@ -1569,8 +1562,7 @@ void FSystemInfo::SpawnTradeLaneAttack(FContentPlayerShip* PlayerShip, int const
     // the iteration that selected it). Affiliation ([ESP+0x1c], the last draw's target) is
     // always written: pub::Reputation::GetAffiliation stores -1 on failure.
     FTradeLaneRing const Ring = TheLane->Rings[Selected->RingIndex];
-    int Rep;
-    std::memcpy(&Rep, &DistanceSq, sizeof(Rep));
+    int Rep = std::bit_cast<int>(DistanceSq);
     unsigned int Affiliation = 0;
     pub::SpaceObj::GetSolarRep(Ring.ObjectId, Rep);
     pub::Reputation::GetAffiliation(Rep, Affiliation);
@@ -1695,7 +1687,7 @@ void FSystemInfo::RemoveTradeLaneShip(unsigned int const* ShipId, unsigned int c
     {
         // 06f78e14-06f78e5c: the first match in ForwardShips.
         std::vector<unsigned int>::iterator Found =
-            std::find(TheLane->ForwardShips.begin(), TheLane->ForwardShips.end(), *ShipId);
+            std::ranges::find(TheLane->ForwardShips, *ShipId);
         if (Found != TheLane->ForwardShips.end())
         {
             TheLane->ForwardShips.erase(Found);
@@ -1705,7 +1697,7 @@ void FSystemInfo::RemoveTradeLaneShip(unsigned int const* ShipId, unsigned int c
         // 06f78e5d-06f78ea8.
         if (!bRemoved)
         {
-            Found = std::find(TheLane->BackwardShips.begin(), TheLane->BackwardShips.end(), *ShipId);
+            Found = std::ranges::find(TheLane->BackwardShips, *ShipId);
             if (Found != TheLane->BackwardShips.end())
             {
                 TheLane->BackwardShips.erase(Found);
@@ -1959,11 +1951,9 @@ double __cdecl DistanceSquaredToSegment(Vector const* Point, Vector const* Start
 // 0x5f3759df - (bits >> 1), SAR on the float's bits.
 static float ReciprocalSqrtGuess(float Value)
 {
-    int Bits;
-    std::memcpy(&Bits, &Value, sizeof(Bits));
+    int Bits = std::bit_cast<int>(Value);
     int const GuessBits = 0x5f3759df - (Bits >> 1);
-    float Guess;
-    std::memcpy(&Guess, &GuessBits, sizeof(Guess));
+    float Guess = std::bit_cast<float>(GuessBits);
     return Guess;
 }
 

@@ -21,6 +21,7 @@
 #include "render/IRenderPipeline.h"
 #include "render/shading.h" // ITextureLibrary2
 
+#include <numbers>
 #include <cmath>
 #include <cstdlib>
 #include <new>
@@ -304,8 +305,8 @@ FGateTunnel::FGateTunnel()
     TimeToMaxSpeed = 8.0f;
     NumTSteps = 200.0f;
     NumSSteps = 12.0f;
-    MinRotation = -3.14159265f; // 0xc0490fdb
-    MaxRotation = 3.14159265f;  // 0x40490fdb
+    MinRotation = -std::numbers::pi_v<float>; // 0xc0490fdb
+    MaxRotation = std::numbers::pi_v<float>; // 0x40490fdb
     LayerCount = 0;
     State = 0;
 

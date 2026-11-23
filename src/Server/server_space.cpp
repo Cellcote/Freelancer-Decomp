@@ -367,7 +367,7 @@ void Server_GetLaunchPosition(unsigned int PlayerId, unsigned int* OutObjId, int
         StarSystem* const System = SysDB_LookupSystem(Players[PlayerId].system_id);
         System->collect_dockable_solars(Rings, Players[PlayerId].exited_base_id);
 
-        if (Rings.size() == 0u)
+        if (Rings.empty())
         {
             FDUMP(0x100002, "%s(%d) : *** WARNING: No docking rings for base %X",
                   "E:\\FL\\Scratch\\Source\\Server\\space\\ServerSpace.cpp", 0x1a3,

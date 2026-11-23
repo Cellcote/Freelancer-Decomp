@@ -16,6 +16,7 @@
 #if FREELANCER_ENABLE_TICK_PROFILE
 #include <charconv>
 #include <iterator>
+#include <utility>
 #include <windows.h>
 
 #include "platform.h"
@@ -126,7 +127,7 @@ FClientTickProfileFrame::~FClientTickProfileFrame()
 {
     if (!bOwnsFrame)
         return;
-    G_SectionTicks[static_cast<int>(EClientTickSection::Tick)] = ReadProfileTicks() - Start;
+    G_SectionTicks[std::to_underlying(EClientTickSection::Tick)] = ReadProfileTicks() - Start;
     G_bProfileActive = false;
     G_bProfileRendering = false;
     for (int Index = 0; Index < G_SectionCount; ++Index)
@@ -179,10 +180,10 @@ void FClientPhysicsProfileScope::Stop()
         EClientTickSection::PhysicsSimUnits, EClientTickSection::PhysicsCommitHulls,
         EClientTickSection::PhysicsContacts, EClientTickSection::PhysicsSync
     };
-    static_assert(std::size(Destinations) ==
-                  static_cast<int>(EPhysicsTickSection::Count), "physics profile mapping");
-    for (int Index = 0; Index < static_cast<int>(EPhysicsTickSection::Count); ++Index)
-        G_SectionTicks[static_cast<int>(Destinations[Index])] += Counters.Ticks[Index];
+    static_assert(std::size(Destinations) == std::to_underlying(EPhysicsTickSection::Count),
+                  "physics profile mapping");
+    for (int Index = 0; Index < std::to_underlying(EPhysicsTickSection::Count); ++Index)
+        G_SectionTicks[std::to_underlying(Destinations[Index])] += Counters.Ticks[Index];
     bRunning = false;
 }
 
@@ -199,7 +200,7 @@ void EndClientProfileRender()
 {
     if (G_bProfileRendering)
     {
-        G_SectionTicks[static_cast<int>(EClientTickSection::Render)] +=
+        G_SectionTicks[std::to_underlying(EClientTickSection::Render)] +=
             ReadProfileTicks() - G_RenderStart;
         G_bProfileRendering = false;
     }

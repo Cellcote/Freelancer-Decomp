@@ -17,6 +17,7 @@
 #include "../ids_strings.h"
 #include "../cmn/input_manager.h" // GetClientMouseButtons (DAT_00616850)
 
+#include <algorithm>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -566,12 +567,8 @@ bool RegisterAcceleratorGroup(char const* GroupNickname)
     }
 
     // 0x0057751b..0x00577539: already active -> true.
-    for (std::list<FKeyMapGroup*>::iterator It = GActiveGroups.begin();
-         It != GActiveGroups.end(); ++It)
-    {
-        if (*It == Group)
-            return true;
-    }
+    if (std::ranges::contains(GActiveGroups, Group))
+        return true;
     // Retail 0057753b..00577564 links the new node before head->next (std::list
     // insert(begin())): the newest group sits at the front and every walker
     // (FUN_00577850, FUN_00577dd0, 00577a59) goes head->next forward, so the most

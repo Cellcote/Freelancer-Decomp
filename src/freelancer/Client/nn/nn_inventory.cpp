@@ -61,6 +61,7 @@
 #include "common_ini.h"             // StringAlloc
 #include "common_misc.h"            // SUBOBJ_ID_NONE
 
+#include <algorithm>
 #include <windows.h>
 
 #include <stdio.h>
@@ -4444,15 +4445,7 @@ void NnInventory::RefreshItemList(EquipDescList const* List, int Arg2, unsigned 
             continue;
 
         // 0047db4d..0047db7c: listed already.
-        bool bListed = false;
-        for (size_t Seen = 0; Seen < ListedAmmo.size(); ++Seen)
-        {
-            if (ListedAmmo[Seen] == AmmoId)
-            {
-                bListed = true;
-                break;
-            }
-        }
+        bool const bListed = std::ranges::contains(ListedAmmo, AmmoId);
         if (bListed)
             continue;
 

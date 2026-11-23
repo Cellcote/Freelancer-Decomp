@@ -521,11 +521,11 @@ COMMON_API void __cdecl Rem(int PlaybackId)
 template <typename T>
 static std::pair<typename std::vector<T>::iterator, bool> InsertUnique(std::vector<T>& Vec, T Value)
 {
-    typename std::vector<T>::iterator It = std::find(Vec.begin(), Vec.end(), Value);
+    typename std::vector<T>::iterator It = std::ranges::find(Vec, Value);
     if (It != Vec.end())
         return std::pair<typename std::vector<T>::iterator, bool>(It, false);
     Vec.insert(Vec.end(), 1, Value);
-    It = std::find(Vec.begin(), Vec.end(), Value);
+    It = std::ranges::find(Vec, Value);
     return std::pair<typename std::vector<T>::iterator, bool>(It, true);
 }
 

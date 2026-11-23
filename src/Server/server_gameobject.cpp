@@ -22,6 +22,7 @@
 #include "x86math.h"          // I3DMathEngine::MatrixToQuaternion
 #include "common_physys.h"   // PhySys::RCBegin/RCEnd, Collision::CalcCollisionDamage
 #include "common_universe.h" // Universe::IZone (CSimple::ZoneAtA4)
+#include <algorithm>
 #include <cmath>
 #include <concepts>
 #include <type_traits>
@@ -146,12 +147,7 @@ void GameObject::mark_for_player(unsigned int PlayerId, int MarkType)
 //   .text:06cef46d  0f95c0    SETNZ  AL                   ; "not end()" == found
 bool GameObject::is_marked_by(unsigned int PlayerId) const
 {
-    for (std::list<unsigned int>::const_iterator It = MarkedByPlayers.begin();
-         It != MarkedByPlayers.end(); ++It) {
-        if (*It == PlayerId)
-            return true;
-    }
-    return false;
+    return std::ranges::contains(MarkedByPlayers, PlayerId);
 }
 
 // Retail inlines this guard at every single call site: load CBase::Object and
@@ -5081,7 +5077,7 @@ void Ship::tick_jettison(float Dt)
 {
     // .text:06d0155a .. 06d01572  FLD +0xac / FCOMP 0.0f, then the queue size
     // (+0xa8) decides the arm.
-    if (Jettison.Items.size() == 0u)
+    if (Jettison.Items.empty())
     {
         // .text:06d01574 TEST AH,0x44 / JNP -> return when the timer is 0.
         if (JettisonTimer == 0.0f)

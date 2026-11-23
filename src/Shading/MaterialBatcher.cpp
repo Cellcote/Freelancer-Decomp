@@ -7,6 +7,7 @@
 #include "MaterialBatcher.h"
 #include "msvcrt_compat.h" // MsvcrtAtoi: retail MSVCRT.DLL wraps mod 2^32, the UCRT saturates
 
+#include <bit>
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
@@ -180,8 +181,7 @@ static float ComputeBatchDepth(const FBatchRecord& Record)
     if ((Record.Flags & 0x20) != 0)
     {
         const FlULong Bits = (FlULong)(std::uintptr_t)Record.Unused; // depth bits, not an address
-        float Depth;
-        std::memcpy(&Depth, &Bits, sizeof(Depth));
+        float Depth = std::bit_cast<float>(Bits);
         return -Depth;
     }
     const FRpVertexSrcDesc& Source = *Record.Context.SourceVertices;

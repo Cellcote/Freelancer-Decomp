@@ -34,6 +34,7 @@
 #include "render/shading.h"
 #include "x86math.h"
 
+#include <bit>
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
@@ -1231,8 +1232,7 @@ void Win3DStartupManager(int Width, int Height)
     // 0x0059d5fc..0x0059d606: FUN_0040f8c0 with the float bits 0x41d9ba5e.
     {
         unsigned int const kHalfFovBits = 0x41d9ba5eu;
-        float HalfFovX;
-        memcpy(&HalfFovX, &kHalfFovBits, sizeof(HalfFovX));
+        float HalfFovX = std::bit_cast<float>(kHalfFovBits);
         SpaceCameraSetHalfFovX(WinCamera, HalfFovX);
     }
     // 0x0059d60b: FUN_0041e5c0 -- mouse.ini shapes and cursors.

@@ -11,6 +11,7 @@
 #include "common_csys.h"   // Matrix / Transform -- FetchNavCandidateBasis's real result type
 #include "common_iface.h"  // IObjInspect -- what NavHelperPtr24[+0x14fc][+0x84] actually is
 
+#include <numbers>
 #include <cstdlib>  // rand()
 
 // BuzzBehavior -- see ai/buzzbehavior.h for the full RTTI/layout writeup
@@ -168,7 +169,7 @@ bool BuzzBehavior::SetContext(void* Param1, void* Param2, void* Param3)
     // +0x38 is ctor-defaulted to exactly this value, so the call restores the
     // member's own default. The old comment's claim that the argument was
     // "not matched to any of MoveIdea's confirmed own fields" is disproved.
-    WatcherA.SetAngle38(3.14159274f);  // 0x40490fdb
+    WatcherA.SetAngle38(std::numbers::pi_v<float>); // 0x40490fdb
 
     // retail: `FUN_062d5980(&WatcherA, 0)` -- MoveIdea::SetMode(0), the 0/1/2
     // transition machine. ai/idea.h notes this address is shared with

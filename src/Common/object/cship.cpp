@@ -21,6 +21,8 @@
 
 #include "DALib.h"
 
+#include <numbers>
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <stdio.h>
@@ -910,7 +912,7 @@ bool CShip::generate_follow_offset(IObjInspect const* Inspect, Transform& OutOff
     // 062b4fcd..062b502a: A = Quad * pi(float, DAT_0639d208) * 0.5(double, DAT_0639df88) kept
     // on the FPU; FST dword stores A rounded, FCOS runs on the unrounded A, FSIN on the
     // reloaded rounded one. Rows {cos, -sin, 0}, {sin, cos, 0}, {0, 0, 1}.
-    double const Angle = (double)(Quad) * (double)(3.1415927f) * 0.5;
+    double const Angle = (double)(Quad) * (double)std::numbers::pi_v<float> * 0.5;
     float const AngleRounded = (float)(Angle);
     float const Cos = X87CosF(Angle);
     float const Sin = X87SinF((double)(AngleRounded));
@@ -1790,11 +1792,9 @@ bool CShip::check_formation_follower_status(float MaxDistance)
         // one Newton step against the unrounded S (0.5 = DAT_0639c13c, 1.5 = DAT_0639e6d0),
         // times S again: an approximate distance.
         float const SRounded = (float)(S);
-        int Bits;
-        memcpy(&Bits, &SRounded, sizeof(Bits));
+        int Bits = std::bit_cast<int>(SRounded);
         Bits = 0x5f3759df - (Bits >> 1);
-        float Y;
-        memcpy(&Y, &Bits, sizeof(Y));
+        float Y = std::bit_cast<float>(Bits);
         double Dist = (double)(Y) * Y;
         Dist *= S;
         Dist *= (double)(0.5f);

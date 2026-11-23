@@ -42,6 +42,7 @@
 #include "../interface/win3d_render.h"
 #include "x86math.h"
 
+#include <numbers>
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -49,7 +50,7 @@
 #include <new>
 
 constexpr int kPipelineStateViewspace = 7;
-constexpr float kPi = 3.14159274f; // 0x40490fdb
+constexpr float kPi = std::numbers::pi_v<float>; // 0x40490fdb
 constexpr float kTinyFade = 1.0e-7f; // 0x33d6bf95 — Load clamp for zero fades
 constexpr float kHalf = 0.5f;       // DAT_00613458
 constexpr float kSpineBlend = 0.8f; // DAT_0061346c

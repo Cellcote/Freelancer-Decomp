@@ -600,7 +600,7 @@ void FSrvAsteroidField::update() {
 
     std::map<FlULong, FSrvAsteroidCube>::iterator It = Cubes.begin();
     while (It != Cubes.end()) {
-        if (It->second.Objects.size() == 0)
+        if (It->second.Objects.empty())
             It = Cubes.erase(It);
         else
             ++It;

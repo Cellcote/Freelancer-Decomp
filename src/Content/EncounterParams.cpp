@@ -29,6 +29,8 @@
 #include "common_tstring.h"
 #include "x86math.h"            // FTransform
 
+#include <algorithm>
+#include <bit>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -56,26 +58,10 @@ namespace
         std::vector<unsigned int> Result;
         for (std::vector<unsigned int>::const_iterator It = A.begin(); It != A.end(); ++It)
         {
-            bool bInB = false;
-            for (std::vector<unsigned int>::const_iterator Other = B.begin(); Other != B.end(); ++Other)
-            {
-                if (*Other == *It)
-                {
-                    bInB = true;
-                    break;
-                }
-            }
+            bool const bInB = std::ranges::contains(B, *It);
             if (!bInB)
                 continue;
-            bool bKnown = false;
-            for (std::vector<unsigned int>::iterator Kept = Result.begin(); Kept != Result.end(); ++Kept)
-            {
-                if (*Kept == *It)
-                {
-                    bKnown = true;
-                    break;
-                }
-            }
+            bool const bKnown = std::ranges::contains(Result, *It);
             if (!bKnown)
                 Result.push_back(*It);                                      // FUN_06eb5770
         }
@@ -629,8 +615,7 @@ bool FEncounterParameters::Refresh(float Time)
 {
     // 06ef52d8-06ef5303: the -1.0f tests compare the raw bits (CMP EAX,0xbf800000). A reroll
     // is due unless Time - LastRerollTime < RerollInterval (TEST AH,1 / JZ: C0 clear).
-    unsigned int LastBits;
-    memcpy(&LastBits, &LastRerollTime, sizeof(LastBits));
+    unsigned int LastBits = std::bit_cast<unsigned int>(LastRerollTime);
     bool const bFirst = LastBits == 0xbf800000u;
     bool bReroll;
     if (bFirst)
@@ -747,12 +732,7 @@ namespace
     // The linear finds of FUN_06ef5a20 / FUN_06ef4eb0 (FUN_06eb5f30): Id in Ids.
     bool ContainsId(std::vector<unsigned int> const* Ids, unsigned int Id)
     {
-        for (std::vector<unsigned int>::const_iterator It = Ids->begin(); It != Ids->end(); ++It)
-        {
-            if (*It == Id)
-                return true;
-        }
-        return false;
+        return std::ranges::contains(*Ids, Id);
     }
 
     // FUN_06ef4eb0 06ef4faa-06ef4fba: REP MOVSD 0xe of the plan into the guide description's

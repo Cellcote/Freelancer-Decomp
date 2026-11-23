@@ -18,6 +18,7 @@
 #include "server_pub.h"        // pub::SpaceObj, pub::AI::lock_maneuvers, pub::GetNicknameId
 #include "ContentInternal.h"      // SubtractVectors (FUN_06eeaee0)
 
+#include <algorithm>
 #include <cstdint>
 #include <vector>
 
@@ -514,15 +515,7 @@ void FGotoGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
                 break;
             if (A != TargetId && A != Ship->SpaceObjId && B != TargetId && B != Ship->SpaceObjId)
                 break;
-            bool bKnownId = false;
-            for (std::list<unsigned int>::iterator It = CombatIds.begin(); It != CombatIds.end(); ++It)
-            {
-                if (*It == A)
-                {
-                    bKnownId = true;
-                    break;
-                }
-            }
+            bool const bKnownId = std::ranges::contains(CombatIds, A);
             if (!bKnownId)
                 CombatIds.push_back(A);                                 // FUN_06eb6740
             break;
@@ -533,15 +526,7 @@ void FGotoGuide::HandleEvent(pub::Controller::EMessage MsgId, void const* Parms)
             break;
         if (A != TargetId && A != Ship->SpaceObjId && B != TargetId && B != Ship->SpaceObjId)
             break;
-        bool bKnown = false;
-        for (std::list<unsigned int>::iterator It = CombatIds.begin(); It != CombatIds.end(); ++It)
-        {
-            if (*It == A)
-            {
-                bKnown = true;
-                break;
-            }
-        }
+        bool const bKnown = std::ranges::contains(CombatIds, A);
         if (!bKnown)
             CombatIds.push_back(A);
         if (State == 7)

@@ -13,6 +13,7 @@
 #include "render/shading.h"
 #include "float_bits.h"
 
+#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -100,8 +101,7 @@ namespace AlchemyImpl
             std::memcpy(&LengthBits, &LengthSquared, sizeof(LengthBits));
             const std::uint32_t GuessBits = 0x5f3759dfu -
                 static_cast<std::uint32_t>(LengthBits >> 1);
-            float Guess;
-            std::memcpy(&Guess, &GuessBits, sizeof(Guess));
+            float Guess = std::bit_cast<float>(GuessBits);
             const double GuessSquared = static_cast<double>(Guess) * Guess;
             const double InverseLength = (1.5 - ((GuessSquared * LengthSquared) * 0.5)) * Guess;
             const double Distance = InverseLength * LengthSquared;
@@ -177,12 +177,10 @@ namespace AlchemyImpl
                 RoundedLengthSquared = static_cast<float>(SumYz + SquareX);
                 LengthSquared = RoundedLengthSquared;
             }
-            std::int32_t LengthBits;
-            std::memcpy(&LengthBits, &RoundedLengthSquared, sizeof(LengthBits));
+            std::int32_t LengthBits = std::bit_cast<std::int32_t>(RoundedLengthSquared);
             const std::uint32_t GuessBits = 0x5f3759dfu -
                 static_cast<std::uint32_t>(LengthBits >> 1);
-            float Guess;
-            std::memcpy(&Guess, &GuessBits, sizeof(Guess));
+            float Guess = std::bit_cast<float>(GuessBits);
             const double GuessSquared = static_cast<double>(Guess) * Guess;
             const double InverseLength = (1.5 - ((GuessSquared * LengthSquared) * 0.5)) * Guess;
             const double Distance = InverseLength * LengthSquared;
@@ -517,15 +515,13 @@ namespace AlchemyImpl
         {
             if ((Flags & 0x1000u) != 0)
             {
-                std::uint32_t Previous;
-                std::memcpy(&Previous, &FrameBlock[3], sizeof(Previous));
+                std::uint32_t Previous = std::bit_cast<std::uint32_t>(FrameBlock[3]);
                 FrameBlock[3] = static_cast<float>(LoadAppearanceScalar(FrameBlock[1]));
                 std::memcpy(&FrameBlock[1], &Previous, sizeof(Previous));
             }
             if ((Flags & 0x2000u) != 0)
             {
-                std::uint32_t Previous;
-                std::memcpy(&Previous, &FrameBlock[4], sizeof(Previous));
+                std::uint32_t Previous = std::bit_cast<std::uint32_t>(FrameBlock[4]);
                 FrameBlock[4] = static_cast<float>(LoadAppearanceScalar(FrameBlock[2]));
                 std::memcpy(&FrameBlock[2], &Previous, sizeof(Previous));
             }
@@ -1379,8 +1375,7 @@ namespace AlchemyImpl
                 *reinterpret_cast<const FVector*>(&Particle->PosX));
             if (C[2] > 0.0f)
                 continue;
-            float OuterTime;
-            std::memcpy(&OuterTime, &AppearanceOuterTime_, sizeof(float));
+            float OuterTime = std::bit_cast<float>(AppearanceOuterTime_);
             const float InnerTime = static_cast<float>(static_cast<double>(Particle->InvDuration) * Particle->Age);
             const float Alpha = static_cast<float>(ForwardAppearanceSingleEval(
                 Descriptor_->SizeRamp, OuterTime, InnerTime));
@@ -1403,8 +1398,7 @@ namespace AlchemyImpl
                 const double FramePosition = ForwardAppearanceSingleEval(
                     Descriptor_->AxisOverrideRamp, AppearanceOuterTime_, InnerTime);
                 const std::uint32_t CountBits = Texture_.FrameCount - 1u;
-                std::int32_t SignedCount;
-                std::memcpy(&SignedCount, &CountBits, sizeof(SignedCount));
+                std::int32_t SignedCount = std::bit_cast<std::int32_t>(CountBits);
                 const std::int64_t FrameInteger = static_cast<std::int64_t>(FramePosition * SignedCount);
                 const std::int32_t Frame = static_cast<std::int32_t>(FrameInteger);
                 if (Frame != LastFrame)
@@ -1438,11 +1432,9 @@ namespace AlchemyImpl
                 const double SquareA = static_cast<double>(Ua) * Ua;
                 const double SumBa = SquareB + SquareA;
                 const float LengthSquared = static_cast<float>(SumBa + Uc * Uc);
-                std::int32_t LengthBits;
-                std::memcpy(&LengthBits, &LengthSquared, sizeof(LengthBits));
+                std::int32_t LengthBits = std::bit_cast<std::int32_t>(LengthSquared);
                 const std::uint32_t GuessBits = 0x5f3759dfu - static_cast<std::uint32_t>(LengthBits >> 1);
-                float Guess;
-                std::memcpy(&Guess, &GuessBits, sizeof(Guess));
+                float Guess = std::bit_cast<float>(GuessBits);
                 const double InverseLength = (1.5 - (((static_cast<double>(Guess) * Guess) * LengthSquared) * 0.5)) * Guess;
                 const float NormalX = static_cast<float>(static_cast<double>(Ua) * InverseLength);
                 const float NormalY = static_cast<float>(static_cast<double>(Ub) * InverseLength);
@@ -1605,8 +1597,7 @@ namespace AlchemyImpl
                 const double FramePosition = ForwardAppearanceSingleEval(
                     Descriptor_->AxisOverrideRamp, AppearanceOuterTime_, InnerTime);
                 const std::uint32_t CountBits = Texture_.FrameCount - 1u;
-                std::int32_t SignedCount;
-                std::memcpy(&SignedCount, &CountBits, sizeof(SignedCount));
+                std::int32_t SignedCount = std::bit_cast<std::int32_t>(CountBits);
                 const std::int64_t FrameInteger = static_cast<std::int64_t>(FramePosition * SignedCount);
                 const std::int32_t Frame = static_cast<std::int32_t>(FrameInteger);
                 if (Frame != LastFrame)
@@ -1985,15 +1976,13 @@ namespace AlchemyImpl
         std::memcpy(FrameBlock, Texture_.Frame, sizeof(FrameBlock));
         if ((Descriptor_->Flags & 0x1000u) != 0)
         {
-            std::uint32_t Previous;
-            std::memcpy(&Previous, &FrameBlock[3], sizeof(Previous));
+            std::uint32_t Previous = std::bit_cast<std::uint32_t>(FrameBlock[3]);
             FrameBlock[3] = static_cast<float>(LoadAppearanceScalar(FrameBlock[1]));
             std::memcpy(&FrameBlock[1], &Previous, sizeof(Previous));
         }
         if ((Descriptor_->Flags & 0x2000u) != 0)
         {
-            std::uint32_t Previous;
-            std::memcpy(&Previous, &FrameBlock[4], sizeof(Previous));
+            std::uint32_t Previous = std::bit_cast<std::uint32_t>(FrameBlock[4]);
             FrameBlock[4] = static_cast<float>(LoadAppearanceScalar(FrameBlock[2]));
             std::memcpy(&FrameBlock[2], &Previous, sizeof(Previous));
         }
@@ -2028,11 +2017,9 @@ namespace AlchemyImpl
             const double VelocitySquared = ((static_cast<double>(Velocity.Z) * Velocity.Z) +
                 (static_cast<double>(Velocity.Y) * Velocity.Y)) + (static_cast<double>(Velocity.X) * Velocity.X);
             const float VelocitySeed = static_cast<float>(VelocitySquared);
-            std::int32_t VelocityBits;
-            std::memcpy(&VelocityBits, &VelocitySeed, sizeof(VelocityBits));
+            std::int32_t VelocityBits = std::bit_cast<std::int32_t>(VelocitySeed);
             const std::uint32_t VelocityGuessBits = 0x5f3759dfu - static_cast<std::uint32_t>(VelocityBits >> 1);
-            float VelocityGuess;
-            std::memcpy(&VelocityGuess, &VelocityGuessBits, sizeof(VelocityGuess));
+            float VelocityGuess = std::bit_cast<float>(VelocityGuessBits);
             const double VelocityInverse = (1.5 - (((static_cast<double>(VelocityGuess) * VelocityGuess) *
                 VelocitySquared) * 0.5)) * VelocityGuess;
             const float Speed = static_cast<float>(VelocityInverse * VelocitySquared);
@@ -2059,11 +2046,9 @@ namespace AlchemyImpl
                 const double DirectionSquared = ((static_cast<double>(Direction.Z) * Direction.Z) +
                     (static_cast<double>(Direction.X) * Direction.X)) + (static_cast<double>(Direction.Y) * Direction.Y);
                 const float DirectionSeed = static_cast<float>(DirectionSquared);
-                std::int32_t DirectionBits;
-                std::memcpy(&DirectionBits, &DirectionSeed, sizeof(DirectionBits));
+                std::int32_t DirectionBits = std::bit_cast<std::int32_t>(DirectionSeed);
                 const std::uint32_t DirectionGuessBits = 0x5f3759dfu - static_cast<std::uint32_t>(DirectionBits >> 1);
-                float DirectionGuess;
-                std::memcpy(&DirectionGuess, &DirectionGuessBits, sizeof(DirectionGuess));
+                float DirectionGuess = std::bit_cast<float>(DirectionGuessBits);
                 const double DirectionInverse = (1.5 - (((static_cast<double>(DirectionGuess) * DirectionGuess) *
                     DirectionSquared) * 0.5)) * DirectionGuess;
                 const double DirectionLength = DirectionInverse * DirectionSquared;
@@ -2111,15 +2096,13 @@ namespace AlchemyImpl
                     Texture_.LookupFrame(Frame, FrameBlock);
                     if ((Descriptor_->Flags & 0x1000u) != 0)
                     {
-                        std::uint32_t Previous;
-                        std::memcpy(&Previous, &FrameBlock[3], sizeof(Previous));
+                        std::uint32_t Previous = std::bit_cast<std::uint32_t>(FrameBlock[3]);
                         FrameBlock[3] = static_cast<float>(LoadAppearanceScalar(FrameBlock[1]));
                         std::memcpy(&FrameBlock[1], &Previous, sizeof(Previous));
                     }
                     if ((Descriptor_->Flags & 0x2000u) != 0)
                     {
-                        std::uint32_t Previous;
-                        std::memcpy(&Previous, &FrameBlock[4], sizeof(Previous));
+                        std::uint32_t Previous = std::bit_cast<std::uint32_t>(FrameBlock[4]);
                         FrameBlock[4] = static_cast<float>(LoadAppearanceScalar(FrameBlock[2]));
                         std::memcpy(&FrameBlock[2], &Previous, sizeof(Previous));
                     }
@@ -2173,11 +2156,9 @@ namespace AlchemyImpl
             const double NormalSquared = ((NormalX * NormalX) + (static_cast<double>(NormalY) * NormalY)) +
                 (NormalZ * NormalZ);
             const float NormalSeed = static_cast<float>(NormalSquared);
-            std::int32_t NormalBits;
-            std::memcpy(&NormalBits, &NormalSeed, sizeof(NormalBits));
+            std::int32_t NormalBits = std::bit_cast<std::int32_t>(NormalSeed);
             const std::uint32_t NormalGuessBits = 0x5f3759dfu - static_cast<std::uint32_t>(NormalBits >> 1);
-            float NormalGuess;
-            std::memcpy(&NormalGuess, &NormalGuessBits, sizeof(NormalGuess));
+            float NormalGuess = std::bit_cast<float>(NormalGuessBits);
             const double NormalInverse = (1.5 - (((static_cast<double>(NormalGuess) * NormalGuess) *
                 NormalSquared) * 0.5)) * NormalGuess;
             const double NormalLength = NormalInverse * NormalSquared;
@@ -2522,15 +2503,13 @@ namespace AlchemyImpl
         std::memcpy(FrameBlock, Texture_.Frame, sizeof(FrameBlock));
         if ((Descriptor_->Flags & 0x1000u) != 0)
         {
-            std::uint32_t Previous;
-            std::memcpy(&Previous, &FrameBlock[3], sizeof(Previous));
+            std::uint32_t Previous = std::bit_cast<std::uint32_t>(FrameBlock[3]);
             FrameBlock[3] = static_cast<float>(LoadAppearanceScalar(FrameBlock[1]));
             std::memcpy(&FrameBlock[1], &Previous, sizeof(Previous));
         }
         if ((Descriptor_->Flags & 0x2000u) != 0)
         {
-            std::uint32_t Previous;
-            std::memcpy(&Previous, &FrameBlock[4], sizeof(Previous));
+            std::uint32_t Previous = std::bit_cast<std::uint32_t>(FrameBlock[4]);
             FrameBlock[4] = static_cast<float>(LoadAppearanceScalar(FrameBlock[2]));
             std::memcpy(&FrameBlock[2], &Previous, sizeof(Previous));
         }
@@ -2562,11 +2541,9 @@ namespace AlchemyImpl
             const double VelocitySquared = ((static_cast<double>(Velocity.X) * Velocity.X) +
                 (static_cast<double>(Velocity.Z) * Velocity.Z)) + (static_cast<double>(Velocity.Y) * Velocity.Y);
             const float RoundedVelocitySquared = static_cast<float>(VelocitySquared);
-            std::int32_t VelocityBits;
-            std::memcpy(&VelocityBits, &RoundedVelocitySquared, sizeof(VelocityBits));
+            std::int32_t VelocityBits = std::bit_cast<std::int32_t>(RoundedVelocitySquared);
             const std::uint32_t VelocityGuessBits = 0x5f3759dfu - static_cast<std::uint32_t>(VelocityBits >> 1);
-            float VelocityGuess;
-            std::memcpy(&VelocityGuess, &VelocityGuessBits, sizeof(VelocityGuess));
+            float VelocityGuess = std::bit_cast<float>(VelocityGuessBits);
             const double VelocityInverse = (1.5 - (((static_cast<double>(VelocityGuess) * VelocityGuess) *
                 VelocitySquared) * 0.5)) * VelocityGuess;
             const double VelocityLength = VelocitySquared * VelocityInverse;
@@ -2608,11 +2585,9 @@ namespace AlchemyImpl
                 const double CameraSquared = ((static_cast<double>(ToCamera.X) * ToCamera.X) +
                     (static_cast<double>(ToCamera.Z) * ToCamera.Z)) + (static_cast<double>(ToCamera.Y) * ToCamera.Y);
                 const float RoundedCameraSquared = static_cast<float>(CameraSquared);
-                std::int32_t CameraBits;
-                std::memcpy(&CameraBits, &RoundedCameraSquared, sizeof(CameraBits));
+                std::int32_t CameraBits = std::bit_cast<std::int32_t>(RoundedCameraSquared);
                 const std::uint32_t CameraGuessBits = 0x5f3759dfu - static_cast<std::uint32_t>(CameraBits >> 1);
-                float CameraGuess;
-                std::memcpy(&CameraGuess, &CameraGuessBits, sizeof(CameraGuess));
+                float CameraGuess = std::bit_cast<float>(CameraGuessBits);
                 const double CameraInverse = (1.5 - (((static_cast<double>(CameraGuess) * CameraGuess) *
                     CameraSquared) * 0.5)) * CameraGuess;
                 const double CameraLength = CameraSquared * CameraInverse;
@@ -2661,15 +2636,13 @@ namespace AlchemyImpl
                     Texture_.LookupFrame(Frame, FrameBlock);
                     if ((Descriptor_->Flags & 0x1000u) != 0)
                     {
-                        std::uint32_t Previous;
-                        std::memcpy(&Previous, &FrameBlock[1], sizeof(Previous));
+                        std::uint32_t Previous = std::bit_cast<std::uint32_t>(FrameBlock[1]);
                         FrameBlock[1] = static_cast<float>(LoadAppearanceScalar(FrameBlock[3]));
                         std::memcpy(&FrameBlock[3], &Previous, sizeof(Previous));
                     }
                     if ((Descriptor_->Flags & 0x2000u) != 0)
                     {
-                        std::uint32_t Previous;
-                        std::memcpy(&Previous, &FrameBlock[2], sizeof(Previous));
+                        std::uint32_t Previous = std::bit_cast<std::uint32_t>(FrameBlock[2]);
                         FrameBlock[2] = static_cast<float>(LoadAppearanceScalar(FrameBlock[4]));
                         std::memcpy(&FrameBlock[4], &Previous, sizeof(Previous));
                     }
@@ -2683,11 +2656,9 @@ namespace AlchemyImpl
                 (static_cast<double>(PreviousAxis.Y) * Velocity.X));
             const float NormalSquared = static_cast<float>(((static_cast<double>(NormalX) * NormalX) +
                 (static_cast<double>(NormalZ) * NormalZ)) + (static_cast<double>(NormalY) * NormalY));
-            std::int32_t NormalBits;
-            std::memcpy(&NormalBits, &NormalSquared, sizeof(NormalBits));
+            std::int32_t NormalBits = std::bit_cast<std::int32_t>(NormalSquared);
             const std::uint32_t NormalGuessBits = 0x5f3759dfu - static_cast<std::uint32_t>(NormalBits >> 1);
-            float NormalGuess;
-            std::memcpy(&NormalGuess, &NormalGuessBits, sizeof(NormalGuess));
+            float NormalGuess = std::bit_cast<float>(NormalGuessBits);
             const double NormalInverse = (1.5 - (((static_cast<double>(NormalGuess) * NormalGuess) *
                 NormalSquared) * 0.5)) * NormalGuess;
             const double NormalizedX = static_cast<double>(NormalX) * NormalInverse;
@@ -2879,8 +2850,7 @@ namespace AlchemyImpl
             return GR_GENERIC;
         const float Scale = static_cast<float>(ForwardAppearanceSingleEval(
             Descriptor_->EffectScaleRamp, AppearanceOuterTime_, LodInput_));
-        float FirstOuterTime;
-        std::memcpy(&FirstOuterTime, &AppearanceOuterTime_, sizeof(float));
+        float FirstOuterTime = std::bit_cast<float>(AppearanceOuterTime_);
         const float FirstInnerTime = static_cast<float>(static_cast<double>(Head->InvDuration) * Head->Age);
         const float FirstPrimary = static_cast<float>(ForwardAppearanceSingleEval(
             Descriptor_->PrimarySizeRamp, FirstOuterTime, FirstInnerTime) * Scale);
@@ -3085,11 +3055,9 @@ namespace AlchemyImpl
                 const double SquareY = static_cast<double>(Direction[1]) * Direction[1];
                 const double LengthSquared = SumXz + SquareY;
                 const float SeedInput = static_cast<float>(LengthSquared);
-                std::int32_t LengthBits;
-                std::memcpy(&LengthBits, &SeedInput, sizeof(LengthBits));
+                std::int32_t LengthBits = std::bit_cast<std::int32_t>(SeedInput);
                 const std::uint32_t GuessBits = 0x5f3759dfu - static_cast<std::uint32_t>(LengthBits >> 1);
-                float Guess;
-                std::memcpy(&Guess, &GuessBits, sizeof(Guess));
+                float Guess = std::bit_cast<float>(GuessBits);
                 const double InverseLength = (1.5 - (((static_cast<double>(Guess) * Guess) * LengthSquared) * 0.5)) * Guess;
                 const double Length = InverseLength * LengthSquared;
                 if (!(Length <= TinyLength))
@@ -3130,8 +3098,7 @@ namespace AlchemyImpl
                 const double FramePosition = ForwardAppearanceSingleEval(
                     Descriptor_->FrameRamp, AppearanceOuterTime_, InnerTime);
                 const std::uint32_t CountBits = Texture_.FrameCount - 1u;
-                std::int32_t SignedCount;
-                std::memcpy(&SignedCount, &CountBits, sizeof(SignedCount));
+                std::int32_t SignedCount = std::bit_cast<std::int32_t>(CountBits);
                 const std::int64_t FrameInteger = static_cast<std::int64_t>(FramePosition * SignedCount);
                 const std::int32_t Frame = static_cast<std::int32_t>(FrameInteger);
                 if (Frame != LastFrame)
@@ -3141,15 +3108,13 @@ namespace AlchemyImpl
                     const FAppearanceRampDescriptor* const FrameDescriptor = Descriptor_;
                     if ((FrameDescriptor->Flags & 0x1000u) != 0)
                     {
-                        std::uint32_t Previous;
-                        std::memcpy(&Previous, &FrameBlock[1], sizeof(Previous));
+                        std::uint32_t Previous = std::bit_cast<std::uint32_t>(FrameBlock[1]);
                         FrameBlock[1] = static_cast<float>(LoadAppearanceScalar(FrameBlock[3]));
                         std::memcpy(&FrameBlock[3], &Previous, sizeof(Previous));
                     }
                     if ((FrameDescriptor->Flags & 0x2000u) != 0)
                     {
-                        std::uint32_t Previous;
-                        std::memcpy(&Previous, &FrameBlock[2], sizeof(Previous));
+                        std::uint32_t Previous = std::bit_cast<std::uint32_t>(FrameBlock[2]);
                         FrameBlock[2] = static_cast<float>(LoadAppearanceScalar(FrameBlock[4]));
                         std::memcpy(&FrameBlock[4], &Previous, sizeof(Previous));
                     }
@@ -3594,11 +3559,9 @@ namespace AlchemyImpl
                     float LenSq;
                     StoreAlchemyFpuFloat(LenSq, ((static_cast<double>(Uy) * Uy +
                         static_cast<double>(Ux) * Ux) + UnroundedUz * UnroundedUz));
-                    std::int32_t LengthBits;
-                    std::memcpy(&LengthBits, &LenSq, sizeof(LengthBits));
+                    std::int32_t LengthBits = std::bit_cast<std::int32_t>(LenSq);
                     const std::uint32_t GuessBits = 0x5f3759dfu - static_cast<std::uint32_t>(LengthBits >> 1);
-                    float Guess;
-                    std::memcpy(&Guess, &GuessBits, sizeof(Guess));
+                    float Guess = std::bit_cast<float>(GuessBits);
                     const double GuessSquared = static_cast<double>(Guess) * Guess;
                     const double InvLen = (1.5 - ((GuessSquared * LenSq) * 0.5)) * Guess;
                     StoreAlchemyFpuFloat(Ux, (static_cast<double>(Ux) * InvLen));
@@ -3936,8 +3899,7 @@ namespace AlchemyImpl
             const FPooledParticle* Particle, const double& Frame, const float& Primary)
         {
             const double Product = Frame * Primary;
-            std::uint32_t Word;
-            std::memcpy(&Word, &Particle->PosX, sizeof(Word));
+            std::uint32_t Word = std::bit_cast<std::uint32_t>(Particle->PosX);
             std::memcpy(Sphere, &Word, sizeof(Word));
             std::memcpy(&Word, &Particle->PosY, sizeof(Word));
             std::memcpy(Sphere + 1, &Word, sizeof(Word));
@@ -3980,12 +3942,10 @@ namespace AlchemyImpl
                 StoreAlchemyFpuFloat(RoundedLengthSquared, SumYz + SquareX);
                 LengthSquared = RoundedLengthSquared;
             }
-            std::int32_t LengthBits;
-            std::memcpy(&LengthBits, &RoundedLengthSquared, sizeof(LengthBits));
+            std::int32_t LengthBits = std::bit_cast<std::int32_t>(RoundedLengthSquared);
             const std::uint32_t GuessBits = 0x5f3759dfu -
                 static_cast<std::uint32_t>(LengthBits >> 1);
-            float Guess;
-            std::memcpy(&Guess, &GuessBits, sizeof(Guess));
+            float Guess = std::bit_cast<float>(GuessBits);
             const double GuessSquared = static_cast<double>(Guess) * Guess;
             const double InverseLength = (1.5 - ((GuessSquared * LengthSquared) * 0.5)) * Guess;
             const double Distance = InverseLength * LengthSquared;
@@ -5360,12 +5320,10 @@ namespace AlchemyImpl
         __declspec(noinline) double ParticleInverseSqrt(const double& LengthSquared)
         {
             const float RoundedLengthSquared = static_cast<float>(LengthSquared);
-            std::int32_t LengthBits;
-            std::memcpy(&LengthBits, &RoundedLengthSquared, sizeof(LengthBits));
+            std::int32_t LengthBits = std::bit_cast<std::int32_t>(RoundedLengthSquared);
             const std::uint32_t GuessBits = 0x5f3759dfu -
                 static_cast<std::uint32_t>(LengthBits >> 1);
-            float Guess;
-            std::memcpy(&Guess, &GuessBits, sizeof(Guess));
+            float Guess = std::bit_cast<float>(GuessBits);
             const double GuessSquared = static_cast<double>(Guess) * Guess;
             return (1.5 - ((GuessSquared * LengthSquared) * 0.5)) * Guess;
         }
@@ -5598,8 +5556,7 @@ namespace AlchemyImpl
                 if (R->Blend > 1.0f)
                     R->Blend = 1.0f;
                 // 062302af: capture the raw interpolation word before lazy creation.
-                float SlerpWeight;
-                std::memcpy(&SlerpWeight, &R->Blend, sizeof(SlerpWeight));
+                float SlerpWeight = std::bit_cast<float>(R->Blend);
                 FQuaternion Slerped;
                 ParticleMath()->QuatSlerpValue(Slerped,
                     *reinterpret_cast<const FQuaternion*>(R->BlendQuat),

@@ -17,6 +17,7 @@
 #include "../gf/room_camera.h" // LightsCameraMath (DAT_006799bc)
 #include "x86math.h"
 
+#include <numbers>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -32,7 +33,7 @@ namespace
     char const* const kEngineLightCpp = "E:\\FL\\Scratch\\Source\\Client\\cmn\\EngineLight.cpp";
 
     // 0x40490fdb.
-    float const kPi = 3.1415927f;
+    float const kPi = std::numbers::pi_v<float>;
 
     // DAT_00610588 — pipeline state 7, latched once on the first light. -1 means "not asked
     // yet"; retail pre-sets 1 so a failed query leaves the "no hardware lights" answer.

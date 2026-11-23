@@ -32,6 +32,8 @@
 #include "render/rendcomp.h"
 #include "x86math.h"
 
+#include <algorithm>
+#include <numbers>
 #include <math.h>
 #include <string.h>
 
@@ -959,8 +961,8 @@ void ShipViewControl::PlaceCamera(int PlaceMode)
 
     // 0x00585647..0x005856a3: the distance that fits the framed radius into the FOV --
     // cot(fov * pi / 180) * radius, at least 2; twice the radius below 1.
-    double const Cot = 1.0 / tan(static_cast<double>(FovY) * static_cast<double>(3.14159265f) *
-                                 (1.0 / 180.0));
+    double const Cot = 1.0 / tan(static_cast<double>(FovY) *
+                                 static_cast<double>(std::numbers::pi_v<float>) * (1.0 / 180.0));
     float Reach;
     if (Distance < 1.0f)
     {
@@ -1370,12 +1372,7 @@ intptr_t ShipViewControl::SetProperty(int Msg, uintptr_t A, uintptr_t B)
 bool ShipViewControl::HasHpType(int HpType) const
 {
     // FUN_00586510 (RET 4).
-    for (size_t Index = 0; Index < HpTypes.size(); ++Index)
-    {
-        if (HpTypes[Index] == HpType)
-            return true;
-    }
-    return false;
+    return std::ranges::contains(HpTypes, HpType);
 }
 
 void ShipViewControl::CollectHpTypes(char const* HpName)

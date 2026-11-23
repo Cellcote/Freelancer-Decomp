@@ -28,6 +28,7 @@
 #include "iustategraph.h" // BuildAiTargetList (HasTargetInForwardArc)
 #include "x87_trig.h"             // X87Tan (062eabf0 FPTAN)
 
+#include <bit>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -115,8 +116,7 @@ bool SystemManagerGunGroupManager::FireAutoTurrets()
         int const Status = OwnShip()->get_equipment_val(Val, Slot.HardpointId, EquipValTargetId, 0.0f);
         if (Status != 0)
             continue;
-        unsigned TargetId;
-        std::memcpy(&TargetId, &Val, sizeof(TargetId));
+        unsigned TargetId = std::bit_cast<unsigned>(Val.Value);
         if ((TargetId & 0x3fffffff) == 0)
             continue;
 
@@ -1110,8 +1110,7 @@ bool SystemManagerGunGroupManager::HasReadyWeaponSlot()
 
         // 062eb95e-062eb96d: nonzero result, or the returned dword outside [0,2] (signed
         // JL 0 / JG 2), skips the slot.
-        int Classify;
-        std::memcpy(&Classify, &Val, sizeof(Classify));
+        int Classify = std::bit_cast<int>(Val.Value);
         if (CallResult == 0 && Classify >= 0 && Classify <= 2)
         {
             // 062eb96f-062eb989: EquipStatus's inlined ctor (Flags &= 0xF8, EquipFlags &=

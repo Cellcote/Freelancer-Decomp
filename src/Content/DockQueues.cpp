@@ -29,6 +29,7 @@
 #include "server_controller.h"   // pub::Controller::_SendMessage
 #include "server_cobject.h"      // EQInfo, TerminalInfo, ActivateEquipment, GetTerminalInfo
 
+#include <bit>
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
@@ -54,7 +55,7 @@ namespace
     bool ContainsClass(std::vector<unsigned int> const* ClassIds, unsigned int ClassId)
     {
         // FUN_06eb5f30: std::find over the vector.
-        return std::find(ClassIds->begin(), ClassIds->end(), ClassId) != ClassIds->end();
+        return std::ranges::contains(*ClassIds, ClassId);
     }
 
     // The terminal-type switch of FUN_06f6c580 (06f6c5fb-06f6c635 and 06f6c791-06f6c7d1):
@@ -119,11 +120,9 @@ namespace
     // ((1.5 - y*y*Square*0.5) * y) * Square.
     double ApproximateSqrt(float StoredSquare, double Square)
     {
-        int Bits;
-        std::memcpy(&Bits, &StoredSquare, sizeof(Bits));
+        int Bits = std::bit_cast<int>(StoredSquare);
         Bits = 0x5f3759df - (Bits >> 1);
-        float Y;
-        std::memcpy(&Y, &Bits, sizeof(Y));
+        float Y = std::bit_cast<float>(Bits);
         double Step = 1.5 - static_cast<double>(Y) * Y * Square * 0.5;
         return Step * Y * Square;
     }

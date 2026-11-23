@@ -16,6 +16,7 @@
 #include "common_universe.h" // Universe::ISystem (CmnAsteroid::Update)
 #include "x87_trig.h"        // retail's inline FSIN / FCOS (CAsteroidField::load)
 
+#include <numbers>
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
@@ -59,7 +60,7 @@ CAsteroidField::CAsteroidField()
     {
         Rotations.Angles[Axis][0] = 0.0f;
         Rotations.Angles[Axis][1] = 1.5707963f;
-        Rotations.Angles[Axis][2] = 3.14159265f;
+        Rotations.Angles[Axis][2] = std::numbers::pi_v<float>;
         Rotations.Angles[Axis][3] = 4.71238898f;
     }
 }

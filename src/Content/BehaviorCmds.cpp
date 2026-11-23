@@ -16,6 +16,8 @@
 #include "ContentStaticIds.h"  // TU50's 16 static-init thunks 06f56f50-06f57130
 #include "server_pub.h"
 
+#include <algorithm>
+
 // FContentShipParams' copy ctor (FUN_06f73680) and dtor (FUN_06ef4ab0) are implicit: their
 // +0x60 work is FMissionDirectiveList's (ObjListDirective.h), see BehaviorCmds.h.
 
@@ -165,12 +167,7 @@ void FContentShipBase::GetTopDamagers(unsigned int* OutTopPlayer, unsigned int* 
 // FUN_06f575a0 (06f575a0-06f575c8): linear find of *ClassId in +0x128.
 bool FContentShipBase::HasClassId(unsigned int const* ClassId) const
 {
-    for (std::vector<unsigned int>::const_iterator It = ClassIds.begin(); It != ClassIds.end(); ++It)
-    {
-        if (*It == *ClassId)
-            return true;
-    }
-    return false;
+    return std::ranges::contains(ClassIds, *ClassId);
 }
 
 // FUN_06f575d0 (06f575d0-06f57632): FUN_06f58080(ShipClassId); null or empty -> false;

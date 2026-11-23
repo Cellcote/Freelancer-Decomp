@@ -17,6 +17,7 @@
                                    // -- AdvancePreamble's two speed-cap sources
                            // directly (Common.dll.txt 062c5025)
 
+#include <numbers>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>   // rand -- EnterState(2)'s spread
@@ -588,7 +589,7 @@ void DockBehavior::RecomputeApproach()
     Zero.y = 0.0f;
     Zero.z = 0.0f;
     SubObjectA.Offset4c = Zero;
-    SubObjectA.SetAngle38(3.14159274f);
+    SubObjectA.SetAngle38(std::numbers::pi_v<float>);
     // 062c38fc-062c3904: MaxApproachSpeed46c = DAT_0639f47c (1000.0f).
     MaxApproachSpeed46c = 1000.0f;
 }
@@ -1286,7 +1287,7 @@ void DockBehavior::RefreshApproachState()
         Vector N1;
         VecNormalize3(&D1, &N1);
         double const Angle = std::acos(ClampedDot3(N1, N2));
-        if (Angle < 3.14159274f / 32.0f)
+        if (Angle < std::numbers::pi_v<float> / 32.0f)
         {
             // 062c529f-062c5343: S = (colZ(Orient40c) + colZ(OrientMatrix3d8)) +
             // colZ(Orient3a8), each sum FSTP'd to float through Vec3Assign.
