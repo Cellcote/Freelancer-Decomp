@@ -241,7 +241,7 @@ typedef SIZE* LPSIZE;
 #define WAIT_FAILED ((DWORD)0xFFFFFFFF)
 
 #include "posix/kernel32.h" // the file, mapping and memory calls (uses the types above)
-#include "posix/wingdi.h"  // GDI's text types and calls, which fail here (fonts come with M3)
+#include "posix/wingdi.h"  // GDI: memory DCs, bitmaps and TrueType text (src/PosixGdi32)
 #include "posix/winreg.h"  // the registry: every key absent
 #include "posix/unknwn.h"   // COM's basics: GUID, IUnknown, the HRESULTs, CoCreateInstance
 #include "posix/winuser.h" // user32: windows, messages, the cursor and keyboard (src/PosixUser32)

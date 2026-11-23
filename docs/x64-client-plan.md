@@ -344,7 +344,7 @@ without the Windows API. Milestones:
   Common keeps engine handles in retail's long / int fields: they go through
   `EngineIdFromHandle` / `EngineHandleFromId` (`engine/engbase.h`, LowArena), and an animation
   script id through `AnimScriptId` / `AnimScriptFromId` (a HandleValue id). Its stand-ins:
-  GDI's text calls fail (no font backend before M3: text is not drawn), the registry has no
+  GDI is the gdi32 module's (below), the registry has no
   keys, MSXML's SAX reader does not exist (RDL text cannot be parsed until the client brings an
   XML reader), and `SHGetFolderPathA` gives ~/Documents, ~/Pictures and the application-data
   folder.
@@ -409,6 +409,13 @@ without the Windows API. Milestones:
   per process), moves and resizes as `WM_MOVE` / `WM_SIZE`, focus as `WM_ACTIVATEAPP` /
   `WM_ACTIVATE`, the close button as `WM_SYSCOMMAND` `SC_CLOSE`. `user32_screen_tests` checks
   it with SDL's dummy video driver.
+  GDI is a module of its own too (`src/PosixGdi32`, linked as user32 is): what the client's
+  glyph atlas and rich text and Common's text renderer ask of it, which is text drawn into
+  memory bitmaps and read back with `GetDIBits` (32, 24 and 16 bits). Fonts are TrueType faces
+  (stb_truetype, vendored) found by face name in the game's folders and the system's
+  (`FL_GDI32_FONT_PATH` adds more), with GDI's sizes and metrics (VDMX first, as Windows: Arial
+  at -16 is 18 / 15 / 3), and lookalikes for faces a system lacks (Agency FB → Arial Narrow,
+  FixedSys → a monospaced face). `gdi32_tests` checks it.
 - **M3:** an SDL window to the main menu, drawn by RPGPU through Metal, without sound. RPGPU
   builds on Linux and macOS against the system's SDL3, shared (Homebrew's on macOS; on CI's
   Ubuntu, a cached build from source), when SDL3 is found (`FreelancerRpGpu`). The client's

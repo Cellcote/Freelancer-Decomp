@@ -116,3 +116,13 @@ target_compile_options(resource_tests PRIVATE -include ${CMAKE_SOURCE_DIR}/src/i
 add_dependencies(resource_tests resource_test_dll resources InfoCards)
 add_test(NAME resource_tests
          COMMAND resource_tests "${FL_BIN_DIR}" "${PROJECT_SOURCE_DIR}/src/Resources" "${_fixture}")
+
+# gdi32_tests: gdi32 (src/PosixGdi32), built and linked as a game module is.
+add_executable(gdi32_tests gdi32_tests.cpp)
+target_compile_features(gdi32_tests PRIVATE cxx_std_20)
+target_link_libraries(gdi32_tests PRIVATE ${CMAKE_DL_LIBS} PosixUser32 PosixGdi32 dacom)
+target_include_directories(gdi32_tests PRIVATE ${CMAKE_SOURCE_DIR}/src/include/posix
+                           ${CMAKE_SOURCE_DIR}/src/include)
+target_compile_options(gdi32_tests PRIVATE -include ${CMAKE_SOURCE_DIR}/src/include/fl_layout.h
+                       "-D__declspec(x)=" -D__cdecl= -D__stdcall= -Wall -Wextra -Wno-unknown-pragmas)
+add_test(NAME gdi32_tests COMMAND gdi32_tests)

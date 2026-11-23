@@ -637,8 +637,6 @@ inline int LoadStringW(HINSTANCE Instance, UINT Id, LPWSTR Buffer, int Size)
     return Count;
 }
 
-// GDI's rectangle fill (no device context draws here).
-FL_USER32_API int FillRect(HDC Dc, const RECT* Rect, HBRUSH Brush);
 
 // The caret's blink and the double click's interval, in milliseconds (Windows' defaults).
 FL_USER32_API UINT GetCaretBlinkTime();

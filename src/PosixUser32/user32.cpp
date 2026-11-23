@@ -1833,11 +1833,6 @@ int wsprintfW(LPWSTR Buffer, LPCWSTR Format, ...)
     return Length;
 }
 
-int FillRect(HDC, const RECT*, HBRUSH)
-{
-    return 0;
-}
-
 // Windows' defaults.
 UINT GetCaretBlinkTime()
 {

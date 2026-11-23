@@ -98,7 +98,7 @@ else()
   # resource-only DLLs (made from their scripts by tools/build_resource_dll.py), RPGPU
   # when SDL3 is there, and PortTest, the checks of the port's platform headers and of those modules (last: its
   # module_tests depend on them).
-  set(FL_PROJECTS qhull TexConvert DPNet PosixUser32 dacom zlib DALib x86math system ReadFile luaprofile Thorn EngBase ximage Shading flmaterials RendComp alchemy Deformable2 Common Server rpclocal RemoteClient RpcCodecTest Content FLDedicated imeui freelancer RemoteServer
+  set(FL_PROJECTS qhull TexConvert DPNet PosixUser32 PosixGdi32 dacom zlib DALib x86math system ReadFile luaprofile Thorn EngBase ximage Shading flmaterials RendComp alchemy Deformable2 Common Server rpclocal RemoteClient RpcCodecTest Content FLDedicated imeui freelancer RemoteServer
     Resources/resources Resources/InfoCards Resources/MiscText Resources/NameResources
     Resources/EquipResources Resources/OfferBribeResources Resources/MiscTextInfo2
     Resources/serverresources)
