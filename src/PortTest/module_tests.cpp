@@ -449,11 +449,14 @@ int main(int argc, char** argv)
         char DALibPath[0x400] = {};
         FlULong const Length = Platform::ModulePath(DALibHandle, DALibPath, sizeof(DALibPath));
         std::string const Found(DALibPath);
-        Check(
-            DALibHandle != nullptr && Length == Found.size() &&
-                (Found.size() > 12 && (Found.compare(Found.size() - 12, 12, "/DALib.dylib") == 0 ||
-                                       Found.compare(Found.size() - 9, 9, "/DALib.so") == 0)),
-            "ModulePath of a loaded module's handle");
+        auto const EndsWith = [&Found](std::string const& Suffix)
+        {
+            return Found.size() >= Suffix.size() &&
+                   Found.compare(Found.size() - Suffix.size(), Suffix.size(), Suffix) == 0;
+        };
+        Check(DALibHandle != nullptr && Length == Found.size() &&
+                  (EndsWith("/DALib.dylib") || EndsWith("/DALib.so")),
+              "ModulePath of a loaded module's handle");
         char Small[4] = {};
         Check(Platform::ModulePath(DALibHandle, Small, sizeof(Small)) == sizeof(Small) &&
                   Small[3] == 0,

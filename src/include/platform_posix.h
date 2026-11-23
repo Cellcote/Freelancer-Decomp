@@ -1348,19 +1348,12 @@ namespace Platform
     }
 
 #if !defined(__APPLE__)
-    struct FModuleSearch
+    // dl_iterate_phdr holds the loader's lock while it calls back, so the callback only
+    // collects the names; they are matched (dlopen) after the iteration.
+    inline int CollectModuleFile(dl_phdr_info* Info, std::size_t, void* Data)
     {
-        Module Library;
-        std::string Found;
-    };
-    inline int FindModuleFile(dl_phdr_info* Info, std::size_t, void* Data)
-    {
-        FModuleSearch* const Search = static_cast<FModuleSearch*>(Data);
-        if (IsModuleFile(Search->Library, Info->dlpi_name))
-        {
-            Search->Found = Info->dlpi_name;
-            return 1;
-        }
+        if (Info->dlpi_name != nullptr && Info->dlpi_name[0] != 0)
+            static_cast<std::vector<std::string>*>(Data)->push_back(Info->dlpi_name);
         return 0;
     }
 #endif
@@ -1401,9 +1394,16 @@ namespace Platform
                 }
             }
 #else
-            Detail::FModuleSearch Search{Library, std::string()};
-            dl_iterate_phdr(&Detail::FindModuleFile, &Search);
-            Found = Search.Found;
+            std::vector<std::string> Names;
+            dl_iterate_phdr(&Detail::CollectModuleFile, &Names);
+            for (std::string const& Name : Names)
+            {
+                if (Detail::IsModuleFile(Library, Name.c_str()))
+                {
+                    Found = Name;
+                    break;
+                }
+            }
 #endif
             if (Found.empty())
                 return 0;
