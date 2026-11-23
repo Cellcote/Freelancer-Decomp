@@ -97,7 +97,7 @@ else()
   # client modules ported so far (M2: the stand-in <windows.h> of src/include/posix), RPGPU
   # when SDL3 is there, and PortTest, the checks of the port's platform headers and of those modules (last: its
   # module_tests depend on them).
-  set(FL_PROJECTS qhull TexConvert DPNet dacom zlib DALib x86math system ReadFile luaprofile Thorn EngBase ximage Shading flmaterials RendComp alchemy Deformable2 Common Server rpclocal RemoteClient RpcCodecTest Content FLDedicated)
+  set(FL_PROJECTS qhull TexConvert DPNet PosixUser32 dacom zlib DALib x86math system ReadFile luaprofile Thorn EngBase ximage Shading flmaterials RendComp alchemy Deformable2 Common Server rpclocal RemoteClient RpcCodecTest Content FLDedicated imeui freelancer RemoteServer)
   # PORT(rpgpu): RPGPU links the system's SDL3 here (Homebrew's sdl3 on macOS, a distribution
   # package or a build from source on Linux), as a shared library: one SDL per process, which the
   # client's window layer shares. FreelancerRpGpu defaults to 1 when SDL3 is found and to 0

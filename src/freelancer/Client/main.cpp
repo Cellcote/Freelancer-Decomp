@@ -831,3 +831,26 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE /*prev*/, LPSTR cmd, int /*show
     // runs from atexit (ClientAtExitTeardown).
     return ExitCode;
 }
+
+#if !defined(_WIN32)
+// PORT(macOS): the C entry point off Windows. WinMain gets what Windows hands it: the module's
+// handle and the command line after the program's name, the arguments joined by spaces (one
+// with a space or a tab in double quotes, as a Windows shell passes it).
+int main(int Argc, char** Argv)
+{
+    std::string CommandLine;
+    for (int Index = 1; Index < Argc; ++Index)
+    {
+        if (!CommandLine.empty())
+            CommandLine += ' ';
+        const bool bQuote = std::strpbrk(Argv[Index], " \t") != nullptr;
+        if (bQuote)
+            CommandLine += '"';
+        CommandLine += Argv[Index];
+        if (bQuote)
+            CommandLine += '"';
+    }
+    return WinMain(static_cast<HINSTANCE>(Platform::ModuleFind(nullptr)), nullptr, &CommandLine[0],
+                   SW_SHOWNORMAL);
+}
+#endif

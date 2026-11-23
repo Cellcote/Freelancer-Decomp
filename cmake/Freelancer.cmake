@@ -97,6 +97,9 @@ if(NOT FL_WINDOWS)
     list(FILTER _sources EXCLUDE REGEX "\\.(rc|def)$")
     if(kind STREQUAL "EXE")
       add_executable(${name} ${_sources})
+      if(A_EXPORTS)
+        set_property(TARGET ${name} PROPERTY ENABLE_EXPORTS ON)
+      endif()
     elseif(kind STREQUAL "DLL")
       add_library(${name} SHARED ${_sources})
     elseif(kind STREQUAL "LIB")
@@ -133,6 +136,11 @@ if(NOT FL_WINDOWS)
       # a shared library exports its functions by default
       target_include_directories(${name} PRIVATE
         "${FL_SRC_DIR}/include/posix" "${FL_SRC_DIR}/include" "${FL_SRC_DIR}/IVP")
+      # user32's calls (posix/winuser.h) are in the PosixUser32 module, which every such module
+      # links, as MSVC links user32.lib into every module by default.
+      if(NOT name STREQUAL "PosixUser32")
+        target_link_libraries(${name} PRIVATE PosixUser32)
+      endif()
       # (A flag: CMake drops function-like macros from its compile definitions.) #pragma
       # comment(lib, ...) and the like are MSVC's, with nothing to do here, and the retail code's
       # sprintf / vsprintf stay as they are (macOS's SDK marks them deprecated). Both after

@@ -186,6 +186,23 @@ typedef struct tagBITMAPINFOHEADER
     DWORD biClrUsed;
     DWORD biClrImportant;
 } BITMAPINFOHEADER;
+typedef struct tagRGBQUAD
+{
+    BYTE rgbBlue;
+    BYTE rgbGreen;
+    BYTE rgbRed;
+    BYTE rgbReserved;
+} RGBQUAD;
+typedef struct tagBITMAPINFO
+{
+    BITMAPINFOHEADER bmiHeader;
+    RGBQUAD bmiColors[1];
+} BITMAPINFO, *LPBITMAPINFO;
+#define BI_RGB 0L
+#define BI_BITFIELDS 3L
+#define DIB_RGB_COLORS 0
+#define DIB_PAL_COLORS 1
+
 typedef struct tagDIBSECTION
 {
     BITMAP dsBm;
@@ -254,4 +271,39 @@ inline int GetRgnBox(HRGN, LPRECT Rect)
 inline BOOL StretchBlt(HDC, int, int, int, int, HDC, int, int, int, int, DWORD)
 {
     return FALSE;
+}
+
+// Bitmaps and brushes: no GDI surfaces here yet (fonts come with M3), so they cannot be made.
+inline HBITMAP CreateCompatibleBitmap(HDC, int, int)
+{
+    return nullptr;
+}
+inline int GetDIBits(HDC, HBITMAP, UINT, UINT, LPVOID, BITMAPINFO*, UINT)
+{
+    return 0;
+}
+inline HBRUSH CreateSolidBrush(COLORREF)
+{
+    return nullptr;
+}
+
+// GetTextExtentPoint32A / GetTextExtentPointW: as GetTextExtentPoint32W, no font to measure.
+inline BOOL GetTextExtentPoint32A(HDC, LPCSTR, int, LPSIZE Size)
+{
+    if (Size != nullptr)
+        *Size = SIZE{0, 0};
+    return FALSE;
+}
+inline BOOL GetTextExtentPointW(HDC Dc, const wchar_t* Text, int Count, LPSIZE Size)
+{
+    return GetTextExtentPoint32W(Dc, Text, Count, Size);
+}
+
+// The stock objects: none here (no GDI surfaces), so a class gets no background brush.
+#define WHITE_BRUSH 0
+#define BLACK_BRUSH 4
+#define NULL_BRUSH 5
+inline HGDIOBJ GetStockObject(int)
+{
+    return nullptr;
 }

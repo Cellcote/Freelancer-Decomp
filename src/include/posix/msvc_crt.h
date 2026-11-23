@@ -329,6 +329,32 @@ inline char* _ltoa(FlLong Value, char* Buffer, int Radix)
     return _itoa((int)Value, Buffer, Radix);
 }
 
+// _itow / _ltow / _ultow: _itoa's digits, widened.
+inline wchar_t* _itow(int Value, wchar_t* Buffer, int Radix)
+{
+    char Digits[72];
+    _itoa(Value, Digits, Radix);
+    std::size_t Index = 0;
+    for (; Digits[Index] != 0; ++Index)
+        Buffer[Index] = static_cast<wchar_t>(Digits[Index]);
+    Buffer[Index] = 0;
+    return Buffer;
+}
+inline wchar_t* _ltow(FlLong Value, wchar_t* Buffer, int Radix)
+{
+    return _itow((int)Value, Buffer, Radix);
+}
+inline wchar_t* _ultow(FlULong Value, wchar_t* Buffer, int Radix)
+{
+    char Digits[72];
+    _ultoa(Value, Digits, Radix);
+    std::size_t Index = 0;
+    for (; Digits[Index] != 0; ++Index)
+        Buffer[Index] = static_cast<wchar_t>(Digits[Index]);
+    Buffer[Index] = 0;
+    return Buffer;
+}
+
 // The "secure" CRT functions the code uses, with MSVC's results for what the callers pass. A
 // destination too small: strcpy_s / strncpy_s fail (an empty destination, ERANGE / EINVAL;
 // MSVC also calls its invalid-parameter handler); with _TRUNCATE the copy is cut and STRUNCATE
@@ -580,6 +606,61 @@ int sscanf_s(char const* Text, char const* Format, Args... Arguments)
             break;
     }
     return std::sscanf(Text, Format, Arguments...);
+}
+
+// _snwprintf / _vsnwprintf: MSVC's, as _snprintf: no terminator when the text fills Count
+// exactly, Count characters and -1 when it does not fit; %s is a wide string (see _swprintf).
+inline int _vsnwprintf(wchar_t* Buffer, std::size_t Count, wchar_t const* Format, va_list Args)
+{
+    // The whole text first: what vswprintf leaves in a buffer too small is unspecified.
+    std::wstring const CFormat = PosixMsvcCrt::WideFormat(Format);
+    std::vector<wchar_t> Text(Count + 64);
+    int Length = -1;
+    for (;;)
+    {
+        va_list Copy;
+        va_copy(Copy, Args);
+        Length = std::vswprintf(Text.data(), Text.size(), CFormat.c_str(), Copy);
+        va_end(Copy);
+        if (Length >= 0 || Text.size() >= 0x100000)
+            break;
+        Text.resize(Text.size() * 2);
+    }
+    if (Length < 0)
+        return -1;
+    std::size_t const Size = static_cast<std::size_t>(Length);
+    if (Size < Count)
+    {
+        std::wmemcpy(Buffer, Text.data(), Size + 1);
+        return Length;
+    }
+    std::wmemcpy(Buffer, Text.data(), Count);
+    return Size == Count ? Length : -1;
+}
+inline int _snwprintf(wchar_t* Buffer, std::size_t Count, wchar_t const* Format, ...)
+{
+    va_list Args;
+    va_start(Args, Format);
+    int const Result = _vsnwprintf(Buffer, Count, Format, Args);
+    va_end(Args);
+    return Result;
+}
+
+// _wcsicoll: the C locale's collation, without regard to case (towlower first), as MSVC in the
+// "C" locale.
+inline int _wcsicoll(wchar_t const* Left, wchar_t const* Right)
+{
+    return _wcsicmp(Left, Right);
+}
+
+// _isnan / _finite: the C library's classification.
+inline int _isnan(double Value)
+{
+    return std::isnan(Value) ? 1 : 0;
+}
+inline int _finite(double Value)
+{
+    return std::isfinite(Value) ? 1 : 0;
 }
 
 // _vswprintf: MSVC's legacy vswprintf, with no buffer size and %s for a wide string (see

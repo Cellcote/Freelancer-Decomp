@@ -70,6 +70,10 @@ inline LSTATUS RegDeleteValueA(HKEY, LPCSTR)
 {
     return ERROR_FILE_NOT_FOUND;
 }
+inline LSTATUS RegDeleteKeyA(HKEY, LPCSTR)
+{
+    return ERROR_FILE_NOT_FOUND;
+}
 
 // GetUserNameA: the login name ($USER, else "player"). *Size counts the terminator, as on
 // Windows; too small a buffer fails with ERROR_INSUFFICIENT_BUFFER and the size needed.

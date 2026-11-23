@@ -669,11 +669,13 @@ inline BOOL SystemTimeToFileTime(const SYSTEMTIME* Time, LPFILETIME Out)
     return TRUE;
 }
 
-// GetStringTypeW for CT_CTYPE1, C1_SPACE only: the characters Windows 10 classes as spaces
-// (0x09-0x0D, 0x20, 0x85, 0xA0, U+1680, U+180E, U+2000-U+200A, U+2028, U+2029, U+202F, U+205F,
-// U+3000). The code asks nothing else of it.
+// GetStringTypeW for CT_CTYPE1, C1_SPACE and C1_CNTRL only: the characters Windows 10 classes
+// as spaces (0x09-0x0D, 0x20, 0x85, 0xA0, U+1680, U+180E, U+2000-U+200A, U+2028, U+2029,
+// U+202F, U+205F, U+3000) and as control characters (C0, DEL and C1). The code asks nothing
+// else of it.
 #define CT_CTYPE1 0x0001
 #define C1_SPACE 0x0008
+#define C1_CNTRL 0x0020
 inline BOOL GetStringTypeW(DWORD InfoType, const wchar_t* Text, int Count, WORD* Types)
 {
     if (InfoType != CT_CTYPE1 || Text == nullptr || Types == nullptr)
@@ -686,7 +688,8 @@ inline BOOL GetStringTypeW(DWORD InfoType, const wchar_t* Text, int Count, WORD*
         const bool bSpace = (C >= 0x09 && C <= 0x0D) || C == 0x20 || C == 0x85 || C == 0xA0 ||
                             C == 0x1680 || C == 0x180E || (C >= 0x2000 && C <= 0x200A) ||
                             C == 0x2028 || C == 0x2029 || C == 0x202F || C == 0x205F || C == 0x3000;
-        Types[Index] = bSpace ? C1_SPACE : 0;
+        const bool bControl = C < 0x20 || (C >= 0x7F && C <= 0x9F);
+        Types[Index] = (WORD)((bSpace ? C1_SPACE : 0) | (bControl ? C1_CNTRL : 0));
     }
     return TRUE;
 }
@@ -846,4 +849,371 @@ inline int WideCharToMultiByte(UINT, DWORD, const wchar_t* Text, int Count, LPST
         return 0;
     std::memcpy(Out, Utf8.data(), Utf8.size());
     return static_cast<int>(Utf8.size());
+}
+
+// GetStringTypeExW: GetStringTypeW, whatever the locale.
+inline BOOL GetStringTypeExW(DWORD, DWORD InfoType, const wchar_t* Text, int Count, WORD* Types)
+{
+    return GetStringTypeW(InfoType, Text, Count, Types);
+}
+
+// MultiByteToWideChar from UTF-8 for any code page (CP_ACP is UTF-8 on these systems); an
+// invalid byte becomes its Latin-1 character. As Windows: Count -1 includes the terminator, and a
+// zero OutSize asks for the size.
+inline int MultiByteToWideChar(UINT, DWORD, LPCSTR Text, int Count, wchar_t* Out, int OutSize)
+{
+    if (Text == nullptr)
+        return 0;
+    std::size_t const Length = Count < 0 ? std::strlen(Text) + 1 : static_cast<std::size_t>(Count);
+    std::wstring Wide;
+    for (std::size_t Index = 0; Index < Length;)
+    {
+        unsigned char const Lead = static_cast<unsigned char>(Text[Index]);
+        int const Extra = Lead < 0x80           ? 0
+                          : (Lead >> 5) == 0x6  ? 1
+                          : (Lead >> 4) == 0xE  ? 2
+                          : (Lead >> 3) == 0x1E ? 3
+                                                : -1;
+        std::uint32_t Code = Extra == 0   ? Lead
+                             : Extra == 1 ? (Lead & 0x1Fu)
+                             : Extra == 2 ? (Lead & 0x0Fu)
+                                          : (Lead & 0x07u);
+        bool bValid = Extra >= 0 && Index + static_cast<std::size_t>(Extra) < Length;
+        for (int Next = 1; bValid && Next <= Extra; ++Next)
+        {
+            unsigned char const Byte = static_cast<unsigned char>(Text[Index + Next]);
+            bValid = (Byte & 0xC0) == 0x80;
+            Code = (Code << 6) | (Byte & 0x3Fu);
+        }
+        if (!bValid)
+        {
+            Wide += static_cast<wchar_t>(Lead);
+            ++Index;
+            continue;
+        }
+        Wide += static_cast<wchar_t>(Code);
+        Index += static_cast<std::size_t>(Extra) + 1;
+    }
+    if (OutSize == 0)
+        return static_cast<int>(Wide.size());
+    if (Out == nullptr || static_cast<std::size_t>(OutSize) < Wide.size())
+        return 0;
+    std::wmemcpy(Out, Wide.data(), Wide.size());
+    return static_cast<int>(Wide.size());
+}
+
+// The wide string calls of kernel32.
+inline int lstrlenW(const wchar_t* Text)
+{
+    return Text != nullptr ? static_cast<int>(std::wcslen(Text)) : 0;
+}
+// lstrcpynW: at most Size - 1 characters and the terminator.
+inline wchar_t* lstrcpynW(wchar_t* Out, const wchar_t* Text, int Size)
+{
+    if (Out == nullptr || Text == nullptr || Size <= 0)
+        return nullptr;
+    int Index = 0;
+    for (; Index < Size - 1 && Text[Index] != 0; ++Index)
+        Out[Index] = Text[Index];
+    Out[Index] = 0;
+    return Out;
+}
+
+// FormatMessageW: FormatMessageA's text, widened (with ALLOCATE_BUFFER, *(wchar_t**)Buffer gets
+// a malloc'd copy for LocalFree, which windows.h defines).
+inline DWORD FormatMessageW(DWORD Flags, LPCVOID, DWORD Code, DWORD, wchar_t* Buffer, DWORD Size,
+                            void*)
+{
+    char Text[64];
+    int const Length = std::snprintf(Text, sizeof(Text), "Error %u.\r\n", (unsigned)Code);
+    if (Length <= 0 || Buffer == nullptr)
+        return 0;
+    wchar_t Wide[64];
+    for (int Index = 0; Index <= Length; ++Index)
+        Wide[Index] = static_cast<wchar_t>(static_cast<unsigned char>(Text[Index]));
+    if ((Flags & 0x00000100) != 0) // FORMAT_MESSAGE_ALLOCATE_BUFFER
+    {
+        wchar_t* const Copy =
+            static_cast<wchar_t*>(std::malloc(sizeof(wchar_t) * ((size_t)Length + 1)));
+        if (Copy == nullptr)
+            return 0;
+        std::wmemcpy(Copy, Wide, (size_t)Length + 1);
+        *reinterpret_cast<wchar_t**>(Buffer) = Copy;
+        return (DWORD)Length;
+    }
+    if ((DWORD)Length >= Size)
+        return 0;
+    std::wmemcpy(Buffer, Wide, (size_t)Length + 1);
+    return (DWORD)Length;
+}
+
+// The code pages here are UTF-8, which has no lead bytes in the DBCS sense.
+inline BOOL IsDBCSLeadByte(BYTE)
+{
+    return FALSE;
+}
+inline BOOL IsDBCSLeadByteEx(UINT, BYTE)
+{
+    return FALSE;
+}
+
+// IsBadWritePtr: Windows probes the pages; here every non-null range counts as writable (the
+// callers only use it to skip a null or freed pointer they were handed).
+inline BOOL IsBadWritePtr(LPVOID Address, UINT_PTR)
+{
+    return Address == nullptr ? TRUE : FALSE;
+}
+
+// The process and thread pseudo-handles and ids.
+inline HANDLE GetCurrentProcess()
+{
+    return reinterpret_cast<HANDLE>(static_cast<std::intptr_t>(-1));
+}
+inline DWORD GetCurrentThreadId()
+{
+    return Platform::CurrentThreadId();
+}
+// DuplicateHandle: there is no other process to hand a handle to here (Dr. Watson's crash
+// block is the only caller), so it fails.
+#define DUPLICATE_CLOSE_SOURCE 0x00000001
+#define DUPLICATE_SAME_ACCESS 0x00000002
+inline BOOL DuplicateHandle(HANDLE, HANDLE, HANDLE, LPHANDLE Target, DWORD, BOOL, DWORD)
+{
+    if (Target != nullptr)
+        *Target = nullptr;
+    return FALSE;
+}
+
+// CreateProcessA: the programs retail starts (dw15.exe, Flasher.exe) are Windows programs, so
+// it fails, as for a missing file.
+typedef struct _STARTUPINFOA
+{
+    DWORD cb;
+    LPSTR lpReserved;
+    LPSTR lpDesktop;
+    LPSTR lpTitle;
+    DWORD dwX;
+    DWORD dwY;
+    DWORD dwXSize;
+    DWORD dwYSize;
+    DWORD dwXCountChars;
+    DWORD dwYCountChars;
+    DWORD dwFillAttribute;
+    DWORD dwFlags;
+    WORD wShowWindow;
+    WORD cbReserved2;
+    LPBYTE lpReserved2;
+    HANDLE hStdInput;
+    HANDLE hStdOutput;
+    HANDLE hStdError;
+} STARTUPINFOA, *LPSTARTUPINFOA;
+typedef struct _PROCESS_INFORMATION
+{
+    HANDLE hProcess;
+    HANDLE hThread;
+    DWORD dwProcessId;
+    DWORD dwThreadId;
+} PROCESS_INFORMATION, *LPPROCESS_INFORMATION;
+inline BOOL CreateProcessA(LPCSTR, LPSTR, LPSECURITY_ATTRIBUTES, LPSECURITY_ATTRIBUTES, BOOL, DWORD,
+                           LPVOID, LPCSTR, LPSTARTUPINFOA, LPPROCESS_INFORMATION Info)
+{
+    if (Info != nullptr)
+        std::memset(Info, 0, sizeof(*Info));
+    return FALSE;
+}
+
+// GetTempPathA: $TMPDIR (or /tmp) with a trailing '/'. The length written, or the size needed.
+inline DWORD GetTempPathA(DWORD Size, LPSTR Buffer)
+{
+    const char* Folder = std::getenv("TMPDIR");
+    if (Folder == nullptr || *Folder == 0)
+        Folder = "/tmp";
+    std::string Path = Folder;
+    if (Path.back() != '/')
+        Path += '/';
+    if (Buffer == nullptr || Size <= Path.size())
+        return static_cast<DWORD>(Path.size() + 1);
+    std::memcpy(Buffer, Path.c_str(), Path.size() + 1);
+    return static_cast<DWORD>(Path.size());
+}
+
+// GetVersionExW: as GetVersionExA (windows.h), Windows 10.
+typedef struct _OSVERSIONINFOW
+{
+    DWORD dwOSVersionInfoSize;
+    DWORD dwMajorVersion;
+    DWORD dwMinorVersion;
+    DWORD dwBuildNumber;
+    DWORD dwPlatformId;
+    WCHAR szCSDVersion[128];
+} OSVERSIONINFOW;
+inline BOOL GetVersionExW(OSVERSIONINFOW* Info)
+{
+    if (Info == nullptr)
+        return FALSE;
+    Info->dwMajorVersion = 10;
+    Info->dwMinorVersion = 0;
+    Info->dwBuildNumber = 19041;
+    Info->dwPlatformId = 2; // VER_PLATFORM_WIN32_NT
+    Info->szCSDVersion[0] = 0;
+    return TRUE;
+}
+
+// GlobalMemoryStatus: the physical memory (sysconf), and 2 GB of virtual address space, as a
+// 32-bit process sees (the code sizes caches from it).
+typedef struct _MEMORYSTATUS
+{
+    DWORD dwLength;
+    DWORD dwMemoryLoad;
+    SIZE_T dwTotalPhys;
+    SIZE_T dwAvailPhys;
+    SIZE_T dwTotalPageFile;
+    SIZE_T dwAvailPageFile;
+    SIZE_T dwTotalVirtual;
+    SIZE_T dwAvailVirtual;
+} MEMORYSTATUS, *LPMEMORYSTATUS;
+inline void GlobalMemoryStatus(LPMEMORYSTATUS Status)
+{
+    if (Status == nullptr)
+        return;
+    long const Pages = sysconf(_SC_PHYS_PAGES);
+    long const PageSize = sysconf(_SC_PAGESIZE);
+    SIZE_T const Physical =
+        Pages > 0 && PageSize > 0 ? static_cast<SIZE_T>(Pages) * static_cast<SIZE_T>(PageSize) : 0;
+    Status->dwMemoryLoad = 0;
+    Status->dwTotalPhys = Status->dwAvailPhys = Physical;
+    Status->dwTotalPageFile = Status->dwAvailPageFile = Physical;
+    Status->dwTotalVirtual = Status->dwAvailVirtual = 0x7FFE0000;
+}
+
+// The modules, by the Win32 names: the platform layer's (LoadLibraryA finds name.dylib / name.so
+// for name.dll). Wide names are converted to UTF-8.
+inline HMODULE LoadLibraryA(LPCSTR Name)
+{
+    return Name != nullptr ? Platform::ModuleLoad(Name) : nullptr;
+}
+inline HMODULE LoadLibraryW(const wchar_t* Name)
+{
+    if (Name == nullptr)
+        return nullptr;
+    int const Size = WideCharToMultiByte(CP_UTF8, 0, Name, -1, nullptr, 0, nullptr, nullptr);
+    std::string Narrow(static_cast<std::size_t>(Size), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, Name, -1, Narrow.data(), Size, nullptr, nullptr);
+    return LoadLibraryA(Narrow.c_str());
+}
+inline BOOL FreeLibrary(HMODULE Module)
+{
+    return Platform::ModuleFree(Module) ? TRUE : FALSE;
+}
+inline FARPROC GetProcAddress(HMODULE Module, LPCSTR Name)
+{
+    return reinterpret_cast<FARPROC>(Platform::ModuleSymbol(Module, Name));
+}
+inline HMODULE GetModuleHandleA(LPCSTR Name)
+{
+    return Platform::ModuleFind(Name);
+}
+
+// Resources live in the Windows resource DLLs (Platform::ResourceModuleLoad), which are not
+// read here yet: FindResource finds nothing, as for a module without the resource.
+typedef struct HRSRC__* HRSRC;
+typedef HANDLE HGLOBAL;
+inline HRSRC FindResourceExA(HMODULE, LPCSTR, LPCSTR, WORD)
+{
+    return nullptr;
+}
+inline HRSRC FindResourceA(HMODULE Module, LPCSTR Name, LPCSTR Type)
+{
+    return FindResourceExA(Module, Type, Name, 0);
+}
+inline DWORD SizeofResource(HMODULE, HRSRC)
+{
+    return 0;
+}
+inline HGLOBAL LoadResource(HMODULE, HRSRC)
+{
+    return nullptr;
+}
+inline LPVOID LockResource(HGLOBAL Resource)
+{
+    return Resource;
+}
+
+// Structured exception handling has no equivalent here: a __try body runs as plain code and
+// its __except block never does (a fault ends the process, or reaches a signal handler).
+// SetUnhandledExceptionFilter keeps nothing.
+typedef struct _EXCEPTION_RECORD
+{
+    DWORD ExceptionCode;
+    DWORD ExceptionFlags;
+    struct _EXCEPTION_RECORD* ExceptionRecord;
+    PVOID ExceptionAddress;
+    DWORD NumberParameters;
+    ULONG_PTR ExceptionInformation[15];
+} EXCEPTION_RECORD, *PEXCEPTION_RECORD;
+typedef struct _EXCEPTION_POINTERS
+{
+    PEXCEPTION_RECORD ExceptionRecord;
+    PVOID ContextRecord;
+} EXCEPTION_POINTERS, *PEXCEPTION_POINTERS;
+#define EXCEPTION_EXECUTE_HANDLER 1
+#define EXCEPTION_CONTINUE_SEARCH 0
+#define EXCEPTION_CONTINUE_EXECUTION (-1)
+#define __try if (true)
+#define __except(Filter) else if (false)
+#define __finally
+typedef LONG(WINAPI* PTOP_LEVEL_EXCEPTION_FILTER)(EXCEPTION_POINTERS*);
+typedef PTOP_LEVEL_EXCEPTION_FILTER LPTOP_LEVEL_EXCEPTION_FILTER;
+inline PTOP_LEVEL_EXCEPTION_FILTER SetUnhandledExceptionFilter(PTOP_LEVEL_EXCEPTION_FILTER)
+{
+    return nullptr;
+}
+
+// The narrow string calls of kernel32.
+inline int lstrlenA(LPCSTR Text)
+{
+    return Text != nullptr ? static_cast<int>(std::strlen(Text)) : 0;
+}
+inline LPSTR lstrcpyA(LPSTR Out, LPCSTR Text)
+{
+    return Out != nullptr && Text != nullptr ? std::strcpy(Out, Text) : nullptr;
+}
+inline LPSTR lstrcatA(LPSTR Out, LPCSTR Text)
+{
+    return Out != nullptr && Text != nullptr ? std::strcat(Out, Text) : nullptr;
+}
+
+// CompareStringA: an ordinal comparison, without regard to case with NORM_IGNORECASE (the
+// callers compare file names). CSTR_LESS_THAN / CSTR_EQUAL / CSTR_GREATER_THAN, 0 on failure.
+#define NORM_IGNORECASE 0x00000001
+#define CSTR_LESS_THAN 1
+#define CSTR_EQUAL 2
+#define CSTR_GREATER_THAN 3
+inline int CompareStringA(DWORD, DWORD Flags, LPCSTR Left, int LeftCount, LPCSTR Right,
+                          int RightCount)
+{
+    if (Left == nullptr || Right == nullptr)
+        return 0;
+    std::string const A(Left, LeftCount < 0 ? std::strlen(Left) : static_cast<size_t>(LeftCount));
+    std::string const B(Right,
+                        RightCount < 0 ? std::strlen(Right) : static_cast<size_t>(RightCount));
+    int const Order = (Flags & NORM_IGNORECASE) != 0 ? strcasecmp(A.c_str(), B.c_str())
+                                                     : std::strcmp(A.c_str(), B.c_str());
+    return Order < 0 ? CSTR_LESS_THAN : Order > 0 ? CSTR_GREATER_THAN : CSTR_EQUAL;
+}
+
+// GetLocaleInfoA: the default ANSI code page only, which is UTF-8 (65001) here. The length
+// written with the terminator, or the size needed when Size is 0; 0 for anything else.
+#define LOCALE_IDEFAULTANSICODEPAGE 0x00001004
+inline int GetLocaleInfoA(DWORD, DWORD Type, LPSTR Out, int Size)
+{
+    if (Type != LOCALE_IDEFAULTANSICODEPAGE)
+        return 0;
+    static const char kCodePage[] = "65001";
+    if (Size == 0)
+        return static_cast<int>(sizeof(kCodePage));
+    if (Out == nullptr || Size < static_cast<int>(sizeof(kCodePage)))
+        return 0;
+    std::memcpy(Out, kCodePage, sizeof(kCodePage));
+    return static_cast<int>(sizeof(kCodePage));
 }
