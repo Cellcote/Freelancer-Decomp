@@ -629,12 +629,15 @@ inline int _vsnwprintf(wchar_t* Buffer, std::size_t Count, wchar_t const* Format
     if (Length < 0)
         return -1;
     std::size_t const Size = static_cast<std::size_t>(Length);
+    // A null buffer with a zero count asks for the length the text needs (without the
+    // terminator), as MSVC answers it.
+    if (Buffer == nullptr && Count == 0)
+        return Length;
     if (Size < Count)
     {
         std::wmemcpy(Buffer, Text.data(), Size + 1);
         return Length;
     }
-    // A zero count (a size query with a null buffer) copies nothing.
     if (Count != 0)
         std::wmemcpy(Buffer, Text.data(), Count);
     return Size == Count ? Length : -1;
