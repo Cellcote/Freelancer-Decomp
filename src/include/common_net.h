@@ -621,10 +621,10 @@ FL_LAYOUT_ASSERT(sizeof(CPlayerAccount) == 0x0C, "CPlayerAccount size");
 // ---------------------------------------------------------------------------
 
 // Freelancer.exe's inlined copy of AsteroidExclusionZoneMgr::set_max_cliasteroid_exclusion_
-// distance (defined in cli_asteroid.cpp; befriended below, not exported).
+// distance (defined in Client/space/cli_asteroid.cpp; befriended below, not exported).
 struct FCliAsteroidExclusionInline;
 // PORT(rp9): reader of NebulaExclusionZoneMgr's zone list for the Direct3D 9 volumetric nebula
-// (freelancer.exe Client/nebula_volume.cpp; befriended below, not exported, read-only).
+// (freelancer.exe Client/space/nebula_volume.cpp; befriended below, not exported, read-only).
 struct FNebulaVolumeExclusionAccess;
 
 namespace Exclusion
@@ -705,7 +705,7 @@ struct COMMON_API NebulaExclusionZone
     // per-zone config limit here -- update_dist() (Common.dll.c 94511-94545) overwrites it every
     // call with the current shell-distance-squared (0 if inside the shell, computed distance^2
     // otherwise), and NebulaExclusionZoneMgr::is_in_exclusion_zone reads it back as a live proximity
-    // cache (`Zone->MaxDistSq <= 10.0f`, common_exclusionzone.cpp). Ctor default 10000000.0f
+    // cache (`Zone->MaxDistSq <= 10.0f`, Common/universe/exclusionzone.cpp). Ctor default 10000000.0f
     // (0x4b189680) is just a "far away" sentinel before the first update_dist call.
     float         MaxDistSq;          // +0x04
     // "fog_far" from the nebula INI: get_fog_far .text:06261da0 (FLD [this+8]) and
@@ -836,7 +836,7 @@ public:
     void set_max_distance(float Dist);
 
 private:
-    // PORT(rp9): reads [Begin, End) (Client/nebula_volume.cpp). No layout or export change.
+    // PORT(rp9): reads [Begin, End) (Client/space/nebula_volume.cpp). No layout or export change.
     friend struct ::FNebulaVolumeExclusionAccess;
 
     unsigned char         ZonesAllocator;         // +0x04 VC6 vector allocator byte, never read

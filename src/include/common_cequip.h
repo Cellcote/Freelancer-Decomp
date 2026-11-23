@@ -356,7 +356,7 @@ public:
     // level (vtable+0x70, no CEquip base slot) -- overridden by CAttachedEquip below. Zeroes Out,
     // and when connected fetches this equip's own ConnectionIndex (GetParentConnector(false),
     // vtable+0x64) and queries DALib::Engine's vtable+0x90 (world-position getter, same slot as
-    // common_misc.cpp's ComputeExplosiveImpulses / this file's own GetConnectionPosition +0xa0
+    // Common/core/misc.cpp's ComputeExplosiveImpulses / this file's own GetConnectionPosition +0xa0
     // sibling) for the connector instance's world position. Like GetVelocity above, retail always
     // hardcodes the return to false regardless of outcome -- reproduced as-is.
     virtual bool GetCenterOfMass(Vector& Out) const;
@@ -627,12 +627,12 @@ public:
     CExternalEquip const* FindByHardpoint(CacheString const& Hardpoint) const;
     // Common.dll.c 0x3b3a0: maps a physics-engine instance id to the CAttachedEquip mounted
     // there and returns its equip Id (0 if Instance==-1 or nothing attached matches). Traverses
-    // with TypeMask 0x1fe0 == kAttachedEquipMask (common_cequip_internal.h), i.e. only CAttachedEquip-
+    // with TypeMask 0x1fe0 == kAttachedEquipMask (Common/equip/cequip_internal.h), i.e. only CAttachedEquip-
     // castable equipment is visited; retail dispatches through a vtable+0x80 slot taking the
     // instance id and returning bool, which this reproduces as
     // CAttachedEquip::cast(Equip)->GetRootIndex() == Instance (GetRootIndex is itself
     // Attachment->GetRootIndex(), -1 when not connected, so it can never false-positive against
-    // a real instance id). See common_ceqobj.cpp's compute_explosion_dmg_bounding_sphere comment
+    // a real instance id). See Common/object/ceqobj.cpp's compute_explosion_dmg_bounding_sphere comment
     // for the caller-side context (inst_to_subobj_id) this unblocks.
     unsigned short InstToSubObjID(FlLong Instance) const;
     // Common.dll.c 0x3b750: cross-checks a serialized EquipDescList against this manager's live
@@ -1427,7 +1427,7 @@ protected:
 
     Transform HpXform;               // +0x20  beam source hardpoint, parent(ship)-space
     std::vector<TractorArm> Arms;    // +0x50  (TractorArm is completed right after CETractor)
-    // The +0x50 offset check lives in the CETractor(CShip*, ...) ctor body in common_cetractor.cpp:
+    // The +0x50 offset check lives in the CETractor(CShip*, ...) ctor body in Common/equip/cetractor.cpp:
     // Arms is protected, and a member function added here only for the check would be exported
     // with the class (retail Common.dll exports no such member).
 };
@@ -1438,7 +1438,7 @@ protected:
 // GetTipPos 0x3df10. Update/GetTipPos both resolve the beam source's world Transform via the
 // owner ship's own world Transform composed with CETractor's stored HpXform through the
 // 3DMathEngine singleton's MulTransform (see CETractor::GetSourcePos / ResolveTractorSourceXform
-// in common_cetractor.cpp) -- DAT_063fc22c is just this cluster's own lazily-cached slot for that
+// in Common/equip/cetractor.cpp) -- DAT_063fc22c is just this cluster's own lazily-cached slot for that
 // same already-ported Acquire3DMathEngine() singleton.
 class COMMON_API TractorArm
 {
@@ -1487,7 +1487,7 @@ protected:
     // 0629de02, right after State is set to 2 -- the one-second countdown before the towed
     // CLoot is consumed. GRAB_TOLERANCE_SQUARED (ordinal 1481, 0x0639d810 = 1.0f) has no reader
     // anywhere in Common.dll: exported but dead in retail, ported for symbol parity only.
-    // Both are DEFINED in common_tractorarm.cpp, with the rest of the class.
+    // Both are DEFINED in Common/equip/tractorarm.cpp, with the rest of the class.
     static float const ACQUIRE_DELAY;
     static float const GRAB_TOLERANCE_SQUARED;
 };
@@ -1562,7 +1562,7 @@ public:
     // distance-out-of-range returns literal 0, insufficient-power returns literal 1.
     // Renamed here from the misleading original guesses (ScanOk/ScanOutOfRange) to
     // match true retail semantics; only ScanComplete's numeric value is ever checked
-    // by callers (common_iobjinspectimpl.cpp), so this rename carries no external risk.
+    // by callers (Common/object/iobjinspectimpl.cpp), so this rename carries no external risk.
     enum ScanResult
     {
         ScanTooFar = 0,
@@ -2018,7 +2018,7 @@ public:
     // (PTR_LAB_0639e5a4 slot 1). Only does anything when LaunchFlags & 0x20 (the
     // immediate-physical-launch path); the AI-directive path (Start() queued a
     // DirectiveLaunchOp instead) just reports "not complete" every tick with no
-    // side effects. See common_launchaction.cpp for the full per-branch trace.
+    // side effects. See Common/object/launchaction.cpp for the full per-branch trace.
     virtual bool update(float Dt) override;
 
     // Retail 0x62b01f0, dispatched via this class's own DirectiveCallback

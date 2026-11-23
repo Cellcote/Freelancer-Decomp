@@ -17,14 +17,14 @@ are not reproduced; our DLLs use the modern STL between them.
 | What | Where |
 |---|---|
 | `MsvcrtAtoi`, `MsvcrtWtoi` (+ `MsvcrtWideCharToDigit`, `MsvcrtIsWideSpace`) | `src/include/msvcrt_compat.h` |
-| `MsvcrtAtof` (decimal branch, integer mantissa) | `src/Common/msvcrt_atof.h/.cpp` |
+| `MsvcrtAtof` (decimal branch, integer mantissa) | `src/Common/core/msvcrt_atof.h/.cpp` |
 | `MsvcrtLegacyVsnprintf`, `MsvcrtFormatLuaNumber`, `MsvcrtNumericVsnprintf` | `src/include/msvcrt_numeric_format.h` |
 
 Consumers: `MsvcrtAtoi` — every direct decimal integer parse in the game sources
 (project rule: `atoi`/`std::atoi` are forbidden); `MsvcrtAtof` — Common `ValueNum`,
 the decimal branch of `ParseNumber`, BINI string → float; `MsvcrtFormatLuaNumber` — `luaV_tostring`
 in Thorn and luaprofile (`lvm.c`); `MsvcrtNumericVsnprintf` — `NumberStringChild::Printf` /
-`FormatFloat` (`font_string.cpp`).
+`FormatFloat` (`Client/cmn/font_string.cpp`).
 
 ## Implemented contracts
 

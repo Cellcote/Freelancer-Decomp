@@ -21,6 +21,7 @@
 #include <cstring>
 #include <cwchar>
 #include <new>
+#include <random>
 
 namespace
 {
@@ -129,9 +130,20 @@ bool CClientImpl::Startup(unsigned int MaxPlayers, unsigned int Port)
 {
     NumClients = 0;
     Host = CreateRemoteClientHost();
+    // PORT(deviation) SERVER-STARTUP-PASSWORD: retail hosts with no password here, and the
+    // server's own password is set only once startup finishes (PublishServerSession, after
+    // IServerImpl::Startup returns). A client could join in between and stay. Until the
+    // session is published, a random password nobody knows keeps everyone out. It goes in
+    // before BeginHosting, whose Host call takes the session description as it stands.
+    {
+        std::random_device Random;
+        wchar_t Placeholder[33];
+        for (int i = 0; i < 32; i += 8)
+            swprintf(Placeholder + i, 9, L"%08x", static_cast<unsigned int>(Random()));
+        Host->SetPassword(Placeholder);
+    }
     Host->BeginHosting(Port);
     Host->SetSessionName(L"Freelancer Default Session Name");
-    Host->SetPassword(L"");
     Host->SetMaxPlayers(static_cast<int>(MaxPlayers));
     Serializer = RpcGetRemotePacketSerializer();
 
@@ -339,11 +351,11 @@ namespace {
 // that is not built for a remote caller. The port drops them before decoding.
 bool IsUnsentClientPacket(unsigned int Channel, unsigned int Opcode) {
     if (Channel == 1)
-        // SET_MISSION_LOG: sent only in single player (nn_story_star.cpp, 0x004ba0f4,
+        // SET_MISSION_LOG: sent only in single player (Client/nn/nn_story_star.cpp, 0x004ba0f4,
         // 0x004ba1a0, 0x004ba3e5).
         return Opcode == 0x19;
     switch (Opcode) {
-    case 0x1E: // SAVEGAME: the save page only exists in single player (nn_pause.cpp)
+    case 0x1E: // SAVEGAME: the save page only exists in single player (Client/nn/nn_pause.cpp)
     // The DBG packets have no client sender; retail logs "encountered in release mode".
     case 0x22: // DBGCREATESHIP
     case 0x23: // DBGLOADSYSTEM
@@ -351,9 +363,9 @@ bool IsUnsentClientPacket(unsigned int Channel, unsigned int Opcode) {
     case 0x2D: // DBGCONSOLE
     case 0x2E: // DBGFREESYSTEM
     case 0x30: // DBGRELOCATE_SHIP
-    case 0x24: // DOCK: single player only (space_state.cpp, 0x0054a79a)
+    case 0x24: // DOCK: single player only (Client/space/space_state.cpp, 0x0054a79a)
     case 0x27: // TRADERESPONSE: no client sender
-    case 0x37: // COMMCOMPLETE: single player only (hud_comm.cpp)
+    case 0x37: // COMMCOMPLETE: single player only (Client/space/hud/hud_comm.cpp)
         return true;
     default:
         return false;
@@ -397,10 +409,16 @@ void CRemoteClientProxy::OnReceive(unsigned char* Data, FlULong Size)
     FPacketBase* Packet = nullptr;
     unsigned int DecodedSize = 0;
     Client.Serializer->Allocate(Channel, Opcode, &Packet);
-    if (Packet == nullptr ||
-        Packet->Decode(Data + 2, static_cast<unsigned int>(Size) - 2u, &DecodedSize) != 0) {
-        // As in retail, a packet that failed to decode is not released: a failed Decode can
-        // leave owned pointers unset, which the destructor would free.
+    if (Packet == nullptr) {
+        Disconnect();
+        return;
+    }
+    if (Packet->Decode(Data + 2, static_cast<unsigned int>(Size) - 2u, &DecodedSize) != 0) {
+        // Retail does not release a packet that failed to decode, so every rejected message
+        // leaked its packet. PORT(deviation) REMOTE-PACKET-HARDENING: every client-to-server packet
+        // that owns memory starts with its pointers null (SAVEGAME since this deviation), and
+        // a decoder only ever stores its own allocation in them, so releasing is safe.
+        Packet->Release();
         Disconnect();
         return;
     }

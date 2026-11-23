@@ -78,7 +78,7 @@ class IVP_Controller_Phantom;
 class IVP_Event_Sim;
 
 // Retail's golem force controller, CObject+0x60. RTTI-confirmed global-scope class name (see
-// PhySys::GolemSetTargetPosition below for the COL trail). Defined in common_controllergolem.cpp.
+// PhySys::GolemSetTargetPosition below for the COL trail). Defined in Common/physics/controllergolem.cpp.
 class FLControllerGolem;
 
 // IVP_Controller -- PhySys::Controller's base (retail CHD: PhySys::Controller,
@@ -469,9 +469,9 @@ namespace PhySys
     // The class is a genuine IVP_Controller: its constructor registers itself into the body's
     // core via IVP_Core::register_controller (FUN_06349020 -> FUN_06349180) and its destructor
     // detaches via FUN_06349030 -> FUN_06349110. It therefore derives from IVP_Controller, and
-    // its full definition lives in common_controllergolem.cpp rather than here: this header is pulled
+    // its full definition lives in Common/physics/controllergolem.cpp rather than here: this header is pulled
     // into Server.dll and Freelancer.exe translation units (common_cobject.h, server_pub.h,
-    // space_scene_load.cpp) that have no src/IVP include path, and dragging ivp_controller.h
+    // Client/space/space_scene_load.cpp) that have no src/IVP include path, and dragging ivp_controller.h
     // across that boundary is not worth it for three call sites. The three entry points below
     // are port-local free functions standing in for retail's __thiscall methods. None of the
     // four functions below is a retail export (all are FUN_ addresses), so none is COMMON_API.
@@ -496,7 +496,7 @@ namespace PhySys
 
     // FUN_06343cc0 (.text:06343cc0-06343f63, __cdecl, 191 insns / 676 bytes; decomp-tracker
     // Common.dll item 2746). "Beam this body onto an absolute world pose by re-seating its
-    // fixed offset inside its own IVP_Core" -- see the definition in common_controllergolem.cpp for the
+    // fixed offset inside its own IVP_Core" -- see the definition in Common/physics/controllergolem.cpp for the
     // full instruction-level derivation.
     //
     // Retail's argument list is (ReferenceBody, Body, Quat, Position, Unused). The fifth
@@ -519,7 +519,7 @@ namespace PhySys
     // FUN_06288e60 (.text:06288e60-062890cd, __cdecl). The per-child-part physics finalize:
     // switches on CreateParms::Type (+0x18), builds and primes the golem for mode 1, and for
     // mode 2 welds the child body into its root's core. See its definition in
-    // common_controllergolem.cpp for what is and is not ported.
+    // Common/physics/controllergolem.cpp for what is and is not ported.
     void __cdecl AttachGolemController(CObject* Object, CreateParms const& Parms);
 
     // ---- Attach / Detach ----
@@ -659,6 +659,6 @@ private:
 // physics body (PhySys::Detach) and returns it. Otherwise the instance is a sub-part of the owner:
 // DetachInstanceInPlace erases the PartMap entries below it and destroys the instance,
 // DetachInstance splits it off into a new object (FUN_0628a0c0, PhySys_SplitInstance).
-// Bodies: src/Common/common_physys_build.cpp (end of file).
+// Bodies: src/Common/physics/physys_build.cpp (end of file).
 void __cdecl DetachInstanceInPlace(FlLong InstanceId);
 CObject* __cdecl DetachInstance(FlLong InstanceId, PhySys::DetachParms const& Parms);

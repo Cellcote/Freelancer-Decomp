@@ -62,7 +62,7 @@ public:
     // bytes, copies the live range, frees the old block and sets _End = _First + Count.
     // Retail exports no such member (it is a std::vector instantiation, not a
     // DetailSwitchTable method), so the port's helper is a friend free function defined in
-    // common_costume.cpp rather than a member of this exported class.
+    // Common/archetype/costume.cpp rather than a member of this exported class.
     friend void DetailSwitchTableReserve(DetailSwitchTable& Target, std::size_t Count);
     // Retail hand-inlines a vector-of-pairs copy/assign; std::vector<std::pair<float,float>>
     // already reproduces that value-for-value, so the special members can be defaulted.
@@ -331,7 +331,7 @@ namespace Reputation
     // on top of the static Relation matrix above (GetGroupFeelingsTowards/AttitudeTowards fall
     // back to Reputation::get_feelings_towards when a group has no override of its own).
     //
-    // Retail keeps these records in TWO stores, and so does the port (common_vibe.cpp):
+    // Retail keeps these records in TWO stores, and so does the port (Common/player/vibe.cpp):
     //  - the static store, a std::vector of {int key; VibeValue} slots (DAT_064018b4), filled
     //    while the universe loads (BeginStaticLoad .. EndStaticLoad: Alloc appends, lookups
     //    scan linearly), then sorted by key and binary-searched, with a one-slot cache
@@ -384,7 +384,7 @@ namespace Reputation
             // (.text:0631feed/0631ff24, .text:063214d2), and the attitude blend FUN_0631ff70
             // reads its +0x20 (the group's feelings map) and treats null as "no base relation"
             // (.text:0631ff99-0631ffaa). Opaque here because the group record type is private
-            // to Common (CmnReputation::FGroup, src/Common/common_reputation_internal.h).
+            // to Common (CmnReputation::FGroup, src/Common/player/reputation_internal.h).
             void const* AffiliationGroup;          // +0x0c
             FmtStr Name1;                          // +0x10
             FmtStr Name2;                           // +0x28
@@ -414,7 +414,7 @@ namespace Reputation
         // Deltas can't reproduce retail's byte layout here regardless of field order -- same
         // constraint already hit by EqObj::DockingSpheres (common_archetype.h), which resolves
         // it the same way: put the vector last, assert nothing after it. Harmless: every access
-        // to both fields in common_vibe.cpp goes through the named C++ members, never raw
+        // to both fields in Common/player/vibe.cpp goes through the named C++ members, never raw
         // offset arithmetic, so the in-memory order carries no behavioral meaning.
         FL_LAYOUT_ASSERT(offsetof(VibeValue, Affiliation) == 0x00, "VibeValue::Affiliation at +0x00");
         FL_LAYOUT_ASSERT(offsetof(VibeValue, AttitudeTowardsPlayer) == 0x04, "VibeValue::AttitudeTowardsPlayer at +0x04");
@@ -511,7 +511,7 @@ namespace Reputation
         COMMON_API int __cdecl Set(int const& GroupId, unsigned Affiliation, unsigned Rank, unsigned char Count, Relation const* const Relations, FmtStr const& Name1, FmtStr const& Name2, wchar_t const* DisplayName);
 
         // AttitudeTowards (.text:063217c0) and AttitudeTowardsSymmetrical (.text:06321a70) are
-        // both FUN_063217e0 (AttitudeTowardsCore in common_vibe.cpp): -2 if From has no
+        // both FUN_063217e0 (AttitudeTowardsCore in Common/player/vibe.cpp): -2 if From has no
         // entry, -3 if To has none (Out1 = 0 first; Out2 untouched on failure), otherwise the
         // blend FUN_0631ff70 per direction, clamped to [-1, 1] and rounded to hundredths
         // (DAT_06401918 / DAT_06401920, static initialisers LAB_0631e6a0 / LAB_0631e680).

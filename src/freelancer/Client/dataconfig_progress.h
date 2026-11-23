@@ -13,7 +13,7 @@
 // sounds, voices, effects, effect_shapes, debris, intro, HUD, igraph), the [Resources] DLLs,
 // then audio\SoundCFG.ini. Also FUN_00564b30, the intro.ini [Images] reader it calls.
 // DataConfig::startup's progress object is not here: it is InitializeEngine's DataConfigPump
-// (engine_init.cpp).
+// (cmn/engine_init.cpp).
 
 // One intro.ini string field: {length, text}, stride 0x48 in retail. FUN_00564b30 hands
 // FUN_00417c50 a capacity of 0x40 and stores the returned length in front of the text; a null

@@ -10,7 +10,7 @@
 
 #include <cstddef>
 
-// Timing -- retail CTiming.cpp, defined in common_timing.cpp.
+// Timing -- retail CTiming.cpp, defined in Common/core/timing.cpp.
 // Free functions: __cdecl (MSVC mangle YA...). Delta methods: __thiscall (QAE...).
 
 namespace Timing

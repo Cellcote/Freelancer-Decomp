@@ -301,7 +301,7 @@ strength (closer than `exterior_max_distance − exterior_fade_distance`); in th
 - the D3D fog of objects inside this nebula (`ReplacesObjectFog`): the fog block of
   `StarSysApplyObjectLighting` (FUN_005554d0) is skipped when the object's "containing nebula" is
   the active controller. Ships and solars (Gameobj +0x38), first person
-  (`space_camera_first.cpp`) and asteroid fields with `contains_fog_zone` (`CliAsteroidAmbientPass`
+  (`Client/space/camera/space_camera_first.cpp`) and asteroid fields with `contains_fog_zone` (`CliAsteroidAmbientPass`
   passes the controller) all go through this function, so there is no separate predicate for
   asteroids. The ambient lerp in the same function stays. Objects inside a nebula the volume does
   not draw (or draws in the fade band) keep the retail fog;
@@ -320,10 +320,10 @@ immersed) and to the `ZItemNebula` nodes of far bucket 2 (`FZItemNebula::Draw`).
 | Site | Decision |
 |---|---|
 | `StarSysApplyObjectLighting` — object / asteroid fog | replaced (see above) |
-| `NebulaDrawCloudsPanels` (texture_panels.cpp) — puff fog | goes away with the puffs |
-| `DrawBoltsPass` (cli_nebula.cpp) — exterior billboard fog | the billboards themselves are replaced (`ReplacesExteriorBits`); `FogApplyColorAndRange` and the fog switch-off around them stay |
+| `NebulaDrawCloudsPanels` (Client/space/texture_panels.cpp) — puff fog | goes away with the puffs |
+| `DrawBoltsPass` (Client/space/cli_nebula.cpp) — exterior billboard fog | the billboards themselves are replaced (`ReplacesExteriorBits`); `FogApplyColorAndRange` and the fog switch-off around them stay |
 | `SpaceObjDrawPass`, effects block (0x0051c741) — black fog of alchemy effects | stays: effects are drawn after the volume and are not attenuated by it; without this fog distant additive effects would shine through the nebula |
-| `GfFogApply` / `room_control.cpp` | not space (base rooms) |
+| `GfFogApply` / `Client/gf/room_control.cpp` | not space (base rooms) |
 
 Also unchanged: the ambient lerp to `[NebulaLight] ambient`, the DynamicLightning light (while the
 camera is fully inside and the volume's lightning is on, the strikes drive it — see "Lightning"),
@@ -716,7 +716,7 @@ Only the nebula's first `[Clouds]` block is used; `puff_max_alpha` is no longer 
 `file = <the nebula ini's name without directory and extension>` (for example
 `li01_badlands_nebula`), then any `[Nebula]` keys; keys not given come from `[Nebula]` regardless of
 section order. `NebulaVolume::RegisterNebula` remembers the name when the system's `[Nebula]` is
-loaded (`star_sys.cpp`), `UnregisterNebula` is called in `NebulaDestroy`. All keys are floats
+loaded (`Client/space/star_sys.cpp`), `UnregisterNebula` is called in `NebulaDestroy`. All keys are floats
 (`key_light_dir` / `key_light_colour` / `lightning_colour` — three floats), described in the ini
 itself; `[Debug] nebula_view`, `lightning_force`, `lightning_show_positions` are global and do not
 take part in `[NebulaOverride]`. A hot reload of the ini applies them from the next frame (changing

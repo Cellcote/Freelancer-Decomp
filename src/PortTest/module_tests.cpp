@@ -7,6 +7,8 @@
 // code is the number of failures.
 
 #include "dacom.h"
+#include "dpaddr.h"
+#include "dplay8.h"
 #include "dalib_net.h"
 #include "engine/engbase.h"
 #include "luaprofile.h"
@@ -22,14 +24,18 @@
 #include <intrin.h>
 #include <xmmintrin.h>
 
+#include <atomic>
+#include <chrono>
 #include <climits>
 #include <cstddef>
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <thread>
 #include <vector>
 
+#include <arpa/inet.h>
 #include <netinet/in.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -297,6 +303,131 @@ void TestDALibServer(Platform::Module DALib)
     Destroy(Storage);
 }
 
+// DPNetAdapter's IDirectPlay8Server, closed by its own message handler on the network thread
+// (an enumeration query's handler here). The teardown waits until the network loop has left the
+// server: the port is let go, and the object can be initialised and host again.
+IDirectPlay8Server* G_ClosingServer = nullptr;
+std::atomic<int> G_EnumQueries{0};
+
+HRESULT WINAPI CloseOnEnumQuery(PVOID, DWORD MessageId, PVOID)
+{
+    if (MessageId == DPN_MSGID_ENUM_HOSTS_QUERY && G_EnumQueries++ == 0)
+        G_ClosingServer->Close(0);
+    return S_OK;
+}
+
+// The same, dropping the last reference instead: NetLoop deletes the object once it is out.
+IDirectPlay8Server* G_ReleasedServer = nullptr;
+std::atomic<int> G_ReleasingQueries{0};
+
+HRESULT WINAPI ReleaseOnEnumQuery(PVOID, DWORD MessageId, PVOID)
+{
+    if (MessageId == DPN_MSGID_ENUM_HOSTS_QUERY && G_ReleasingQueries++ == 0)
+        G_ReleasedServer->Release();
+    return S_OK;
+}
+
+HRESULT WINAPI IgnoreMessages(PVOID, DWORD, PVOID)
+{
+    return S_OK;
+}
+
+// Waits up to two seconds for Done.
+template <typename FDone>
+bool WaitFor(FDone Done)
+{
+    for (int Try = 0; Try < 200; ++Try)
+    {
+        if (Done())
+            return true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    return Done();
+}
+
+// An enumeration query ([MC-DPLHP] 2.2.1, no application GUID) to Port on this machine.
+void SendEnumQuery(unsigned short Port)
+{
+    int const Client = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    unsigned char const Query[] = {0x00, 0x02, 0x00, 0x00, 0x02};
+    sockaddr_in To{};
+    To.sin_family = AF_INET;
+    To.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    To.sin_port = htons(Port);
+    sendto(Client, Query, sizeof(Query), 0, reinterpret_cast<const sockaddr*>(&To), sizeof(To));
+    close(Client);
+}
+
+HRESULT HostOn(IDirectPlay8Server* Server, IDirectPlay8Address* Device, unsigned short Port)
+{
+    DWORD const Value = Port;
+    Device->AddComponent(DPNA_KEY_PORT, &Value, sizeof(Value), DPNA_DATATYPE_DWORD);
+    DPN_APPLICATION_DESC Desc{};
+    Desc.dwSize = sizeof(Desc);
+    Desc.dwMaxPlayers = 4;
+    return Server->Host(&Desc, &Device, 1, nullptr, nullptr, nullptr, 0);
+}
+
+void TestDPNetCloseFromHandler(Platform::Module DALib)
+{
+    auto const CreateServer = reinterpret_cast<HRESULT (*)(IDirectPlay8Server**)>(
+        Platform::ModuleSymbol(DALib, "_ZN12DPNetAdapter12CreateServerEPP18IDirectPlay8Server"));
+    auto const CreateAddress = reinterpret_cast<HRESULT (*)(IDirectPlay8Address**)>(
+        Platform::ModuleSymbol(DALib, "_ZN12DPNetAdapter13CreateAddressEPP19IDirectPlay8Address"));
+    Check(CreateServer != nullptr && CreateAddress != nullptr, "DALib exports DPNetAdapter");
+    if (CreateServer == nullptr || CreateAddress == nullptr)
+        return;
+    IDirectPlay8Server* Server = nullptr;
+    IDirectPlay8Address* Device = nullptr;
+    Check(CreateServer(&Server) == S_OK && CreateAddress(&Device) == S_OK,
+          "DPNetAdapter makes a server and an address");
+    if (Server == nullptr || Device == nullptr)
+        return;
+    G_ClosingServer = Server;
+
+    unsigned short const Port = FreeUdpPort();
+    Check(Server->Initialize(nullptr, CloseOnEnumQuery, 0) == S_OK, "the server initialises");
+    Check(HostOn(Server, Device, Port) == S_OK, "the server hosts");
+
+    SendEnumQuery(Port); // its handler closes the server
+    Check(WaitFor([] { return G_EnumQueries.load() > 0; }),
+          "the enumeration query reaches the handler");
+    Check(WaitFor([Port] { return CanBindUdp(Port); }),
+          "a Close from the handler lets the port go once the network loop is out");
+
+    // The closed object initialises and hosts again (its finished network thread is joined).
+    HRESULT Initialised = DPNERR_ALREADYCLOSING;
+    WaitFor(
+        [&]
+        {
+            return (Initialised = Server->Initialize(nullptr, IgnoreMessages, 0)) !=
+                   DPNERR_ALREADYCLOSING;
+        });
+    Check(Initialised == S_OK, "the server initialises again after that Close");
+    unsigned short const Port2 = FreeUdpPort();
+    Check(HostOn(Server, Device, Port2) == S_OK, "and hosts again");
+    Check(Server->Close(0) == S_OK && CanBindUdp(Port2), "an ordinary Close lets the port go");
+    Server->Release();
+
+    // The handler drops the last reference: the server is not touched again here.
+    IDirectPlay8Server* Released = nullptr;
+    Check(CreateServer(&Released) == S_OK, "DPNetAdapter makes another server");
+    if (Released != nullptr)
+    {
+        G_ReleasedServer = Released;
+        unsigned short const Port3 = FreeUdpPort();
+        Check(Released->Initialize(nullptr, ReleaseOnEnumQuery, 0) == S_OK &&
+                  HostOn(Released, Device, Port3) == S_OK,
+              "it initialises and hosts");
+        SendEnumQuery(Port3); // its handler releases the server
+        Check(WaitFor([] { return G_ReleasingQueries.load() > 0; }),
+              "the enumeration query reaches the releasing handler");
+        Check(WaitFor([Port3] { return CanBindUdp(Port3); }),
+              "the last Release from the handler lets the port go");
+    }
+    Device->Release();
+}
+
 int __cdecl CountComponent(IDAComponent* Factory, const char* Name, void*, void* Context)
 {
     if (Factory != nullptr && Name != nullptr)
@@ -548,7 +679,10 @@ int main(int argc, char** argv)
     Check(DALib != nullptr && Platform::ModuleSymbol(DALib, "CriticalWarningFn") != nullptr,
           "DALib.dll loads and exports its error hooks");
     if (DALib != nullptr)
+    {
         TestDALibServer(DALib);
+        TestDPNetCloseFromHandler(DALib);
+    }
 
     Platform::Module const Dacom = Platform::ModuleFind((Folder + "dacom.dylib").c_str()) != nullptr
                                        ? Platform::ModuleFind((Folder + "dacom.dylib").c_str())

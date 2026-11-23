@@ -8,7 +8,7 @@ The project never calls the Win32 profile API (`GetPrivateProfileString` and fri
 
 | Parser | Used for | Implemented in |
 |---|---|---|
-| `INI_Reader` (text and BINI) | `freelancer.ini`, every file listed in its `[Data]` section, every file found by name inside another INI, `InitialWorld.ini`, `.fl` save and template files (text only) | [common_ini.cpp](../../src/Common/common_ini.cpp), [common_textfile.cpp](../../src/Common/common_textfile.cpp), declared in [common_ini.h](../../src/include/common_ini.h) |
+| `INI_Reader` (text and BINI) | `freelancer.ini`, every file listed in its `[Data]` section, every file found by name inside another INI, `InitialWorld.ini`, `.fl` save and template files (text only) | [Common/core/ini.cpp](../../src/Common/core/ini.cpp), [Common/core/textfile.cpp](../../src/Common/core/textfile.cpp), declared in [common_ini.h](../../src/include/common_ini.h) |
 | DACOM `IProfileParser` | `DACOM.INI` (client) and `DACOMsrv.ini` (server), plus the engine modules that query it for their own sections (see [engine-dacom.md](engine-dacom.md)) | `FIniLexer` / `FIniDatabase` in [dacom.cpp](../../src/dacom/dacom.cpp) |
 
 Modules that never read INI files at all: ximage, x86math, ReadFile, RemoteClient, RemoteServer, RemoteCommon, rpclocal, Editor, Thorn, IVP, qhull, zlib, MemoryDiagnostics, SoundStreamer, flmaterials, imeui, movie (no `INI_Reader` or `IProfileParser` use in their sources).
@@ -140,7 +140,7 @@ If loading fails, start-up stops with "ERROR: creating DACOM with INI file". Aft
 | User data | Saves live under `<My Documents>\My Games\Freelancer` (`GetUserDataPath`), local per-user data under the local application-data folder (`GetUserLocalDataPath`). |
 | Beside the executable | Some files are read from the directory of the running executable rather than from Data: the new-character templates (`NewCharacter.fl`, `MPNewCharacter.fl`, `NewPlayer.fl`) and `flconfigdatabase.txt`. |
 
-Relevant sources: [common_misc.cpp](../../src/Common/common_misc.cpp), [ContentDataPath.cpp](../../src/Content/ContentDataPath.cpp), [DALib.cpp](../../src/DALib/DALib.cpp), [startup_config.cpp](../../src/freelancer/Client/startup_config.cpp), [ServerControl.cpp](../../src/FLServer/ServerControl.cpp).
+Relevant sources: [Common/core/misc.cpp](../../src/Common/core/misc.cpp), [ContentDataPath.cpp](../../src/Content/ContentDataPath.cpp), [DALib.cpp](../../src/DALib/DALib.cpp), [startup_config.cpp](../../src/freelancer/Client/startup_config.cpp), [ServerControl.cpp](../../src/FLServer/ServerControl.cpp).
 
 ## Conventions used in the other pages
 

@@ -18,29 +18,29 @@ rest are open.
 
 | # | Where | Today | Fix | Equivalence conditions |
 |---|-------|-------|-----|------------------------|
-| A1 | **Done (#9).** `ClientObjDb_FindObject` / `FindObjectInKind` (`freelancer/Client/client_objdb.cpp`) | Walks the kind's intrusive list (kind 0: kinds 1, 4, 5, 6, 7, 2). Called for every incoming position update (`IClientImpl::SendCommonUpdateObject`), every destroy, launcher lookups, and per HUD entry per frame (`hud_targetable_objects.cpp`). O(N) per call, about O(N²) per update interval. | Per-kind map id → object, kept in `LinkGameobj` / `UnlinkGameobj`; kind 0 does the lookups in the same kind order. | First hit in list order wins; the id must be final when the object is linked; the map lives outside `FGameobjList`. |
-| A2 | **Done (#9).** `IObjDB::FindById` (`client_objdb.cpp`) | Same walk. Common uses it for fire control, pathfinding and timers. | Route through A1. | As A1. |
-| A3 | `ClientObjDb_FindByCObject` (`client_objdb.cpp`) | Walks the bucket for the matching `cobject()`, once per collision event. | Map `CObject*` → object, kept with A1. | `cobject()` stable while linked. |
-| A4 | `CObject::Find` (both overloads) and `RemoveFromClassList` (`Common/common_cobject.cpp`) | Walk `G_ClassLists`; removal is O(n). Used by client and server. | Per-class maps to list iterators. The `std::list` and the shared `FindFirst`/`FindNext` cursor stay. | `CSimple::Id` and `EngineInstanceId` are plain fields: every write after the object is listed must update the map. First match in list order, with its `AddRef`. |
+| A1 | **Done (#9).** `ClientObjDb_FindObject` / `FindObjectInKind` (`freelancer/Client/space/objdb.cpp`) | Walks the kind's intrusive list (kind 0: kinds 1, 4, 5, 6, 7, 2). Called for every incoming position update (`IClientImpl::SendCommonUpdateObject`), every destroy, launcher lookups, and per HUD entry per frame (`Client/space/hud/hud_targetable_objects.cpp`). O(N) per call, about O(N²) per update interval. | Per-kind map id → object, kept in `LinkGameobj` / `UnlinkGameobj`; kind 0 does the lookups in the same kind order. | First hit in list order wins; the id must be final when the object is linked; the map lives outside `FGameobjList`. |
+| A2 | **Done (#9).** `IObjDB::FindById` (`Client/space/objdb.cpp`) | Same walk. Common uses it for fire control, pathfinding and timers. | Route through A1. | As A1. |
+| A3 | `ClientObjDb_FindByCObject` (`Client/space/objdb.cpp`) | Walks the bucket for the matching `cobject()`, once per collision event. | Map `CObject*` → object, kept with A1. | `cobject()` stable while linked. |
+| A4 | `CObject::Find` (both overloads) and `RemoveFromClassList` (`Common/object/cobject.cpp`) | Walk `G_ClassLists`; removal is O(n). Used by client and server. | Per-class maps to list iterators. The `std::list` and the shared `FindFirst`/`FindNext` cursor stay. | `CSimple::Id` and `EngineInstanceId` are plain fields: every write after the object is listed must update the map. First match in list order, with its `AddRef`. |
 | A5 | `FSoundManager::FindInstanceByKey` / `FindAttached` (`SoundManager/SoundManager.cpp`) | Linear walk per lookup; `MixerTick` does it per source, so O(sources × instances) per frame. | Map `PlayKey` → node. | First match in list order; voice assignment unchanged because the lists stay. |
-| A6 | Contact list watch-list merge in `RebuildContacts` (`freelancer/Client/hud_contact_list.cpp`) | O(watched × contacts) per rebuild (every 3 s). | Temporary map during the merge. | Low priority; the watch list is small. |
+| A6 | Contact list watch-list merge in `RebuildContacts` (`freelancer/Client/space/hud/hud_contact_list.cpp`) | O(watched × contacts) per rebuild (every 3 s). | Temporary map during the merge. | Low priority; the watch list is small. |
 | A7 | **Mostly done (#10)**: `ObjectList::find_by_id` answers from a side table, so a miss now costs about 7 hash lookups per loaded system plus the in-transit walk. `Server_FindObject` (`Server/server_space.cpp`), `StarSystem::find_object` (`Server/server_starsystem.cpp`) | Before #10: one-entry cache, then the cached system's 7 lists, then the in-transit list, then **every system**: up to O(all objects in the universe) per call. Used by the observer, the near-ships pass and collision resolution. | Remaining: (1) skip systems whose lists are all empty (every universe system is in `SysDB::SysMap`, loaded or not); (2) update #10's per-list index on each edit instead of marking it stale (every death moves an object to `Deferred`, so busy lists are often stale). A global id map is not worth it: it saves hash lookups per system, not per object, and is hard to keep exact (lists appended before their id is readable, systems re-created at the same address). | Keep the one-entry cache, its hit/miss counters and every write to it. When an id exists in more than one place, return what the walk would. |
 | A8 | `StarSystem::sp_obj_update` (`Server/server_starsystem.cpp`) | Walks `Ships` for every incoming client position update. | Per-system map id → ship. | First match in list order. |
 | A9 | **Done (#34).** `SystemPlayerView_SendObjectUpdate` and other id lookups in a view's tracked list (`Server/server_playerview.cpp`, `Server/server_observer.cpp`) | For each incoming player update, **each other player's view** walks its tracked list (every object in the system): O(P × N) per update, O(P² × N) per tick. The worst hot path at 1000 players. | Per-view map id → tracked node. The fan-out over players stays. | Sends stay in the same order. Multiplayer only (single player returns early), so FLRegress does not cover it. |
 | A10 | `CDPServer` proxy registry (`DALib/CDPServer.cpp`); `OnConnect` slot search (`RemoteClient/RemoteClient_transport.cpp`) | Linear walk of a `std::list`; first free slot of 128. | Map / free-slot list. | Low priority until B1; the chosen slot stays the lowest free one. |
-| A11 | `G_PlayerListNames` (`freelancer/Client/client_iclient.cpp`) | Never erased: "remove" inserts. Grows over a session. | Probably leave: nothing reads it, so the cost is memory only, and it reproduces retail on purpose. Ask before changing. | — |
+| A11 | `G_PlayerListNames` (`freelancer/Client/iclient.cpp`) | Never erased: "remove" inserts. Grows over a session. | Probably leave: nothing reads it, so the cost is memory only, and it reproduces retail on purpose. Ask before changing. | — |
 
 Algorithmic, but **not** safe today:
 
-- **Ships in a spatial index for scanner queries** (`ScanList::add_in_range`, `Common/common_cescanner.cpp`).
+- **Ships in a spatial index for scanner queries** (`ScanList::add_in_range`, `Common/equip/cescanner.cpp`).
   The scanner keeps the first 256 hits in list order, so a different candidate order changes *which*
   ships it keeps.
 - **Spatial grid for the server observer's visibility test** (`SystemPlayerView_ShouldBeVisible`). It
   changes the order in which objects are found, and so the order of creates and resyncs on the wire.
 - **Frustum culling of ships before enqueue** (`EnqueueObject`,
-  `freelancer/Client/space_scene_obj_draw.cpp`). It changes what is queued and the sort input; the picture
+  `freelancer/Client/space/space_scene_obj_draw.cpp`). It changes what is queued and the sort input; the picture
   should be the same but is not provably identical.
-- **Incremental chat table** (`FillPrivate`, `freelancer/Client/chat_control.cpp`). Retail rebuilds and
+- **Incremental chat table** (`FillPrivate`, `freelancer/Client/nn/chat_control.cpp`). Retail rebuilds and
   `qsort`s; `qsort` is not stable, so an incremental version can reorder equal entries.
 
 ## Part B — when we break compatibility
@@ -53,7 +53,7 @@ Algorithmic, but **not** safe today:
 | Server settings | `FLServer/ServerConfigDlg.cpp` | Spinner 1..0x80, larger values rejected, text box 3 characters, message string `0xf006`. `FLServer.cfg` stores an int32, so the file format is fine. | Widen range, text limit and message. |
 | DirectPlay | `SetMaxPlayers` in `RemoteClient_transport.cpp` and `DALib/CDPServer.cpp` | Not clamped; DALib default 0x10. | Check whether Microsoft DirectPlay 8 copes with 1000 connections; make it configurable in DPNet (port-only). |
 | PlayerDB | `PlayerDB` (`Server/server_playerdb.cpp`) | `new PlayerData[MaxPlayers]` (0x418 bytes each); broadcasts loop 1..MaxPlayers. | Works; O(P) per event (see costs). |
-| Chat ids | `ChatIdForPlayer` (`freelancer/Client/chat_init.h`), `GetPlayerId` (`include/common_server_types.h`), `MakeChatId` (`Server/server_classes_internal.h`), `Server/server_chat.cpp` | Player id truncated to 16 bits; bits 16..23 are a channel tag. | Fine up to 65535 players; above that ids alias. |
+| Chat ids | `ChatIdForPlayer` (`freelancer/Client/nn/chat_init.h`), `GetPlayerId` (`include/common_server_types.h`), `MakeChatId` (`Server/server_classes_internal.h`), `Server/server_chat.cpp` | Player id truncated to 16 bits; bits 16..23 are a channel tag. | Fine up to 65535 players; above that ids alias. |
 | Vibe bitmap | `g_VibeBitmap` (`Server/server_pub.cpp`) | 4096 bits; allocates per-player reputation ids. | Fine for 1000; grow before about 4000 players. |
 | Formation id list | `AddId` in the MISCOBJUPDATE codec (`remote_server_channel_codecs.cpp`) | Count is one byte. | Only matters for formations above 255. |
 
@@ -64,7 +64,7 @@ clients on the wire. The costs below are what stop it:
   (`PlayerDB`, `Server/server_playerdb.cpp`), so 8 per existing player. About four million packets to fill a
   1000-player server.
 - Every join, leave, group or system change makes the client rebuild and sort its whole chat table on
-  the next frame (`ChatControlRefreshAll` / `FillPrivate`, `freelancer/Client/chat_control.cpp`). Retail
+  the next frame (`ChatControlRefreshAll` / `FillPrivate`, `freelancer/Client/nn/chat_control.cpp`). Retail
   builds that array with `alloca`.
 - A group or system change of any player is broadcast to all (`PlayerDB::SendGroupID` / `SendSystemID`).
 
@@ -77,7 +77,7 @@ Hard caps; things silently disappear when they fill up:
 | Scanner list 256 | `ScanList` (`include/common_cequip.h`), `ScanList::add_in_range` | Radar and targeting miss ships; the 256 kept are first in list order, not nearest. Applies to NPC scanners too. | Layout shared across DLLs: grow it or use a vector, and prefer the nearest. |
 | Particle pools, 8 × 1000 | `alchemy/alchemy_common.cpp` | New particles not emitted (engine trails, weapon fire). | Pool size is INI-configurable; raise it in data, or let pools grow. |
 | Sound channels | `FSoundManager::MixerTick` (`SoundManager/SoundManager.cpp`) | Sources beyond the cap muted in attach order. | Choose voices by distance and priority. |
-| IVP spawned mindists 100 | `PhySys::MAX_SPAWNED_MINDIST_COUNT` (`Common/common_constants.cpp`), written over IVP's own default of 1000 by `PhysicalSystem::AddRef` | Coarser collision. | Already INI-configurable (`MAX_SPAWNED_MINDIST_COUNT` in `[PhySysConsts]`). |
+| IVP spawned mindists 100 | `PhySys::MAX_SPAWNED_MINDIST_COUNT` (`Common/archetype/constants.cpp`), written over IVP's own default of 1000 by `PhysicalSystem::AddRef` | Coarser collision. | Already INI-configurable (`MAX_SPAWNED_MINDIST_COUNT` in `[PhySysConsts]`). |
 | Spatial query result 2048 | `FSpatialQueryResult` (`include/common_spatial.h`) | Solars only on the client. | Grow if more objects go into the index. |
 
 Per-frame costs with no level of detail:
@@ -114,7 +114,7 @@ Hard caps:
 |-----|-------|--------|--------|
 | Near-ships query 0x800 | `StarSystem_UpdateNearShips` (`Server/IServerImpl.cpp`) | Results beyond 2048 dropped. | Vector. |
 | `scan_objects` bucket 0x800; `pub::` callers 0x400 | `Server/server_starsystem.cpp`, `Server/server_pub.cpp` | Same. | Same; the `pub::` signatures are a plugin API. |
-| Object id counter | `CFLIDMaker::AllocateObjectID` (`Common/common_id.cpp`) | `NextDynamicId++ & 0x3FFFFFFF`: never reused, no check against live objects, can return 0 (= "none"). Projectiles and loot use the same counter, so a busy long-running server wraps after about 1.07 billion allocations and can collide with live objects. | Free list or generation scheme; skip 0. A 64-bit id is a wire change. |
+| Object id counter | `CFLIDMaker::AllocateObjectID` (`Common/core/id.cpp`) | `NextDynamicId++ & 0x3FFFFFFF`: never reused, no check against live objects, can return 0 (= "none"). Projectiles and loot use the same counter, so a busy long-running server wraps after about 1.07 billion allocations and can collide with live objects. | Free list or generation scheme; skip 0. A 64-bit id is a wire change. |
 
 Per-tick costs:
 

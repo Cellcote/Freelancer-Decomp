@@ -126,7 +126,7 @@ void Server_BroadcastGroupControl(unsigned int MsgType, unsigned int Param) {
 // CheckForSync -- have no body here and resolve through Common.lib's import
 // thunks, as retail Server.dll imports them (.text:06cf7184 ctor, 06cf531a dtor,
 // 06cf5527 Doit, 06cf5c29 Reset, 06cf5d34 CheckForSync). Their only bodies are in
-// src/Common/common_physys.cpp. Do not add a body for any CRemotePhysicsSimulation
+// src/Common/physics/physys.cpp. Do not add a body for any CRemotePhysicsSimulation
 // member to this file: the copies that used to live here drifted from Common's.
 // ===========================================================================
 

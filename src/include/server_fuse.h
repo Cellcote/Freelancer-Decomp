@@ -18,7 +18,7 @@
 // action section. An EqObj ignites a fuse by copy-constructing the prototype into its own burn
 // list (EqObj light_fuse, .text:06cec4d0, vtable +0x1e4) and binding itself as the owner
 // (FUN_06cfd1e0). The freelancer.exe counterpart of this file is
-// src/freelancer/Client/client_fuse.h.
+// src/freelancer/Client/space/fuse.h.
 //
 // Port status: the database (load / teardown / accessor), the INI reader, the owner binding,
 // every constructor / clone / Read / slot-12 copy and every Trigger / UnTrigger override follow
@@ -87,7 +87,7 @@ public:
 // Slot 12 (+0x30) of every action subclass below except DestroyRootAction is a new virtual
 // that copies the archetype part of another instance of the same class
 // (FuseAction::CopyArchProperties + the subclass fields); the slot-1 clones call it on the fresh
-// object. Its retail name is unknown, hence Slot30 (the same convention as client_fuse.h).
+// object. Its retail name is unknown, hence Slot30 (the same convention as Client/space/fuse.h).
 
 // ---------------------------------------------------------------------------
 // IgniteFuseAction -- vftable .rdata:06d66e70, sizeof 0x30 ([ignite_fuse]).

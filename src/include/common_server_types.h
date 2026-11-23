@@ -353,7 +353,7 @@ enum class EFLConnection : int {
 // were not. Server.dll's SetManeuver (0x11540) resolves the CEqObj from +0x04, so
 // +0x04 is the object id and the other two dwords are still unidentified.
 // The only client sender, HUD_Maneuvers::RequestManeuver (freelancer.exe 0x004d935a..0x004d93ac,
-// hud_maneuvers.cpp), fills +0x00 = the id of the HUD's watched object (the player ship),
+// Client/space/hud/hud_maneuvers.cpp), fills +0x00 = the id of the HUD's watched object (the player ship),
 // +0x04 = the player ship's target id, +0x08 = the behaviour id it switched to.
 struct XSetManeuver {
     // TODO: semantics unproven (maneuver type?). rpclocal writes it to packet+0x20.
@@ -437,7 +437,7 @@ struct EquipDesc;
 // (`06d4a7d3  CALL dword ptr [->COMMON.DLL::CHARACTER_ID::operator=]`), so the
 // export is a real cross-module contract, not decoration. Every one of the
 // seven therefore carries COMMON_API, and the two bodies that used to be inline
-// are now out of line in src/Common/common_id.cpp: a __declspec(dllimport)
+// are now out of line in src/Common/core/id.cpp: a __declspec(dllimport)
 // declaration must not also carry a definition in the importing TU.
 struct CHARACTER_ID {
     char Buffer[0x200];

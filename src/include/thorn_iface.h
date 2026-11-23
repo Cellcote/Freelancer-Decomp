@@ -30,7 +30,7 @@ struct IMotionPath : IDAComponent
 // public "thorn.h" would be picked up instead of src/Thorn/Thorn.h by every include inside
 // the module itself.
 //
-// Common (common_roomdata.cpp) and freelancer's Gf script layer (gf_script / gf_script_object /
+// Common (Common/universe/roomdata.cpp) and freelancer's Gf script layer (gf_script / gf_script_object /
 // gf_script_spawn, the Thorn_* component classes in gf_thorn_*.cpp, gf_character_object,
 // space_camera_script) both drive this interface; until 2026-09-16 both did it by raw slot
 // number, and Common's locals were named `Engine`, which reads exactly like an IEngine and
@@ -38,7 +38,7 @@ struct IMotionPath : IDAComponent
 
 // ---------------------------------------------------------------------------------------
 // Entity and event records the slots below hand out and take in. Declared here once, for
-// thorn.dll (src/Thorn/ThornScene.h) and freelancer's Gf script layer (gf_script_object.h,
+// thorn.dll (src/Thorn/ThornScene.h) and freelancer's Gf script layer (Client/gf/gf_script_object.h,
 // gf_thorn_*.h); no module may keep a private copy -- earlier port-invented copies in
 // freelancer disagreed on the size.
 // ---------------------------------------------------------------------------------------

@@ -71,7 +71,7 @@ class IVP_Template_Phantom;   // src/IVP/ivp_physics/ivp_phantom.h (cmn-ivp3d)
 //
 // The member NAMES deliberately keep IVP_Hull_Manager's `Pool...` spelling so
 // that the two implementations below are literally the same text, and so that
-// src/Common/common_physys.cpp (which reads Hull.PoolEntries / Hull.PoolLiveIndex
+// src/Common/physics/physys.cpp (which reads Hull.PoolEntries / Hull.PoolLiveIndex
 // / Hull.PoolKeyThreshold directly, and which this lane must not touch) keeps
 // compiling unchanged.
 // ============================================================================
@@ -194,7 +194,7 @@ public:
     // 2026-09-17, lane claude:w26-simunit, so retail's OTHER instantiation of
     // the same allocator can be expressed). This alias keeps every existing
     // `IVP_Hull_Manager::Entry` spelling -- including the ones in
-    // src/Common/common_physys.cpp, which this lane must not touch -- valid.
+    // src/Common/physics/physys.cpp, which this lane must not touch -- valid.
     // Entries read by this class's own WalkActiveEntries/DrainAndShift:
     // Entry::Next at +0x4 (:0635225d/:06352277), Entry::Key at +0x8
     // (06352263-0635226f), Entry::Payload at +0xc, dispatched through vtable
@@ -286,7 +286,7 @@ public:
     // calls FUN_06362ef0/f70/f90/FUN_06363280 on `this+0x20` directly
     // (Common.dll.txt:0635217e ctor, :063521d8 dtor). They are kept spelled out
     // here rather than replaced by an `IVP_Priority_Pool Pool;` member only
-    // because src/Common/common_physys.cpp reads Hull.PoolEntries /
+    // because src/Common/physics/physys.cpp reads Hull.PoolEntries /
     // Hull.PoolLiveIndex / Hull.PoolKeyThreshold by those names and is owned by
     // another lane. This accessor is the single bridge, and the static_asserts
     // right after the class pin all seven offsets across the two spellings, so

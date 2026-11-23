@@ -61,7 +61,10 @@ stand-in `<dplay8.h>` and the sockets from a stand-in `<winsock2.h>` over BSD so
   thread or on the caller of `SendTo`, `DestroyClient` or `Close`; `CDPServer`'s handler only
   queues messages under its own locks.
 - **Receive buffers** stay valid until `ReturnBuffer` (the handler returns `DPNSUCCESS_PENDING`).
-- **`Close`** waits up to 5 s for the players to be told and gone.
+- **`Close`** waits up to 5 s for the players to be told and gone. Called by a handler on the
+  network thread (or the last `Release` there), it cannot wait: the goodbyes go out once, the
+  handler is called no more, and the network thread frees the session (and the object) as it
+  unwinds. `Initialize` returns `DPNERR_ALREADYCLOSING` until it has.
 - **`GetConnectionInfo`** fills the round-trip time, the guaranteed bytes and packets each way,
   retries, drops and message counts; the throughput fields are 0.
 - Methods `CDPServer` never calls return `DPNERR_UNSUPPORTED`.

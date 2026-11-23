@@ -17,18 +17,18 @@ unless the row says otherwise. "Off" in the compatibility column means the switc
 
 | Feature (tag) | Switch → define | Default | Where | Retail compatibility | Doc |
 |---|---|---|---|---|---|
-| Walk mode (`walk`) | `FreelancerWalkMode` → `FREELANCER_WALK_MODE` (client only) | 1 | `freelancer/Client/base_walk.cpp`; hooks in `gameflow`, `gf_character_object`, `input_manager`, `menu_keymap`, `nav_bar`, `nn_main_button`, `room_control`, `screen_quad_state`, `win3d*` | Off: the client is retail's. On: controlling Trent in base rooms, client-side only; no save, server or packet change | [walk_mode.md](../walk_mode.md) |
-| Widescreen (`widescreen`) | `FreelancerWidescreenSupport` → `FREELANCER_WIDESCREEN_SUPPORT` (client only) | 1 | `freelancer/Client/widescreen.h`, `hud_widescreen.*`; cameras, HUD, fonts, nav map, settings page, `win3d.cpp` | Off: retail's 4:3 client. On: Hor+ cameras and device resolutions; the interface stays 4:3 in the centre | [below](#client-widescreen-resolutions-hor-cameras-widescreen-2026-10-16), [hd_edition.md](../hd_edition.md) |
-| Direct3D 9 pipeline and volumetric nebula (`rp9`) | `FreelancerRp9` → `FREELANCER_RP9` (client hooks); `RP9.dll` is not built at 0 | 0 | `src/RP9`, `freelancer/Client/render_ex.cpp`, `nebula_volume.cpp`; hooks in `cli_nebula`, `cli_asteroid`, `space_scene_obj_draw`, `star_sphere`, `star_sys`, `client_gameobj`, `engine_init`, `main` | Off: neither RP9.dll nor the hooks are built. On: RP9 runs only when `DACOM.INI` selects `DirectX9`; with RP8 every hook takes the retail path | [rp9.md](rp9.md) |
+| Walk mode (`walk`) | `FreelancerWalkMode` → `FREELANCER_WALK_MODE` (client only) | 1 | `freelancer/Client/gf/base_walk.cpp`; hooks in `gameflow`, `gf_character_object`, `input_manager`, `menu_keymap`, `nav_bar`, `nn_main_button`, `room_control`, `screen_quad_state`, `win3d*` | Off: the client is retail's. On: controlling Trent in base rooms, client-side only; no save, server or packet change | [walk_mode.md](../walk_mode.md) |
+| Widescreen (`widescreen`) | `FreelancerWidescreenSupport` → `FREELANCER_WIDESCREEN_SUPPORT` (client only) | 1 | `freelancer/Client/widescreen.h`, `hud_widescreen.*`; cameras, HUD, fonts, nav map, settings page, `Client/interface/win3d.cpp` | Off: retail's 4:3 client. On: Hor+ cameras and device resolutions; the interface stays 4:3 in the centre | [below](#client-widescreen-resolutions-hor-cameras-widescreen-2026-10-16), [hd_edition.md](../hd_edition.md) |
+| Direct3D 9 pipeline and volumetric nebula (`rp9`) | `FreelancerRp9` → `FREELANCER_RP9` (client hooks); `RP9.dll` is not built at 0 | 0 | `src/RP9`, `freelancer/Client/cmn/render_ex.cpp`, `Client/space/nebula_volume.cpp`; hooks in `cli_nebula`, `cli_asteroid`, `space_scene_obj_draw`, `star_sphere`, `star_sys`, `client_gameobj`, `engine_init`, `main` | Off: neither RP9.dll nor the hooks are built. On: RP9 runs only when `DACOM.INI` selects `DirectX9`; with RP8 every hook takes the retail path | [rp9.md](rp9.md) |
 | SDL3 + SDL_GPU pipeline (`rpgpu`) | `FreelancerRpGpu` (1 on x64), with vcpkg; chosen in `DACOM.INI` | RP8 selected | `src/RPGPU` | Opt-in renderer behind RP8's interface IDs; no other module changes | [rpgpu.md](rpgpu.md) |
-| Diagnostics (`diag`) | `FreelancerBetaLabel` → `FREELANCER_BETA_LABEL`; `FreelancerEnableTickProfile` → `FREELANCER_ENABLE_TICK_PROFILE`; the FDUMP echo is always on | 0, 0 | `freelancer/Client/client_tick_profile.*`, `client_frame_tick.cpp`, `include/common_tick_profile.h`, `Common/physics_tick_profile.h`, IVP environment, `Common/common_errorhandler.cpp` | Both off: nothing is drawn. Adds the port-only export `PhySys::SetTickProfile`; the FDUMP echo also writes to the debugger | [below](#client-beta-label-and-on-screen-profiler-client-beta-label-2026-10-12), [FdumpHook](#commondll-errorhandlerfdumphook-extra-debugger-output-2026-09-27) |
-| Side indexes (`perf-index`) | None: always compiled | On | `freelancer/Client/client_objdb.cpp`, `Server/server_classes.cpp`, `include/server_sysdb.h`, `Common/common_cobject.cpp` (+ the `ClassListKeysChanged` callers), `SoundManager/SoundManager.cpp` | Same results in the same order as the retail walks they answer; containers, layouts and packets unchanged; `_DEBUG` builds cross-check against the walk | [scaling.md](../scaling.md), part A |
+| Diagnostics (`diag`) | `FreelancerBetaLabel` → `FREELANCER_BETA_LABEL`; `FreelancerEnableTickProfile` → `FREELANCER_ENABLE_TICK_PROFILE`; the FDUMP echo is always on | 0, 0 | `freelancer/Client/client_tick_profile.*`, `Client/frame_tick.cpp`, `include/common_tick_profile.h`, `Common/physics_tick_profile.h`, IVP environment, `Common/core/errorhandler.cpp` | Both off: nothing is drawn. Adds the port-only export `PhySys::SetTickProfile`; the FDUMP echo also writes to the debugger | [below](#client-beta-label-and-on-screen-profiler-client-beta-label-2026-10-12), [FdumpHook](#commondll-errorhandlerfdumphook-extra-debugger-output-2026-09-27) |
+| Side indexes (`perf-index`) | None: always compiled | On | `freelancer/Client/space/objdb.cpp`, `Server/server_classes.cpp`, `include/server_sysdb.h`, `Common/object/cobject.cpp` (+ the `ClassListKeysChanged` callers), `SoundManager/SoundManager.cpp` | Same results in the same order as the retail walks they answer; containers, layouts and packets unchanged; `_DEBUG` builds cross-check against the walk | [scaling.md](../scaling.md), part A |
 | x64 build (`x64`) | x64 toolchain (`release-x64` preset) | Win32 | `_WIN64` / non-`_M_IX86` branches; `include/x64_low_arena.h`, `x87_portable.h`, `x87_trig.h`, `facet_offset.h`, `fl_layout.h` | Win32 output unchanged (CI compares FLRegress and RpcCodecTest). x64 modules do not mix with retail DLLs; the wire protocol is the same | [x64.md](../x64.md) |
 | DPNet (`dpnet`) | `FREELANCER_DPNET`, set by `src/DALib/CMakeLists.txt` for x64 | x64 only | `src/DPNet`, `DALib/DPNetAdapter.*`, `DALib/CDPServer.cpp`, `src/DPNetInteropTest` | Win32 keeps Microsoft's `dpnet.dll`; the x64 server is wire-compatible with retail clients | [dpnet.md](../dpnet.md) |
 | FLRegress (`flregress`) | Own program | Built | `src/FLRegress` | Changes no retail module | [flregress.md](../flregress.md) |
 | FLDedicated (`dedicated`) | Own program | Built | `src/FLDedicated` | Loads the same modules as FLServer.exe; retail clients see the same server | [dedicated_server.md](../dedicated_server.md) |
 | Test tools (`tools`) | Own programs | Built | `src/RpcCodecTest`, `src/MemoryDiagnostics` | Changes no retail module | [testing.md](../testing.md), [memory_diagnostics.md](../memory_diagnostics.md) |
-| Platform layer (untagged) | None | On | `include/platform.h`, `platform_folders.h` | Each function is the single Win32 call retail made, with the same arguments | [platform.md](../platform.md) |
+| Platform layer (untagged) | None | On | `include/platform.h`, `Common/core/platform_folders.h` | Each function is the single Win32 call retail made, with the same arguments | [platform.md](../platform.md) |
 | Single-instance guard (`deviation`) | `FL_SINGLE_INSTANCE` (nothing defines it) | Undefined: guard off | `freelancer/Client/main.cpp` | Several clients can run on one machine; defining it restores retail | [below](#client-single-instance-guard-behind-fl_single_instance) |
 
 ## Client: Beta label and on-screen profiler (CLIENT-BETA-LABEL, 2026-10-12)
@@ -37,7 +37,7 @@ Status: OPEN — intentional deviation at the owner's direct request. Owner: Gip
 
 In `FUN_00425080` (`0x00425080..0x00425138`) retail calls `EndScene` right after the flush (`0x0042508f..0x0042509a`): there is neither a caption nor any timing there.
 
-The version label (`Beta 2`, `src/freelancer/Client/client_tick_profile.cpp`) is guarded by the `FREELANCER_BETA_LABEL` define and is **off by default** (the `FreelancerBetaLabel` switch, `-DFreelancerBetaLabel=1`). When enabled, the port draws it in the top-left corner of every finished frame, with a 12-pixel margin. `DrawClientTickProfile` is called from `EndSceneHalf` after `MaterialBatcher->FlushAll(1)` and before `Pipeline->EndScene`. Below the label it optionally prints the list of timings of the previous finished `TickClientFrame` (QPC, milliseconds; a parent's time includes its children): UI/Server/Game tick, Objects, Physics / hits (with sub-items IVP simulate, PSI prepare, Sim units, Commit / hulls, Contacts / events, Move beams, Find beam hits, Dispatch hits), World / FX, Sound, Render, Present.
+The version label (`Beta 2`, `src/freelancer/Client/tick_profile.cpp`) is guarded by the `FREELANCER_BETA_LABEL` define and is **off by default** (the `FreelancerBetaLabel` switch, `-DFreelancerBetaLabel=1`). When enabled, the port draws it in the top-left corner of every finished frame, with a 12-pixel margin. `DrawClientTickProfile` is called from `EndSceneHalf` after `MaterialBatcher->FlushAll(1)` and before `Pipeline->EndScene`. Below the label it optionally prints the list of timings of the previous finished `TickClientFrame` (QPC, milliseconds; a parent's time includes its children): UI/Server/Game tick, Objects, Physics / hits (with sub-items IVP simulate, PSI prepare, Sim units, Commit / hulls, Contacts / events, Move beams, Find beam hits, Dispatch hits), World / FX, Sound, Render, Present.
 
 The profiler is enabled by the `FREELANCER_ENABLE_TICK_PROFILE` define (0 by default; `-DFreelancerEnableTickProfile=1` turns it on). When both defines are 0, `DrawClientTickProfile` draws nothing. For physics, a port-only export `PhySys::SetTickProfile` and the contract `src/include/common_tick_profile.h` (`FPhysicsTickProfile`) were added: the client installs a sink for the duration of its `Physics / hits`. These QPC measurements and the API exist only in the port; they do not change the order or arguments of game calls.
 
@@ -52,7 +52,7 @@ The port with the define:
 - Hor+ cameras. The stored horizontal half-angle means the angle at 4:3 of the same height; a camera whose viewport covers the whole surface width widens the tangent by `surface aspect / (4/3)` (`src/freelancer/Client/widescreen.h`); the inverse conversions divide by the same factor. HUD window viewports (target, comm, nav map, preview) are not wider than the surface and stay on retail maths. Letterbox keeps the full width and cuts only the height; at an aspect wider than 1.85 the bars do not go negative.
 - The interface stays 4:3 in the centre (scaled by height): consumers that tied their scale to the surface width take `WidescreenEquivalentSurfaceWidth` (font selection `FUN_00416110`/`FUN_00416f50` and their cache key, HUD bands `FUN_004d5410`, contact captions, the steering circle, lead markers, the ticker, the nav map, the cursor). The loading picture is drawn 4:3 in the centre.
 - The settings page mode list is built from the device modes: not smaller than 800×600, not narrower than 4:3, up to 24 resolutions (16 and 32 bit); the selection is keyed by width only, and one height remains per width — the one with the aspect closest to the desktop. Without a saved `[Display] size`, a fullscreen start uses the desktop resolution.
-- Corner HUD windows at the screen edges (like HudShift): `HUD_Status` to the right; `HUD_Target`, `HUD_ContactList`, the comm window `HUD_Receiver` to the left; NeuroNet buttons `NN_MainButton` to the right; main menu: buttons to the left, `Version` to the right, logo to the left edge. The windows' world positions do not change: while a window is drawn, updated or receives the mouse (Win3D bypasses in `win3d.cpp`), the Win3D camera `DAT_0067dbf8` is shifted (`src/freelancer/Client/hud_widescreen.cpp`), so meshes, Project/Unproject and mouse rays agree at any depth. Centred children (`SpecialModeText*`, `ScaledBackground`) are not shifted.
+- Corner HUD windows at the screen edges (like HudShift): `HUD_Status` to the right; `HUD_Target`, `HUD_ContactList`, the comm window `HUD_Receiver` to the left; NeuroNet buttons `NN_MainButton` to the right; main menu: buttons to the left, `Version` to the right, logo to the left edge. The windows' world positions do not change: while a window is drawn, updated or receives the mouse (Win3D bypasses in `Client/interface/win3d.cpp`), the Win3D camera `DAT_0067dbf8` is shifted (`src/freelancer/Client/space/hud/hud_widescreen.cpp`), so meshes, Project/Unproject and mouse rays agree at any depth. Centred children (`SpecialModeText*`, `ScaledBackground`) are not shifted.
 
 Known leftovers: full-screen 2D elements other than the loading picture are stretched; drawing inside corner windows that counts pixels from the surface width without a camera is not shifted; the LOD threshold in `RendComp` (viewport width / XScale) picks a slightly coarser LOD on a wide screen than 4:3 of the same height.
 
@@ -78,33 +78,33 @@ Retail keeps the sound archetype map in a red-black tree (`+0xF8`); the port use
 
 Status: OPEN. Owner: freelancer.exe / menu screens; out of scope by the owner's decision.
 
-Retail imports `MOVIE.DLL` statically (three `[Startup]` movies, `FUN_005b1300` `0x005b18c0..0x005b19bc`). The port (`src/freelancer/Client/engine_init.cpp:265`, `PlayStartupMovies`) does `LoadLibraryA("movie.dll")` and takes six `MediaPlayer` exports via `GetProcAddress`, because `src/movie` does not publish a header in `src/include`; if the DLL or an export is missing, the movies are skipped instead of failing startup. Removal condition: a `movie` header in `src/include` and a static import, as in retail.
+Retail imports `MOVIE.DLL` statically (three `[Startup]` movies, `FUN_005b1300` `0x005b18c0..0x005b19bc`). The port (`src/freelancer/Client/cmn/engine_init.cpp:265`, `PlayStartupMovies`) does `LoadLibraryA("movie.dll")` and takes six `MediaPlayer` exports via `GetProcAddress`, because `src/movie` does not publish a header in `src/include`; if the DLL or an export is missing, the movies are skipped instead of failing startup. Removal condition: a `movie` header in `src/include` and a static import, as in retail.
 
 ## `Acquire3DMathEngine`: one shared cache instead of per-translation-unit statics
 
 Status: OPEN, `simplified` (tracker `0x06391cf0`). Owner: Common.dll.
 
-The retail body (`0x06391cf0..0x06391d28`) does not cache: every call builds an AGGDESC, calls `DACOM_Acquire` and `CreateInstance`. In retail the cache lives at the call sites — 25 file-level statics in separate translation units. In the port none of the 114 call sites cached, so the cache is collapsed into one `static` variable inside `Acquire3DMathEngine` (`src/Common/common_csys.cpp:729`). Observable difference: retail may hold up to 25 references to the engine, the port holds one. Removal condition: restore the cache at the call sites and bring the body to retail if `CreateInstance` stops returning a shared instance.
+The retail body (`0x06391cf0..0x06391d28`) does not cache: every call builds an AGGDESC, calls `DACOM_Acquire` and `CreateInstance`. In retail the cache lives at the call sites — 25 file-level statics in separate translation units. In the port none of the 114 call sites cached, so the cache is collapsed into one `static` variable inside `Acquire3DMathEngine` (`src/Common/core/csys.cpp:729`). Observable difference: retail may hold up to 25 references to the engine, the port holds one. Removal condition: restore the cache at the call sites and bring the body to retail if `CreateInstance` stops returning a shared instance.
 
 ## `ArchetypeLoadFromPath`: port-only helper with no callers
 
 Status: OPEN, scaffold. Owner: freelancer.exe / `client_mesh_load`.
 
-This is not a retail function: it replaces code in `FUN_0059ec80` / `FUN_00420dd0` and the room spawners (`Archetype::Load`, then an optional `IEngine::CreateInstance`, fallback `.sph` → `.cmp`). Defined in `src/freelancer/Client/client_mesh_load.cpp:96`, declared in `client_mesh_load.h`; there are no callers in `src/` (it is only pulled in by `#include` in `menu_universe_base.cpp`). Removal condition: delete the function and the header; the retail paths already call `Archetype::Load` directly.
+This is not a retail function: it replaces code in `FUN_0059ec80` / `FUN_00420dd0` and the room spawners (`Archetype::Load`, then an optional `IEngine::CreateInstance`, fallback `.sph` → `.cmp`). Defined in `src/freelancer/Client/space/mesh_load.cpp:96`, declared in `Client/space/mesh_load.h`; there are no callers in `src/` (it is only pulled in by `#include` in `Client/gf/menu_universe_base.cpp`). Removal condition: delete the function and the header; the retail paths already call `Archetype::Load` directly.
 
 ## Universe: uninitialised retail stack values reproduced as zeros
 
 Status: retail quirk, reproduced on purpose (the owner's decision on retail UB, 2026-10-08).
 
-The loader `FUN_06337250` (`SYSTEM`) keeps stack slots between INI sections that retail does not zero: the `[System]` position (`+0x74`) and the `[Object]` nickname; their first values in retail are stack garbage, in the port 0 (`src/Common/common_universe.cpp:78`). `CopyRelPath` (`:329`, = `0633753a` and `063367e8`) copies the system file name byte by byte without a bound into a `0x108` stack buffer; the port stops at the bound — for names shorter than the buffer the result is identical.
+The loader `FUN_06337250` (`SYSTEM`) keeps stack slots between INI sections that retail does not zero: the `[System]` position (`+0x74`) and the `[Object]` nickname; their first values in retail are stack garbage, in the port 0 (`src/Common/universe/universe.cpp:78`). `CopyRelPath` (`:329`, = `0633753a` and `063367e8`) copies the system file name byte by byte without a bound into a `0x108` stack buffer; the port stops at the bound — for names shorter than the buffer the result is identical.
 
 ## FUN_00402500 aliasing: base Inherit of ICliObj (2026-09-25, W3-A)
 
-Status: retail quirk, partly reproduced (the owner's decision on retail UB, 2026-10-08). Owner: freelancer.exe / SPACE_OBJ (`src/freelancer/Client/client_cliobj.cpp`).
+Status: retail quirk, partly reproduced (the owner's decision on retail UB, 2026-10-08). Owner: freelancer.exe / SPACE_OBJ (`src/freelancer/Client/cmn/cliobj.cpp`).
 
-The base `Inherit` `LAB_00406970` (`FCliObj::Inherit`, `client_cliobj.cpp:2091`) first copies fields member by member (the donor's `+0x04` lands in the recipient), then calls `FUN_00402500(&this->LodHead, Src->LodHead)` (`0x00402500..0x00402575`). This gives `*Dest == Source`: retail frees the donor's shared LOD chain (`0x00402510..0x00402520`) and reads the freed nodes (`0x00402550`, `0x00402565`) — a use-after-free, the outcome depends on the MSVCRT heap; the recipient is left with an empty chain either way (`*Dest` = null, the copies are lost), the donor with a dangling pointer.
+The base `Inherit` `LAB_00406970` (`FCliObj::Inherit`, `Client/cmn/cliobj.cpp:2091`) first copies fields member by member (the donor's `+0x04` lands in the recipient), then calls `FUN_00402500(&this->LodHead, Src->LodHead)` (`0x00402500..0x00402575`). This gives `*Dest == Source`: retail frees the donor's shared LOD chain (`0x00402510..0x00402520`) and reads the freed nodes (`0x00402550`, `0x00402565`) — a use-after-free, the outcome depends on the MSVCRT heap; the recipient is left with an empty chain either way (`*Dest` = null, the copies are lost), the donor with a dangling pointer.
 
-The port (`CopyLodChain`, `client_cliobj.cpp:1464`) does not free the chain in the only differing case `*Dest == Source != null`: the recipient gets the same result (empty), the donor keeps a live chain. The other paths match the listing. On regular data this is not reached: `LAB_00406970` sits in slot 7 only for CliRoot and CliEQShield, and `inherit =` in `DATA\` occurs only for `[Light]` (CliEQLight, its own `FUN_0040b0a0`, does not call `FUN_00402500`). Removal condition: it becomes known that retail never reaches `0x00406b31` with a non-empty donor `+0x04`.
+The port (`CopyLodChain`, `Client/cmn/cliobj.cpp:1464`) does not free the chain in the only differing case `*Dest == Source != null`: the recipient gets the same result (empty), the donor keeps a live chain. The other paths match the listing. On regular data this is not reached: `LAB_00406970` sits in slot 7 only for CliRoot and CliEQShield, and `inherit =` in `DATA\` occurs only for `[Light]` (CliEQLight, its own `FUN_0040b0a0`, does not call `FUN_00402500`). Removal condition: it becomes known that retail never reaches `0x00406b31` with a non-empty donor `+0x04`.
 
 ## PerfOptions (`FUN_005b38d0` / `FUN_005b3ec0` / `FUN_005b40f0`, BOOT, 2026-09-01)
 
@@ -121,39 +121,39 @@ Owner: freelancer.exe / Client. Removal condition: none (replacing the container
 Status: OPEN (the owner's port-only debug line; remove only at his decision).
 Owner: Common.dll / ErrorHandler.
 
-Retail `LAB_0630abd0` (`ErrorHandler::activate` installs it at `0x0630ad5f`) writes the message only to the configured logs via `fwrite`/`fflush` (`0x0630ad01`, `0x0630ad11`). In `FdumpHook()` (`src/Common/common_errorhandler.cpp:319-320`) the port first formats the message into a local 1024-byte buffer and calls `OutputDebugStringA` twice, so messages reach the debugger even when the log does not accept them. The rest of the body (severity, the counters `DAT_063fcf30/34`, the `Flags >> 4` versus `LogId` route, the severity limit, `fwrite`/`fflush` for a FILE*) repeats `LAB_0630abd0`; retail's unbounded `vsprintf` (UB) is bounded by the buffer in the port.
+Retail `LAB_0630abd0` (`ErrorHandler::activate` installs it at `0x0630ad5f`) writes the message only to the configured logs via `fwrite`/`fflush` (`0x0630ad01`, `0x0630ad11`). In `FdumpHook()` (`src/Common/core/errorhandler.cpp:319-320`) the port first formats the message into a local 1024-byte buffer and calls `OutputDebugStringA` twice, so messages reach the debugger even when the log does not accept them. The rest of the body (severity, the counters `DAT_063fcf30/34`, the `Flags >> 4` versus `LogId` route, the severity limit, `fwrite`/`fflush` for a FILE*) repeats `LAB_0630abd0`; retail's unbounded `vsprintf` (UB) is bounded by the buffer in the port.
 Removal condition: remove these two lines and the formatting that feeds them when the owner finishes debugging FDUMP.
 
 ## Minor Common exports (2026-09-01)
 
-Status: no deviations; the entry is kept for comments in `src/Common/common_misc.cpp` (`ParseGUID`) and `src/Common/common_csys.cpp:387` (`RotateMatrix`).
+Status: no deviations; the entry is kept for comments in `src/Common/core/misc.cpp` (`ParseGUID`) and `src/Common/core/csys.cpp:387` (`RotateMatrix`).
 
 - **`ParseGUID` (`0631b9c3`..`0631bb64`).** At `0631b9e7` retail does a `strcpy` of the remainder of the string into a stack buffer (`[S+0x1c]`) and never reads it (Data1 `[S+0x18]`, Data2 `[S+0x14]`, Data4 `[S+0xc..0x13]`, the pair buffer `[S+8]`). The port omits the copy: its only observable effect is a UB frame overflow on a long tail.
-- **`ParseGUID` returns NULL** at `0631b9c3` and `0631bb4d` (`CMPSD.REPE` with 16 zero bytes `DAT_06401750`, `SETZ`/`DEC`/`AND`) — this is retail behaviour, the port repeats it (`common_misc.cpp`, `kNullGuidText`).
-- `ValueNum` (`0631bee0`) uses `MsvcrtAtof` (`src/Common/msvcrt_atof.cpp`) — a decimal emulation of MSVCRT `atof`, `"0x10"` gives 0 as in retail. `RotateMatrix` (`src/Common/common_csys.cpp:377` = `06303fe0`) goes through the math engine.
+- **`ParseGUID` returns NULL** at `0631b9c3` and `0631bb4d` (`CMPSD.REPE` with 16 zero bytes `DAT_06401750`, `SETZ`/`DEC`/`AND`) — this is retail behaviour, the port repeats it (`Common/core/misc.cpp`, `kNullGuidText`).
+- `ValueNum` (`0631bee0`) uses `MsvcrtAtof` (`src/Common/core/msvcrt_atof.cpp`) — a decimal emulation of MSVCRT `atof`, `"0x10"` gives 0 as in retail. `RotateMatrix` (`src/Common/core/csys.cpp:377` = `06303fe0`) goes through the math engine.
 
 ## `Gun::get_hp_type_by_index`: retail reads one element further (2026-09-01)
 
 Status: retail UB, deterministic in the port (the owner's decision of 2026-10-08 on retail UB); for all defined indices the behaviour matches.
 
-`Gun::get_hp_type_by_index` (`062f68c0..062f690a`) compares the index with the size of the `HpGunTypes` vector via `CMP EDX,EAX / JG` (`062f68f8`), i.e. it accepts `Index == Count` and reads a dword past the end of the array. The port (`src/Common/common_archetype_weapons.cpp:361`) returns `HpTypeNone` for this index, as for any other out-of-range one. With an empty vector the default table `DAT_063ecc38` is used (24 dwords, `0 <= Index <= 0x17`) — the bounds match. The same applies to `ShieldGenerator::get_hp_type_by_index` (`src/Common/common_archetype_equipment.cpp:1466`, the non-empty-vector branch stops at `Count`). The `HpAttachmentType` enumerator names are not retail (an enum leaves no symbols in the binary), only the values are retail; the names are derived from the `hp_gun_type` strings of the archetype loader.
+`Gun::get_hp_type_by_index` (`062f68c0..062f690a`) compares the index with the size of the `HpGunTypes` vector via `CMP EDX,EAX / JG` (`062f68f8`), i.e. it accepts `Index == Count` and reads a dword past the end of the array. The port (`src/Common/archetype/archetype_weapons.cpp:361`) returns `HpTypeNone` for this index, as for any other out-of-range one. With an empty vector the default table `DAT_063ecc38` is used (24 dwords, `0 <= Index <= 0x17`) — the bounds match. The same applies to `ShieldGenerator::get_hp_type_by_index` (`src/Common/archetype/archetype_equipment.cpp:1466`, the non-empty-vector branch stops at `Count`). The `HpAttachmentType` enumerator names are not retail (an enum leaves no symbols in the binary), only the values are retail; the names are derived from the `hp_gun_type` strings of the archetype loader.
 
 ## Cameras: mixed calling convention in the camera table
 
 Status: retail quirk, reproduced in the port.
 
-The retail camera vtable mixes two conventions. Slots `0x00..0x44` take `this` as an explicit stack argument (they start with `MOV EAX,[ESP+4]`; confirmed by the call `push edi; call [ecx+0x18]` at `0x0051b431`). Slots `0x48` (`LAB_0040f5d0`, `RET 4`, `this` is not read — the only stack argument is the output vector) and `0x4c` (`FUN_0040f5f0`, `RET 8`; the call `mov ecx,this; push value; push key` at `0x0051b3fe`) are `__thiscall`. The port declares the former as `DACOM_API` (stdcall), and `GetVelocity(float* Out3)` and `SetProperty(Key, Value)` as ordinary virtual (thiscall) methods in `src/freelancer/Client/space_camera.h` (lines 11-13 and 44-62), the implementations `FSpaceCamera::GetVelocity` (`space_camera.cpp:1058`) and the 0x48/0x4c overrides in GameCamera. Binary compatibility with retail is not a goal here; the goal is matching slot semantics.
+The retail camera vtable mixes two conventions. Slots `0x00..0x44` take `this` as an explicit stack argument (they start with `MOV EAX,[ESP+4]`; confirmed by the call `push edi; call [ecx+0x18]` at `0x0051b431`). Slots `0x48` (`LAB_0040f5d0`, `RET 4`, `this` is not read — the only stack argument is the output vector) and `0x4c` (`FUN_0040f5f0`, `RET 8`; the call `mov ecx,this; push value; push key` at `0x0051b3fe`) are `__thiscall`. The port declares the former as `DACOM_API` (stdcall), and `GetVelocity(float* Out3)` and `SetProperty(Key, Value)` as ordinary virtual (thiscall) methods in `src/freelancer/Client/space/camera/space_camera.h` (lines 11-13 and 44-62), the implementations `FSpaceCamera::GetVelocity` (`Client/space/camera/space_camera.cpp:1058`) and the 0x48/0x4c overrides in GameCamera. Binary compatibility with retail is not a goal here; the goal is matching slot semantics.
 
 ## `ScriptCamera`: the destructor does not release the script, a failed load leaves the engine hanging — retail, reproduced on purpose
 
 **Retail:** the destructor `0x0051dfc0` releases two sinks and detaches both watchers, but not the `IScriptEngine` at `+0xf8` — it was supposed to be released by the deactivation slot `0x68`. The failed-load path (`0x0051e575` `FDUMP` without a pointer check, `0x0051e57d` `XOR AL,AL`) returns `false` without releasing the engine and without zeroing `Script`; only the deactivation slot removes it.
-**Port:** `src/freelancer/Client/space_camera_script.cpp` (`ScriptCameraDestruct`, `ScriptCameraActivate`) and `.h` repeat the asymmetry; comments refer to this entry.
+**Port:** `src/freelancer/Client/space/camera/space_camera_script.cpp` (`ScriptCameraDestruct`, `ScriptCameraActivate`) and `.h` repeat the asymmetry; comments refer to this entry.
 **Removal condition:** none — this is retail behaviour, a "fix" changes the timing of `IsFinished` and the release order.
 
 ## Docking camera: `SetPlayerStrafeBurst` takes `int`, not `StrafeDir`
 
 **Retail:** slot `0x58` (`FUN_0051eaa0`) starts with `FUN_004c7950` (reset of the behaviour direction) and `FUN_004c7a30(StrafeNone)`.
-**Port:** `DockingCameraAttach` (`src/freelancer/Client/space_camera_docking.cpp:65-66`) calls `ResetPlayerBehaviorDirection()` and `SetPlayerStrafeBurst(0)` (`player_behavior.cpp:122/130`). The difference is only in the signature: `Dir` is an `int` (0 none, 1 left, 2 right, 3 up, 4 down) so that cameras do not pull in the `common_cequip.h` headers. It does not change behaviour; the entry exists as a reference from `player_behavior.h`.
+**Port:** `DockingCameraAttach` (`src/freelancer/Client/space/camera/space_camera_docking.cpp:65-66`) calls `ResetPlayerBehaviorDirection()` and `SetPlayerStrafeBurst(0)` (`Client/space/player_behavior.cpp:122/130`). The difference is only in the signature: `Dir` is an `int` (0 none, 1 left, 2 right, 3 up, 4 down) so that cameras do not pull in the `common_cequip.h` headers. It does not change behaviour; the entry exists as a reference from `Client/space/player_behavior.h`.
 
 ## rpclocal: the ch1 buffer family — IClient senders keep the caller's block, IServerImpl senders copy
 
@@ -232,9 +232,9 @@ The retail `rpclocal.dll` imports 417 symbols by name from COMMON.DLL, including
 
 ## `GetDirectionMatrix`: retail compares an integer with 0.98 (0xa3c10, 2026-09-01)
 
-> **Status:** a retail bug reproduced on purpose (`src/Common/common_csys.cpp:452-488`, comment in `src/include/common_csys.h:115`).
+> **Status:** a retail bug reproduced on purpose (`src/Common/core/csys.cpp:452-488`, comment in `src/include/common_csys.h:115`).
 
-Reference axis selection at `06303cf9..06303d16`: `dot = column1(Base) . Dir` → `ftol` (truncation) → integer abs → `FILD`/`FCOMP double 0.98`. The author wrote `abs()` from `<stdlib.h>` over a float, so `trunc(dot)` ∈ {-1, 0, 1}, and the condition `abs(...) <= 0.98` is true only at zero: the "column 1" branch is always taken, except when `dot == ±1.0`. The port repeats `abs(static_cast<int>(Dot))` (`common_csys.cpp:488`) — the matrix for nearly parallel inputs depends on the threshold. There is nothing to fix without changing the semantics. There are no direct references to the function in `freelancer.exe`, only the IAT slot `005c65a0`; the export is mandatory.
+Reference axis selection at `06303cf9..06303d16`: `dot = column1(Base) . Dir` → `ftol` (truncation) → integer abs → `FILD`/`FCOMP double 0.98`. The author wrote `abs()` from `<stdlib.h>` over a float, so `trunc(dot)` ∈ {-1, 0, 1}, and the condition `abs(...) <= 0.98` is true only at zero: the "column 1" branch is always taken, except when `dot == ±1.0`. The port repeats `abs(static_cast<int>(Dot))` (`Common/core/csys.cpp:488`) — the matrix for nearly parallel inputs depends on the threshold. There is nothing to fix without changing the semantics. There are no direct references to the function in `freelancer.exe`, only the IAT slot `005c65a0`; the export is mandatory.
 
 ## `atoi`/`atol`/`_wtoi`: own copy of MSVCRT instead of the port's CRT
 
@@ -315,7 +315,7 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 **Retail → port:**
 - **Receive loop (06b3932d).** Retail loops while bytes remain in a message, but moves the cursor by the 2-byte header only, and an odd remainder reaches `Decode` as `0xffffffff`. It decodes every registered type, the server-to-client (channel 2) ones included. The port decodes one packet per message. An empty message, one under 2 bytes, or one on a channel other than 1 or 3 disconnects the peer. The retail client sends one channel-1 or channel-3 packet per message (RemoteServer `PushToServer`, 06bd9ac0), and DALib answers 1-byte pings before `OnReceive`.
 - **Packets a multiplayer client never sends** are dropped before decoding:
-  - SET_MISSION_LOG, SAVEGAME, DOCK and COMMCOMPLETE: sent only in single player. See `nn_story_star.cpp`, the save page, `space_state.cpp` 0x0054a79a and `hud_comm.cpp`.
+  - SET_MISSION_LOG, SAVEGAME, DOCK and COMMCOMPLETE: sent only in single player. See `Client/nn/nn_story_star.cpp`, the save page, `Client/space/space_state.cpp` 0x0054a79a and `Client/space/hud/hud_comm.cpp`.
   - The six DBG packets, which retail logs as "encountered in release mode".
   - TRADERESPONSE, which has no client sender.
 - **Length checks.** `FRpcWireStream::Advance` and every `MarshalCursor + N > MarshalLimit` preflight computed the sum in 32 bits, so a size near `0xffffffff` wrapped and passed. `RpcRunExceedsLimit` gives the same answer whenever the sum does not wrap, and refuses the wrapped ones. This covers SET_WEAPON_GROUP, CREATESHIP and SETREPUTATION, and is in both DLLs' codecs.
@@ -325,7 +325,7 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 - **PLAYER_TRADE on a multiplayer server.** Retail read the uncounted target DWORD (actions 04/08/10) and wrote one (action 40) past the received message. The port touches it only when it is counted. Clients leave it out there, and the dispatch does not use it.
 - **Hardpoint names.** In REQEQUIPMENT, REQCARGO, REQADDITEM and REQMODIFYITEM, RemoteClient refuses a non-empty hardpoint whose last byte is not 0. The client always sends `strlen + 1` bytes, and `StringAlloc` reads to the terminator.
 
-**Not changed.** A packet that fails to decode is still not released, as in retail, because a failed `Decode` can leave owned pointers unset.
+**Failed decodes.** Retail never releases a packet that failed to decode, so each rejected message leaked it. The port releases it. Every client-to-server packet that owns memory starts with its pointers null, and a decoder stores only its own allocations in them, so the destructor is safe after a failed decode.
 
 **Tests.** RpcCodecTest used to skip the overflowing inputs. It now records them as failed decodes (`0x17`), so its output differs from the base: the PR carries `codecs: expected change`.
 
@@ -364,10 +364,10 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 
 **Port (multiplayer only).** Single player keeps retail's behaviour. Each check matches what the client sends:
 - **The sender's ship** (`Players[session].ship_object_id`):
-  - FireWeapon, ActivateEquip, ActivateCruise, ActivateThrusters, TractorObjects, JettisonCargo, SPRequestUseItem and SPObjUpdate: the client sends these for its own ship (`cli_projectile_fx.cpp`, `client_gameobj.cpp`, `hud_status_core.cpp`, `player_spawn.cpp`).
+  - FireWeapon, ActivateEquip, ActivateCruise, ActivateThrusters, TractorObjects, JettisonCargo, SPRequestUseItem and SPObjUpdate: the client sends these for its own ship (`Client/space/cli_projectile_fx.cpp`, `Client/space/gameobj.cpp`, `Client/space/hud/hud_status_core.cpp`, `Client/space/player_spawn.cpp`).
   - RequestEvent and RequestCancel: the requesting ship `p1`. The dock or formation target is not checked.
-  - LaunchComplete and JumpInComplete (the object id), and Hail (the hailing ship). The client sends the first two from `FClientShipGameobj::slot_70` / `slot_74`, reached only for the player's own ship (`LaunchFromDock` and the jump-in branch both test `get_id() == GetPlayerCharacterId()`), and Hail with the player's ship (`hud_target_panel.cpp`). These reach `IServer` without the sender's id, so remoteclient.dll checks them before dispatching, through `Server_IsClientShip`.
-- **StopTradeRequest:** the id in the payload is the sender's own (withdrawing its request, `hud_target_panel.cpp`) or that of a player whose request to the sender is pending (declining it, `nn_group_control.cpp`). Any other id is dropped (`Server_MayStopTradeRequest`).
+  - LaunchComplete and JumpInComplete (the object id), and Hail (the hailing ship). The client sends the first two from `FClientShipGameobj::slot_70` / `slot_74`, reached only for the player's own ship (`LaunchFromDock` and the jump-in branch both test `get_id() == GetPlayerCharacterId()`), and Hail with the player's ship (`Client/space/hud/hud_target_panel.cpp`). These reach `IServer` without the sender's id, so remoteclient.dll checks them before dispatching, through `Server_IsClientShip`.
+- **StopTradeRequest:** the id in the payload is the sender's own (withdrawing its request, `Client/space/hud/hud_target_panel.cpp`) or that of a player whose request to the sender is pending (declining it, `Client/nn/nn_group_control.cpp`). Any other id is dropped (`Server_MayStopTradeRequest`).
 - **An object the sender owns.** Either `CSimple::OwnerPlayer` is the session, or the object is a projectile whose launcher (`CProjectile::OwnerId`) is the sender's ship. The server creates missiles, mines and countermeasures with `OwnerPlayer` 0.
   - SetTarget: the client's ship, or its own missile.
   - SPObjCollision: the damaged side. That is the client's own side; it reports only when it owns that side.
@@ -375,7 +375,7 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 - **SPMunitionCollision:** the shooter is the sender's ship (the client's own gun shots), or the sender owns the victim. The victim's client reports missile hits by others.
 
 **Changes for legitimate clients.**
-- The client sets `OwnerPlayer` on its local copy of a ship that is dying, jumping out or landing (`client_iclient_space.cpp`). It then reports collisions, and possibly an automatic countermeasure or thruster command, for a ship it does not own.
+- The client sets `OwnerPlayer` on its local copy of a ship that is dying, jumping out or landing (`Client/space/iclient_space.cpp`). It then reports collisions, and possibly an automatic countermeasure or thruster command, for a ship it does not own.
 - Retail applies those reports on top of the server's or the real owner's. The port drops them, so that damage is applied once.
 - The owner accepted this on 2026-11-22.
 
@@ -421,3 +421,23 @@ Rule for new code: a port of a call to `MSVCRT.DLL::atoi`/`atol`/`_wtoi`/`_wtol`
 - Selling in a later dock pays up to the highest variance price, because the client draws new prices on every dock. So the price spread is open to whoever docks again, as it is in retail.
 - A mod whose client market differs from the server's prices against the server's data.
 - Rolling back at undock with retail's net-worth check is not done.
+
+## Server: account names kept out of the logs (SERVER-LOG-ACCOUNT-ID, 2026-11-22)
+
+> **Status:** OPEN (retail defect fixed)
+> **Owner:** Server (`src/Server/server_playerdb.cpp`, `AccountLogLabel`); code tagged `PORT(deviation) SERVER-LOG-ACCOUNT-ID`
+> **Removal condition:** none planned.
+
+**Retail.** The multiplayer log lines for login, logout, character deletion, and account creation and deletion print the account name (`%S`). So do the cheat report and `cheaters.log`. A multiplayer account name is the account's only credential: the client sends it from its registry as its login. Anyone who can read the server log can therefore log in as any player in it.
+
+**Port.** These lines print the account's directory name instead (`Server_AccountDirName`, `%02x-%08x` of a CRC of the lowercased name). That is the folder under `Accts\MultiPlayer`, so an operator can still tell which account it was. Single player logs nothing here, as before.
+
+## RemoteClient: no joins before the server's password is set (SERVER-STARTUP-PASSWORD, 2026-11-22)
+
+> **Status:** OPEN (retail defect fixed)
+> **Owner:** RemoteClient (`src/RemoteClient/RemoteClient_transport.cpp`, `CClientImpl::Startup`); code tagged `PORT(deviation) SERVER-STARTUP-PASSWORD`
+> **Removal condition:** none planned.
+
+**Retail.** `CClientImpl::Startup` starts hosting with an empty password. FLServer and FLDedicated set the configured password (`PublishServerSession`, `SetRemoteClientPassword`) only after `IServerImpl::Startup` has returned. A client that joins in between keeps its connection on a password-protected server.
+
+**Port.** Startup hosts with a random 32-character password from `std::random_device` until `PublishServerSession` sets the real one, which may be empty. A client that tries during startup gets "wrong password", and can retry a moment later. Both hosts call `PublishServerSession`, FLServer even when startup failed.

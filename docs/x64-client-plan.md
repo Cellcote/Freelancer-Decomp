@@ -45,8 +45,8 @@ What is left, from a fresh survey of `master` (counts are from grep, then spot-c
 | Projects without an x64 build | movie (step 2.2); RP8 and RP9 (Win32-only renderers); FLServer (MFC), DPNetInteropTest, MemoryDiagnostics and the 8 resource-only DLLs, which are Win32-only by design |
 | Inline assembly | None left outside `#if defined(_M_IX86)`; every block has a portable version |
 | Layout `static_assert`s not yet `FL_LAYOUT_ASSERT` | None left in the client modules. The plain ones that remain hold on both platforms |
-| Hard-coded retail byte offsets | About 160 in the client modules (freelancer 92, of which `cli_nebula.cpp` 37; movie 48; alchemy 9; flmaterials 5; RemoteServer 2; Deformable2 1), and about 45 more in Common and Server |
-| Raw `this + 0x..` offsets in Common's AI behaviours | About 44 sites in 14 files (`common_behavior.cpp` and the behaviours). They already run in the x64 server and hit the wrong fields there; being fixed first |
+| Hard-coded retail byte offsets | About 160 in the client modules (freelancer 92, of which `Client/space/cli_nebula.cpp` 37; movie 48; alchemy 9; flmaterials 5; RemoteServer 2; Deformable2 1), and about 45 more in Common and Server |
+| Raw `this + 0x..` offsets in Common's AI behaviours | About 44 sites in 14 files (`Common/ai/behavior.cpp` and the behaviours). They already run in the x64 server and hit the wrong fields there; being fixed first |
 | Pointers stored in 32-bit integers | movie's big-number code (about 300 casts, left out on x64, step 2.2); the rest was fixed in phase 2 |
 | Renderer | RP8 cannot be built for x64 (D3DX8 has no 64-bit version). The x64 client gets RPGPU (phase 5), which so far draws the 2D draws (menus, HUD) |
 
@@ -70,15 +70,15 @@ passing run with the switch is evidence, not proof, that no truncation is left.
 **1.2 x87 helpers for the client.** Done in #40. Extend `x87_portable.h`:
 
 - a compare helper that reproduces FCOM/FCOMP plus the FNSTSW flag tests, unordered cases
-  included (the six compare sites in `menu_sound_arch.cpp` and `lparser.c`);
-- `log10` as FLDLG2 + FYL2X, then ×10 rounded to float (`menu_sound_arch.cpp`, `SoundManager.cpp`).
+  included (the six compare sites in `Client/cmn/menu_sound_arch.cpp` and `lparser.c`);
+- `log10` as FLDLG2 + FYL2X, then ×10 rounded to float (`Client/cmn/menu_sound_arch.cpp`, `SoundManager.cpp`).
   This can differ from Win32 in the last bit, like `x87_trig.h`.
 
 Also document the client's precision rule (done in #40). The client runs at 53-bit precision
 except between `BeginScene` and `EndScene`, where it uses the precision the Direct3D device left:
 24-bit with RP8's default (`FPU_PRESERVE` 0). Portable client arithmetic is therefore the server's
 `double` rule outside the scene and `float` arithmetic in the x87 order inside it. The
-`_control87` precision switches (`client_frame_tick.cpp`, `engine_init.cpp`) are Win32 only,
+`_control87` precision switches (`Client/frame_tick.cpp`, `Client/cmn/engine_init.cpp`) are Win32 only,
 since x64 has no x87 precision control.
 
 **1.3 Layout checks.** Done in #43. Convert the client modules' layout `static_assert`s to
@@ -91,7 +91,7 @@ strings and infocards (and every mod's resource DLL) would disappear. Add
 `Platform::ResourceModuleLoad`: `LoadLibraryExA(..., LOAD_LIBRARY_AS_DATAFILE |
 LOAD_LIBRARY_AS_IMAGE_RESOURCE)` on x64, unchanged `LoadLibraryA` on Win32. Use it only at
 `dataconfig_progress.cpp:217` and `main.cpp:750`. Then check that
-`DialogBoxParamA(g_client.resources, ...)` (`engine_init.cpp:792`) works with that handle.
+`DialogBoxParamA(g_client.resources, ...)` (`Client/cmn/engine_init.cpp:792`) works with that handle.
 
 ## Phase 2: the client builds for x64
 
@@ -115,7 +115,7 @@ flmaterials, alchemy, Deformable2, luaprofile. Includes:
 **2.2 movie.dll:**
 
 - `SetWindowLongPtrA` / `GWLP_*` for the subclassed window procedure and user data;
-- the exe resolves movie's exports by their decorated 32-bit names (`engine_init.cpp:292`).
+- the exe resolves movie's exports by their decorated 32-bit names (`Client/cmn/engine_init.cpp:292`).
   `PlayMovie`'s name is different on x64; take its x64 name there, so Win32 is unchanged;
 - the big-number code (`MovieField*.cpp`, `MovieGraph.cpp`, `MovieExp.cpp`, `MovieWide.cpp`,
   about 320 pointer-to-integer casts) answers the WM ASF Reader's `IWMAuthorizer` challenge: the
@@ -133,11 +133,11 @@ ported and checked by RpcCodecTest.
 offsets in "Where we are" are what is left)**:**
 
 - the seven asm blocks;
-- pointers kept in integers: `engine_light.cpp`, the `DrawStateA` sites, `cli_asteroid.cpp`,
-  `space_scene_obj_draw.cpp`, `long` engine-instance handles, and the UI slot messages that
+- pointers kept in integers: `Client/cmn/engine_light.cpp`, the `DrawStateA` sites, `Client/space/cli_asteroid.cpp`,
+  `Client/space/space_scene_obj_draw.cpp`, `long` engine-instance handles, and the UI slot messages that
   pass `this` as `unsigned` (`Slot23`);
 - `FL_FACET_OFFSET` for `G_ThornFacetTable` and the `Watchable` ±8 adjustments;
-- the 133 hard-coded byte offsets (for example `cli_nebula.cpp` `This + 0x294`), each replaced
+- the 133 hard-coded byte offsets (for example `Client/space/cli_nebula.cpp` `This + 0x294`), each replaced
   by a named member;
 - the crash-report block for `dw15.exe` (`main.cpp:150`), which has 32-bit offsets; leave it out
   on x64.

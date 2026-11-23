@@ -6,7 +6,7 @@ wrapper (`ClientEquip`) and puts it into the object's list (`+0xb8`, count at `+
 to equipment events (firing, a hit, switching on), are updated every frame, and play sounds, lights and
 particles. This document describes the structure; function status is in decomp-tracker.
 Port files: `client_equip_fx.{h,cpp}` (factory, cleanup, rebuild), `client_gameobj.*`
-(list initialisation), `cli_projectile_fx.*` (firing, activation, explosion), `cli_tractor_beam.cpp`.
+(list initialisation), `cli_projectile_fx.*` (firing, activation, explosion), `Client/space/cli_tractor_beam.cpp`.
 
 ## Structure
 

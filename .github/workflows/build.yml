@@ -976,14 +976,14 @@ jobs:
           # sed drops the function context git appends to each hunk header: clang-format-diff.py
           # reads the hunk's start line from the last "+N" on the line, which a context such as
           # "// +0x40" would supply. -iregex: the extensions git clang-format checks by default.
+          exts='.*\.(c|h|m|mm|cc|cp|cpp|c\+\+|cxx|hh|hpp|hxx|inc|ccm|cppm|cxxm|c\+\+m|cu|cuh|proto|protodevel|java|js|ts|cs|json|sv|svh|v|vh)'
           status=0
           git diff -M -U0 --no-color "$base" HEAD -- src |
             sed -E 's/^(@@ [^@]* @@).*/\1/' |
-            clang-format-diff.py -p1 -binary "$(command -v clang-format)" \
-              -iregex '.*\.(c|h|m|mm|cc|cp|cpp|c\+\+|cxx|hh|hpp|hxx|inc|ccm|cppm|cxxm|c\+\+m|cu|cuh|proto|protodevel|java|js|ts|cs|json|sv|svh|v|vh)' \
+            clang-format-diff.py -p1 -binary "$(command -v clang-format)" -iregex "$exts" \
               > format.diff || status=$?
           cat format.diff
           if [ "$status" -ne 0 ]; then
-            echo "::error::Changed lines are not clang-formatted. Run: git diff -M -U0 $base -- src | sed -E 's/^(@@ [^@]* @@).*/\1/' | clang-format-diff.py -p1 -i"
+            echo "::error::Changed lines are not clang-formatted. Run: git diff -M -U0 $base -- src | sed -E 's/^(@@ [^@]* @@).*/\1/' | clang-format-diff.py -p1 -i -iregex '$exts'"
             exit 1
           fi

@@ -30,7 +30,7 @@ class IVP_Environment;
 
 // The IVP SDK's IVP_Controller_Manager: 4 bytes, only the environment
 // (.text:0634c285-0634c29e stores `this` into a fresh operator new(4)). Its
-// methods are the free functions in ivp_controller.h / common_physys.cpp that
+// methods are the free functions in ivp_controller.h / Common/physics/physys.cpp that
 // take this object as `this`.
 class IVP_Controller_Manager
 {
@@ -477,9 +477,9 @@ public:
     // INDEPENDENT CONFIRMATION: FUN_0634bc60 was already reached from the OTHER
     // direction by an earlier lane, via its non-vtable caller FUN_0628c770, and
     // was ALREADY PORTED under exactly this reading -- as `DefaultCollisionFilter`
-    // (decomp-tracker item 3011; that free function sat in the former common_cequip.cpp and
+    // (decomp-tracker item 3011; that free function sat in the former Common/equip/cequip.cpp and
     // is now ivp_listener.cpp's FUN_0634bc60), with FUN_0628c770 itself ported as
-    // `NotifyCollisionFilter` (item 784; now common_physys.cpp's
+    // `NotifyCollisionFilter` (item 784; now Common/physics/physys.cpp's
     // check_objects_for_collision_detection override). Two
     // lanes arriving at "collision filter" from two unrelated call sites is
     // what makes this a finding rather than a hypothesis. That existing port is
@@ -852,7 +852,7 @@ void IVP_Environment_Enqueue_Core(IVP_Environment* env, IVP_Core* core);
 // loads ECX = environment->controller_manager (+0x90), but the body never reads
 // ECX: it is `IVP_Environment_Enqueue_Core(core->Environment, core)`. Callers:
 // the golem setters 063435e4 / 063436eb and CRemotePhysicsSimulation 062923cb /
-// 062923f4 / 06292580 (common_physys.cpp). (ivp_environment.cpp)
+// 062923f4 / 06292580 (Common/physics/physys.cpp). (ivp_environment.cpp)
 void IVP_Controller_Manager_Ensure_Core_To_Be_In_Simulation(IVP_Core* core);
 
 // FUN_0634cf60 (decomp-tracker item 3056): broadcasts to every "armed"

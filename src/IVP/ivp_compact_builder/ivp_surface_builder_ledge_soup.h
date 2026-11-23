@@ -260,7 +260,7 @@ struct IVP_U_Matrix;               // ivp_math.h
 // Compile() -- its 4 inputs are themselves produced by FUN_0636d650/
 // FUN_0635ada0 (items 3659/3312), neither of which is portable yet (one is
 // a well-identified-but-out-of-scope Mirtich's-algorithm mass-property
-// computation belonging to common_physys.cpp's territory; the other bottoms
+// computation belonging to Common/physics/physys.cpp's territory; the other bottoms
 // out in a genuinely unidentified tree-node layout, items 3310/3311). See
 // ApplyMassPropertyHeader()'s own .cpp comment and Compile()'s declaration
 // comment below for the complete evidence trail and current blocker.
