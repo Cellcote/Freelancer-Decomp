@@ -1365,7 +1365,8 @@ BOOL GetMessageA(LPMSG Message, HWND Window, UINT First, UINT Last)
     {
         std::lock_guard<std::recursive_mutex> Guard(State().Lock);
         if (Message == nullptr ||
-            (Window != nullptr && Window != reinterpret_cast<HWND>(static_cast<std::intptr_t>(-1)) &&
+            (Window != nullptr &&
+             Window != reinterpret_cast<HWND>(static_cast<std::intptr_t>(-1)) &&
              Find(Window) == nullptr))
             return -1;
     }
