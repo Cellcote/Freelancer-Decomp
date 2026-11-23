@@ -51,7 +51,7 @@ std::pair<std::vector<unsigned int>::iterator, bool> __cdecl RmInsertUnique(
     std::vector<unsigned int>* Values, unsigned int const& Value)
 {
     // 06f95e03-06f95e21: linear find over [begin, end).
-    std::vector<unsigned int>::iterator It = std::find(Values->begin(), Values->end(), Value);
+    std::vector<unsigned int>::iterator It = std::ranges::find(*Values, Value);
     if (It != Values->end())
         return std::make_pair(It, false);                     // 06f95e6b
     // 06f95e25 FUN_06f937c0(end, 1, &Value), then the same find again (06f95e30-06f95e49);
@@ -230,7 +230,7 @@ FRmKillableSolar* __cdecl PickKillableSolar(unsigned int Faction, int SolarType,
     {
         FRmKillableSolar& Entry = It->second;
         if (!Entry.bAnyFaction &&
-            std::find(Entry.Factions.begin(), Entry.Factions.end(), Faction) == Entry.Factions.end())
+            std::ranges::find(Entry.Factions, Faction) == Entry.Factions.end())
             continue;
         if (Entry.SolarType != SolarType)
             continue;
@@ -338,10 +338,9 @@ FRmCriticalLoot* __cdecl PickCriticalLoot(unsigned int Faction, unsigned int Typ
     for (std::vector<FRmCriticalLoot>::iterator It = GRmCriticalLoot.begin();
          It != GRmCriticalLoot.end(); ++It)
     {
-        if (!It->bAnyFaction &&
-            std::find(It->Factions.begin(), It->Factions.end(), Faction) == It->Factions.end())
+        if (!It->bAnyFaction && std::ranges::find(It->Factions, Faction) == It->Factions.end())
             continue;
-        if (std::find(It->Types.begin(), It->Types.end(), Type) == It->Types.end())
+        if (std::ranges::find(It->Types, Type) == It->Types.end())
             continue;
         Candidates.insert(Candidates.end(), &*It);               // FUN_06f937c0(end, 1, &p)
     }
@@ -1035,8 +1034,7 @@ bool FRandEncTLPopulator::Accept(FRandEncParams* Params, pub::Controller::EMessa
                     for (std::vector<unsigned int>::iterator It = Factions.begin();
                          It != Factions.end(); ++It)
                     {
-                        if (std::find(ClassFactions.begin(), ClassFactions.end(), *It) ==
-                            ClassFactions.end())
+                        if (std::ranges::find(ClassFactions, *It) == ClassFactions.end())
                             ClassFactions.insert(ClassFactions.end(), *It);
                     }
                 }
@@ -1051,8 +1049,7 @@ bool FRandEncTLPopulator::Accept(FRandEncParams* Params, pub::Controller::EMessa
                          PopulationCopy.Items.begin();
                      It != PopulationCopy.Items.end(); ++It)
                 {
-                    if (std::find(ClassFactions.begin(), ClassFactions.end(), It->first) !=
-                        ClassFactions.end())
+                    if (std::ranges::find(ClassFactions, It->first) != ClassFactions.end())
                         Populated.push_back(*It);
                 }
             }
@@ -1399,8 +1396,7 @@ bool FRandEncSPPopulator::Accept(FRandEncParams* Params, pub::Controller::EMessa
             for (std::vector<unsigned int>::iterator It = Factions.begin(); It != Factions.end();
                  ++It)
             {
-                if (std::find(ClassFactions.begin(), ClassFactions.end(), *It) ==
-                    ClassFactions.end())
+                if (std::ranges::find(ClassFactions, *It) == ClassFactions.end())
                     ClassFactions.insert(ClassFactions.end(), 1, *It);
             }
         }
@@ -1416,8 +1412,7 @@ bool FRandEncSPPopulator::Accept(FRandEncParams* Params, pub::Controller::EMessa
                  PopulationCopy.Items.begin();
              It != PopulationCopy.Items.end(); ++It)
         {
-            if (std::find(ClassFactions.begin(), ClassFactions.end(), It->first) !=
-                ClassFactions.end())
+            if (std::ranges::find(ClassFactions, It->first) != ClassFactions.end())
                 Populated.push_back(*It);
         }
     }

@@ -94,7 +94,7 @@ namespace
                 pub::GetBaseID(BaseId, Reader->get_value_string());
                 // 06eb4107-06eb4167: insert-unique (FUN_06eb5770 at end); the returned
                 // pair<iterator, bool> is dropped.
-                if (std::find(Item->Bases.begin(), Item->Bases.end(), BaseId) == Item->Bases.end())
+                if (std::ranges::find(Item->Bases, BaseId) == Item->Bases.end())
                     Item->Bases.insert(Item->Bases.end(), BaseId);
             }
             else if (Reader->is_value("rank"))
@@ -296,7 +296,7 @@ namespace
                  Item != GNewsItems.end(); ++Item)
             {
                 // FUN_06eb5f30 (find), then signed JL / JG on the stage bounds.
-                if (std::find(Item->Bases.begin(), Item->Bases.end(), BaseId) == Item->Bases.end())
+                if (std::ranges::find(Item->Bases, BaseId) == Item->Bases.end())
                     continue;
                 int const Stage = static_cast<int>(State->MissionNumber);
                 if (Stage < Item->FromStage || Stage > Item->ToStage)

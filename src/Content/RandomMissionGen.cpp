@@ -68,7 +68,7 @@ FRmSolarFormation* __cdecl PickSolarFormation(std::vector<int> const* SpawnTypes
         for (std::vector<int>::const_iterator Type = Mandatory.begin(); Type != Mandatory.end();
              ++Type)
         {
-            if (std::find(SpawnTypes->begin(), SpawnTypes->end(), *Type) == SpawnTypes->end())
+            if (std::ranges::find(*SpawnTypes, *Type) == SpawnTypes->end())
             {
                 bMatches = false;
                 break;
@@ -79,9 +79,9 @@ FRmSolarFormation* __cdecl PickSolarFormation(std::vector<int> const* SpawnTypes
             for (std::vector<int>::const_iterator Type = SpawnTypes->begin();
                  Type != SpawnTypes->end(); ++Type)
             {
-                if (std::find(Mandatory.begin(), Mandatory.end(), *Type) != Mandatory.end())
+                if (std::ranges::find(Mandatory, *Type) != Mandatory.end())
                     continue;
-                if (std::find(Optional.begin(), Optional.end(), *Type) == Optional.end())
+                if (std::ranges::find(Optional, *Type) == Optional.end())
                 {
                     bMatches = false;
                     break;
@@ -749,23 +749,20 @@ void FRmOfferText::Build(bool bOfferGroupSingular, bool bHostileGroupSingular, F
     for (std::vector<FRmOfferTextEntry>::iterator Entry = Entries.begin(); Entry != Entries.end();
          ++Entry)
     {
-        bool const bHas1 = std::find(Entry->Params.begin(), Entry->Params.end(), 1) !=
-                           Entry->Params.end();
+        bool const bHas1 = std::ranges::find(Entry->Params, 1) != Entry->Params.end();
         bool bBuild = false;
         if (Entry->Form == 1)
         {
             if (bHas1 && bFlag1)
                 bBuild = true;
-            else if (std::find(Entry->Params.begin(), Entry->Params.end(), 2) !=
-                     Entry->Params.end())
+            else if (std::ranges::find(Entry->Params, 2) != Entry->Params.end())
                 bBuild = bFlag2;
         }
         else if (Entry->Form == 2)
         {
             if (bHas1 && !bFlag1)
                 bBuild = true;
-            else if (std::find(Entry->Params.begin(), Entry->Params.end(), 2) !=
-                     Entry->Params.end())
+            else if (std::ranges::find(Entry->Params, 2) != Entry->Params.end())
                 bBuild = !bFlag2;
         }
         else if (Entry->Form == 3)
@@ -1518,11 +1515,10 @@ unsigned int FRandomMissionGenerator::PickOfferNode(FRmOfferQuery const* Query)
     {
         FRmVignetteNode const& Node = Nodes.find(*LeafIt)->second;
         std::vector<unsigned int> const& OfferGroups = Node.Params.OfferGroups;
-        if (std::find(OfferGroups.begin(), OfferGroups.end(), OfferGroup) == OfferGroups.end())
+        if (std::ranges::find(OfferGroups, OfferGroup) == OfferGroups.end())
             continue;
         std::vector<unsigned int> const& HostileGroups = Node.Params.HostileGroups;
-        if (std::find(HostileGroups.begin(), HostileGroups.end(), Query->EnemyGroup) ==
-            HostileGroups.end())
+        if (std::ranges::find(HostileGroups, Query->EnemyGroup) == HostileGroups.end())
             continue;
         float const Difficulty = Query->Difficulty;
         for (std::list<FRmDifficultyWindow>::const_iterator Window = Node.Windows.Windows.begin();
@@ -1589,8 +1585,8 @@ void FRandomMissionGenerator::CollectTreePaths(std::vector<FRmTreePath>* OutPath
 
         std::vector<unsigned int> const& OfferGroups = Parent.Params.OfferGroups;
         if (!OfferGroups.empty() &&
-            std::find(OfferGroups.begin(), OfferGroups.end(),
-                      static_cast<unsigned int>(OfferGroup)) == OfferGroups.end())
+            std::ranges::find(OfferGroups, static_cast<unsigned int>(OfferGroup)) ==
+                OfferGroups.end())
             continue;
 
         Choices.insert(Choices.begin(), Bit);
@@ -2038,7 +2034,7 @@ bool __cdecl BuildRmShips(FRmShipGroup* Group, unsigned int GroupId, FRmShipSize
     FEncounterShip Classes;
     std::vector<unsigned int>& ClassIds = Classes.ShipClasses;
     unsigned int ClassId = CreateID("class_fighter");
-    if (std::find(ClassIds.begin(), ClassIds.end(), ClassId) == ClassIds.end())
+    if (std::ranges::find(ClassIds, ClassId) == ClassIds.end())
         ClassIds.insert(ClassIds.end(), ClassId);
 
     char LevelClass[8];
@@ -2047,7 +2043,7 @@ bool __cdecl BuildRmShips(FRmShipGroup* Group, unsigned int GroupId, FRmShipSize
     else
         std::sprintf(LevelClass, "D%d", Size.Level);
     ClassId = CreateID(LevelClass);
-    if (std::find(ClassIds.begin(), ClassIds.end(), ClassId) == ClassIds.end())
+    if (std::ranges::find(ClassIds, ClassId) == ClassIds.end())
         ClassIds.insert(ClassIds.end(), ClassId);
 
     FNpcShipArch* const Arch = PickFactionShipLineArch(GroupId, &Classes, -1);
@@ -2381,12 +2377,12 @@ bool FRmDestroySolarsFilter::FillSolarSpawns(FRmOfferQuery const* Query,
     std::vector<int> Types;
     if (bBigSolar)
     {
-        if (std::find(Types.begin(), Types.end(), 0) == Types.end())
+        if (std::ranges::find(Types, 0) == Types.end())
             Types.push_back(0);
     }
     if (bDefensiveSolars)
     {
-        if (std::find(Types.begin(), Types.end(), 1) == Types.end())
+        if (std::ranges::find(Types, 1) == Types.end())
             Types.push_back(1);
     }
 
@@ -2939,7 +2935,7 @@ bool FRmAssassinateFilter::FillDefensiveSolars(FRmOfferQuery const* Query,
 
     std::vector<int> Types;
     int const Type = 1;
-    if (std::find(Types.begin(), Types.end(), Type) == Types.end())
+    if (std::ranges::find(Types, Type) == Types.end())
         Types.insert(Types.end(), Type);
 
     FRmSolarFormation* const Formation = PickSolarFormation(&Types);

@@ -48,7 +48,7 @@ namespace
     // Retail's inline find over a vector<uint> (FUN_06eb5f30 and the open-coded loops).
     bool ContainsId(std::vector<unsigned int> const& Ids, unsigned int Id)
     {
-        return std::find(Ids.begin(), Ids.end(), Id) != Ids.end();
+        return std::ranges::find(Ids, Id) != Ids.end();
     }
 
     // Every member's id not yet in Ids appended (FUN_06eb5770); retail then looks the id up
@@ -713,8 +713,7 @@ int FCargoScanRoute::HandleEvent(pub::Controller::EMessage MsgId, void const* Pa
         }
         if (LootIds.empty())
             break;
-        std::vector<unsigned int>::iterator Loot =
-            std::find(LootIds.begin(), LootIds.end(), Words[0]);
+        std::vector<unsigned int>::iterator Loot = std::ranges::find(LootIds, Words[0]);
         if (Loot == LootIds.end())
             break;
         LootIds.erase(Loot);

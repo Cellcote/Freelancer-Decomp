@@ -4205,7 +4205,7 @@ void FGcsHandler2::HandleMessage(pub::Controller::EMessage MessageId, void const
         FContentPlayerState* const Player = PlayerIt->second.get();
         if (Player->ShipObject == nullptr)
             continue;
-        if (std::find(Handled.begin(), Handled.end(), Player) != Handled.end())
+        if (std::ranges::find(Handled, Player) != Handled.end())
             continue;
         // 06eea91d-06eea93c: DAT_06fb6230 (1/120).
         if (!IsRandBelow(0.0083333338f))
@@ -4285,7 +4285,7 @@ void FGcsHandler2::HandleMessage(pub::Controller::EMessage MessageId, void const
                          OtherIt != Players.end(); ++OtherIt)
                     {
                         FContentPlayerState* const Other = OtherIt->second.get();
-                        if (std::find(Handled.begin(), Handled.end(), Other) != Handled.end())
+                        if (std::ranges::find(Handled, Other) != Handled.end())
                             continue;
                         if (Other->ShipObject == nullptr)
                             continue;

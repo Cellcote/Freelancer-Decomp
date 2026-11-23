@@ -1695,7 +1695,7 @@ void FSystemInfo::RemoveTradeLaneShip(unsigned int const* ShipId, unsigned int c
     {
         // 06f78e14-06f78e5c: the first match in ForwardShips.
         std::vector<unsigned int>::iterator Found =
-            std::find(TheLane->ForwardShips.begin(), TheLane->ForwardShips.end(), *ShipId);
+            std::ranges::find(TheLane->ForwardShips, *ShipId);
         if (Found != TheLane->ForwardShips.end())
         {
             TheLane->ForwardShips.erase(Found);
@@ -1705,7 +1705,7 @@ void FSystemInfo::RemoveTradeLaneShip(unsigned int const* ShipId, unsigned int c
         // 06f78e5d-06f78ea8.
         if (!bRemoved)
         {
-            Found = std::find(TheLane->BackwardShips.begin(), TheLane->BackwardShips.end(), *ShipId);
+            Found = std::ranges::find(TheLane->BackwardShips, *ShipId);
             if (Found != TheLane->BackwardShips.end())
             {
                 TheLane->BackwardShips.erase(Found);

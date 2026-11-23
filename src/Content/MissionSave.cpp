@@ -256,8 +256,7 @@ void FMissionObject::SnapshotMissionObjects()
             {
                 // 06f13254-06f132b6: remembered for the formation pass.
                 FormationNpcs.insert(std::make_pair(FormationRef, Npc));
-                if (std::find(FormationRefs.begin(), FormationRefs.end(), FormationRef) ==
-                    FormationRefs.end())
+                if (std::ranges::find(FormationRefs, FormationRef) == FormationRefs.end())
                     FormationRefs.push_back(FormationRef);
                 continue;
             }
@@ -882,7 +881,7 @@ namespace
     // returned pair is not used).
     void AddUniqueRep(std::vector<int>* Reps, int Rep)
     {
-        if (std::find(Reps->begin(), Reps->end(), Rep) == Reps->end())
+        if (std::ranges::find(*Reps, Rep) == Reps->end())
             Reps->push_back(Rep);
     }
 }
@@ -1002,7 +1001,7 @@ void FMissionObject::LoadMissionSave(INI_Reader* Reader)
                         if (IsEndMarker(Reader->get_value_string(Index)))
                             break;
                         unsigned int ClassId = static_cast<unsigned int>(Reader->get_value_int(Index));
-                        if (std::find(Classes.begin(), Classes.end(), ClassId) == Classes.end())
+                        if (std::ranges::find(Classes, ClassId) == Classes.end())
                             Classes.push_back(ClassId);
                     }
                     FRandEncShipChoice const Choice{Classes, 1.0f};

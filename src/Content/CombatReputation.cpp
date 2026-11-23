@@ -367,9 +367,8 @@ void __cdecl UpdateNpcReputations(float /*Unused*/)
                         bExcluded = true;
                 }
                 // 06f7072d-06f70753: in single player the mission objects too.
-                if (!bMultiplayer
-                    && std::find(MissionObjects->begin(), MissionObjects->end(), Found[Index])
-                           != MissionObjects->end())
+                if (!bMultiplayer &&
+                    std::ranges::find(*MissionObjects, Found[Index]) != MissionObjects->end())
                 {
                     Entry.bValid = 0;
                     continue;

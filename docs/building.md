@@ -167,7 +167,9 @@ The code is C++23, but use only what every compiler CI builds with supports: MSV
 
 - **Available**: `std::expected`, `std::to_underlying`, `std::byteswap`, `std::unreachable`,
   `string::contains`, `if consteval`, and C++20's `std::bit_cast`, `<bit>`, `std::span`,
-  `std::numbers`, `contains()` on associative containers and `std::erase_if`.
+  `std::numbers`, `contains()` on associative containers, `std::erase`/`std::erase_if`, the
+  `std::ranges` algorithms (`std::ranges::find(Ids, Id)` over `std::find(Ids.begin(), Ids.end(),
+  Id)`) and the C++20 views (`filter`, `transform`, `reverse`, `iota`).
 - **Not yet**: `std::print` and `std::ranges::to` (libstdc++ 14), `std::ranges::contains`,
   `fold_left`, `views::zip` and `views::enumerate` (libc++ 19), `std::flat_map`, deducing `this`
   and `static constexpr` locals in `constexpr` functions (Apple Clang 15), `[[assume]]` (MSVC).
@@ -182,6 +184,8 @@ some hand-written forms stay:
   `countl_zero(0)` is 32.
 - `push_back(T(...))` is not `emplace_back(...)`: the temporary's construction and destruction go
   away.
+- `std::sort` is not `std::ranges::sort`: they are separate implementations, and an unstable
+  sort may leave equal elements in a different order.
 - A literal that is pi rounded to float but written as a `double` (`3.1415927410125732`) is not
   `std::numbers::pi`.
 

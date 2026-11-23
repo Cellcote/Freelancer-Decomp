@@ -349,14 +349,9 @@ void FRmMachineGroup::AddMachine(StateMachineMessageHandler* Machine)
 void FRmMachineGroup::RemoveMachine(unsigned int Id)
 {
     remove_state_machine(Id);
-    std::vector<unsigned int>::iterator const NewEnd =
-        std::remove(StateMachines.begin(), StateMachines.end(), Id);
-    if (NewEnd != StateMachines.end())
-    {
-        StateMachines.erase(NewEnd, StateMachines.end());
+    if (std::erase(StateMachines, Id) != 0)
         return;
-    }
-    Machines.erase(std::remove(Machines.begin(), Machines.end(), Id), Machines.end());
+    std::erase(Machines, Id);
 }
 
 // LAB_06f71a30. The events are stack SMEventData (Content's copy of the table 06fb7620).

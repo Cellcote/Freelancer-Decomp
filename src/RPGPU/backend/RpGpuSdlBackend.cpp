@@ -604,9 +604,8 @@ void FRpGpuSdlBackend::UploadTexture(std::uint64_t Key, FRpGpuTextureImage&& Ima
 
 void FRpGpuSdlBackend::ForgetTexture(std::uint64_t Key)
 {
-    PendingUploads_.erase(std::remove_if(PendingUploads_.begin(), PendingUploads_.end(),
-                                         [Key](const FPendingUpload& Pending) { return Pending.Key == Key; }),
-                          PendingUploads_.end());
+    std::erase_if(PendingUploads_,
+                  [Key](const FPendingUpload& Pending) { return Pending.Key == Key; });
     Textures_.erase(Key);
 }
 
@@ -643,9 +642,8 @@ bool FRpGpuSdlBackend::UploadIndexBlock(std::uint64_t Key, std::vector<std::uint
 void FRpGpuSdlBackend::ForgetBlock(std::uint64_t Key)
 {
     LostBlocks_.erase(Key);
-    PendingBlocks_.erase(std::remove_if(PendingBlocks_.begin(), PendingBlocks_.end(),
-                                        [Key](const FPendingBlock& Pending) { return Pending.Key == Key; }),
-                         PendingBlocks_.end());
+    std::erase_if(PendingBlocks_,
+                  [Key](const FPendingBlock& Pending) { return Pending.Key == Key; });
     Blocks_.erase(Key);
 }
 
@@ -757,12 +755,8 @@ bool FRpGpuSdlBackend::UploadFrame(SDL_GPUCommandBuffer* Commands, const FRpGpuF
     }
     if (!Dropped.empty())
     {
-        PendingUploads_.erase(std::remove_if(PendingUploads_.begin(), PendingUploads_.end(),
-                                             [&Dropped](const FPendingUpload& Upload) {
-                                                 return std::find(Dropped.begin(), Dropped.end(), Upload.Key) !=
-                                                        Dropped.end();
-                                             }),
-                              PendingUploads_.end());
+        std::erase_if(PendingUploads_, [&Dropped](const FPendingUpload& Upload)
+                      { return std::ranges::find(Dropped, Upload.Key) != Dropped.end(); });
     }
 
     // Sizes in 64 bits first: SDL_GPU's buffers and offsets are 32-bit, so a frame whose uploads
@@ -916,9 +910,7 @@ bool FRpGpuSdlBackend::UploadFrame(SDL_GPUCommandBuffer* Commands, const FRpGpuF
                      static_cast<std::uint32_t>(Pending.Bytes()));
     }
     // The uploaded blocks are done; deferred ones wait for the next frame.
-    PendingBlocks_.erase(std::remove_if(PendingBlocks_.begin(), PendingBlocks_.end(),
-                                        [](const FPendingBlock& Pending) { return !Pending.bDeferred; }),
-                         PendingBlocks_.end());
+    std::erase_if(PendingBlocks_, [](const FPendingBlock& Pending) { return !Pending.bDeferred; });
     if (VertexBytes != 0)
         UploadBuffer(VertexBuffer_.get(), VertexOffset, VertexBytes);
     if (IndexBytes != 0)

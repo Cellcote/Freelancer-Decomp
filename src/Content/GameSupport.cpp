@@ -325,8 +325,7 @@ namespace
                 Start = Position;
                 if (!LockedGates.empty())
                 {
-                    if (std::find(LockedGates.begin(), LockedGates.end(), EntryObjectId) !=
-                        LockedGates.end())
+                    if (std::ranges::find(LockedGates, EntryObjectId) != LockedGates.end())
                     {
                         bFailed = true;
                         break;
@@ -433,7 +432,7 @@ namespace
         else if ((Type & 0x20000) != 0)
             ClassId = &GIdFreighter;                                            // DAT_06fcf3fc
         if (ClassId != nullptr &&
-            std::find(Params.ClassIds.begin(), Params.ClassIds.end(), *ClassId) == Params.ClassIds.end())
+            std::ranges::find(Params.ClassIds, *ClassId) == Params.ClassIds.end())
         {
             Params.ClassIds.insert(Params.ClassIds.end(), *ClassId);           // FUN_06eae440
         }

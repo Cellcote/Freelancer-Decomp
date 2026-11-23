@@ -51,14 +51,14 @@ namespace
     // FUN_06f95e00 and its inline copies: linear find, insert at end when absent.
     void AppendUnique(std::vector<unsigned int>* Values, unsigned int Value)
     {
-        std::vector<unsigned int>::iterator It = std::find(Values->begin(), Values->end(), Value);
+        std::vector<unsigned int>::iterator It = std::ranges::find(*Values, Value);
         if (It == Values->end())
             Values->insert(Values->end(), Value);
     }
 
     void AppendUniqueInt(std::vector<int>* Values, int Value)
     {
-        std::vector<int>::iterator It = std::find(Values->begin(), Values->end(), Value);
+        std::vector<int>::iterator It = std::ranges::find(*Values, Value);
         if (It == Values->end())
             Values->insert(Values->end(), Value);
     }
@@ -1118,11 +1118,11 @@ void FRandomMissionObject::SetPlayer(unsigned int InPlayerId)
 // lookup (FUN_06f4daa0) finds it (FUN_06f4e220).
 void FRandomMissionObject::AddPlayerName(std::wstring const& Name)
 {
-    if (std::find(PlayerNames.begin(), PlayerNames.end(), Name) != PlayerNames.end())
+    if (std::ranges::find(PlayerNames, Name) != PlayerNames.end())
         return;
     if (PlayerNames.size() < 8)
         ++PlayerCount;
-    if (std::find(PlayerNames.begin(), PlayerNames.end(), Name) == PlayerNames.end())
+    if (std::ranges::find(PlayerNames, Name) == PlayerNames.end())
         PlayerNames.insert(PlayerNames.end(), Name);
 }
 
@@ -1979,8 +1979,7 @@ bool FRandEncParams::SpawnFormation(FTransform const* Placement, int Count,
         ClassId.clear();
         FindShipClassByMembers(&ClassId.Id, MemberLine.ShipClasses);
         FEncounterShip ClassLine;
-        if (std::find(ClassLine.ShipClasses.begin(), ClassLine.ShipClasses.end(), ClassId.Id) ==
-            ClassLine.ShipClasses.end())
+        if (std::ranges::find(ClassLine.ShipClasses, ClassId.Id) == ClassLine.ShipClasses.end())
             ClassLine.ShipClasses.insert(ClassLine.ShipClasses.end(), ClassId.Id);
 
         // 06efbf21-06efbf52

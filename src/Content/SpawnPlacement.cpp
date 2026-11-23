@@ -119,7 +119,7 @@ namespace
     // std::find over a class list (FUN_06eb5f30 against the vector's end).
     bool HasClass(std::vector<unsigned int> const& Classes, unsigned int ClassId)
     {
-        return std::find(Classes.begin(), Classes.end(), ClassId) != Classes.end();
+        return std::ranges::find(Classes, ClassId) != Classes.end();
     }
 
     // The "(rand() * Count) >> 15" index idiom (IMUL, CDQ, AND EDX,0x7fff, ADD, SAR 0xf).
@@ -1503,7 +1503,7 @@ void __cdecl SetLeaderGuideTargets(FSystemInfo* System, FSpawnPlan* Plan,
             // 06f640dc-06f64109: TEST AH,5 / JNP -- below 0.5, or the only lane.
             if (static_cast<double>(rand()) * GRandScale < 0.5 || bOneLane)
                 Target1 = PickLeaderDockTarget(System, Leader, &Target2, &Anchor, 20000.0f);
-            std::vector<FTradeLane*>::iterator Own = std::find(Near.begin(), Near.end(), Lane);
+            std::vector<FTradeLane*>::iterator Own = std::ranges::find(Near, Lane);
             if (Own != Near.end())
                 Near.erase(Own);                                                    // FUN_06f69a10
             while (Target1 == 0)

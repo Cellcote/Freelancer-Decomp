@@ -156,7 +156,7 @@ namespace
         {
             const int Category = (int)Code.Value >> 4;
             const std::vector<int>& Categories = GOptions.LogCategories;
-            if (std::find(Categories.begin(), Categories.end(), Category) == Categories.end())
+            if (std::ranges::find(Categories, Category) == Categories.end())
             {
                 ReleaseMutex(GLogMutex);
                 return 0;
