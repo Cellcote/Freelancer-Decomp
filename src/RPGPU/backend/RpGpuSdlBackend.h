@@ -184,10 +184,10 @@ private:
     std::uint32_t IndexCapacity_ = 0; // bytes
     TGpuHandle<SDL_GPUTransferBuffer> Transfer_;
     std::uint32_t TransferCapacity_ = 0; // bytes
-    // The back buffer's size: what Create was asked for, as RP8's back buffer is the mode's size,
-    // or the window's size in pixels when it was asked for 0.
+    // The back buffer's size: what Create was asked for, as RP8's back buffer is the mode's size;
+    // a dimension asked for as 0 is the window's in pixels.
     std::uint32_t Width_ = 0;
     std::uint32_t Height_ = 0;
-    std::uint32_t RequestedWidth_ = 0; // 0: the window's size
-    std::uint32_t RequestedHeight_ = 0;
+    std::uint32_t RequestedWidth_ = 0; // 0: the window's width
+    std::uint32_t RequestedHeight_ = 0; // 0: the window's height
 };

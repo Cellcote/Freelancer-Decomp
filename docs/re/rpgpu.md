@@ -390,8 +390,8 @@ RPGPU records each frame and draws it at `SwapBuffers`, which is plan step 5.3.
    one transfer buffer.
 2. The commands replay on RPGPU's own colour target (B8G8R8A8) and a depth buffer, in one render
    pass per clear. The first pass clears colour and depth. The target is the back buffer: the
-   size `CreateBuffers` asks for, as RP8's back buffer is the mode's size windowed or not (the
-   window's size in pixels when it asks for 0). It is then blitted to the swap-chain image,
+   size `CreateBuffers` asks for, as RP8's back buffer is the mode's size windowed or not (a
+   dimension it asks for as 0 is the window's in pixels, each on its own). It is then blitted to the swap-chain image,
    pixel for pixel when the sizes agree, otherwise stretched over the window with linear
    filtering, as Direct3D 8 presents a windowed back buffer of another size. The target stays
    readable for `PrintScreen`, at the back buffer's size.

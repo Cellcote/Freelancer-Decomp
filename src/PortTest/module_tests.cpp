@@ -481,7 +481,7 @@ IRenderPipeline* MakeRpGpu(ICOManager* Manager, const char* Section)
 }
 
 // One frame cleared to Argb on Window, then the frame read back through PrintScreen's BMP: true
-// when every pixel is Argb's colour and the image is Width x Height (0: any size).
+// when every pixel is Argb's colour and the image is Width x Height (a dimension of 0: any).
 bool ClearPresentReadBack(IRenderPipeline* Pipeline, RpWindow Window, int Width, int Height,
                           std::uint32_t Argb, const std::string& Bmp, std::uint32_t* OutWidth,
                           std::uint32_t* OutHeight)
@@ -526,9 +526,8 @@ bool ClearPresentReadBack(IRenderPipeline* Pipeline, RpWindow Window, int Width,
         return false;
     std::uint32_t const W = U32(18), H = U32(22);
     std::size_t const RowBytes = (static_cast<std::size_t>(W) * 3 + 3) & ~std::size_t(3);
-    if (W == 0 || H == 0 ||
-        (Width != 0 && (W != std::uint32_t(Width) || H != std::uint32_t(Height))) ||
-        File.size() < 54 + RowBytes * H)
+    if (W == 0 || H == 0 || (Width != 0 && W != std::uint32_t(Width)) ||
+        (Height != 0 && H != std::uint32_t(Height)) || File.size() < 54 + RowBytes * H)
         return false;
     *OutWidth = W;
     *OutHeight = H;
@@ -1106,6 +1105,13 @@ void TestRpGpu(ICOManager* Manager, const std::string& Folder)
                                                 &WindowW, &WindowH) &&
                            WindowW == std::uint32_t(PixelW) && WindowH == std::uint32_t(PixelH)),
                       "RPGPU's SDL back buffer asked for at 0 x 0 is the window's size in pixels");
+                // Each dimension asked for as 0 is the window's on its own, as in Direct3D 8.
+                std::uint32_t MixedW = 0, MixedH = 0;
+                Check(!bOk || (ClearPresentReadBack(Gpu, Hwnd, 32, 0, 0xFF336699u,
+                                                    Root + "/mixed.bmp", &MixedW, &MixedH) &&
+                               MixedW == 32u && MixedH == std::uint32_t(PixelH)),
+                      "RPGPU's SDL back buffer asked for at 32 x 0 keeps 32 and takes the window's "
+                      "height");
                 if (bOk)
                     TestRpGpuDraws(Gpu, Hwnd, true, Root, Driver != nullptr ? Driver : "SDL_GPU");
                 if (bOk)

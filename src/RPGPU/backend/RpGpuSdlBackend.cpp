@@ -270,21 +270,19 @@ bool FRpGpuSdlBackend::Create(RpWindowHandle Hwnd, std::uint32_t Width, std::uin
 
     // The back buffer is the size asked for, as RP8's (BackBufferWidth / BackBufferHeight are the
     // mode's, windowed or not); Present scales it to the window, as Direct3D 8's Present
-    // stretches a windowed back buffer over the client area. Asked for 0: the window's size.
-    RequestedWidth_ = Width != 0 && Height != 0 ? Width : 0;
-    RequestedHeight_ = Width != 0 && Height != 0 ? Height : 0;
+    // stretches a windowed back buffer over the client area. A dimension asked for as 0 is the
+    // window's, each on its own, as Direct3D 8 resolves them.
+    RequestedWidth_ = Width;
+    RequestedHeight_ = Height;
     int W = 0;
     int H = 0;
-    if (RequestedWidth_ != 0)
+    if ((Width == 0 || Height == 0) && !SDL_GetWindowSizeInPixels(Window_, &W, &H))
     {
-        Width_ = RequestedWidth_;
-        Height_ = RequestedHeight_;
+        W = 0;
+        H = 0;
     }
-    else if (SDL_GetWindowSizeInPixels(Window_, &W, &H))
-    {
-        Width_ = static_cast<std::uint32_t>(W);
-        Height_ = static_cast<std::uint32_t>(H);
-    }
+    Width_ = Width != 0 ? Width : static_cast<std::uint32_t>(W);
+    Height_ = Height != 0 ? Height : static_cast<std::uint32_t>(H);
     return true;
 }
 
