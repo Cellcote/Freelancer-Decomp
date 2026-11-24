@@ -1259,16 +1259,22 @@ static int stbtt__cff_index_count(stbtt__buf *b)
 
 static stbtt__buf stbtt__cff_index_get(stbtt__buf b, int i)
 {
-   int count, offsize, start, end;
+   // Freelancer Decomp: i and offsize are checked at run time (upstream asserts them), and the
+   // offsets stay unsigned until the object lies inside the buffer (no signed overflow).
+   int count, offsize;
+   stbtt_uint32 start, end, data;
    stbtt__buf_seek(&b, 0);
    count = stbtt__buf_get16(&b);
    offsize = stbtt__buf_get8(&b);
-   STBTT_assert(i >= 0 && i < count);
-   STBTT_assert(offsize >= 1 && offsize <= 4);
+   if (i < 0 || i >= count || offsize < 1 || offsize > 4)
+      return stbtt__new_buf(NULL, 0);
    stbtt__buf_skip(&b, i*offsize);
    start = stbtt__buf_get(&b, offsize);
    end = stbtt__buf_get(&b, offsize);
-   return stbtt__buf_range(&b, 2+(count+1)*offsize+start, end - start);
+   data = 2 + (stbtt_uint32) (count+1) * (stbtt_uint32) offsize;
+   if (end < start || (unsigned long long) data + end > (unsigned long long) b.size)
+      return stbtt__new_buf(NULL, 0);
+   return stbtt__buf_range(&b, (int) (data + start), (int) (end - start));
 }
 
 //////////////////////////////////////////////////////////////////////////

@@ -118,6 +118,7 @@ struct FFontSpec
         BadFull, // a format 12 map whose groups run past the cmap, before the format 4 one
     } Cmap = Plain;
     unsigned UnitsPerEm = 1000;
+    const char* Typographic = nullptr; // a typographic family (nameID 16) too
 };
 
 void PutSquare(std::vector<char>& Glyf)
@@ -263,13 +264,24 @@ std::vector<char> BuildFont(const FFontSpec& Spec)
     std::vector<char> Loca;
     for (std::size_t Offset : {std::size_t{0}, std::size_t{0}, Second, Glyf.size()})
         Put16(Loca, static_cast<unsigned>(Offset / 2));
+    // nameID 1 (and 16), Windows platform, English, UTF-16BE.
+    std::vector<std::pair<unsigned, const char*>> Names = {{1u, Spec.Family}};
+    if (Spec.Typographic != nullptr)
+        Names.emplace_back(16u, Spec.Typographic);
     std::vector<char> Name;
-    std::size_t const Length = std::strlen(Spec.Family) * 2;
-    Put16(Name, 0), Put16(Name, 1), Put16(Name, 18);
-    for (unsigned Value : {3u, 1u, 0x409u, 1u, static_cast<unsigned>(Length), 0u})
-        Put16(Name, Value);
-    for (const char* Character = Spec.Family; *Character != 0; ++Character)
-        Put16(Name, static_cast<unsigned char>(*Character));
+    Put16(Name, 0), Put16(Name, static_cast<unsigned>(Names.size()));
+    Put16(Name, static_cast<unsigned>(6 + 12 * Names.size()));
+    unsigned Strings = 0;
+    for (const auto& Entry : Names)
+    {
+        unsigned const Length = static_cast<unsigned>(std::strlen(Entry.second) * 2);
+        for (unsigned Value : {3u, 1u, 0x409u, Entry.first, Length, Strings})
+            Put16(Name, Value);
+        Strings += Length;
+    }
+    for (const auto& Entry : Names)
+        for (const char* Character = Entry.second; *Character != 0; ++Character)
+            Put16(Name, static_cast<unsigned char>(*Character));
     std::vector<std::pair<const char*, std::vector<char>>> const Tables = {
         {"cmap", Cmap}, {"glyf", Glyf}, {"head", Head}, {"hhea", Hhea},
         {"hmtx", Hmtx}, {"loca", Loca}, {"maxp", Maxp}, {"name", Name}};
@@ -417,7 +429,8 @@ int main()
         Second + "/Full.ttf",    Third + "/Arial.ttf",  First + "/Swap.ttf",
         Second + "/Swap.ttf",    Second + "/Split.ttf", Second + "/Square.ttf",
         Second + "/Range.ttf",   Second + "/Near.ttf",  Second + "/Neighbour.ttf",
-        Second + "/BadFull.ttf", Second + "/Text.ttf",  Second + "/Huge.ttf"};
+        Second + "/BadFull.ttf", Second + "/Text.ttf",  Second + "/Huge.ttf",
+        First + "/Alias.ttf",    Second + "/AliasB.ttf"};
     // Each step of the setup must hold, or what the checks below find is not what they test.
     bool bSetUp =
         mkdir(First.c_str(), 0700) == 0 && mkdir(Second.c_str(), 0700) == 0 &&
@@ -443,7 +456,9 @@ int main()
         {Files[17], {"Gdi Test Neighbour", 500, 0, 0, FFontSpec::Neighbour}},
         {Files[18], {"Gdi Test Bad Full", 500, 0, 0, FFontSpec::BadFull}},
         {Files[19], {"Gdi Test Text", 800, 0, 0, FFontSpec::Ascii}},
-        {Files[20], {"Gdi Test Huge", 500, 0, 0, FFontSpec::Plain, 1}}};
+        {Files[20], {"Gdi Test Huge", 500, 0, 0, FFontSpec::Plain, 1}},
+        {Files[21], {"Gdi Test Alias A", 600, 0, 0, FFontSpec::Plain, 1000, "Gdi Test Alias B"}},
+        {Files[22], {"Gdi Test Alias B", 700}}};
     for (const auto& Fixture : Fixtures)
     {
         std::vector<char> const Data = BuildFont(Fixture.second);
@@ -457,14 +472,18 @@ int main()
 #endif
     // A file catalogued under one family that is replaced by a face of another: checked below.
     std::vector<char> const Other = BuildFont({"Gdi Test Other", 900});
+    // And one catalogued under two families (A, and B as its typographic family) replaced by a
+    // face of A alone.
+    std::vector<char> const AliasA = BuildFont({"Gdi Test Alias A", 900});
     Check(bSetUp, "the font folders are set up (folders, FL_GDI32_FONT_PATH, FIFO, font files)");
 
     HFONT const Before = MakeFont("Gdi Test Face", -100);
     Check(Before != nullptr && AdvanceOfA(Before) == 60,
           "the catalogue skips a FIFO and a cut-short font, and takes the first folder's face");
     DeleteObject(Before);
-    Check(std::remove(Files[2].c_str()) == 0 && WriteFile(Files[11], Other, Other.size()),
-          "the first folder's face is removed, and its Gdi Test Swap replaced by another family");
+    Check(std::remove(Files[2].c_str()) == 0 && WriteFile(Files[11], Other, Other.size()) &&
+              WriteFile(Files[21], AliasA, AliasA.size()),
+          "the first folder's face is removed, and two others replaced");
     {
         HDC const Probe = CreateCompatibleDC(nullptr);
         HFONT const After = MakeFont("Gdi Test Face", -100);
@@ -482,6 +501,15 @@ int main()
         Check(FaceOf(Swap) == "Gdi Test Swap" && AdvanceOfA(Swap) == 70,
               "a catalogued file now of another family gives way to the family's next file");
         DeleteObject(Swap);
+        // A, open, holds the replaced file's face; asked for B, that face (no longer B) gives
+        // way to B's other file.
+        HFONT const Alias = MakeFont("Gdi Test Alias A", -100);
+        HFONT const Typographic = MakeFont("Gdi Test Alias B", -100);
+        Check(AdvanceOfA(Alias) == 90 && FaceOf(Typographic) == "Gdi Test Alias B" &&
+                  AdvanceOfA(Typographic) == 70,
+              "an open face answers only for a family it still has");
+        DeleteObject(Alias);
+        DeleteObject(Typographic);
     }
     {
         // Drawn, the glyph is read to its last point and no further (ASan checks).
@@ -518,6 +546,9 @@ int main()
         DeleteObject(Near);
         // One unit per em: at -16 the 500 x 700-unit square is 8000 x 11200 pixels, past the
         // coverage one glyph may rasterize; it is drawn as nothing.
+        Check(MakeFont("Gdi Test Text", INT_MIN) == nullptr &&
+                  MakeFont("Gdi Test Text", (1 << 20) + 1) == nullptr,
+              "a height past 2^20 pixels (INT_MIN among them) makes no font");
         HFONT const Huge = MakeFont("Gdi Test Huge", -16);
         FDrawn const HugeA = DrawA(Huge);
         Check(HugeA.Face == "Gdi Test Huge" && HugeA.bDrawn && !HugeA.Lit(),
@@ -780,6 +811,15 @@ int main()
 
         Check(SelectObject(Other, Four) == nullptr,
               "a bitmap selected into one DC is not selected into another");
+        {
+            // The refused selection left Other's bitmap as it was: its first (stock) one.
+            HBITMAP const Probe = CreateCompatibleBitmap(nullptr, 1, 1);
+            HGDIOBJ const OtherFirst = SelectObject(Other, Probe);
+            Check(OtherFirst != nullptr && OtherFirst != Four &&
+                      SelectObject(Other, OtherFirst) == Probe,
+                  "the refused selection leaves the other DC's bitmap as it was");
+            DeleteObject(Probe);
+        }
         Check(SelectObject(Strip, Four) == Four, "it may be selected again into its own DC");
         SelectObject(Strip, StripOriginal);
         HGDIOBJ const OtherOriginal = SelectObject(Other, Four);

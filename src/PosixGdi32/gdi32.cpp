@@ -136,6 +136,7 @@ struct FFace
     std::uint32_t VdmxLength = 0;
     std::uint32_t GlyfLength = 0;
     std::string Family;               // nameID 1, as GetTextFace answers it
+    std::set<std::string> Families;   // nameIDs 1 and 16 in lower case, as the catalogue keys it
     std::vector<std::int8_t> Readable; // per glyph: 0 unchecked, 1 readable, -1 not (TrueType)
 };
 
@@ -299,19 +300,28 @@ int FacesInFile(const unsigned char* Data, std::size_t Size)
 // into the next subtable. Format 4's 16-bit length wraps for a subtable of 64 KiB or more: it is
 // taken as the length plus the multiple of 65536 the arrays need, when that much follows before
 // the cmap's end or the next subtable.
-bool ValidCharacterMap(const unsigned char* Data, FTable Cmap, std::uint32_t Map)
+// Where a cmap's subtables start (ValidFont checked the encoding records), sorted, each once.
+std::vector<std::uint64_t> SubtableStarts(const unsigned char* Data, FTable Cmap)
 {
-    // The subtable ends at the cmap's end or where the next subtable after it starts, whatever
-    // its length says (ValidFont checked the encoding records).
-    std::uint64_t End = static_cast<std::uint64_t>(Cmap.Offset) + Cmap.Length;
+    std::vector<std::uint64_t> Starts;
     int const Encodings = ReadU16(Data + Cmap.Offset + 2);
     for (int Index = 0; Index < Encodings; ++Index)
-    {
-        std::uint64_t const Start =
-            static_cast<std::uint64_t>(Cmap.Offset) + ReadU32(Data + Cmap.Offset + 8 + 8 * Index);
-        if (Start > Map && Start < End)
-            End = Start;
-    }
+        Starts.push_back(static_cast<std::uint64_t>(Cmap.Offset) +
+                         ReadU32(Data + Cmap.Offset + 8 + 8 * Index));
+    std::sort(Starts.begin(), Starts.end());
+    Starts.erase(std::unique(Starts.begin(), Starts.end()), Starts.end());
+    return Starts;
+}
+
+bool ValidCharacterMap(const unsigned char* Data, FTable Cmap, std::uint32_t Map,
+                       const std::vector<std::uint64_t>& Starts)
+{
+    // The subtable ends at the cmap's end or where the next subtable after it starts, whatever
+    // its length says.
+    std::uint64_t End = static_cast<std::uint64_t>(Cmap.Offset) + Cmap.Length;
+    auto const Next = std::upper_bound(Starts.begin(), Starts.end(), std::uint64_t{Map});
+    if (Next != Starts.end() && *Next < End)
+        End = *Next;
     if (Map < Cmap.Offset || static_cast<std::uint64_t>(Map) + 8 > End)
         return false;
     std::uint64_t const Available = End - Map;
@@ -450,12 +460,15 @@ bool InitFace(stbtt_fontinfo& Info, const unsigned char* Data, std::size_t Size,
         !stbtt_InitFont(&Info, Data, Offset))
         return false;
     FTable const Cmap = FindTable(Data, static_cast<std::uint32_t>(Offset), "cmap");
-    if (ValidCharacterMap(Data, Cmap, static_cast<std::uint32_t>(Info.index_map)))
+    std::vector<std::uint64_t> const Starts = SubtableStarts(Data, Cmap);
+    if (ValidCharacterMap(Data, Cmap, static_cast<std::uint32_t>(Info.index_map), Starts))
         return true;
     // The map stb_truetype chose cannot be read: the best one that can, ranked as it ranks them
     // (format 12 / 13, then 4, then the others), of the records it reads.
+    // Each distinct subtable is checked once, however many records name it.
     int BestRank = 0;
     std::uint32_t Best = 0;
+    std::map<std::uint32_t, bool> Checked;
     int const Encodings = ReadU16(Data + Cmap.Offset + 2);
     for (int Encoding = 0; Encoding < Encodings; ++Encoding)
     {
@@ -469,7 +482,14 @@ bool InitFace(stbtt_fontinfo& Info, const unsigned char* Data, std::size_t Size,
         std::uint32_t const Map = Cmap.Offset + ReadU32(Record + 4);
         int const Format = ReadU16(Data + Map);
         int const Rank = Format == 12 || Format == 13 ? 3 : Format == 4 ? 2 : Format == 14 ? 0 : 1;
-        if (Rank > 0 && Rank >= BestRank && ValidCharacterMap(Data, Cmap, Map))
+        if (Rank <= 0 || Rank < BestRank)
+            continue;
+        auto const Known = Checked.find(Map);
+        bool const bValid =
+            Known != Checked.end()
+                ? Known->second
+                : Checked.emplace(Map, ValidCharacterMap(Data, Cmap, Map, Starts)).first->second;
+        if (bValid)
         {
             Best = Map;
             BestRank = Rank;
@@ -866,16 +886,22 @@ std::shared_ptr<FFace> OpenFace(const std::string& Path, int Index, const std::s
 {
     FState& S = State();
     auto const Key = std::make_pair(Path, Index);
+    // A face already open answers only for a family it still has (the file it was read from may
+    // have been replaced since the catalogue listed it under another).
     if (std::shared_ptr<FFace> const Cached = S.Faces[Key].lock())
-        return Cached;
+        return Cached->Families.count(Family) != 0 ? Cached : nullptr;
     // Read, not mapped: a file truncated or rewritten later cannot change (or fault) what the
     // face reads. The catalogue scan maps files, for the moment it reads their names.
     auto Face = std::make_shared<FFace>();
     if (!ReadWhole(Path, Face->Bytes))
         return nullptr;
     const unsigned char* const Data = Face->Bytes.data();
-    if (!InitFace(Face->Info, Data, Face->Bytes.size(), Index) ||
-        (Lower(NameString(Face->Info, 1)) != Family && Lower(NameString(Face->Info, 16)) != Family))
+    if (!InitFace(Face->Info, Data, Face->Bytes.size(), Index))
+        return nullptr;
+    for (int NameId : {1, 16})
+        if (std::string const Name = Lower(NameString(Face->Info, NameId)); !Name.empty())
+            Face->Families.insert(Name);
+    if (Face->Families.count(Family) == 0)
         return nullptr;
     stbtt_fontinfo& Info = Face->Info;
     auto const Start = static_cast<std::uint32_t>(Info.fontstart);
@@ -1025,20 +1051,21 @@ void SizeFont(FFont& Font)
 {
     const FFace& Face = *Font.Face;
     int const Cell = std::max(1, Face.WinAscent + Face.WinDescent);
-    LONG Height = Font.Log.lfHeight;
+    // Widened before its magnitude is taken (MakeFont refuses heights past kMaxFontHeight).
+    std::int64_t Height = Font.Log.lfHeight;
     if (Height == 0)
         Height = -16; // the system font's em height at 96 dpi
+    int const Pixels = static_cast<int>(Height < 0 ? -Height : Height);
     if (Height < 0)
-        Font.Scale = static_cast<float>(-Height) / static_cast<float>(Face.UnitsPerEm);
+        Font.Scale = static_cast<float>(Pixels) / static_cast<float>(Face.UnitsPerEm);
     else
-        Font.Scale = static_cast<float>(Height) / static_cast<float>(Cell);
+        Font.Scale = static_cast<float>(Pixels) / static_cast<float>(Cell);
     Font.Ascent = static_cast<LONG>(std::lround(Face.WinAscent * Font.Scale));
     Font.Descent = static_cast<LONG>(std::lround(Face.WinDescent * Font.Scale));
     int VdmxAscent = 0;
     int VdmxDescent = 0;
     int VdmxPpem = 0;
-    if (VdmxExtent(Face, Height < 0 ? -Height : Height, Height > 0, &VdmxAscent, &VdmxDescent,
-                   &VdmxPpem))
+    if (VdmxExtent(Face, Pixels, Height > 0, &VdmxAscent, &VdmxDescent, &VdmxPpem))
     {
         Font.Ascent = VdmxAscent;
         Font.Descent = VdmxDescent;
@@ -1066,8 +1093,15 @@ void SizeFont(FFont& Font)
     }
 }
 
+// The tallest font made: a height past it (INT_MIN's magnitude among them) is refused before any
+// size is taken from it, as its metrics would not fit a LONG.
+constexpr std::int64_t kMaxFontHeight = 1 << 20;
+
 FFont* MakeFont(const LOGFONTA& Log)
 {
+    std::int64_t const Height = Log.lfHeight;
+    if (Height > kMaxFontHeight || Height < -kMaxFontHeight)
+        return nullptr;
     bool const bBold = Log.lfWeight >= 600;
     bool const bItalic = Log.lfItalic != 0;
     // A catalogued file may since have gone (or not be readable): the next candidate then.

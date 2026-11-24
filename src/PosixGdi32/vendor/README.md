@@ -11,7 +11,9 @@ Local changes, each marked "Freelancer Decomp" in the source:
 - A nonzero format 4 glyph-array entry takes the segment's idDelta (modulo 65536), as the spec says.
 - A contour that starts with an off-curve point that is also its last starts there, rather than
   taking the next contour's first point (or reading past the glyph's last).
-- A CFF glyph runs at most 65536 charstring operators, its subroutines' included.
+- A CFF glyph runs at most 65536 charstring operators, its subroutines' included; a CFF INDEX
+  lookup checks its index and offset size at run time and keeps offsets unsigned until the object
+  lies inside its buffer.
 - A failed allocation of CFF vertices or of the rasterizer's scanline draws nothing, and a failed
   second CFF pass frees its vertices.
 
