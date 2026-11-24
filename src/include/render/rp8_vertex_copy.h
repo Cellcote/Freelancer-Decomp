@@ -14,20 +14,23 @@
 // - 3 (interleaved, same format): the vertices copied as they are.
 // - 6 (interleaved and indexed, another format): nothing (retail's switch has no case for it).
 // - 1 and 5 (separate streams, same format): retail's two 0x41-entry jump tables, indexed by
-//   Rp8FvfJumpIndex. Their entries are the generic converter, a fast path for one format
-//   (the generic converter's bytes, with the format's own source strides assumed), or an empty
-//   function: every pre-transformed (XYZRHW) format and
-//   every format with a specular colour but no diffuse one copies nothing.
-// - Otherwise the generic converter, sequential or indexed (each stream's IndexArray, one index
-//   per vertex). Case 0 and 4 have fast paths for a few format pairs too, with the same bytes.
+//   Rp8FvfJumpIndex. An entry is the generic converter, a fixed-layout converter, or an empty
+//   function: every pre-transformed (XYZRHW) format and every format with a specular colour but
+//   no diffuse one copies nothing.
+// - 0 and 4 (separate streams, another format): a fixed-layout converter for a few format
+//   pairs, the generic converter for the rest.
 //
 // The generic converter writes, per vertex at Dst + (StartVertex + n) * Rp8FvfStride(DstFvf):
 // 12 position bytes; the normal's 12 when the destination has one (copied when the source has
 // one too); the diffuse colour's 4 likewise; then each destination texture set, copied from the
 // source set of the same index when there is one (the source set's ByteSize bytes), the cursor
-// moving by the destination set's size. A destination specular colour, blend weights and the
-// fourth position float of XYZRHW are not accounted for, as in retail. Bytes it does not copy
-// are left as they were.
+// moving by the destination set's size. Each source element is read at its stream's Stride. A
+// destination specular colour, blend weights and the fourth position float of XYZRHW are not
+// accounted for, as in retail. Bytes it does not copy are left as they were.
+//
+// A fixed-layout converter (FRp8FixedLayout) has its own destination stride and offsets, and
+// reads the source at retail's literal strides whatever the descriptor says: 12 bytes a
+// position or normal, 4 a diffuse colour, 8 a texture set (8 bytes copied).
 //
 // The descriptor has two texture streams; retail reads a source's third and later sets past
 // them (the descriptor's tail and beyond). Here a source set past the second copies nothing.
@@ -35,6 +38,7 @@
 #include "render/IRenderPipeline.h"
 #include "render/rp8_semantics.h"
 
+#include <cstddef>
 #include <cstring>
 
 namespace Rp8VertexCopyDetail
@@ -65,26 +69,151 @@ inline unsigned int JumpIndex(unsigned int Fvf)
     return High | (((Fvf >> 6) & 3) << 2) | (((Fvf >> 4) & 1) << 1) | ((Fvf >> 2) & 1);
 }
 
-// Whether retail's jump-table entry for DstFvf is the empty ConvNoOp (FUN_06d1f5fd). Both
-// tables have it at the same entries: an odd index (XYZRHW), the rows whose colour bits are 2
-// (specular without diffuse) and 0x20..0x2F, which JumpIndex never gives. Entry 0x40 (three
-// or more texture sets, not pre-transformed) is the generic converter.
-inline bool JumpTableCopiesNothing(unsigned int DstFvf)
+// Rp8JumpTableIndex (RP8.cpp): entry 0x40 for three or more texture sets, not pre-transformed.
+inline unsigned int TableIndex(unsigned int DstFvf)
 {
-    if (((DstFvf & 0xF00) >> 8) >= 3 && (DstFvf & 4) == 0)
+    if (((DstFvf & 0xF00) >> 8) < 3 || (DstFvf & 4) != 0)
+        return JumpIndex(DstFvf);
+    return 0x40;
+}
+
+// Whether a jump-table entry is the empty ConvNoOp (FUN_06d1f5fd). Both tables have it at the
+// same entries: an odd index (XYZRHW), the rows whose colour bits are 2 (specular without
+// diffuse) and 0x20..0x2F, which JumpIndex never gives. Entry 0x40 is the generic converter.
+inline bool TableCopiesNothing(unsigned int Index)
+{
+    if (Index == 0x40)
         return false;
-    const unsigned int Index = JumpIndex(DstFvf);
     return (Index & 1) != 0 || ((Index >> 2) & 3) == 2 || (Index & 0x30) == 0x20;
 }
 
-inline const FRpVertexStream* SourceTexSet(const FRpVertexSrcDesc* Src, unsigned int Index)
+// One fixed-layout converter: the destination stride and where the normal, the diffuse colour
+// and texture sets 0 and 1 go (-1: not written). The position is at 0.
+struct FRp8FixedLayout
 {
-    return Index < 2 ? &Src->Tex[Index] : nullptr;
+    unsigned int Stride;
+    int Normal;
+    int Diffuse;
+    int Tex0;
+    int Tex1;
+};
+
+// RP8.cpp's converters, by their retail addresses.
+inline constexpr FRp8FixedLayout kPosNormTex1_S20 = {
+    0x20, 0xC, -1, 0x18, -1};     // ConvSeqPosNormTex1_S20 (table A 0x12), 06d20ad2
+inline constexpr FRp8FixedLayout kPosNormTex1_S28 = {0x28, 0xC, -1, 0x18, -1}; // 06d220df, 06d1fe6f
+inline constexpr FRp8FixedLayout kPosNormTex1_S2C = {0x2C, 0xC, -1, 0x1C, -1}; // 06d21ea6, 06d20138
+inline constexpr FRp8FixedLayout kPosNormTex2_S2C = {0x2C, 0xC, -1, 0x1C,
+                                                     0x24}; // 06d21be9, 06d20754
+inline constexpr FRp8FixedLayout kPosNormTex2_S28 = {0x28, 0xC, -1, 0x18, 0x20}; // 06d210dd
+inline constexpr FRp8FixedLayout kPosNormDiffTex1_S24 = {0x24, 0xC, 0x18, 0x1C, -1}; // 06d20d92
+inline constexpr FRp8FixedLayout kPosNormDiffTex1_S2C = {0x2C, 0xC, 0x18, 0x1C, -1}; // 06d20409
+inline constexpr FRp8FixedLayout kPosNorm_S18 = {0x18, 0xC, -1, -1, -1}; // 06d1f602
+inline constexpr FRp8FixedLayout kPosNorm_S20 = {0x20, 0xC, -1, -1, -1}; // 06d1fc57
+inline constexpr FRp8FixedLayout kPosNorm_S28 = {0x28, 0xC, -1, -1, -1}; // 06d1f818
+inline constexpr FRp8FixedLayout kPosNorm_S2C = {0x2C, 0xC, -1, -1, -1}; // 06d1fa33
+
+// The fixed-layout converter RP8 picks, or null for the generic one (the empty entries are
+// tested before). Sequential: case 0's chain and table A; indexed: case 4's chain and table B.
+inline const FRp8FixedLayout* FixedLayout(unsigned int Selector, unsigned int SrcFvf,
+                                          unsigned int DstFvf)
+{
+    switch (Selector)
+    {
+    case 0:
+        if (SrcFvf == 0x112 && DstFvf == 0x252)
+            return &kPosNormTex1_S2C;
+        if (SrcFvf == 0x112 && DstFvf == 0x212)
+            return &kPosNormTex1_S28;
+        if (SrcFvf == 0x212 && DstFvf == 0x252)
+            return &kPosNormTex2_S2C;
+        return nullptr;
+    case 1:
+        return TableIndex(DstFvf) == 0x12 ? &kPosNormTex1_S20 : nullptr;
+    case 4:
+        if (SrcFvf == 0x12)
+        {
+            if (DstFvf == 0x252)
+                return &kPosNorm_S2C;
+            if (DstFvf == 0x212)
+                return &kPosNorm_S28;
+            if (DstFvf == 0x112)
+                return &kPosNorm_S20;
+        }
+        else if (SrcFvf == 0x112)
+        {
+            if (DstFvf == 0x252)
+                return &kPosNormTex1_S2C;
+            if (DstFvf == 0x212)
+                return &kPosNormTex1_S28;
+        }
+        else if (SrcFvf == 0x152 && DstFvf == 0x252)
+            return &kPosNormDiffTex1_S2C;
+        else if (SrcFvf == 0x212 && DstFvf == 0x252)
+            return &kPosNormTex2_S2C;
+        return nullptr;
+    case 5:
+        switch (TableIndex(DstFvf))
+        {
+        case 0x02:
+            return &kPosNorm_S18;
+        case 0x12:
+            return &kPosNormTex1_S20;
+        case 0x16:
+            return &kPosNormDiffTex1_S24;
+        case 0x32:
+            return &kPosNormTex2_S28;
+        default:
+            return nullptr;
+        }
+    default:
+        return nullptr;
+    }
 }
 
-// FUN_06d2230f (Indexed false) and FUN_06d21450 (Indexed true).
-inline void CopyGeneric(unsigned char* Dst, unsigned int DstFvf, const FRpVertexSrcDesc* Src,
-                        unsigned int StartVertex, unsigned int Count, bool bIndexed)
+// The source vertex of a stream for the n-th vertex copied, at Stride bytes a vertex.
+inline const unsigned char* Element(const FRpVertexStream& Stream, unsigned int Stride,
+                                    unsigned int StartVertex, unsigned int N, bool bIndexed)
+{
+    const std::size_t Vertex = bIndexed
+                                   ? static_cast<std::size_t>(Stream.IndexArray[StartVertex + N])
+                                   : static_cast<std::size_t>(StartVertex) + N;
+    return Stream.Base + Vertex * Stride;
+}
+
+// Where vertex V of the destination goes: Origin + V * Stride + Skew, the offset worked out
+// before it is added (Skew lets a caller hand in a pointer to its first vertex).
+inline unsigned char* Destination(unsigned char* Origin, std::ptrdiff_t Skew, unsigned int Vertex,
+                                  unsigned int Stride)
+{
+    return Origin + (static_cast<std::ptrdiff_t>(static_cast<std::size_t>(Vertex) * Stride) + Skew);
+}
+
+inline void CopyFixed(unsigned char* Origin, std::ptrdiff_t Skew, const FRp8FixedLayout& Layout,
+                      const FRpVertexSrcDesc* Src, unsigned int StartVertex, unsigned int Count,
+                      bool bIndexed)
+{
+    for (unsigned int N = 0; N < Count; ++N)
+    {
+        unsigned char* const Out = Destination(Origin, Skew, StartVertex + N, Layout.Stride);
+        std::memcpy(Out, Element(Src->Position, 0xC, StartVertex, N, bIndexed), 0xC);
+        if (Layout.Normal >= 0)
+            std::memcpy(Out + Layout.Normal, Element(Src->Normal, 0xC, StartVertex, N, bIndexed),
+                        0xC);
+        if (Layout.Diffuse >= 0)
+            std::memcpy(Out + Layout.Diffuse, Element(Src->Diffuse, 4, StartVertex, N, bIndexed),
+                        4);
+        if (Layout.Tex0 >= 0)
+            std::memcpy(Out + Layout.Tex0, Element(Src->Tex[0], 8, StartVertex, N, bIndexed), 8);
+        if (Layout.Tex1 >= 0)
+            std::memcpy(Out + Layout.Tex1, Element(Src->Tex[1], 8, StartVertex, N, bIndexed), 8);
+    }
+}
+
+// FUN_06d2230f (sequential) and FUN_06d21450 (indexed).
+inline void CopyGeneric(unsigned char* Origin, std::ptrdiff_t Skew, unsigned int DstFvf,
+                        const FRpVertexSrcDesc* Src, unsigned int StartVertex, unsigned int Count,
+                        bool bIndexed)
 {
     const unsigned int SrcFvf = Src->SrcFvf;
     const bool bSrcNormal = (SrcFvf & 0x10) != 0;
@@ -95,80 +224,85 @@ inline void CopyGeneric(unsigned char* Dst, unsigned int DstFvf, const FRpVertex
     const unsigned int DstTexCount = (DstFvf & 0xF00) >> 8;
     const unsigned int DstStride = Rp8FvfStride(DstFvf);
 
-    // The source vertex of stream S for the n-th vertex copied.
-    auto const Element = [&](const FRpVertexStream& Stream, unsigned int N)
-    {
-        const std::size_t Vertex =
-            bIndexed ? static_cast<std::size_t>(Stream.IndexArray[StartVertex + N])
-                     : static_cast<std::size_t>(StartVertex) + N;
-        return Stream.Base + Vertex * Stream.Stride;
-    };
-
     for (unsigned int N = 0; N < Count; ++N)
     {
-        unsigned char* Cursor = Dst + static_cast<std::size_t>(StartVertex + N) * DstStride;
-        std::memcpy(Cursor, Element(Src->Position, N), 0xC);
+        unsigned char* Cursor = Destination(Origin, Skew, StartVertex + N, DstStride);
+        std::memcpy(Cursor, Element(Src->Position, Src->Position.Stride, StartVertex, N, bIndexed),
+                    0xC);
         Cursor += 0xC;
         if (bDstNormal)
         {
             if (bSrcNormal)
-                std::memcpy(Cursor, Element(Src->Normal, N), 0xC);
+                std::memcpy(Cursor,
+                            Element(Src->Normal, Src->Normal.Stride, StartVertex, N, bIndexed),
+                            0xC);
             Cursor += 0xC;
         }
         if (bDstDiffuse)
         {
             if (bSrcDiffuse)
-                std::memcpy(Cursor, Element(Src->Diffuse, N), 4);
+                std::memcpy(Cursor,
+                            Element(Src->Diffuse, Src->Diffuse.Stride, StartVertex, N, bIndexed),
+                            4);
             Cursor += 4;
         }
         for (unsigned int Index = 0; Index < DstTexCount && Index < 8; ++Index)
         {
-            const FRpVertexStream* const Set = SourceTexSet(Src, Index);
-            if (Index < SrcTexCount && Set != nullptr)
-                std::memcpy(Cursor, Element(*Set, N), Set->ByteSize);
+            if (Index < SrcTexCount && Index < 2)
+            {
+                const FRpVertexStream& Set = Src->Tex[Index];
+                std::memcpy(Cursor, Element(Set, Set.Stride, StartVertex, N, bIndexed),
+                            Set.ByteSize);
+            }
             Cursor += TexelBytes(DstFvf >> (Index * 2 + 0x10));
         }
     }
 }
-} // namespace Rp8VertexCopyDetail
 
-// FUN_06d1f040: Src's vertices StartVertex .. StartVertex + Count - 1 into Dst, a buffer of
-// DstFvf vertices (the same vertex numbers).
-inline void Rp8CopyVertexData(void* Destination, unsigned int DstFvf, const FRpVertexSrcDesc* Src,
-                              unsigned int StartVertex, unsigned int Count)
+// FUN_06d1f040 with the destination's vertex V at Origin + V * stride + Skew.
+inline void Copy(unsigned char* Origin, std::ptrdiff_t Skew, unsigned int DstFvf,
+                 const FRpVertexSrcDesc* Src, unsigned int StartVertex, unsigned int Count)
 {
-    using namespace Rp8VertexCopyDetail;
-    unsigned char* const Dst = static_cast<unsigned char*>(Destination);
     const unsigned int Selector =
         static_cast<unsigned int>(Src->SrcFvf == DstFvf) | (Src->Flags & 6u);
-    switch (Selector)
-    {
-    case 0:
-    case 2:
-        CopyGeneric(Dst, DstFvf, Src, StartVertex, Count, false);
-        break;
-    case 1:
-        if (!JumpTableCopiesNothing(DstFvf))
-            CopyGeneric(Dst, DstFvf, Src, StartVertex, Count, false);
-        break;
-    case 3:
+    if (Selector == 3)
     {
         const unsigned int Stride = Rp8FvfStride(DstFvf);
-        std::memcpy(Dst + static_cast<std::size_t>(StartVertex) * Stride,
+        std::memcpy(Destination(Origin, Skew, StartVertex, Stride),
                     Src->Position.Base +
                         static_cast<std::size_t>(StartVertex) * Src->Position.Stride,
                     static_cast<std::size_t>(Stride) * Count);
-        break;
+        return;
     }
-    case 4:
-    case 7:
-        CopyGeneric(Dst, DstFvf, Src, StartVertex, Count, true);
-        break;
-    case 5:
-        if (!JumpTableCopiesNothing(DstFvf))
-            CopyGeneric(Dst, DstFvf, Src, StartVertex, Count, true);
-        break;
-    default: // 6
-        break;
-    }
+    if (Selector == 6)
+        return;
+    if ((Selector == 1 || Selector == 5) && TableCopiesNothing(TableIndex(DstFvf)))
+        return;
+    const bool bIndexed = (Selector & 4) != 0;
+    if (const FRp8FixedLayout* const Layout = FixedLayout(Selector, Src->SrcFvf, DstFvf))
+        CopyFixed(Origin, Skew, *Layout, Src, StartVertex, Count, bIndexed);
+    else
+        CopyGeneric(Origin, Skew, DstFvf, Src, StartVertex, Count, bIndexed);
+}
+} // namespace Rp8VertexCopyDetail
+
+// FUN_06d1f040: Src's vertices StartVertex .. StartVertex + Count - 1 into Destination, a
+// buffer of DstFvf vertices, at the same vertex numbers.
+inline void Rp8CopyVertexData(void* Destination, unsigned int DstFvf, const FRpVertexSrcDesc* Src,
+                              unsigned int StartVertex, unsigned int Count)
+{
+    Rp8VertexCopyDetail::Copy(static_cast<unsigned char*>(Destination), 0, DstFvf, Src, StartVertex,
+                              Count);
+}
+
+// RP8's CopyVertices call (FUN_06d1228c): FUN_06d1f040 on Bits - FvfStride(DstFvf) *
+// StartVertex, so the source's vertex StartVertex lands at Bits. The same, with the offset
+// applied per vertex instead of to a pointer before Bits.
+inline void Rp8CopyVertexDataAt(void* Bits, unsigned int DstFvf, const FRpVertexSrcDesc* Src,
+                                unsigned int StartVertex, unsigned int Count)
+{
+    const std::ptrdiff_t Skew =
+        -static_cast<std::ptrdiff_t>(static_cast<std::size_t>(Rp8FvfStride(DstFvf)) * StartVertex);
+    Rp8VertexCopyDetail::Copy(static_cast<unsigned char*>(Bits), Skew, DstFvf, Src, StartVertex,
+                              Count);
 }

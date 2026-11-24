@@ -641,6 +641,15 @@ void TestRpGpuVertexCopy(IRenderPipeline* Pipeline)
     else
         Check(false, "RPGPU locks vertex memory");
 
+    // Table A's entry for 0x112 is a fixed-layout converter: it reads the source at 12, 12 and
+    // 8 bytes a vertex whatever the descriptor's strides say.
+    FRpVertexSrcDesc Padded = Sphere;
+    Padded.Position.Stride = 16;
+    unsigned char Fixed[2][0x20] = {};
+    Manager->CopyVertexData(Fixed, 0x112, &Padded, 0, 2);
+    Check(Matches(Fixed[0], 0) && Matches(Fixed[1], 1),
+          "a same-format sphere copy reads RP8's literal strides, not the descriptor's");
+
     // Indexed (Flags 4) into XYZ | NORMAL | DIFFUSE | TEX1 (0x152): the diffuse bytes the
     // source has no stream for are left alone.
     FRpVertexSrcDesc Indexed = Sphere;

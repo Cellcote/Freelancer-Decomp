@@ -702,8 +702,7 @@ GENRESULT DACOM_API FRpGpu::CopyVertices(void* Handle, unsigned int* OutOffset, 
         Bits = static_cast<unsigned char*>(Locked);
     }
     if (SrcData != nullptr)
-        Rp8CopyVertexData(Bits - static_cast<std::ptrdiff_t>(Buffer->Stride) * StartVertex,
-                          Buffer->Fvf, SrcData, StartVertex, Count);
+        Rp8CopyVertexDataAt(Bits, Buffer->Fvf, SrcData, StartVertex, Count);
     GENRESULT Result = GR_OK;
     if (!bWasLocked)
         Result = UnlockVb(Target);
