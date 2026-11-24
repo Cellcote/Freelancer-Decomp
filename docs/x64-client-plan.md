@@ -344,7 +344,7 @@ without the Windows API. Milestones:
   Common keeps engine handles in retail's long / int fields: they go through
   `EngineIdFromHandle` / `EngineHandleFromId` (`engine/engbase.h`, LowArena), and an animation
   script id through `AnimScriptId` / `AnimScriptFromId` (a HandleValue id). Its stand-ins:
-  GDI's text calls fail (no font backend before M3: text is not drawn), the registry has no
+  GDI is the gdi32 module's (below), the registry has no
   keys, MSXML's SAX reader does not exist (RDL text cannot be parsed until the client brings an
   XML reader), and `SHGetFolderPathA` gives ~/Documents, ~/Pictures and the application-data
   folder.
@@ -378,8 +378,20 @@ without the Windows API. Milestones:
   window procedure (an `HWND` is a small number), the message queue, focus, the cursor and the
   US keyboard's scan codes and key names. It uses none of the platform layer's shared state,
   since dacom, which holds that, links it; `MsgWaitForMultipleObjects` waits in the header for
-  that reason. Dialog templates and string tables wait for the resource reader, so
-  `DialogBoxParamA` fails and `FindResourceExA` finds nothing. DirectInput 8 is a stand-in
+  that reason. Dialog templates wait for a dialog layer, so `DialogBoxParamA` fails. The
+  resource DLLs are read (M3, `src/include/pe_resources.h`): `Platform::ResourceModuleLoad` reads
+  a PE32 or PE32+ resource-only DLL into read-only memory (retail's and mods' as they are), its handle that
+  memory's address, which no dlopen handle can be; `FindResourceExA` (ids, `#n` and string
+  names, Windows' language fallback), `SizeofResource`, `LoadResource`, `LockResource`,
+  `FreeLibrary` and `LoadStringW` (an inline in `posix/winuser.h`, since the user32 module may
+  not use the platform's state) work on it. The text is UTF-16LE while `wchar_t` is 4 bytes
+  here: the client's readers (`ids_strings.cpp`, `ids_rdl.cpp`) take it through
+  `resource_text.h`, which is the original access on Windows and converts one unit per
+  `wchar_t` elsewhere (a converted copy that lives as long as the module where a `TextPtrNode`
+  keeps a pointer). A fresh build needs only the retail `DATA`: the build makes the 8 resource
+  DLLs from `src/Resources/*/*.rc` with `tools/build_resource_dll.py` (string tables, type 23
+  infocards, bitmaps; dialogs, menus, icons and version information are left out).
+  `resource_tests` checks the reader on them. DirectInput 8 is a stand-in
   with a working system mouse (`posix/dinput.h`): the client, as retail, does not survive a
   failed `DirectInput8Create`. There is no IME
   (`posix/imm.h`: no layout is an IME, no window has an input context) and no structured
@@ -397,6 +409,13 @@ without the Windows API. Milestones:
   per process), moves and resizes as `WM_MOVE` / `WM_SIZE`, focus as `WM_ACTIVATEAPP` /
   `WM_ACTIVATE`, the close button as `WM_SYSCOMMAND` `SC_CLOSE`. `user32_screen_tests` checks
   it with SDL's dummy video driver.
+  GDI is a module of its own too (`src/PosixGdi32`, linked as user32 is): what the client's
+  glyph atlas and rich text and Common's text renderer ask of it, which is text drawn into
+  memory bitmaps and read back with `GetDIBits` (32, 24 and 16 bits). Fonts are TrueType faces
+  (stb_truetype, vendored) found by face name in the game's folders and the system's
+  (`FL_GDI32_FONT_PATH` adds more), with GDI's sizes and metrics (VDMX first, as Windows: Arial
+  at -16 is 18 / 15 / 3), and lookalikes for faces a system lacks (Agency FB → Arial Narrow,
+  FixedSys → a monospaced face). `gdi32_tests` checks it.
 - **M3:** an SDL window to the main menu, drawn by RPGPU through Metal, without sound. RPGPU
   builds on Linux and macOS against the system's SDL3, shared (Homebrew's on macOS; on CI's
   Ubuntu, a cached build from source), when SDL3 is found (`FreelancerRpGpu`). The client's

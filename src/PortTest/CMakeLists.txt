@@ -90,3 +90,39 @@ set_tests_properties(user32_tests PROPERTIES ENVIRONMENT FL_USER32_HEADLESS=1)
 add_test(NAME user32_screen_tests COMMAND user32_tests --screen)
 set_tests_properties(user32_screen_tests PROPERTIES ENVIRONMENT
                      "SDL_VIDEO_DRIVER=dummy;FL_USER32_HEADLESS=0")
+
+# resource_tests: the resource reader (pe_resources.h, Platform::ResourceModuleLoad) and the
+# resource calls over it, on the game's generated resources.dll / InfoCards.dll (PE32) and on
+# resource_test.dll (PE32+), made here from resource_test.rc. Built against the stand-in
+# <windows.h>, as the client is; it holds the platform state itself.
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+set(_fixture "${CMAKE_CURRENT_BINARY_DIR}/resource_test.dll")
+add_custom_command(OUTPUT "${_fixture}"
+  COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/tools/build_resource_dll.py"
+          "${CMAKE_CURRENT_SOURCE_DIR}/resource_test.rc" "${_fixture}" --machine amd64
+  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/resource_test.rc"
+          "${CMAKE_CURRENT_SOURCE_DIR}/resource_test_card.txt"
+          "${PROJECT_SOURCE_DIR}/tools/build_resource_dll.py"
+  COMMENT "Generating resource_test.dll"
+  VERBATIM)
+add_custom_target(resource_test_dll DEPENDS "${_fixture}")
+add_executable(resource_tests resource_tests.cpp)
+target_compile_features(resource_tests PRIVATE cxx_std_20)
+target_link_libraries(resource_tests PRIVATE ${CMAKE_DL_LIBS})
+target_include_directories(resource_tests PRIVATE ${CMAKE_SOURCE_DIR}/src/include/posix
+                           ${CMAKE_SOURCE_DIR}/src/include)
+target_compile_options(resource_tests PRIVATE -include ${CMAKE_SOURCE_DIR}/src/include/fl_layout.h
+                       "-D__declspec(x)=" -D__cdecl= -D__stdcall= -Wall -Wextra -Wno-unknown-pragmas)
+add_dependencies(resource_tests resource_test_dll resources InfoCards)
+add_test(NAME resource_tests
+         COMMAND resource_tests "${FL_BIN_DIR}" "${PROJECT_SOURCE_DIR}/src/Resources" "${_fixture}")
+
+# gdi32_tests: gdi32 (src/PosixGdi32), built and linked as a game module is.
+add_executable(gdi32_tests gdi32_tests.cpp)
+target_compile_features(gdi32_tests PRIVATE cxx_std_20)
+target_link_libraries(gdi32_tests PRIVATE ${CMAKE_DL_LIBS} PosixUser32 PosixGdi32 dacom)
+target_include_directories(gdi32_tests PRIVATE ${CMAKE_SOURCE_DIR}/src/include/posix
+                           ${CMAKE_SOURCE_DIR}/src/include)
+target_compile_options(gdi32_tests PRIVATE -include ${CMAKE_SOURCE_DIR}/src/include/fl_layout.h
+                       "-D__declspec(x)=" -D__cdecl= -D__stdcall= -Wall -Wextra -Wno-unknown-pragmas)
+add_test(NAME gdi32_tests COMMAND gdi32_tests)

@@ -80,7 +80,8 @@ wchar_t* FUiPageDesc::TrackedWiden(char const* Src)
     // 005925ed..00592634: operator_new(len*2+2); each byte MOVSX DX,DL (sign-extended) into a
     // 16-bit unit; terminating 0 unit.
     unsigned Length = static_cast<unsigned>(strlen(Src));
-    wchar_t* Wide = static_cast<wchar_t*>(TrackedNew(Length * 2 + 2));
+    // (Length + 1) wchar_t: Length * 2 + 2 bytes on Windows, where wchar_t is 2 bytes.
+    wchar_t* Wide = static_cast<wchar_t*>(TrackedNew((Length + 1) * sizeof(wchar_t)));
     unsigned Index = 0;
     while (Src[Index] != '\0')
     {
@@ -355,13 +356,13 @@ bool FUiPageDesc::LoadFromFile(char const* FullPath)
 
         if (bOk)
         {
-            // 00594474..005944d1: aspect magic, a tracked (count+1)*4 array, list copied in
-            // order, null terminator.
+            // 00594474..005944d1: aspect magic, a tracked array of count + 1 pointers (retail's
+            // (count+1)*4 bytes), list copied in order, null terminator.
             unsigned MagicBits = kUiPageLoadMagicBits;
             memcpy(&Data.Aspect, &MagicBits, sizeof(float));
             unsigned Count = static_cast<unsigned>(EntryList.size());
             FUiWidgetEntry** Array =
-                static_cast<FUiWidgetEntry**>(TrackedNew(Count * 4 + 4));
+                static_cast<FUiWidgetEntry**>(TrackedNew((Count + 1) * sizeof(FUiWidgetEntry*)));
             Data.Entries = Array;
             unsigned Index = 0;
             for (std::list<FUiWidgetEntry*>::iterator It = EntryList.begin(); It != EntryList.end();

@@ -90,6 +90,23 @@ bool CursorVisible()
     return SDL_CursorVisible();
 }
 
+std::string ActivateHint(bool* bSet)
+{
+    const char* const Value = SDL_GetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
+    *bSet = Value != nullptr;
+    return Value != nullptr ? Value : "";
+}
+
+void SetActivateHint(const char* Value)
+{
+    SDL_SetHintWithPriority(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, Value, SDL_HINT_OVERRIDE);
+}
+
+void ResetActivateHint()
+{
+    SDL_ResetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
+}
+
 void PushModifier(std::uint32_t Id, EModifier Key, bool bDown)
 {
     bool const bLeft = Key == EModifier::LeftShift;
@@ -97,9 +114,14 @@ void PushModifier(std::uint32_t Id, EModifier Key, bool bDown)
             bDown ? (bLeft ? SDL_KMOD_LSHIFT : SDL_KMOD_RSHIFT) : SDL_KMOD_NONE, bDown);
 }
 
-void PushKeyA(std::uint32_t Id, bool bDown)
+void PushKeyA(std::uint32_t Id, bool bDown, bool bCtrlHeld)
 {
-    PushKey(Id, SDL_SCANCODE_A, SDL_KMOD_NONE, bDown);
+    PushKey(Id, SDL_SCANCODE_A, bCtrlHeld ? SDL_KMOD_LCTRL : SDL_KMOD_NONE, bDown);
+}
+
+void PushCtrl(std::uint32_t Id, bool bDown)
+{
+    PushKey(Id, SDL_SCANCODE_LCTRL, bDown ? SDL_KMOD_LCTRL : SDL_KMOD_NONE, bDown);
 }
 
 void PushButton(std::uint32_t Id, int Button, bool bDown, float X, float Y)
@@ -153,6 +175,14 @@ void PushFocus(std::uint32_t Id, bool bGained)
 {
     PushWindowEvent(bGained ? SDL_EVENT_WINDOW_FOCUS_GAINED : SDL_EVENT_WINDOW_FOCUS_LOST, Id, 0,
                     0);
+}
+
+void PushShowState(std::uint32_t Id, int State)
+{
+    PushWindowEvent(State == 1   ? SDL_EVENT_WINDOW_MINIMIZED
+                    : State == 2 ? SDL_EVENT_WINDOW_MAXIMIZED
+                                 : SDL_EVENT_WINDOW_RESTORED,
+                    Id, 0, 0);
 }
 
 void PushCloseRequest(std::uint32_t Id)

@@ -23,10 +23,13 @@
 //   CreateMutexA open the existing one). A mutex whose owning thread ends is abandoned: the
 //   next wait takes it and returns kWaitAbandoned.
 // - Not available here: ThreadTerminate (POSIX has no safe equivalent; it fails), objects
-//   shared between processes, and ResourceModuleLoad (resource DLLs are Windows PE images;
-//   reading their resources is M3).
+//   shared between processes.
+// - Resource-only DLLs (ResourceModuleLoad) are Windows PE images (pe_resources.h), read into
+//   read-only memory of their own. Their handles are that memory's address, which no dlopen
+//   handle can be: the module calls tell the two apart by the registry of resource modules.
 
 #include "fl_layout.h" // FlULong / FlLong (also forced into every source)
+#include "pe_resources.h" // ResourceModuleLoad's images
 
 #include <atomic>
 #include <cerrno>
@@ -38,7 +41,9 @@
 #include <cctype>
 #include <cstring>
 #include <ctime>
+#include <algorithm>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <set>
 #include <vector>
@@ -51,6 +56,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <strings.h>
+#include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -126,6 +132,7 @@ namespace Platform
         };
 
         struct FMutex;
+        struct FResourceModule;
 
         // The layer's process-wide state. A header's statics are per module on macOS and Linux
         // (each .dylib / .so has its own), and handles, waits, thread ids and the last error
@@ -144,6 +151,8 @@ namespace Platform
             std::set<FMutex*> Mutexes; // every mutex, under WaitLock
             std::mutex RegionsLock; // posix/kernel32.h's views and VirtualAlloc blocks
             std::map<const void*, std::size_t> Regions;
+            std::mutex ResourceModulesLock; // ResourceModuleLoad's modules, by address
+            std::map<std::uintptr_t, FResourceModule*> ResourceModules;
             std::chrono::steady_clock::time_point Start =
                 std::chrono::steady_clock::now(); // timeGetTime's zero
 
@@ -1273,6 +1282,51 @@ namespace Platform
     using Module = void*;
     using Symbol = void*;
 
+    namespace Detail
+    {
+    // A resource-only DLL mapped by ResourceModuleLoad: its file bytes, read-only. Its
+    // handle is Base. The text of a resource is converted to wchar_t on first use
+    // (ResourceWideText) and kept until the module is freed, as long as the mapped UTF-16
+    // it stands for.
+    struct FResourceModule
+    {
+        unsigned char const* Base = nullptr;
+        std::size_t Size = 0;
+        std::string Path;
+        PeResources::FImage Image;
+        std::vector<std::pair<std::uint32_t, std::uint32_t>> Resources; // (offset, size)
+        bool bIndexed = false;
+        std::map<std::pair<std::uint32_t, std::uint32_t>, std::unique_ptr<wchar_t[]>>
+            Wide; // by (offset, size)
+        ~FResourceModule()
+        {
+            if (Base != nullptr)
+                munmap(const_cast<unsigned char*>(Base), Size);
+        }
+    };
+
+    // The resource module Library is, or nullptr. Under ResourceModulesLock.
+    inline FResourceModule* ResourceModuleOf(void const* Library)
+    {
+        auto& Modules = Shared().ResourceModules;
+        auto const Found = Modules.find(reinterpret_cast<std::uintptr_t>(Library));
+        return Found != Modules.end() ? Found->second : nullptr;
+    }
+
+    // The resource module whose mapping holds Address, or nullptr. Under
+    // ResourceModulesLock.
+    inline FResourceModule* ResourceModuleHolding(void const* Address)
+    {
+        auto& Modules = Shared().ResourceModules;
+        std::uintptr_t const Value = reinterpret_cast<std::uintptr_t>(Address);
+        auto Found = Modules.upper_bound(Value);
+        if (Found == Modules.begin())
+            return nullptr;
+        --Found;
+        return Value - Found->first < Found->second->Size ? Found->second : nullptr;
+    }
+    }
+
     // LoadLibraryA: dlopen. A name ending in .dll is also tried as .dylib (macOS) or .so.
     // nullptr on failure.
     //
@@ -1303,15 +1357,28 @@ namespace Platform
         return nullptr;
     }
 
-    // A resource-only DLL: Windows PE images, which need a resource reader here (M3). nullptr.
-    inline Module ResourceModuleLoad(char const* Path)
+    // FreeLibrary: drops a reference; the module stays mapped (see ModuleLoad). A resource
+    // module (ResourceModuleLoad) is unmapped.
+    inline bool ModuleFree(Module Library)
     {
-        (void)Path;
-        return nullptr;
+        if (Library == nullptr)
+            return false;
+        Detail::FShared& State = Detail::Shared();
+        std::unique_ptr<Detail::FResourceModule> Resources;
+        {
+            std::lock_guard<std::mutex> Lock(State.ResourceModulesLock);
+            auto const Found =
+                State.ResourceModules.find(reinterpret_cast<std::uintptr_t>(Library));
+            if (Found != State.ResourceModules.end())
+            {
+                Resources.reset(Found->second);
+                State.ResourceModules.erase(Found);
+            }
+        }
+        if (Resources != nullptr)
+            return true;
+        return dlclose(Library) == 0;
     }
-
-    // FreeLibrary: drops a reference; the module stays mapped (see ModuleLoad).
-    inline bool ModuleFree(Module Library) { return Library != nullptr && dlclose(Library) == 0; }
 
     // GetModuleHandleA: an already loaded module, nullptr naming the executable. Borrowed, as
     // on Windows: the caller does not free it (the reference dlopen took is dropped here, and the
@@ -1325,9 +1392,17 @@ namespace Platform
     }
 
     // GetProcAddress: nullptr when the module has no such export.
+    // A resource module has none (Windows' data-file modules have no exports to find).
     inline Symbol ModuleSymbol(Module Library, char const* Name)
     {
-        return Library != nullptr ? dlsym(Library, Name) : nullptr;
+        if (Library == nullptr)
+            return nullptr;
+        {
+            std::lock_guard<std::mutex> Lock(Detail::Shared().ResourceModulesLock);
+            if (Detail::ResourceModuleOf(Library) != nullptr)
+                return nullptr;
+        }
+        return dlsym(Library, Name);
     }
 
     // GetModuleFileNameA for the executable (Library nullptr): the length written, 0 on failure.
@@ -1384,8 +1459,15 @@ namespace Platform
         }
         else
         {
+            {
+                std::lock_guard<std::mutex> Lock(Detail::Shared().ResourceModulesLock);
+                if (Detail::FResourceModule const* const Resources =
+                        Detail::ResourceModuleOf(Library))
+                    Found = Resources->Path;
+            }
 #if defined(__APPLE__)
-            for (std::uint32_t Index = 0, Count = _dyld_image_count(); Index < Count; ++Index)
+            for (std::uint32_t Index = 0, Count = _dyld_image_count();
+                 Found.empty() && Index < Count; ++Index)
             {
                 if (Detail::IsModuleFile(Library, _dyld_get_image_name(Index)))
                 {
@@ -1395,7 +1477,8 @@ namespace Platform
             }
 #else
             std::vector<std::string> Names;
-            dl_iterate_phdr(&Detail::CollectModuleFile, &Names);
+            if (Found.empty())
+                dl_iterate_phdr(&Detail::CollectModuleFile, &Names);
             for (std::string const& Name : Names)
             {
                 if (Detail::IsModuleFile(Library, Name.c_str()))
@@ -1416,6 +1499,220 @@ namespace Platform
         }
         std::memcpy(Path, Found.c_str(), Found.size() + 1);
         return static_cast<FlULong>(Found.size());
+    }
+
+    // A resource-only DLL (LoadLibraryExA with LOAD_LIBRARY_AS_DATAFILE |
+    // LOAD_LIBRARY_AS_IMAGE_RESOURCE, as the x64 Windows build loads them): a PE32 or PE32+
+    // image, read into read-only memory of its own for its resources (FindResourceExA,
+    // LoadStringW, ModuleFree, ModulePath; ModuleSymbol finds nothing). A bare name is looked
+    // for next to the executable first, then in the current directory, as Windows' search
+    // starts with the application's directory. Each load reads the file again, as Windows maps
+    // each data-file load. nullptr when the file is missing or is not a PE image.
+    inline Module ResourceModuleLoad(char const* Path)
+    {
+        if (Path == nullptr || Path[0] == 0)
+            return nullptr;
+        std::vector<std::string> Candidates;
+        if (std::strpbrk(Path, "/\\") == nullptr)
+        {
+            char Executable[4096];
+            FlULong const Length = ModulePath(nullptr, Executable, sizeof(Executable));
+            if (Length != 0 && Length < sizeof(Executable))
+            {
+                std::string Directory(Executable, Length);
+                Directory.erase(Directory.find_last_of('/') + 1);
+                Candidates.push_back(Detail::ResolvePath((Directory + Path).c_str()));
+            }
+        }
+        Candidates.push_back(Detail::ResolvePath(Path));
+
+        for (std::string const& Candidate : Candidates)
+        {
+            // O_NONBLOCK: a FIFO without a writer must not hold the open (S_ISREG refuses it).
+            int const Descriptor = open(Candidate.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
+            if (Descriptor < 0)
+                continue;
+            // The file is read into pages of the module's own rather than mapped: Windows keeps a
+            // mapped image's file from being changed, POSIX does not, and a mapped file cut short
+            // by another process would fault the next read past its new end. The pages are
+            // read-only once filled, as the image's are.
+            struct stat Info = {};
+            void* Mapped = MAP_FAILED;
+            std::size_t Size = 0;
+            if (fstat(Descriptor, &Info) == 0 && S_ISREG(Info.st_mode) && Info.st_size > 0 &&
+                static_cast<std::uint64_t>(Info.st_size) <= 0xFFFFFFFFu)
+            {
+                Size = static_cast<std::size_t>(Info.st_size);
+                Mapped = mmap(nullptr, Size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+            }
+            if (Mapped != MAP_FAILED)
+            {
+                std::size_t Done = 0;
+                while (Done < Size)
+                {
+                    ssize_t const Read =
+                        pread(Descriptor, static_cast<unsigned char*>(Mapped) + Done, Size - Done,
+                              static_cast<off_t>(Done));
+                    if (Read < 0 && errno == EINTR)
+                        continue;
+                    if (Read <= 0)
+                        break;
+                    Done += static_cast<std::size_t>(Read);
+                }
+                if (Done != Size || mprotect(Mapped, Size, PROT_READ) != 0)
+                {
+                    munmap(Mapped, Size);
+                    Mapped = MAP_FAILED;
+                }
+            }
+            close(Descriptor);
+            if (Mapped == MAP_FAILED)
+                continue;
+
+            std::unique_ptr<Detail::FResourceModule> Resources(new (std::nothrow)
+                                                                   Detail::FResourceModule);
+            if (Resources == nullptr)
+            {
+                munmap(Mapped, Size);
+                return nullptr;
+            }
+            Resources->Base = static_cast<unsigned char const*>(Mapped);
+            Resources->Size = Size;
+            if (!PeResources::Open(Resources->Base, Size, Resources->Image))
+                return nullptr; // not a PE image (the destructor unmaps it)
+            try
+            {
+                Resources->Path = Candidate;
+                Detail::FShared& State = Detail::Shared();
+                std::lock_guard<std::mutex> Lock(State.ResourceModulesLock);
+                State.ResourceModules[reinterpret_cast<std::uintptr_t>(Mapped)] = Resources.get();
+            }
+            catch (std::bad_alloc const&)
+            {
+                return nullptr;
+            }
+            Resources.release(); // the registry's now
+            return Mapped;
+        }
+        return nullptr;
+    }
+
+    // FindResourceExA: the resource's data entry in a resource module (HRSRC), or nullptr. Type
+    // and Name are MAKEINTRESOURCE ids, "#<id>" or strings. Library nullptr (the executable) and
+    // the modules ModuleLoad loads have no PE resources here: nullptr.
+    inline void const* ResourceFind(Module Library, char const* Type, char const* Name,
+                                    unsigned short Language)
+    {
+        if (Library == nullptr || Type == nullptr || Name == nullptr)
+            return nullptr;
+        std::lock_guard<std::mutex> Lock(Detail::Shared().ResourceModulesLock);
+        Detail::FResourceModule const* const Resources = Detail::ResourceModuleOf(Library);
+        std::uint32_t Entry = 0;
+        if (Resources == nullptr || !PeResources::Find(Resources->Image, PeResources::NameOf(Type),
+                                                       PeResources::NameOf(Name), Language, Entry))
+            return nullptr;
+        return Resources->Base + Entry;
+    }
+
+    namespace Detail
+    {
+    // The data of the resource whose data entry is at Info: its address and size, or false.
+    // The module is the one Info lies in; Library is not needed (as LoadResource and
+    // SizeofResource take the module only to find the image). Under ResourceModulesLock.
+    inline bool ResourceDataOf(void const* Info, void const*& Data, FlULong& Size)
+    {
+        FResourceModule const* const Resources = ResourceModuleHolding(Info);
+        if (Resources == nullptr)
+            return false;
+        std::uint32_t Offset = 0, Bytes = 0;
+        if (!PeResources::Data(Resources->Image,
+                               static_cast<std::uint32_t>(static_cast<unsigned char const*>(Info) -
+                                                          Resources->Base),
+                               Offset, Bytes))
+            return false;
+        Data = Resources->Base + Offset;
+        Size = Bytes;
+        return true;
+    }
+    }
+
+    // SizeofResource: the resource's size in bytes, 0 for an unknown HRSRC.
+    inline FlULong ResourceSize(Module Library, void const* Info)
+    {
+        (void)Library;
+        void const* Data = nullptr;
+        FlULong Size = 0;
+        std::lock_guard<std::mutex> Lock(Detail::Shared().ResourceModulesLock);
+        return Detail::ResourceDataOf(Info, Data, Size) ? Size : 0;
+    }
+
+    // LoadResource (and LockResource, which returns it): the resource's data, in the module's
+    // read-only mapping, or nullptr for an unknown HRSRC.
+    inline void const* ResourceData(Module Library, void const* Info)
+    {
+        (void)Library;
+        void const* Data = nullptr;
+        FlULong Size = 0;
+        std::lock_guard<std::mutex> Lock(Detail::Shared().ResourceModulesLock);
+        return Detail::ResourceDataOf(Info, Data, Size) ? Data : nullptr;
+    }
+
+    // Resource text as wchar_t: Text points at UTF-16LE units in a resource of a resource
+    // module (wchar_t is 4 bytes here). The whole resource is converted on first use, one
+    // wchar_t per unit as the wire's text (rpc_wire_wide.h), so counts in units stay counts in
+    // characters, and followed by a terminator; the result lives as long as the module, as the
+    // mapped text does. At least Units units follow Text in the resource the copy is made of (a
+    // damaged image's resources may overlap: one that holds them is taken). nullptr when Text is
+    // not in a resource, falls between two units or has fewer than Units after it.
+    inline wchar_t const* ResourceWideText(void const* Text, std::size_t Units = 0)
+    {
+        std::lock_guard<std::mutex> Lock(Detail::Shared().ResourceModulesLock);
+        Detail::FResourceModule* const Resources = Detail::ResourceModuleHolding(Text);
+        if (Resources == nullptr)
+            return nullptr;
+        try
+        {
+            if (!Resources->bIndexed)
+            {
+                // Built aside and kept only when complete: a failed attempt leaves nothing behind.
+                std::vector<std::pair<std::uint32_t, std::uint32_t>> Index;
+                PeResources::ForEach(Resources->Image, [&](std::uint32_t Offset, std::uint32_t Size)
+                                     { Index.emplace_back(Offset, Size); });
+                std::sort(Index.begin(), Index.end());
+                Resources->Resources = std::move(Index);
+                Resources->bIndexed = true;
+            }
+            std::uint32_t const Into = static_cast<std::uint32_t>(
+                static_cast<unsigned char const*>(Text) - Resources->Base);
+            // The nearest resource that starts at or before Text and holds Units units after it.
+            auto Found = std::upper_bound(Resources->Resources.begin(), Resources->Resources.end(),
+                                          std::make_pair(Into, ~std::uint32_t(0)));
+            while (Found != Resources->Resources.begin())
+            {
+                --Found;
+                std::uint32_t const Start = Found->first;
+                std::uint32_t const Count = Found->second / 2;
+                if ((Into - Start) % 2 != 0 || (Into - Start) / 2 > Count ||
+                    Count - (Into - Start) / 2 < Units)
+                    continue;
+                std::unique_ptr<wchar_t[]>& Wide = Resources->Wide[*Found];
+                if (Wide == nullptr)
+                {
+                    Wide.reset(new wchar_t[Count + 1]);
+                    unsigned char const* const In = Resources->Base + Start;
+                    for (std::uint32_t Index = 0; Index < Count; ++Index)
+                        Wide[Index] =
+                            static_cast<wchar_t>(In[Index * 2] | (In[Index * 2 + 1] << 8));
+                    Wide[Count] = 0;
+                }
+                return Wide.get() + (Into - Start) / 2;
+            }
+            return nullptr;
+        }
+        catch (std::bad_alloc const&)
+        {
+            return nullptr;
+        }
     }
 
     // ---------------------------------------------------------------------------------------

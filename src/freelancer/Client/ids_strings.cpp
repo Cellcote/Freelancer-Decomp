@@ -11,6 +11,7 @@
 #include "dacom.h"
 #include "globals.h"
 #include "cmn/misc_util.h" // FormatGroupedNumber (FUN_004779a0)
+#include "resource_text.h" // ResourceUnit: the locked text is UTF-16LE
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -44,8 +45,8 @@ namespace
     // zeroed first, then the resource of type 0x17 named by the numeric id. False on a missing
     // resource or a failed load / lock; otherwise the word count (SizeofResource >> 1) and the
     // locked pointer.
-    bool LoadRawTextResource(HMODULE Module, unsigned int Id, wchar_t const** OutData,
-                              unsigned int* OutWordCount)
+    bool LoadRawTextResource(HMODULE Module, unsigned int Id, ResourceUnit const** OutData,
+                             unsigned int* OutWordCount)
     {
         *OutData = nullptr;
         *OutWordCount = 0;
@@ -64,7 +65,7 @@ namespace
             return false;
 
         *OutWordCount = SizeBytes >> 1;
-        *OutData = static_cast<wchar_t const*>(Data);
+        *OutData = static_cast<ResourceUnit const*>(Data);
         return true;
     }
 }
@@ -127,7 +128,7 @@ unsigned int GetIdsStringW(unsigned int Ids, wchar_t* Dest, int DestChars)
     unsigned int Count = static_cast<unsigned int>(DestChars - 1);
     if (!(Count < Length))
         Count = Length;
-    wcsncpy(Dest, reinterpret_cast<wchar_t const*>(Cursor + 1), Count);
+    ResourceTextCopyN(Dest, reinterpret_cast<ResourceUnit const*>(Cursor + 1), Count);
     Dest[Count] = L'\0';
     return Count;
 }
@@ -170,10 +171,18 @@ unsigned int GetIdsStringWWithRawFallback(unsigned int Ids, wchar_t* Dest, int D
     // 0x00434808..0x00434835: FUN_0057d980 on the ids copy, then FUN_0057d9c0 with its low
     // word -- the module is not tested (a null one searches the process image).
     HMODULE const Module = TakeIdsModule(&Ids);
-    wchar_t const* RawData = nullptr;
+    ResourceUnit const* RawData = nullptr;
     unsigned int RawWordCount = 0;
     if (!LoadRawTextResource(Module, Ids & 0xffffu, &RawData, &RawWordCount))
         return 0;
+#if !defined(_WIN32)
+    // PORT(macOS, Linux): a resource without even the leading word would make words - 1 wrap
+    // below and the copy read past it, and a destination without room (an append that filled
+    // its buffer, AppendIdsStringOrWarn) would make count - 1 wrap and the copy write past it.
+    // Retail reads and writes on; here either gives nothing.
+    if (RawWordCount == 0 || DestChars < 1)
+        return 0;
+#endif
 
     // 0x00434837..0x00434864: min(words - 1, count - 1), unsigned (JC keeps words - 1); the text
     // starts one word into the resource (ADD ESI,2); REP MOVS, then the terminator. Dest is
@@ -182,7 +191,7 @@ unsigned int GetIdsStringWWithRawFallback(unsigned int Ids, wchar_t* Dest, int D
     unsigned int const Room = static_cast<unsigned int>(DestChars - 1);
     if (!(Count < Room))
         Count = Room;
-    memcpy(Dest, RawData + 1, Count * sizeof(wchar_t));
+    ResourceTextCopy(Dest, RawData + 1, Count);
     Dest[Count] = L'\0';
     return Count;
 }

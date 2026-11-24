@@ -1,0 +1,49 @@
+// PORT(macOS, Linux): the fixture of resource_tests (src/PortTest/CMakeLists.txt), built by
+// tools/build_resource_dll.py as a PE32+ image: string tables in two languages, a numeric
+// type 23 resource, named types and names, and a resource in German only.
+#pragma code_page(65001)
+#include <windows.h>
+
+LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
+
+STRINGTABLE
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+{
+  1, 	"One"
+  2, 	"Two ""quoted""\n"
+  3, 	""
+  17, 	L"Café ’ \x263A"
+  18, 	"\xA92001"
+  31, 	"Joined" " text"
+  32+1, 	"Sum"
+}
+
+STRINGTABLE
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+{
+  1, 	"Eins"
+}
+
+// An unquoted file name of a skipped type, followed by a resource that must not be lost.
+1 ICON resource_test_icon.ico
+
+STRINGTABLE
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+{
+  48, 	L"\xD83D\xDE00"
+  49, 	"😀"
+  50, 	"Hello \
+world"
+  51/*a comment ends the id*/, "Commented"
+}
+
+5 23 "resource_test_card.txt"
+
+CardName CARDTYPE "resource_test_card.txt"
+
+Café CARDTYPE "resource_test_card.txt"
+
+Straße CARDTYPE "resource_test_card.txt"
+
+LANGUAGE LANG_GERMAN, SUBLANG_GERMAN
+7 23 "resource_test_card.txt"

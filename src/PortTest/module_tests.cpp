@@ -481,7 +481,7 @@ IRenderPipeline* MakeRpGpu(ICOManager* Manager, const char* Section)
 }
 
 // One frame cleared to Argb on Window, then the frame read back through PrintScreen's BMP: true
-// when every pixel is Argb's colour and the image is Width x Height (0: any size).
+// when every pixel is Argb's colour and the image is Width x Height (a dimension of 0: any).
 bool ClearPresentReadBack(IRenderPipeline* Pipeline, RpWindow Window, int Width, int Height,
                           std::uint32_t Argb, const std::string& Bmp, std::uint32_t* OutWidth,
                           std::uint32_t* OutHeight)
@@ -526,9 +526,8 @@ bool ClearPresentReadBack(IRenderPipeline* Pipeline, RpWindow Window, int Width,
         return false;
     std::uint32_t const W = U32(18), H = U32(22);
     std::size_t const RowBytes = (static_cast<std::size_t>(W) * 3 + 3) & ~std::size_t(3);
-    if (W == 0 || H == 0 ||
-        (Width != 0 && (W != std::uint32_t(Width) || H != std::uint32_t(Height))) ||
-        File.size() < 54 + RowBytes * H)
+    if (W == 0 || H == 0 || (Width != 0 && W != std::uint32_t(Width)) ||
+        (Height != 0 && H != std::uint32_t(Height)) || File.size() < 54 + RowBytes * H)
         return false;
     *OutWidth = W;
     *OutHeight = H;
@@ -541,6 +540,452 @@ bool ClearPresentReadBack(IRenderPipeline* Pipeline, RpWindow Window, int Width,
                 return false;
         }
     return true;
+}
+
+// RP8's vertex copy (render/rp8_vertex_copy.h) through RPGPU's IRPVertexBuffer::CopyVertices
+// and IVertexBufferManager::CopyVertexData: a sphere's separate position / normal / texture
+// streams, an indexed source into a format with a diffuse colour it does not have, and a
+// pre-transformed format, which RP8's jump table copies nothing for.
+void TestRpGpuVertexCopy(IRenderPipeline* Pipeline)
+{
+    IRPVertexBuffer* Buffers = nullptr;
+    IVertexBufferManager* Manager = nullptr;
+    Pipeline->QueryInterface(Iids::RPVertexBuffer, (void**)(&Buffers));
+    Pipeline->QueryInterface(Iids::VertexBufferManager, (void**)(&Manager));
+    Check(Buffers != nullptr && Manager != nullptr,
+          "RPGPU has IRPVertexBuffer and IVertexBufferManager");
+    if (Buffers == nullptr || Manager == nullptr)
+    {
+        if (Buffers != nullptr)
+            Buffers->Release();
+        if (Manager != nullptr)
+            Manager->Release();
+        return;
+    }
+
+    float const Positions[2][3] = {{1.0f, 2.0f, 3.0f}, {4.0f, 5.0f, 6.0f}};
+    float const Normals[2][3] = {{0.0f, 0.0f, 1.0f}, {0.0f, 1.0f, 0.0f}};
+    float const Texels[2][2] = {{0.25f, 0.5f}, {0.75f, 1.0f}};
+    FlULong const Order[2] = {1, 0};
+    auto const Stream = [](const void* Base, unsigned int Size, const FlULong* Indices)
+    {
+        FRpVertexStream Out = {};
+        Out.Base = static_cast<const unsigned char*>(Base);
+        Out.ByteSize = Size;
+        Out.Stride = Size;
+        Out.IndexArray = Indices;
+        Out.Count = 2;
+        return Out;
+    };
+    FRpVertexSrcDesc Sphere = {};
+    Sphere.SrcFvf = 0x112; // XYZ | NORMAL | TEX1, as SphereMesh hands it over
+    Sphere.SrcCount = 2;
+    Sphere.Position = Stream(Positions, 0xC, nullptr);
+    Sphere.Normal = Stream(Normals, 0xC, nullptr);
+    Sphere.Tex[0] = Stream(Texels, 8, nullptr);
+    // One vertex of a 0x112 buffer: position, normal, texture set 0.
+    auto const Matches = [&](const unsigned char* Vertex, int Source)
+    {
+        return std::memcmp(Vertex, Positions[Source], 0xC) == 0 &&
+               std::memcmp(Vertex + 0xC, Normals[Source], 0xC) == 0 &&
+               std::memcmp(Vertex + 0x18, Texels[Source], 8) == 0;
+    };
+    auto const Zero = [](const unsigned char* Bytes, std::size_t Size)
+    {
+        for (std::size_t Index = 0; Index < Size; ++Index)
+            if (Bytes[Index] != 0)
+                return false;
+        return true;
+    };
+
+    // A static buffer: copied unlocked at a byte offset, then in place into a lock.
+    unsigned int* Handle = nullptr;
+    Check(Buffers->CreateVb(0x112, 6, &Handle, 0) == GR_OK && Handle != nullptr,
+          "RPGPU makes a vertex buffer");
+    unsigned int Offset = 0x20; // bytes in, the vertex index out
+    Check(Buffers->CopyVertices(Handle, &Offset, &Sphere, 0, 2) == GR_OK && Offset == 1,
+          "CopyVertices locks at the byte offset and hands back the vertex index");
+    void* Bits = nullptr;
+    unsigned int LockAt = 0x80; // vertex 4
+    Check(Buffers->LockVb(Handle, &LockAt, &Bits, 2) == GR_OK && LockAt == 4,
+          "the buffer locks two vertices at vertex 4");
+    unsigned int InLock = 1;
+    Check(Buffers->CopyVertices(Handle, &InLock, &Sphere, 1, 1) == GR_OK && InLock == 1,
+          "CopyVertices writes into a lock in place, at a vertex of the lock");
+    unsigned int PastLock = 1;
+    Check(Buffers->CopyVertices(Handle, &PastLock, &Sphere, 0, 2) != GR_OK,
+          "a copy into a lock that would run past the locked vertices is refused");
+    unsigned int StillLocked = 1;
+    Check(Buffers->CopyVertices(Handle, &StillLocked, &Sphere, 1, 1) == GR_OK,
+          "the lock stays open after a refused copy: an in-range copy goes in");
+    Check(Buffers->ResizeVb(Handle, 0x112, 8) != GR_OK, "a locked buffer is not resized");
+    Buffers->UnlockVb(Handle);
+    unsigned int Whole = 0;
+    if (Buffers->LockVb(Handle, &Whole, &Bits, 6) == GR_OK && Bits != nullptr)
+    {
+        const unsigned char* const Data = static_cast<const unsigned char*>(Bits);
+        Check(Zero(Data, 0x20) && Matches(Data + 0x20, 0) && Matches(Data + 0x40, 1) &&
+                  Zero(Data + 0x60, 0x40) && Matches(Data + 0xA0, 1),
+              "the copies are RP8's: position, normal and texture at the vertices asked for, "
+              "the rest left as it was");
+        Buffers->UnlockVb(Handle);
+    }
+    else
+        Check(false, "the vertex buffer locks whole");
+    Buffers->DestroyVb((void**)(&Handle));
+
+    // XYZ | NORMAL | TEX1 with a three-float set (0x10112, 0x24 bytes a vertex) takes table A's
+    // 0x20-byte fixed layout: RP8 would start the source's vertex 1 four bytes before the lock.
+    // RPGPU refuses that copy and writes nothing.
+    FRpVertexSrcDesc Wide = Sphere;
+    Wide.SrcFvf = 0x10112;
+    Check(Buffers->CreateVb(0x10112, 2, &Handle, 0) == GR_OK && Handle != nullptr,
+          "RPGPU makes a vertex buffer of a three-float texture set");
+    unsigned int AtStart = 0;
+    Check(Buffers->CopyVertices(Handle, &AtStart, &Wide, 1, 1) != GR_OK,
+          "a copy RP8 would start before the buffer is refused");
+    unsigned int WideAt = 0;
+    if (Buffers->LockVb(Handle, &WideAt, &Bits, 2) == GR_OK && Bits != nullptr)
+    {
+        Check(Zero(static_cast<const unsigned char*>(Bits), 0x48), "a refused copy writes nothing");
+        Buffers->UnlockVb(Handle);
+    }
+    else
+        Check(false, "the three-float buffer locks after the refused copy");
+    Buffers->DestroyVb((void**)(&Handle));
+
+    // A locked pool does not grow (its lock's vertices would move); unlocked, it does.
+    unsigned int* Pool = nullptr;
+    unsigned int PoolFvf = 0, PoolCount = 0;
+    if (Buffers->CreateVb(0x112, 1, &Pool, 1) == GR_OK && Pool != nullptr &&
+        Buffers->GetVbInfo(Pool, &PoolFvf, &PoolCount) == GR_OK)
+    {
+        unsigned int PoolAt = 0;
+        void* PoolBits = nullptr;
+        unsigned int* Grown = nullptr;
+        Check(Buffers->LockVb(Pool, &PoolAt, &PoolBits, 1) == GR_OK &&
+                  Buffers->CreateVb(0x112, PoolCount + 1, &Grown, 1) != GR_OK,
+              "a locked pool is not grown");
+        Buffers->UnlockVb(Pool);
+        Check(Buffers->CreateVb(0x112, PoolCount + 1, &Grown, 1) == GR_OK && Grown == Pool,
+              "an unlocked pool grows");
+    }
+    else
+        Check(false, "RPGPU hands out its 0x112 pool");
+
+    // The pool through the manager, as SphereMesh draws: LockVertexMemory, CopyVertexData.
+    FVertexMemoryLock Lock = {};
+    if (Manager->LockVertexMemory(0x112, 2, &Lock) == GR_OK && Lock.Vertices != nullptr)
+    {
+        Manager->CopyVertexData(Lock.Vertices, Lock.Listing.Fvf, &Sphere, 0, 2);
+        const unsigned char* const Data = static_cast<const unsigned char*>(Lock.Vertices);
+        Check(Lock.Listing.Fvf == 0x112 && Matches(Data, 0) && Matches(Data + 0x20, 1),
+              "CopyVertexData converts a sphere's streams into the vertex memory");
+        Manager->UnlockVertexMemory(&Lock);
+    }
+    else
+        Check(false, "RPGPU locks vertex memory");
+
+    // Table A's entry for 0x112 is a fixed-layout converter: it reads the source at 12, 12 and
+    // 8 bytes a vertex whatever the descriptor's strides say.
+    // The backing holds a 16-byte stride's second position too, with other values there.
+    float const PackedPositions[8] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 9.0f, 9.0f};
+    FRpVertexSrcDesc Padded = Sphere;
+    Padded.Position = Stream(PackedPositions, 0xC, nullptr);
+    Padded.Position.Stride = 16;
+    unsigned char Fixed[2][0x20] = {};
+    Manager->CopyVertexData(Fixed, 0x112, &Padded, 0, 2);
+    Check(Matches(Fixed[0], 0) && Matches(Fixed[1], 1),
+          "a same-format sphere copy reads RP8's literal strides, not the descriptor's");
+
+    // Indexed (Flags 4) into XYZ | NORMAL | DIFFUSE | TEX1 (0x152): the diffuse bytes the
+    // source has no stream for are left alone.
+    FlULong const Identity[2] = {0, 1};
+    FRpVertexSrcDesc Indexed = Sphere;
+    Indexed.Flags = 4;
+    Indexed.Position = Stream(Positions, 0xC, Order);
+    Indexed.Normal = Stream(Normals, 0xC, Identity); // an order of its own
+    Indexed.Tex[0] = Stream(Texels, 8, Order);
+    unsigned char Out[2][0x24];
+    std::memset(Out, 0xAB, sizeof(Out));
+    Manager->CopyVertexData(Out, 0x152, &Indexed, 0, 2);
+    unsigned char const Untouched[4] = {0xAB, 0xAB, 0xAB, 0xAB};
+    bool bIndexedOk = true;
+    for (int Vertex = 0; Vertex < 2; ++Vertex)
+    {
+        int const Other = 1 - Vertex;
+        bIndexedOk = bIndexedOk && std::memcmp(Out[Vertex], Positions[Other], 0xC) == 0 &&
+                     std::memcmp(Out[Vertex] + 0xC, Normals[Vertex], 0xC) == 0 &&
+                     std::memcmp(Out[Vertex] + 0x18, Untouched, 4) == 0 &&
+                     std::memcmp(Out[Vertex] + 0x1C, Texels[Other], 8) == 0;
+    }
+    Check(bIndexedOk, "an indexed copy follows each stream's own indices and skips the diffuse "
+                      "colour");
+
+    // XYZ | NORMAL | TEX1 with a one-float set (0x30112, 0x1C bytes a vertex): table A's
+    // fixed layout writes 0x20 a vertex, past the vertices given; nothing is copied.
+    FRpVertexSrcDesc Narrow = Sphere;
+    Narrow.SrcFvf = 0x30112;
+    unsigned char Short[2][0x1C];
+    std::memset(Short, 0xAB, sizeof(Short));
+    Manager->CopyVertexData(Short, 0x30112, &Narrow, 0, 2);
+    bool bShortUntouched = true;
+    for (std::size_t Index = 0; Index < sizeof(Short); ++Index)
+        bShortUntouched = bShortUntouched && Short[Index / 0x1C][Index % 0x1C] == 0xAB;
+    Check(bShortUntouched, "a fixed layout wider than its format copies nothing");
+
+    // The generic converter (table A's entry for XYZ | TEX1, 0x102, 0x14 bytes a vertex) copies
+    // a 16-byte source texture set only up to its vertex's end: 8 bytes, the next vertex's
+    // bytes untouched. A destination without a position (0x10, a normal only: 0xC bytes, the
+    // copy would write 0x18) copies nothing.
+    float const WideTexels[4] = {0.5f, 0.25f, 7.0f, 7.0f};
+    FRpVertexSrcDesc Long = {};
+    Long.SrcFvf = 0x102;
+    Long.Position = Stream(Positions, 0xC, nullptr);
+    Long.Tex[0] = Stream(WideTexels, 16, nullptr);
+    unsigned char Pair[2][0x14];
+    std::memset(Pair, 0xAB, sizeof(Pair));
+    Manager->CopyVertexData(Pair, 0x102, &Long, 0, 1);
+    bool bPairOk = std::memcmp(Pair[0], Positions[0], 0xC) == 0 &&
+                   std::memcmp(Pair[0] + 0xC, WideTexels, 8) == 0;
+    for (std::size_t Index = 0; Index < 0x14; ++Index)
+        bPairOk = bPairOk && Pair[1][Index] == 0xAB;
+    Check(bPairOk, "a texture set wider than the rest of its vertex is cut at the vertex's end");
+    FRpVertexSrcDesc NormalOnly = Sphere;
+    NormalOnly.Flags = 0;
+    std::memset(Pair, 0xAB, sizeof(Pair));
+    Manager->CopyVertexData(Pair, 0x10, &NormalOnly, 0, 1);
+    bool bNormalOnlyUntouched = true;
+    for (std::size_t Index = 0; Index < sizeof(Pair); ++Index)
+        bNormalOnlyUntouched = bNormalOnlyUntouched && Pair[Index / 0x14][Index % 0x14] == 0xAB;
+    Check(bNormalOnlyUntouched, "a generic copy wider than its format copies nothing");
+
+    // Two texture sets and no position (0x200, 0x10 bytes a vertex): the 12 position bytes
+    // leave 4 for set 0 and none for set 1, whose copy would start past the record.
+    FRpVertexSrcDesc NoPosition = {};
+    NoPosition.SrcFvf = 0x200;
+    NoPosition.Position = Stream(Positions, 0xC, nullptr);
+    NoPosition.Tex[0] = Stream(Texels, 8, nullptr);
+    NoPosition.Tex[1] = Stream(Texels, 8, nullptr);
+    unsigned char Bare[2][0x10];
+    std::memset(Bare, 0xAB, sizeof(Bare));
+    Manager->CopyVertexData(Bare, 0x200, &NoPosition, 0, 1);
+    bool bBareOk = std::memcmp(Bare[0], Positions[0], 0xC) == 0 &&
+                   std::memcmp(Bare[0] + 0xC, Texels[0], 4) == 0;
+    for (std::size_t Index = 0; Index < 0x10; ++Index)
+        bBareOk = bBareOk && Bare[1][Index] == 0xAB;
+    Check(bBareOk, "a texture set whose copy would start past its vertex writes nothing");
+
+    // XYZRHW | TEX1 (0x104) from separate streams of the same format: RP8's jump table has
+    // the empty converter there.
+    FRpVertexSrcDesc Transformed = {};
+    Transformed.SrcFvf = 0x104;
+    Transformed.Position = Stream(Positions, 0xC, nullptr);
+    Transformed.Tex[0] = Stream(Texels, 8, nullptr);
+    std::memset(Out, 0xAB, sizeof(Out));
+    Manager->CopyVertexData(Out, 0x104, &Transformed, 0, 2);
+    bool bUntouched = true;
+    for (std::size_t Index = 0; Index < sizeof(Out); ++Index)
+        bUntouched = bUntouched && Out[Index / 0x24][Index % 0x24] == 0xAB;
+    Check(bUntouched, "a pre-transformed format from separate streams copies nothing, as RP8");
+
+    Buffers->Release();
+    Manager->Release();
+}
+
+// A 24-bit BMP as PrintScreen writes it, read into top-down rows of B, G, R bytes.
+struct FRpGpuBmp
+{
+    std::uint32_t Width = 0;
+    std::uint32_t Height = 0;
+    std::vector<unsigned char> Bgr;
+
+    // 0xRRGGBB at (X, Y), Y counted from the top.
+    std::uint32_t Pixel(std::uint32_t X, std::uint32_t Y) const
+    {
+        const unsigned char* const P = &Bgr[(static_cast<std::size_t>(Y) * Width + X) * 3];
+        return static_cast<std::uint32_t>(P[2]) << 16 | static_cast<std::uint32_t>(P[1]) << 8 |
+               P[0];
+    }
+};
+
+bool ReadRpGpuBmp(const std::string& Path, FRpGpuBmp* Out)
+{
+    std::vector<unsigned char> File;
+    if (FILE* const Handle = fopen(Path.c_str(), "rb"))
+    {
+        unsigned char Chunk[4096];
+        for (std::size_t Read; (Read = std::fread(Chunk, 1, sizeof(Chunk), Handle)) > 0;)
+            File.insert(File.end(), Chunk, Chunk + Read);
+        std::fclose(Handle);
+    }
+    std::remove(Path.c_str());
+    auto const U32 = [&File](std::size_t At)
+    {
+        return static_cast<std::uint32_t>(File[At] | File[At + 1] << 8 | File[At + 2] << 16 |
+                                          static_cast<std::uint32_t>(File[At + 3]) << 24);
+    };
+    if (File.size() < 54 || File[0] != 'B' || File[1] != 'M' || U32(10) != 54)
+        return false;
+    std::uint32_t const W = U32(18), H = U32(22);
+    std::size_t const RowBytes = (static_cast<std::size_t>(W) * 3 + 3) & ~std::size_t(3);
+    if (W == 0 || H == 0 || File.size() < 54 + RowBytes * H)
+        return false;
+    Out->Width = W;
+    Out->Height = H;
+    Out->Bgr.resize(static_cast<std::size_t>(W) * H * 3);
+    for (std::uint32_t Y = 0; Y < H; ++Y) // bottom-up in the file
+        std::memcpy(&Out->Bgr[static_cast<std::size_t>(Y) * W * 3],
+                    &File[54 + (H - 1 - Y) * RowBytes], static_cast<std::size_t>(W) * 3);
+    return true;
+}
+
+bool NearColour(std::uint32_t Rgb, std::uint32_t Want, int Tolerance)
+{
+    for (int Shift = 0; Shift < 24; Shift += 8)
+    {
+        const int Have = static_cast<int>((Rgb >> Shift) & 0xFF);
+        const int Expected = static_cast<int>((Want >> Shift) & 0xFF);
+        if (Have < Expected - Tolerance || Have > Expected + Tolerance)
+            return false;
+    }
+    return true;
+}
+
+// The draws the menu scene's materials ask of RPGPU (docs/re/rpgpu.md, "The menu scene"), each a
+// frame of its own: cleared to blue, one pre-transformed quad over the whole target, then read
+// back. On the Null backend the frame is only the clear, so the checks are that every call
+// succeeds; with a device (bPixels) the centre pixel is the colour Direct3D 8 draws.
+void TestRpGpuDraws(IRenderPipeline* Pipeline, RpWindow Window, bool bPixels,
+                    const std::string& Root, const char* Backend)
+{
+    int Mode[10] = {};
+    Mode[2] = 64;
+    Mode[3] = 32;
+    Mode[4] = 32;
+    Mode[8] = 1;
+    int Out[10] = {};
+    if (Pipeline->CreateBuffers(Window, Mode, Out) != GR_OK)
+    {
+        Check(false, "RPGPU's draw checks create buffers");
+        return;
+    }
+    IRPTexture* Texture = nullptr;
+    if (Pipeline->QueryInterface(Iids::RPTexture, (void**)(&Texture)) != GR_OK ||
+        Texture == nullptr)
+    {
+        Check(false, "RPGPU answers IRPTexture");
+        Pipeline->DestroyGpuResources();
+        return;
+    }
+    auto const Rs = [Pipeline](int State, int Value)
+    { return Pipeline->SetRenderState(static_cast<RpRenderState>(State), Value) == GR_OK; };
+    auto const Tss = [Pipeline](int Stage, int State, int Value)
+    { return Pipeline->SetTextureStageState(Stage, State, Value) == GR_OK; };
+
+    // One frame: Setup sets the state, then a quad with the given diffuse colour; the centre
+    // pixel goes to *Centre (with a device).
+    struct FVertex
+    {
+        float X, Y, Z, Rhw;
+        std::uint32_t Diffuse;
+        float U, V;
+    };
+    auto const Frame = [&](const char* What, std::uint32_t Diffuse, auto&& Setup,
+                           std::uint32_t Want, int Tolerance)
+    {
+        std::string Message = std::string("RPGPU (") + Backend + "): " + What;
+        Pipeline->ResetRenderStatesToDefaults();
+        Pipeline->SetPipelineState(8, static_cast<int>(0xFF0000FFu)); // the clear colour: blue
+        bool bOk = Pipeline->BeginScene() == GR_OK && Pipeline->ClearBuffers(3, nullptr) == GR_OK;
+        bOk = bOk && Rs(7, 0) && Rs(137, 0); // ZENABLE, LIGHTING off
+        // Stage 0 selects the diffuse colour and alpha unless Setup says otherwise.
+        bOk = bOk && Tss(0, 1, 2) && Tss(0, 2, 0) && Tss(0, 4, 2) && Tss(0, 5, 0) && Tss(1, 1, 1) &&
+              Tss(1, 4, 1);
+        bOk = bOk && Setup();
+        // Larger than any target (a Retina window's is twice its size in points).
+        const FVertex Quad[4] = {{0, 0, 0.5f, 1, Diffuse, 0, 0},
+                                 {4096, 0, 0.5f, 1, Diffuse, 1, 0},
+                                 {0, 4096, 0.5f, 1, Diffuse, 0, 1},
+                                 {4096, 4096, 0.5f, 1, Diffuse, 1, 1}};
+        // D3DPT_TRIANGLESTRIP, D3DFVF_XYZRHW | DIFFUSE | TEX1.
+        bOk = bOk && Pipeline->DrawPrimitive(5, 0x144, Quad, 4, nullptr) == GR_OK;
+        bOk = bOk && Pipeline->EndScene() == GR_OK && Pipeline->SwapBuffers() == GR_OK;
+        const std::string Bmp = Root + "/draw.bmp";
+        bOk = bOk && Texture->PrintScreen(nullptr, Bmp.c_str()) == GR_OK;
+        FRpGpuBmp Image;
+        bOk = bOk && ReadRpGpuBmp(Bmp, &Image);
+        Pipeline->SetTextureStageTexture(0, nullptr);
+        if (!bOk)
+        {
+            Check(false, (Message + ": the frame draws and reads back").c_str());
+            return;
+        }
+        if (!bPixels)
+            return;
+        const std::uint32_t Centre = Image.Pixel(Image.Width / 2, Image.Height / 2);
+        if (!NearColour(Centre, Want, Tolerance))
+            std::printf("module_tests: %s: centre 0x%06X, expected 0x%06X\n", Message.c_str(),
+                        static_cast<unsigned>(Centre), static_cast<unsigned>(Want));
+        Check(NearColour(Centre, Want, Tolerance), Message.c_str());
+    };
+
+    // D3DBLEND_BOTHSRCALPHA as SRCBLEND: source alpha and its inverse, DESTBLEND (ONE) ignored.
+    Frame(
+        "SRCBLEND BOTHSRCALPHA blends by source alpha", 0x80FF0000u,
+        [&] { return Rs(27, 1) && Rs(19, 12) && Rs(20, 2); }, 0x80007F, 2);
+    // ... and BOTHINVSRCALPHA, the other way round: alpha 0x40 keeps 0.75 of the source.
+    Frame(
+        "SRCBLEND BOTHINVSRCALPHA blends by inverse source alpha", 0x40FF0000u,
+        [&] { return Rs(27, 1) && Rs(19, 13) && Rs(20, 2); }, 0xBF0040, 2);
+
+    // A DXT1 texture (BC1 on the GPU where the device samples it): one 4x4 block, every texel
+    // colour 0, pure red in R5G6B5.
+    void* Dxt1 = nullptr;
+    unsigned int Format = 10; // DXT1
+    const unsigned char Block[8] = {0x00, 0xF8, 0x00, 0x00, 0, 0, 0, 0};
+    unsigned int SourceFormat = 10;
+    bool bDxt1 = Pipeline->CreateTexture(4, 4, &Format, 1, 0, &Dxt1) == GR_OK &&
+                 Pipeline->SetTextureLevelData(Dxt1, 0, 4, 4, 8, &SourceFormat, Block, nullptr,
+                                               nullptr) == GR_OK;
+    Check(bDxt1, "RPGPU makes and fills a DXT1 texture");
+    if (bDxt1)
+    {
+        Frame(
+            "a DXT1 texture samples its block's colour", 0xFFFFFFFFu,
+            [&] { return Pipeline->SetTextureStageTexture(0, Dxt1) == GR_OK && Tss(0, 2, 2); },
+            0xFF0000, 0);
+    }
+    if (Dxt1 != nullptr)
+        Pipeline->DestroyTexture(Dxt1);
+
+    // An 8-bit palettized level (the TGA mips most of the scene's textures are) loaded into an
+    // A8R8G8B8 texture: the palette's RGB triplets give the texels their colour.
+    void* Paletted = nullptr;
+    Format = 7; // A8R8G8B8
+    unsigned char Indices[16];
+    std::memset(Indices, 1, sizeof(Indices));
+    unsigned char Palette[256 * 3] = {};
+    Palette[3] = 0x20; // entry 1: R, G, B
+    Palette[4] = 0xC0;
+    Palette[5] = 0x60;
+    SourceFormat = 1; // P8
+    bool bP8 = Pipeline->CreateTexture(4, 4, &Format, 1, 0, &Paletted) == GR_OK &&
+               Pipeline->SetTextureLevelData(Paletted, 0, 4, 4, 4, &SourceFormat, Indices, nullptr,
+                                             Palette) == GR_OK;
+    Check(bP8, "RPGPU loads a P8 level with its palette");
+    if (bP8)
+    {
+        Frame(
+            "a P8 level's palette colours its texels", 0xFFFFFFFFu,
+            [&] { return Pipeline->SetTextureStageTexture(0, Paletted) == GR_OK && Tss(0, 2, 2); },
+            0x20C060, 0);
+    }
+    if (Paletted != nullptr)
+        Pipeline->DestroyTexture(Paletted);
+
+    Texture->Release();
+    Pipeline->DestroyGpuResources();
 }
 
 // RPGPU without a device (NULL_DEVICE = 1), and, where SDL_GPU has a device that takes RPGPU's
@@ -582,6 +1027,8 @@ void TestRpGpu(ICOManager* Manager, const std::string& Folder)
         Check(ClearPresentReadBack(Null, reinterpret_cast<RpWindow>(std::uintptr_t(1)), 64, 32,
                                    0xFF336699u, Root + "/null.bmp", &W, &H),
               "RPGPU's Null backend presents a clear and reads it back");
+        TestRpGpuVertexCopy(Null);
+        TestRpGpuDraws(Null, reinterpret_cast<RpWindow>(std::uintptr_t(1)), false, Root, "Null");
         Null->ShutdownPipeline();
         Null->Release();
     }
@@ -643,10 +1090,30 @@ void TestRpGpu(ICOManager* Manager, const std::string& Folder)
                     ClearPresentReadBack(Gpu, Hwnd, 64, 32, 0xFF336699u, Root + "/sdl.bmp", &W, &H);
                 Check(bOk, "RPGPU's SDL backend presents a clear on the client's SDL window and "
                            "reads it back");
+                // The back buffer is the size CreateBuffers asks for, as RP8's, whatever the
+                // window's size in pixels (twice its size on a Retina display); Present stretches
+                // it over the window. A smaller one on the same window, then 0: the window's size.
+                std::uint32_t SmallW = 0, SmallH = 0;
+                Check(!bOk || ClearPresentReadBack(Gpu, Hwnd, 32, 16, 0xFF996633u,
+                                                   Root + "/small.bmp", &SmallW, &SmallH),
+                      "RPGPU's SDL back buffer is the size asked for, not the window's");
                 int PixelW = 0, PixelH = 0;
                 SDL_GetWindowSizeInPixels(Window, &PixelW, &PixelH);
-                Check(!bOk || (W == std::uint32_t(PixelW) && H == std::uint32_t(PixelH)),
-                      "RPGPU's SDL frame is the window's size in pixels");
+                std::uint32_t WindowW = 0, WindowH = 0;
+                Check(!bOk ||
+                          (ClearPresentReadBack(Gpu, Hwnd, 0, 0, 0xFF336699u, Root + "/window.bmp",
+                                                &WindowW, &WindowH) &&
+                           WindowW == std::uint32_t(PixelW) && WindowH == std::uint32_t(PixelH)),
+                      "RPGPU's SDL back buffer asked for at 0 x 0 is the window's size in pixels");
+                // Each dimension asked for as 0 is the window's on its own, as in Direct3D 8.
+                std::uint32_t MixedW = 0, MixedH = 0;
+                Check(!bOk || (ClearPresentReadBack(Gpu, Hwnd, 32, 0, 0xFF336699u,
+                                                    Root + "/mixed.bmp", &MixedW, &MixedH) &&
+                               MixedW == 32u && MixedH == std::uint32_t(PixelH)),
+                      "RPGPU's SDL back buffer asked for at 32 x 0 keeps 32 and takes the window's "
+                      "height");
+                if (bOk)
+                    TestRpGpuDraws(Gpu, Hwnd, true, Root, Driver != nullptr ? Driver : "SDL_GPU");
                 if (bOk)
                     std::printf("module_tests: RPGPU's SDL backend (%s) cleared, presented and "
                                 "read back %ux%u\n",
@@ -826,6 +1293,49 @@ int main(int argc, char** argv)
     Check(SphereVolume != nullptr && SphereVolume(10.0f, 1.0f, 1.0f) == 0.0f &&
               SphereVolume(0.0f, 1.0f, 5.0f) == 4.1887903f,
           "Common's GetSphereIntersectVol");
+
+    // MarshalBuffer's wide strings are UTF-16 units on the wire, as Windows' wchar_t: a
+    // character above U+FFFF goes as a surrogate pair, and reads back as one wchar_t.
+    {
+        using FCtor = void (*)(void*);
+        using FUseWrite = void (*)(void*, unsigned char*, int);
+        using FUseRead = void (*)(void*, unsigned char const*, int);
+        using FPutWide = void (*)(void*, wchar_t const*);
+        using FGetWide = wchar_t* (*)(void*);
+        auto const Ctor =
+            reinterpret_cast<FCtor>(Platform::ModuleSymbol(Common, "_ZN13MarshalBufferC1Ev"));
+        auto const UseWrite = reinterpret_cast<FUseWrite>(
+            Platform::ModuleSymbol(Common, "_ZN13MarshalBuffer16use_write_bufferEPhi"));
+        auto const UseRead = reinterpret_cast<FUseRead>(
+            Platform::ModuleSymbol(Common, "_ZN13MarshalBuffer15use_read_bufferEPKhi"));
+        auto const PutWide = reinterpret_cast<FPutWide>(
+            Platform::ModuleSymbol(Common, "_ZN13MarshalBuffer11put_wstringEPKw"));
+        auto const GetWide = reinterpret_cast<FGetWide>(
+            Platform::ModuleSymbol(Common, "_ZN13MarshalBuffer11get_wstringEv"));
+        Check(Ctor != nullptr && UseWrite != nullptr && UseRead != nullptr && PutWide != nullptr &&
+                  GetWide != nullptr,
+              "Common exports MarshalBuffer's wide string calls");
+        if (Ctor != nullptr && UseWrite != nullptr && UseRead != nullptr && PutWide != nullptr &&
+            GetWide != nullptr)
+        {
+            alignas(std::max_align_t) unsigned char Buffer[256] = {};
+            alignas(std::max_align_t) unsigned char Wire[64] = {};
+            Ctor(Buffer);
+            UseWrite(Buffer, Wire, sizeof(Wire));
+            wchar_t const Text[] = {L'A', static_cast<wchar_t>(0x1F600), 0};
+            PutWide(Buffer, Text);
+            unsigned char const Expected[] = {3, 0, 0, 0, 'A', 0, 0x3D, 0xD8, 0x00, 0xDE};
+            Check(std::memcmp(Wire, Expected, sizeof(Expected)) == 0,
+                  "MarshalBuffer::put_wstring writes UTF-16 units");
+            Ctor(Buffer);
+            UseRead(Buffer, Wire, sizeof(Expected));
+            wchar_t* const Read = GetWide(Buffer);
+            Check(Read != nullptr && Read[0] == L'A' && Read[1] == static_cast<wchar_t>(0x1F600) &&
+                      Read[2] == 0,
+                  "MarshalBuffer::get_wstring reads them back");
+            free(Read);
+        }
+    }
 
     // Server loads (on dacom, DALib and Common) and runs: destroying a phantom it never made
     // reports -2, as retail's does.

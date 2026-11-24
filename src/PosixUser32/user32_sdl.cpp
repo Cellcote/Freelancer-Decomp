@@ -15,11 +15,22 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
+#include <atomic>
 #include <cstdio>
 #include <deque>
+#include <functional>
 #include <map>
+#include <mutex>
 #include <string>
 #include <vector>
+
+#if defined(__APPLE__)
+#include <pthread.h>
+#else
+#include <sys/syscall.h>
+#include <unistd.h>
+#endif
 
 namespace
 {
@@ -49,6 +60,8 @@ constexpr int kSwMinimize = 6;
 constexpr int kSwShowMinNoActive = 7;
 constexpr int kSwShowNa = 8;
 constexpr int kSwRestore = 9;
+constexpr int kSwShow = 5;
+constexpr int kSwForceMinimize = 11;
 constexpr unsigned kVkLShift = 0xA0;
 constexpr unsigned kVkRShift = 0xA1;
 constexpr unsigned kVkLControl = 0xA2;
@@ -56,7 +69,171 @@ constexpr unsigned kVkRControl = 0xA3;
 constexpr unsigned kVkLMenu = 0xA4;
 constexpr unsigned kVkRMenu = 0xA5;
 
-bool GReady = false;
+// SDL's video, started on the main thread by the first window. Everything below that touches
+// SDL or the state here runs on the main thread (SDL's windows are the main thread's on macOS):
+// a call from another thread is forwarded to it (OnMain), and a window is made only there.
+std::atomic<bool> GReady = false;
+
+// The process's main thread, by the system (SDL_IsMainThread takes any thread for the main one
+// before SDL is started).
+bool OnMainThread()
+{
+#if defined(__APPLE__)
+    return pthread_main_np() != 0;
+#else
+    return static_cast<pid_t>(syscall(SYS_gettid)) == getpid();
+#endif
+}
+
+// Calls forwarded from other threads, in the order they were made, for the main thread.
+std::mutex GForwardedLock;
+std::deque<std::function<void()>> GForwarded;
+
+// Runs the forwarded calls (on the main thread), oldest first, including any one of them
+// forwards.
+void RunForwarded()
+{
+    for (;;)
+    {
+        std::function<void()> Next;
+        {
+            std::lock_guard<std::mutex> Guard(GForwardedLock);
+            if (GForwarded.empty())
+                return;
+            Next = std::move(GForwarded.front());
+            GForwarded.pop_front();
+        }
+        Next();
+    }
+}
+
+// Runs Call on the main thread, after every call forwarded before it: at once there, else
+// queued and run when the main thread next takes its events or makes a call of its own
+// (SDL_RunOnMainThread wakes it; not waited for, so that a thread the main thread waits on
+// cannot deadlock). False when it cannot be forwarded; dropped before SDL is started, when
+// there is no window.
+bool OnMain(std::function<void()> Call)
+{
+    if (OnMainThread())
+    {
+        RunForwarded();
+        Call();
+        return true;
+    }
+    if (!GReady)
+        return false;
+    {
+        std::lock_guard<std::mutex> Guard(GForwardedLock);
+        GForwarded.push_back(std::move(Call));
+    }
+    if (!SDL_RunOnMainThread([](void*) { RunForwarded(); }, nullptr, false))
+    {
+        // Not queued with SDL: still run by the main thread's next Pump.
+        std::fprintf(stderr, "[user32_sdl] SDL_RunOnMainThread: %s\n", SDL_GetError());
+    }
+    return true;
+}
+
+// Windows user32 has destroyed, from any thread, before the main thread destroys their SDL
+// window: their buffered input is dropped from then on.
+std::mutex GDestroyedLock;
+std::vector<SDL_WindowID> GDestroyed;
+
+bool IsDestroyed(SDL_WindowID Id)
+{
+    std::lock_guard<std::mutex> Guard(GDestroyedLock);
+    return std::find(GDestroyed.begin(), GDestroyed.end(), Id) != GDestroyed.end();
+}
+
+// Windows whose forwarded state command SDL refused: their show state goes back to user32 as
+// SDL has it, at the next Pump (main thread only). Each with the refused command's state number
+// (GShowCommands, below): a window that got a newer state command since is left to that one.
+struct FReconcile
+{
+    SDL_WindowID Id;
+    std::uint64_t Command;
+};
+std::vector<FReconcile> GReconcile;
+// Two numbers per window: every show command (a forwarded one that a newer command has
+// overtaken is not run), and the commands that set the window's state (minimize, maximize,
+// restore; not SW_SHOW, SW_HIDE or SW_SHOWNA, which only show or hide it): a refusal is
+// reconciled unless a newer state command has been made.
+struct FShowCommands
+{
+    std::uint64_t Any = 0;
+    std::uint64_t State = 0;
+};
+std::mutex GShowCommandsLock;
+std::map<SDL_WindowID, FShowCommands> GShowCommands;
+
+bool SetsState(int Command)
+{
+    return Command != kSwHide && Command != kSwShow && Command != kSwShowNa;
+}
+
+FShowCommands NextShowCommand(SDL_WindowID Id, int Command)
+{
+    std::lock_guard<std::mutex> Guard(GShowCommandsLock);
+    FShowCommands& Numbers = GShowCommands[Id];
+    ++Numbers.Any;
+    if (SetsState(Command))
+        ++Numbers.State;
+    return Numbers;
+}
+
+bool IsLatestShowCommand(SDL_WindowID Id, std::uint64_t Any)
+{
+    std::lock_guard<std::mutex> Guard(GShowCommandsLock);
+    auto const Found = GShowCommands.find(Id);
+    return Found != GShowCommands.end() && Found->second.Any == Any;
+}
+
+bool IsLatestStateCommand(SDL_WindowID Id, std::uint64_t State)
+{
+    std::lock_guard<std::mutex> Guard(GShowCommandsLock);
+    auto const Found = GShowCommands.find(Id);
+    return Found != GShowCommands.end() && Found->second.State == State;
+}
+
+// The display's modes, read on the main thread when SDL starts and when the displays change,
+// for DisplayMode from any thread.
+struct FMode
+{
+    int Width = 0;
+    int Height = 0;
+    int Bits = 0;
+    int RefreshHz = 0;
+};
+std::mutex GModesLock;
+FMode GDesktopMode;
+std::vector<FMode> GModes;
+
+FMode ModeOf(const SDL_DisplayMode& Mode)
+{
+    FMode Out;
+    Out.Width = Mode.w;
+    Out.Height = Mode.h;
+    Out.Bits = static_cast<int>(SDL_BITSPERPIXEL(Mode.format)) >= 24 ? 32 : 16;
+    Out.RefreshHz = Mode.refresh_rate > 0.f ? static_cast<int>(Mode.refresh_rate + 0.5f) : 60;
+    return Out;
+}
+
+void ReadModes()
+{
+    SDL_DisplayID const Display = SDL_GetPrimaryDisplay();
+    FMode Desktop;
+    if (const SDL_DisplayMode* const Mode = SDL_GetDesktopDisplayMode(Display))
+        Desktop = ModeOf(*Mode);
+    std::vector<FMode> Modes;
+    int Count = 0;
+    SDL_DisplayMode** const List = SDL_GetFullscreenDisplayModes(Display, &Count);
+    for (int Index = 0; List != nullptr && Index < Count; ++Index)
+        Modes.push_back(ModeOf(*List[Index]));
+    SDL_free(List);
+    std::lock_guard<std::mutex> Guard(GModesLock);
+    GDesktopMode = Desktop;
+    GModes = std::move(Modes);
+}
 
 // A window's geometry as the events delivered so far left it (desktop position, client size),
 // and the windowed bounds asked for while it was fullscreen, applied when it leaves fullscreen.
@@ -101,6 +278,8 @@ bool Ready()
         // signal), not after a window's close button, which is a close request of its own.
         SDL_SetHint(SDL_HINT_QUIT_ON_LAST_WINDOW_CLOSE, "0");
         GReady = SDL_InitSubSystem(SDL_INIT_VIDEO);
+        if (GReady)
+            ReadModes();
     }
     if (!GReady)
         std::fprintf(stderr, "[user32_sdl] SDL_InitSubSystem(VIDEO): %s\n", SDL_GetError());
@@ -303,9 +482,121 @@ std::intptr_t PointParam(int X, int Y)
         static_cast<std::uint32_t>((X & 0xFFFF) | ((Y & 0xFFFF) << 16)));
 }
 
+// The modifier flag of a modifier key; none for other keys.
+SDL_Keymod ModifierOf(SDL_Scancode Code)
+{
+    switch (Code)
+    {
+    case SDL_SCANCODE_LSHIFT:
+        return SDL_KMOD_LSHIFT;
+    case SDL_SCANCODE_RSHIFT:
+        return SDL_KMOD_RSHIFT;
+    case SDL_SCANCODE_LCTRL:
+        return SDL_KMOD_LCTRL;
+    case SDL_SCANCODE_RCTRL:
+        return SDL_KMOD_RCTRL;
+    case SDL_SCANCODE_LALT:
+        return SDL_KMOD_LALT;
+    case SDL_SCANCODE_RALT:
+        return SDL_KMOD_RALT;
+    case SDL_SCANCODE_LGUI:
+        return SDL_KMOD_LGUI;
+    case SDL_SCANCODE_RGUI:
+        return SDL_KMOD_RGUI;
+    default:
+        return SDL_KMOD_NONE;
+    }
+}
+
+// DirectInput's button for an SDL button: left, right, middle, then X1 and X2 as 3 and 4.
+std::uint32_t DirectInputButton(Uint8 Button)
+{
+    switch (Button)
+    {
+    case SDL_BUTTON_LEFT:
+        return 0;
+    case SDL_BUTTON_RIGHT:
+        return 1;
+    case SDL_BUTTON_MIDDLE:
+        return 2;
+    default:
+        return Button - 1u;
+    }
+}
+
+// The window an input event is for; 0 for other events.
+SDL_WindowID InputWindow(const SDL_Event& Event)
+{
+    switch (Event.type)
+    {
+    case SDL_EVENT_KEY_DOWN:
+    case SDL_EVENT_KEY_UP:
+        return Event.key.windowID;
+    case SDL_EVENT_TEXT_INPUT:
+        return Event.text.windowID;
+    case SDL_EVENT_MOUSE_MOTION:
+        return Event.motion.windowID;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+        return Event.button.windowID;
+    case SDL_EVENT_MOUSE_WHEEL:
+        return Event.wheel.windowID;
+    default:
+        return 0;
+    }
+}
+
+bool IsInput(const SDL_Event& Event)
+{
+    switch (Event.type)
+    {
+    case SDL_EVENT_KEY_DOWN:
+    case SDL_EVENT_KEY_UP:
+    case SDL_EVENT_TEXT_INPUT:
+    case SDL_EVENT_MOUSE_MOTION:
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+    case SDL_EVENT_MOUSE_WHEEL:
+        return true;
+    default:
+        return false;
+    }
+}
+
 void Deliver(const FPending& Pending, const FUser32Sink* Sink)
 {
     SDL_Event const& Event = Pending.Event;
+    // Input for a window that is gone (destroyed by an earlier event's handler) or not one of
+    // user32's: dropped before it changes the mouse, the modifiers or DirectInput.
+    if (IsInput(Event) &&
+        (GWindows.count(InputWindow(Event)) == 0 || IsDestroyed(InputWindow(Event))))
+    {
+        // A release still lets go of what it releases (the live key state, the buttons held,
+        // DirectInput's button), without a message: it starts nothing new.
+        if (Event.type == SDL_EVENT_KEY_UP)
+        {
+            // Only the modifier this releases: the event's whole modifier state may hold
+            // presses that were dropped with the window.
+            GMods = static_cast<SDL_Keymod>(GMods & ~ModifierOf(Event.key.scancode));
+            FKey const Key = KeyOf(Event.key.scancode);
+            if (Key.Vk != 0)
+                Sink->ReleaseKey(Key.Vk);
+        }
+        else if (Event.type == SDL_EVENT_MOUSE_BUTTON_UP)
+        {
+            if (Event.button.button >= 1 && Event.button.button <= 32)
+                GButtons &= ~SDL_BUTTON_MASK(Event.button.button);
+            std::uint32_t const Button = DirectInputButton(Event.button.button);
+            if (Button < 8)
+                Sink->MouseRaw(kDimofsButton0 + Button, 0u);
+        }
+        return;
+    }
+    if (Event.type >= SDL_EVENT_DISPLAY_FIRST && Event.type <= SDL_EVENT_DISPLAY_LAST)
+    {
+        ReadModes();
+        return;
+    }
     switch (Event.type)
     {
     case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
@@ -351,20 +642,73 @@ void Deliver(const FPending& Pending, const FUser32Sink* Sink)
         Sink->Bounds(Event.window.windowID, Window.X, Window.Y, Window.Width, Window.Height);
         break;
     }
+    case SDL_EVENT_WINDOW_MINIMIZED:
+    case SDL_EVENT_WINDOW_MAXIMIZED:
+    case SDL_EVENT_WINDOW_RESTORED:
+    {
+        // The window's own minimize and maximize buttons, the system's restore, with the size
+        // of this transition: the resize SDL queued after it (before the window's next show
+        // change), else, if another show change of the window is queued, the size the events
+        // left (this one did not resize), else the size the window has now (SDL may report the
+        // resize later; the one after this then changes nothing).
+        auto const Found = GWindows.find(Event.window.windowID);
+        SDL_Window* const Window = WindowOf(Event.window.windowID);
+        if (Found == GWindows.end() || Window == nullptr)
+            break;
+        FScreenWindow& State = Found->second;
+        if (Event.type != SDL_EVENT_WINDOW_MINIMIZED)
+        {
+            bool bSized = false;
+            bool bLaterShowChange = false;
+            for (const FPending& Later : GPending)
+            {
+                SDL_EventType const Type = static_cast<SDL_EventType>(Later.Event.type);
+                bool const bResize = Type == SDL_EVENT_WINDOW_RESIZED;
+                bool const bShowChange = Type == SDL_EVENT_WINDOW_MINIMIZED ||
+                                         Type == SDL_EVENT_WINDOW_MAXIMIZED ||
+                                         Type == SDL_EVENT_WINDOW_RESTORED;
+                if ((!bResize && !bShowChange) ||
+                    Later.Event.window.windowID != Event.window.windowID)
+                    continue;
+                if (bResize)
+                {
+                    State.Width = Later.Event.window.data1;
+                    State.Height = Later.Event.window.data2;
+                    bSized = true;
+                }
+                else
+                    bLaterShowChange = true;
+                break;
+            }
+            if (!bSized && !bLaterShowChange)
+                SDL_GetWindowSize(Window, &State.Width, &State.Height);
+        }
+        Sink->ShowState(Event.window.windowID,
+                        Event.type == SDL_EVENT_WINDOW_MINIMIZED   ? 1
+                        : Event.type == SDL_EVENT_WINDOW_MAXIMIZED ? 2
+                                                                   : 0,
+                        State.Width, State.Height);
+        break;
+    }
     case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
     {
-        // The windowed bounds asked for while fullscreen, if SetFrame could not apply them.
+        // The windowed bounds asked for while fullscreen, if SetFrame could not apply them; not
+        // while the window is fullscreen again (a late event), which keeps them for its next
+        // exit.
         auto const Found = GWindows.find(Event.window.windowID);
-        if (Found == GWindows.end())
-            break;
-        if (SDL_Window* const Window = WindowOf(Event.window.windowID))
+        SDL_Window* const Window = WindowOf(Event.window.windowID);
+        if (Found != GWindows.end() && Window != nullptr &&
+            (SDL_GetWindowFlags(Window) & SDL_WINDOW_FULLSCREEN) == 0)
             ApplyWindowed(Window, Found->second);
         break;
     }
     case SDL_EVENT_KEY_DOWN:
     case SDL_EVENT_KEY_UP:
     {
-        GMods = Event.key.mod;
+        // The modifiers the mouse messages report change with the modifier keys taken here, not
+        // with another key's whole SDL mask (which may hold a press dropped with its window).
+        SDL_Keymod const Modifier = ModifierOf(Event.key.scancode);
+        GMods = static_cast<SDL_Keymod>(Event.key.down ? GMods | Modifier : GMods & ~Modifier);
         FKey const Key = KeyOf(Event.key.scancode);
         if (Key.Vk != 0)
             Sink->Key(Event.key.windowID, Key.Vk, Key.bExtended, Event.key.down, Event.key.repeat);
@@ -412,6 +756,11 @@ void Deliver(const FPending& Pending, const FUser32Sink* Sink)
         }
         int const X = static_cast<int>(Event.button.x);
         int const Y = static_cast<int>(Event.button.y);
+        // The cursor where the button was pressed, for the message's MSG.pt.
+        int ScreenX = 0;
+        int ScreenY = 0;
+        ToDesktop(Event.button.windowID, Event.button.x, Event.button.y, &ScreenX, &ScreenY);
+        Sink->MouseMove(Event.button.windowID, X, Y, ScreenX, ScreenY);
         unsigned Message = 0;
         std::uint32_t Button = 0;
         switch (Event.button.button)
@@ -455,6 +804,8 @@ void Deliver(const FPending& Pending, const FUser32Sink* Sink)
         int ScreenY = 0;
         ToDesktop(Event.wheel.windowID, Event.wheel.mouse_x, Event.wheel.mouse_y, &ScreenX,
                   &ScreenY);
+        Sink->MouseMove(Event.wheel.windowID, static_cast<int>(Event.wheel.mouse_x),
+                        static_cast<int>(Event.wheel.mouse_y), ScreenX, ScreenY);
         std::uintptr_t const WParam =
             ButtonFlags() | (static_cast<std::uintptr_t>(static_cast<std::uint16_t>(
                                  static_cast<std::int16_t>(Notches * kWheelDelta)))
@@ -469,10 +820,19 @@ void Deliver(const FPending& Pending, const FUser32Sink* Sink)
     }
 }
 
+// A window is made on the main thread only (SDL_CreateWindow's rule, and where macOS keeps its
+// windows): on another thread, false, and user32 keeps the window as a record.
 bool CreateWindow(const char* Title, int X, int Y, int Width, int Height, bool bFramed,
                   bool bResizable, bool bVisible, std::uint32_t* OutId)
 {
-    if (!Ready() || OutId == nullptr)
+    if (OutId == nullptr)
+        return false;
+    if (!OnMainThread())
+    {
+        std::fprintf(stderr, "[user32_sdl] a window made off the main thread has no screen\n");
+        return false;
+    }
+    if (!Ready())
         return false;
     SDL_WindowFlags Flags = 0;
     if (!bFramed)
@@ -506,55 +866,116 @@ bool CreateWindow(const char* Title, int X, int Y, int Width, int Height, bool b
 
 void DestroyWindow(std::uint32_t Id)
 {
-    GWindows.erase(Id);
-    if (SDL_Window* const Window = WindowOf(Id))
-        SDL_DestroyWindow(Window);
+    {
+        std::lock_guard<std::mutex> Guard(GDestroyedLock);
+        GDestroyed.push_back(Id);
+    }
+    OnMain(
+        [Id]
+        {
+            GWindows.erase(Id);
+            {
+                std::lock_guard<std::mutex> Guard(GShowCommandsLock);
+                GShowCommands.erase(Id);
+            }
+            if (SDL_Window* const Window = WindowOf(Id))
+                SDL_DestroyWindow(Window);
+            // Its buffered input is dropped by GWindows from now on (SDL's ids are not reused).
+            std::lock_guard<std::mutex> Guard(GDestroyedLock);
+            GDestroyed.erase(std::remove(GDestroyed.begin(), GDestroyed.end(), Id),
+                             GDestroyed.end());
+        });
 }
 
-// Position and size; a fullscreen window keeps them for when it leaves fullscreen (SDL ignores
-// both while it is fullscreen).
+// Position and size, asked for. The geometry the events report stays as they left it (earlier
+// queued events are placed by it) until SDL's own move and resize events. A fullscreen window
+// keeps the bounds for when it leaves fullscreen (SDL ignores both while it is fullscreen).
 void SetBounds(std::uint32_t Id, int X, int Y, int Width, int Height)
 {
-    SDL_Window* const Window = WindowOf(Id);
-    if (Window == nullptr)
-        return;
-    FScreenWindow& State = GWindows[Id];
-    State.X = X;
-    State.Y = Y;
-    State.Width = Width;
-    State.Height = Height;
-    State.bWindowedPending = true;
-    State.WindowedX = X;
-    State.WindowedY = Y;
-    State.WindowedWidth = Width;
-    State.WindowedHeight = Height;
-    if ((SDL_GetWindowFlags(Window) & SDL_WINDOW_FULLSCREEN) == 0)
-        ApplyWindowed(Window, State);
+    OnMain(
+        [=]
+        {
+            SDL_Window* const Window = WindowOf(Id);
+            auto const Found = GWindows.find(Id);
+            if (Window == nullptr || Found == GWindows.end())
+                return;
+            FScreenWindow& State = Found->second;
+            State.bWindowedPending = true;
+            State.WindowedX = X;
+            State.WindowedY = Y;
+            State.WindowedWidth = Width;
+            State.WindowedHeight = Height;
+            if ((SDL_GetWindowFlags(Window) & SDL_WINDOW_FULLSCREEN) == 0)
+                ApplyWindowed(Window, State);
+        });
 }
 
 void SetFrame(std::uint32_t Id, bool bFramed, bool bResizable, bool bFullscreen)
 {
-    SDL_Window* const Window = WindowOf(Id);
-    if (Window == nullptr)
-        return;
-    bool const bWasFullscreen = (SDL_GetWindowFlags(Window) & SDL_WINDOW_FULLSCREEN) != 0;
-    SDL_SetWindowBordered(Window, bFramed);
-    SDL_SetWindowResizable(Window, bResizable);
-    // Fullscreen on the desktop's mode: the game's frame is scaled to it by RPGPU.
-    SDL_SetWindowFullscreenMode(Window, nullptr);
-    SDL_SetWindowFullscreen(Window, bFullscreen);
-    if (bWasFullscreen && !bFullscreen)
-    {
-        // The windowed bounds asked for while fullscreen, once SDL has left it (or, if leaving
-        // takes longer, when SDL_EVENT_WINDOW_LEAVE_FULLSCREEN comes).
-        SDL_SyncWindow(Window);
-        if ((SDL_GetWindowFlags(Window) & SDL_WINDOW_FULLSCREEN) == 0)
-            ApplyWindowed(Window, GWindows[Id]);
-    }
+    OnMain(
+        [=]
+        {
+            SDL_Window* const Window = WindowOf(Id);
+            if (Window == nullptr)
+                return;
+            bool const bWasFullscreen = (SDL_GetWindowFlags(Window) & SDL_WINDOW_FULLSCREEN) != 0;
+            SDL_SetWindowBordered(Window, bFramed);
+            SDL_SetWindowResizable(Window, bResizable);
+            // Fullscreen on the desktop's mode: the game's frame is scaled to it by RPGPU.
+            SDL_SetWindowFullscreenMode(Window, nullptr);
+            SDL_SetWindowFullscreen(Window, bFullscreen);
+            if (bWasFullscreen && !bFullscreen)
+            {
+                // The windowed bounds asked for while fullscreen, once SDL has left it (or, if
+                // leaving takes longer, when SDL_EVENT_WINDOW_LEAVE_FULLSCREEN comes).
+                SDL_SyncWindow(Window);
+                auto const Found = GWindows.find(Id);
+                if ((SDL_GetWindowFlags(Window) & SDL_WINDOW_FULLSCREEN) == 0 &&
+                    Found != GWindows.end())
+                    ApplyWindowed(Window, Found->second);
+            }
+        });
 }
 
-// False when SDL refuses the command (maximizing a window that cannot be resized).
-bool Show(std::uint32_t Id, int Command)
+// Shown without being activated (made key on macOS): SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN off
+// for the call, then as it was.
+// The hint is set at override priority, which wins over the environment's; if it still does
+// not take, the window is not shown rather than shown activated. Afterwards the hint is back
+// to the environment's (or the default), and to a value set earlier at normal priority.
+bool ShowWithoutActivating(SDL_Window* Window)
+{
+    // Activation already off (the environment, or the application at any priority): shown as
+    // it is, the hint untouched.
+    if (!SDL_GetHintBoolean(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, true))
+        return SDL_ShowWindow(Window);
+    const char* const Before = SDL_GetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
+    bool const bHadValue = Before != nullptr;
+    std::string const Saved = bHadValue ? Before : "";
+    bool const bSet =
+        SDL_SetHintWithPriority(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, "0", SDL_HINT_OVERRIDE) &&
+        !SDL_GetHintBoolean(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, true);
+    bool const bShown = bSet && SDL_ShowWindow(Window);
+    // Back to the value from before at the lowest priority that holds it: the reset brings
+    // back the environment's (or none); a value the application set over it comes back at
+    // normal priority, or at override where the environment's would win (SDL has no way to
+    // read a hint's priority).
+    SDL_ResetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
+    auto const Holds = [&]
+    {
+        const char* const After = SDL_GetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
+        return bHadValue ? After != nullptr && Saved == After : After == nullptr;
+    };
+    if (bHadValue && !Holds())
+    {
+        SDL_SetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, Saved.c_str());
+        if (!Holds())
+            SDL_SetHintWithPriority(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, Saved.c_str(),
+                                    SDL_HINT_OVERRIDE);
+    }
+    return bShown;
+}
+
+bool ShowOnMain(std::uint32_t Id, int Command)
 {
     SDL_Window* const Window = WindowOf(Id);
     if (Window == nullptr)
@@ -564,13 +985,18 @@ bool Show(std::uint32_t Id, int Command)
     case kSwHide:
         return SDL_HideWindow(Window);
     case kSwMinimize:
+    case kSwForceMinimize:
         return SDL_MinimizeWindow(Window);
     case kSwShowMinimized:
-    case kSwShowMinNoActive:
     {
         // Shown as well: a hidden window takes the minimized state when it is shown.
         bool const bMinimized = SDL_MinimizeWindow(Window);
         return SDL_ShowWindow(Window) && bMinimized;
+    }
+    case kSwShowMinNoActive:
+    {
+        bool const bMinimized = SDL_MinimizeWindow(Window);
+        return ShowWithoutActivating(Window) && bMinimized;
     }
     case kSwMaximize:
     {
@@ -583,28 +1009,124 @@ bool Show(std::uint32_t Id, int Command)
         return SDL_RestoreWindow(Window) && bShown;
     }
     case kSwShowNoActivate:
+    {
+        // As SW_SHOWNORMAL (a minimized window restored), not activated nor raised.
+        bool const bShown = ShowWithoutActivating(Window);
+        if ((SDL_GetWindowFlags(Window) & SDL_WINDOW_MINIMIZED) != 0)
+            SDL_RestoreWindow(Window);
+        return bShown;
+    }
     case kSwShowNa:
-        // Shown, not raised in front of the others.
-        return SDL_ShowWindow(Window);
+        // Shown as it is (minimized or maximized stays so), neither activated nor raised.
+        return ShowWithoutActivating(Window);
+    case kSwShow:
+    {
+        // Shown as it is: a minimized window stays minimized (SW_SHOW is not SW_SHOWNORMAL).
+        bool const bShown = SDL_ShowWindow(Window);
+        SDL_RaiseWindow(Window);
+        return bShown;
+    }
     default:
     {
+        // SW_SHOWNORMAL, SW_SHOWDEFAULT: a minimized window is restored, as Windows shows it.
         bool const bShown = SDL_ShowWindow(Window);
+        if ((SDL_GetWindowFlags(Window) & SDL_WINDOW_MINIMIZED) != 0)
+            SDL_RestoreWindow(Window);
         SDL_RaiseWindow(Window);
         return bShown;
     }
     }
 }
 
+// A state command's state alone (minimized, maximized, restored), the window shown or hidden as
+// it is; false when SDL refuses it.
+bool SetStateOnMain(std::uint32_t Id, int Command)
+{
+    SDL_Window* const Window = WindowOf(Id);
+    if (Window == nullptr)
+        return false;
+    switch (Command)
+    {
+    case kSwMinimize:
+    case kSwForceMinimize:
+    case kSwShowMinimized:
+    case kSwShowMinNoActive:
+        return SDL_MinimizeWindow(Window);
+    case kSwMaximize:
+        return SDL_MaximizeWindow(Window);
+    default:
+        // Always: on a hidden window SDL keeps an earlier minimize or maximize as a deferred
+        // state (applied when it is shown) that the flags do not show, and a restore clears it.
+        return SDL_RestoreWindow(Window);
+    }
+}
+
+// False when SDL refuses the command (maximizing a window that cannot be resized); from another
+// thread the command is forwarded, and taken as done.
+bool Show(std::uint32_t Id, int Command)
+{
+    // Numbered when it is made (user32 has recorded its style by then), on whatever thread.
+    FShowCommands const Number = NextShowCommand(Id, Command);
+    if (OnMainThread())
+    {
+        RunForwarded();
+        return ShowOnMain(Id, Command);
+    }
+    // Forwarded: a command SDL then refuses sends the window's show state back to user32 as SDL
+    // has it (the next Pump), so a maximize recorded for it is undone, unless a newer command
+    // for the window has been made by then.
+    return OnMain(
+        [=]
+        {
+            // The latest command for the window: run. Overtaken (a newer command was made after
+            // this one was numbered, run or still queued behind it): a state command whose newer
+            // commands only showed or hid the window still sets its state, leaving the
+            // visibility to them; anything else is left to the newer command.
+            bool bDone = true;
+            if (IsLatestShowCommand(Id, Number.Any))
+                bDone = ShowOnMain(Id, Command);
+            else if (SetsState(Command) && IsLatestStateCommand(Id, Number.State))
+                bDone = SetStateOnMain(Id, Command);
+            else
+                return;
+            if (!bDone && SetsState(Command))
+                GReconcile.push_back({Id, Number.State});
+        });
+}
+
 void SetTitle(std::uint32_t Id, const char* Title)
 {
-    if (SDL_Window* const Window = WindowOf(Id))
-        SDL_SetWindowTitle(Window, Title != nullptr ? Title : "");
+    OnMain(
+        [Id, Text = std::string(Title != nullptr ? Title : "")]
+        {
+            if (SDL_Window* const Window = WindowOf(Id))
+                SDL_SetWindowTitle(Window, Text.c_str());
+        });
 }
 
 void Pump(const FUser32Sink* Sink)
 {
-    if (!GReady || Sink == nullptr)
+    if (!GReady || Sink == nullptr || !OnMainThread())
         return;
+    RunForwarded();
+    // Show states SDL kept against a forwarded command.
+    std::vector<FReconcile> Reconcile;
+    Reconcile.swap(GReconcile);
+    for (FReconcile const& Refused : Reconcile)
+    {
+        SDL_WindowID const Id = Refused.Id;
+        SDL_Window* const Window = WindowOf(Id);
+        auto const Found = GWindows.find(Id);
+        if (Window == nullptr || Found == GWindows.end() ||
+            !IsLatestStateCommand(Id, Refused.Command))
+            continue;
+        SDL_WindowFlags const Flags = SDL_GetWindowFlags(Window);
+        Sink->ShowState(Id,
+                        (Flags & SDL_WINDOW_MINIMIZED) != 0   ? 1
+                        : (Flags & SDL_WINDOW_MAXIMIZED) != 0 ? 2
+                                                              : 0,
+                        Found->second.Width, Found->second.Height);
+    }
     FPending Pending;
     while (SDL_PollEvent(&Pending.Event))
     {
@@ -625,58 +1147,69 @@ void Pump(const FUser32Sink* Sink)
 
 void Wait(int Milliseconds)
 {
-    if (GReady)
+    if (GReady && OnMainThread())
         SDL_WaitEventTimeout(nullptr, Milliseconds);
 }
 
 void ShowCursor(bool bShow)
 {
-    if (!GReady)
-        return;
-    if (bShow)
-        SDL_ShowCursor();
-    else
-        SDL_HideCursor();
+    OnMain(
+        [bShow]
+        {
+            if (!GReady)
+                return;
+            if (bShow)
+                SDL_ShowCursor();
+            else
+                SDL_HideCursor();
+        });
 }
 
 void WarpMouse(std::uint32_t Id, int X, int Y)
 {
-    if (SDL_Window* const Window = WindowOf(Id))
-        SDL_WarpMouseInWindow(Window, static_cast<float>(X), static_cast<float>(Y));
+    OnMain(
+        [=]
+        {
+            if (SDL_Window* const Window = WindowOf(Id))
+                SDL_WarpMouseInWindow(Window, static_cast<float>(X), static_cast<float>(Y));
+        });
 }
 
 void ClipCursor(std::uint32_t Id, bool bClip)
 {
-    if (SDL_Window* const Window = WindowOf(Id))
-        SDL_SetWindowMouseGrab(Window, bClip);
+    OnMain(
+        [=]
+        {
+            if (SDL_Window* const Window = WindowOf(Id))
+                SDL_SetWindowMouseGrab(Window, bClip);
+        });
 }
 
+// SDL started (on the main thread only), so that the display's modes are known before the first
+// window is sized.
+bool Start()
+{
+    return OnMainThread() && Ready();
+}
+
+// From the modes read on the main thread, so any thread may ask; false before SDL is started.
 bool DisplayMode(int Index, int* Width, int* Height, int* Bits, int* RefreshHz)
 {
-    if (!Ready())
+    if (!GReady)
         return false;
-    SDL_DisplayID const Display = SDL_GetPrimaryDisplay();
-    const SDL_DisplayMode* Mode = nullptr;
-    SDL_DisplayMode** Modes = nullptr;
+    std::lock_guard<std::mutex> Guard(GModesLock);
+    FMode Mode;
     if (Index < 0)
-        Mode = SDL_GetDesktopDisplayMode(Display);
-    else
-    {
-        int Count = 0;
-        Modes = SDL_GetFullscreenDisplayModes(Display, &Count);
-        if (Modes != nullptr && Index < Count)
-            Mode = Modes[Index];
-    }
-    bool const bFound = Mode != nullptr;
-    if (bFound)
-    {
-        *Width = Mode->w;
-        *Height = Mode->h;
-        *Bits = static_cast<int>(SDL_BITSPERPIXEL(Mode->format)) >= 24 ? 32 : 16;
-        *RefreshHz = Mode->refresh_rate > 0.f ? static_cast<int>(Mode->refresh_rate + 0.5f) : 60;
-    }
-    SDL_free(Modes);
-    return bFound;
+        Mode = GDesktopMode;
+    else if (static_cast<std::size_t>(Index) < GModes.size())
+        Mode = GModes[static_cast<std::size_t>(Index)];
+    if (Mode.Width <= 0 || Mode.Height <= 0)
+        return false;
+    *Width = Mode.Width;
+    *Height = Mode.Height;
+    *Bits = Mode.Bits;
+    *RefreshHz = Mode.RefreshHz;
+    return true;
 }
 
 const FUser32Backend GBackend = {
@@ -693,6 +1226,7 @@ const FUser32Backend GBackend = {
     &WarpMouse,
     &ClipCursor,
     &DisplayMode,
+    &Start,
 };
 } // namespace
 

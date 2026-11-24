@@ -11,6 +11,7 @@
 #include "RpGpuDds.h"
 #include "readfile.h" // IFileSystem
 #include "render/rp8_semantics.h"
+#include "render/rp8_vertex_copy.h" // CopyVertexData
 #include "TexConvert.h"
 
 #include <algorithm>
@@ -323,6 +324,8 @@ bool FRpGpu::LockRing(FRpGpuBuffer* Buffer, unsigned int Count, unsigned int* Ou
     {
         if (Buffer->Fvf == 0)
             return false; // the scratch index buffer has a fixed size
+        if (Buffer->bLocked)
+            return false; // a lock's vertices do not move: no growth until it is unlocked
         unsigned int Grown = 0;
         if (!RoundToPoolStep(Count, &Grown) || !ResizeStorage(Buffer, Grown, Buffer->Stride))
             return false;
@@ -446,12 +449,9 @@ GENRESULT DACOM_API FRpGpu::UnsupportedManagerOperation()
 GENRESULT DACOM_API FRpGpu::CopyVertexData(void* Dest, unsigned int Fvf, const FRpVertexSrcDesc* Source,
                                            unsigned int StartVertex, unsigned int Count)
 {
-    // RP8 converts the source streams into Dest. Nothing reads the vertices yet.
-    (void)Dest;
-    (void)Fvf;
-    (void)Source;
-    (void)StartVertex;
-    (void)Count;
+    // RP8's conversion (FUN_06d1f040): the source streams into Dest, a buffer of Fvf vertices
+    // (a pool buffer LockVertexMemory handed out). Always 0, as retail's slot 8.
+    Rp8CopyVertexData(Dest, Fvf, Source, StartVertex, Count);
     return GR_OK;
 }
 
@@ -602,7 +602,11 @@ GENRESULT DACOM_API FRpGpu::CreateVb(unsigned int Fvf, unsigned int Count, unsig
     {
         // The shared pool, grown first when it is smaller than the request.
         Buffer = PoolBuffer(Fvf);
-        if (Buffer != nullptr && Count > Buffer->Count)
+        // A pool that is locked keeps its storage until it is unlocked: growing it would move
+        // the vertices the lock handed out. The request fails as an allocation failure does.
+        if (Buffer != nullptr && Count > Buffer->Count && Buffer->bLocked)
+            Buffer = nullptr;
+        else if (Buffer != nullptr && Count > Buffer->Count)
         {
             unsigned int Grown = 0;
             if (!RoundToPoolStep(Count, &Grown) || !ResizeStorage(Buffer, Grown, Buffer->Stride))
@@ -656,6 +660,10 @@ GENRESULT DACOM_API FRpGpu::ResizeVb(void* Handle, unsigned int Fvf, unsigned in
     FRpGpuBuffer* const Buffer = static_cast<FRpGpuBuffer*>(Handle);
     if (VertexBuffers_.count(Buffer) != 0)
     {
+        // A locked buffer keeps its storage and its format until it is unlocked: the lock's
+        // vertices (and CopyVertices' bounds) stay valid. Refused as a failed allocation is.
+        if (Buffer->bLocked)
+            return GR_OUT_OF_MEMORY;
         if (!ResizeStorage(Buffer, std::max(1u, Count), std::max(1u, Rp8FvfStride(Fvf))))
             return GR_OUT_OF_MEMORY;
         Buffer->Fvf = Fvf;
@@ -668,7 +676,6 @@ GENRESULT DACOM_API FRpGpu::ResizeVb(void* Handle, unsigned int Fvf, unsigned in
 GENRESULT DACOM_API FRpGpu::CopyVertices(void* Handle, unsigned int* OutOffset, const FRpVertexSrcDesc* SrcData,
                                          unsigned int StartVertex, unsigned int Count)
 {
-    (void)StartVertex;
     if (Handle == nullptr)
         return GR_GENERIC;
     void* Target = Handle;
@@ -681,17 +688,46 @@ GENRESULT DACOM_API FRpGpu::CopyVertices(void* Handle, unsigned int* OutOffset, 
     FRpGpuBuffer* const Buffer = LiveVb(Target);
     if (Buffer == nullptr)
         return GR_GENERIC;
-    if (Buffer->bLocked)
-        return GR_OK; // the offset is already a vertex index
-    // The vertices are not converted yet: nothing reads them.
-    void* Bits = nullptr;
-    unsigned int Offset = OutOffset != nullptr ? *OutOffset : 0; // bytes in, as LockVb takes them
-    const GENRESULT Result = LockVb(Target, &Offset, &Bits, Count);
-    if (Result != GR_OK)
-        return Result;
+    // RP8 (FUN_06d1228c): a buffer that is already locked is written in place, Offset vertices
+    // into the lock; otherwise Count vertices are locked at Offset (bytes in, a vertex index
+    // out) and unlocked again. The source's vertices StartVertex.. land at the vertex the
+    // offset names (the converter adds StartVertex back).
+    unsigned int Offset = OutOffset != nullptr ? *OutOffset : 0;
+    unsigned char* Bits = nullptr;
+    const bool bWasLocked = Buffer->bLocked;
+    if (bWasLocked)
+    {
+        // RP8 writes wherever Offset and Count say; here a copy must stay inside the lock. A
+        // refused copy leaves the lock as it was.
+        if (Offset > Buffer->LockCount || Count > Buffer->LockCount - Offset)
+            return kFail;
+        Bits = Buffer->Data.data() +
+               static_cast<std::size_t>(Buffer->LockStart + Offset) * Buffer->Stride;
+    }
+    else
+    {
+        void* Locked = nullptr;
+        const GENRESULT Result = LockVb(Target, &Offset, &Locked, Count);
+        if (Result != GR_OK)
+            return Result;
+        Bits = static_cast<unsigned char*>(Locked);
+    }
+    GENRESULT Result = GR_OK;
+    // The bytes from Bits to the end of the locked vertices.
+    const std::size_t Available =
+        static_cast<std::size_t>(bWasLocked ? Buffer->LockCount - Offset : Count) * Buffer->Stride;
+    if (SrcData != nullptr &&
+        !Rp8CopyVertexDataAt(Bits, Available, Buffer->Fvf, SrcData, StartVertex, Count))
+        Result = kFail; // RP8 would write outside the buffer: nothing written
+    if (!bWasLocked)
+    {
+        const GENRESULT Unlocked = UnlockVb(Target);
+        if (Result == GR_OK)
+            Result = Unlocked;
+    }
     if (OutOffset != nullptr)
         *OutOffset = Offset;
-    return UnlockVb(Target);
+    return Result;
 }
 
 // Offset goes in as bytes and comes back as a vertex index. Pool buffers ignore the input and
@@ -718,6 +754,8 @@ GENRESULT DACOM_API FRpGpu::LockVb(void* Handle, unsigned int* Offset, void** Ou
     if (Offset != nullptr)
         *Offset = Start;
     Buffer->bLocked = true;
+    Buffer->LockStart = Start;
+    Buffer->LockCount = Count;
     RetireBlocks(Buffer); // the caller may write any vertex it locked
     Buffer->LastWriteFrame = FrameNumber_;
     *Out = Buffer->Data.data() + static_cast<std::size_t>(Start) * Buffer->Stride;

@@ -19,6 +19,9 @@
 #include <cstring>
 #include <cwchar>
 #include <list>
+#if !defined(_WIN32)
+#include <string>
+#endif
 
 // ===========================================================================
 // MarshalBuffer
@@ -350,7 +353,27 @@ void MarshalBuffer::put_wstring(const wchar_t* Str)
         return;
     }
 
+#if defined(_WIN32)
     unsigned int const CharLen = (unsigned int)wcslen(Str);
+    const void* const Units = Str;
+#else
+    // PORT(macOS): the wire holds UTF-16 units, Windows' wchar_t; a 4-byte wchar_t is encoded
+    // to them (a character above U+FFFF as a surrogate pair), and the length counts units.
+    std::u16string Encoded;
+    for (const wchar_t* Char = Str; *Char != L'\0'; ++Char)
+    {
+        std::uint32_t const Code = static_cast<std::uint32_t>(*Char);
+        if (Code > 0xFFFFu && Code <= 0x10FFFFu)
+        {
+            Encoded += static_cast<char16_t>(0xD800u + ((Code - 0x10000u) >> 10));
+            Encoded += static_cast<char16_t>(0xDC00u + ((Code - 0x10000u) & 0x3FFu));
+        }
+        else
+            Encoded += static_cast<char16_t>(Code);
+    }
+    unsigned int const CharLen = (unsigned int)Encoded.size();
+    const void* const Units = Encoded.data();
+#endif
     memcpy(Cursor, &CharLen, 4);
     Cursor += 4;
     Remaining -= 4;
@@ -359,7 +382,7 @@ void MarshalBuffer::put_wstring(const wchar_t* Str)
     unsigned int const ByteLen = CharLen * 2;
     if (ByteLen > 0)
     {
-        put_void(Str, (int)ByteLen);
+        put_void(Units, (int)ByteLen);
     }
 }
 
@@ -379,9 +402,30 @@ wchar_t* MarshalBuffer::get_wstring()
     if (CharLen == 0xFFFFFFFF || CharLen >= 0x4000)
         return nullptr;
 
+#if defined(_WIN32)
     wchar_t* Result = (wchar_t*)malloc(CharLen * 2 + 2);
     get_void(Result, (int)(CharLen * 2));
     Result[CharLen] = 0;
+#else
+    // PORT(macOS): the CharLen UTF-16 units decoded into a 4-byte wchar_t string (a surrogate
+    // pair into one character), as put_wstring encodes them.
+    std::u16string Units(CharLen, u'\0');
+    get_void(Units.data(), (int)(CharLen * 2));
+    wchar_t* Result = (wchar_t*)malloc((CharLen + 1) * sizeof(wchar_t));
+    unsigned int Out = 0;
+    for (unsigned int Index = 0; Index < CharLen; ++Index)
+    {
+        std::uint32_t Code = Units[Index];
+        if (Code >= 0xD800u && Code <= 0xDBFFu && Index + 1 < CharLen &&
+            Units[Index + 1] >= 0xDC00u && Units[Index + 1] <= 0xDFFFu)
+        {
+            Code = 0x10000u + ((Code - 0xD800u) << 10) + (Units[Index + 1] - 0xDC00u);
+            ++Index;
+        }
+        Result[Out++] = static_cast<wchar_t>(Code);
+    }
+    Result[Out] = 0;
+#endif
     return Result;
 }
 

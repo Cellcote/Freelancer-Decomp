@@ -169,7 +169,8 @@ private:
     TGpuHandle<SDL_GPUTexture> White_; // bound when a draw has no texture
     TGpuHandle<SDL_GPUTexture> WhiteCube_; // bound to the cube slots when a stage has no cube map
     bool bWhiteUploaded_ = false;
-    // The frame is drawn here, then copied to the swap-chain image, so it can be read back.
+    // The frame is drawn here (the back buffer), then scaled to the swap-chain image, so it can be
+    // read back.
     TGpuHandle<SDL_GPUTexture> Target_;
     std::uint32_t TargetWidth_ = 0;
     std::uint32_t TargetHeight_ = 0;
@@ -183,6 +184,10 @@ private:
     std::uint32_t IndexCapacity_ = 0; // bytes
     TGpuHandle<SDL_GPUTransferBuffer> Transfer_;
     std::uint32_t TransferCapacity_ = 0; // bytes
+    // The back buffer's size: what Create was asked for, as RP8's back buffer is the mode's size;
+    // a dimension asked for as 0 is the window's in pixels.
     std::uint32_t Width_ = 0;
     std::uint32_t Height_ = 0;
+    std::uint32_t RequestedWidth_ = 0; // 0: the window's width
+    std::uint32_t RequestedHeight_ = 0; // 0: the window's height
 };

@@ -28,6 +28,7 @@
 #include "user32_backend.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <condition_variable>
 #include <cstdarg>
@@ -39,6 +40,7 @@
 #include <deque>
 #include <limits>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <strings.h>
@@ -71,6 +73,10 @@ struct FWindow
     bool bEnabled = true;
     bool bDestroying = false; // DestroyWindow under way: a nested call does nothing
     std::uint64_t Owner = 0; // the thread (ThreadSerial) whose queue takes its posted messages
+    // The screen: the show state last reported to the window procedure (0 restored,
+    // 1 minimized, 2 maximized), and an owned popup hidden while its owner is minimized.
+    int ReportedShowState = 0;
+    bool bHiddenWithOwner = false;
 };
 
 // A posted message, numbered so that a wait can tell input that arrived since the thread last
@@ -79,6 +85,9 @@ struct FQueued
 {
     MSG Message;
     std::uint64_t Sequence;
+    // A key message from the screen: the whole key state (GetKeyState) as of that key, which
+    // it brings when it is taken out of the queue.
+    std::shared_ptr<const std::array<SHORT, 256>> Keys;
 };
 
 struct FThreadQueue
@@ -113,7 +122,12 @@ struct FState
     HCURSOR Cursor = nullptr;
     int CursorCount = 0; // ShowCursor's display count: shown at 0 and above
     POINT CursorPos = {kHeadlessWidth / 2, kHeadlessHeight / 2};
+    // GetKeyState's table: the keys as of the last key message taken from the queue. The keys
+    // as the screen has them now (GetAsyncKeyState) are LiveKeys.
     SHORT Keys[256] = {};
+    SHORT LiveKeys[256] = {};
+    std::uint64_t Activations = 0; // the screen's focus changes, to tell a superseded one
+    int BlockedWaiters = 0;        // threads blocked in GetMessageA's wait (off the screen)
     // The backend, once looked for; the thread that made the first screen window, the only one
     // that takes the screen's events (macOS has its windows on the main thread only).
     const FUser32Backend* Backend = nullptr;
@@ -294,7 +308,12 @@ bool TakeMessage(LPMSG Out, HWND Window, UINT First, UINT Last, bool bRemove)
         if (Out != nullptr)
             *Out = It->Message;
         if (bRemove)
+        {
+            // A key message brings its key state as it is taken out, as Windows' GetKeyState.
+            if (It->Keys != nullptr)
+                std::copy(It->Keys->begin(), It->Keys->end(), std::begin(State().Keys));
             Queue.Messages.erase(It);
+        }
         return true;
     }
     return false;
@@ -314,13 +333,15 @@ DWORD InputClass(UINT Message)
 
 // Queues a message on a thread's queue; false when that thread has ended. The caller holds the
 // lock.
-bool Enqueue(std::uint64_t Thread, const MSG& Message)
+bool Enqueue(std::uint64_t Thread, const MSG& Message,
+             std::shared_ptr<const std::array<SHORT, 256>> Keys = nullptr)
 {
     FState& S = State();
     auto const Queue = S.Queues.find(Thread);
     if (Queue == S.Queues.end())
         return false;
-    Queue->second.Messages.push_back(FQueued{Message, S.NextSequence++});
+    FQueued Entry{Message, S.NextSequence++, std::move(Keys)};
+    Queue->second.Messages.push_back(std::move(Entry));
     S.Posted.notify_all();
     return true;
 }
@@ -606,10 +627,14 @@ HWND CreateWindowExA(DWORD ExStyle, LPCSTR ClassName, LPCSTR Title, DWORD Style,
         Record.ExStyle = ExStyle;
         Record.bEnabled = (Style & WS_DISABLED) == 0;
         Record.Owner = ThreadSerial();
-        // A top-level window gets a screen when there is a backend (looked for now, so that
-        // its default size is the display's); its id is the HWND.
-        bool const bTopLevel = Parent == nullptr && (Style & WS_CHILD) == 0;
+        // A top-level window (not WS_CHILD: an owned popup is one too) gets a screen when there
+        // is a backend (looked for now, so that its default size is the display's); its id is
+        // the HWND.
+        bool const bTopLevel = (Style & WS_CHILD) == 0;
         const FUser32Backend* const Screen = bTopLevel ? Backend() : nullptr;
+        // The screen started (on the main thread) before the default size is taken from it.
+        if (Screen != nullptr)
+            Screen->Start();
         if (X == CW_USEDEFAULT)
             X = Y = 0;
         if (Width == CW_USEDEFAULT)
@@ -718,6 +743,8 @@ BOOL DestroyWindow(HWND Window)
                                       { return Entry.Message.hwnd == Window; }),
                        Messages.end());
     }
+    // A GetMessageA waiting for this window's messages returns -1.
+    S.Posted.notify_all();
     return TRUE;
 }
 
@@ -760,11 +787,18 @@ BOOL ShowWindow(HWND Window, int Command)
         bWasVisible = (Record->Style & WS_VISIBLE) != 0;
         bVisible = Command != SW_HIDE;
         Record->Style = bVisible ? (Record->Style | WS_VISIBLE) : (Record->Style & ~WS_VISIBLE);
-        Record->Style &= ~(WS_MINIMIZE | WS_MAXIMIZE);
-        if (Command == SW_MINIMIZE || Command == SW_SHOWMINIMIZED)
-            Record->Style |= WS_MINIMIZE;
-        else if (Command == SW_MAXIMIZE)
-            Record->Style |= WS_MAXIMIZE;
+        // SW_SHOW, SW_HIDE and SW_SHOWNA keep the window minimized or maximized as it is; the
+        // others set its state. An explicit command also ends an owner's hold on a popup.
+        if (Command != SW_SHOW && Command != SW_HIDE && Command != SW_SHOWNA)
+        {
+            Record->Style &= ~(WS_MINIMIZE | WS_MAXIMIZE);
+            if (Command == SW_MINIMIZE || Command == SW_SHOWMINIMIZED || Command == 7 ||
+                Command == 11) // SW_SHOWMINNOACTIVE, SW_FORCEMINIMIZE
+                Record->Style |= WS_MINIMIZE;
+            else if (Command == SW_MAXIMIZE)
+                Record->Style |= WS_MAXIMIZE;
+        }
+        Record->bHiddenWithOwner = false;
         Procedure = Record->Procedure;
     }
     // A maximize the screen refuses (a window that cannot be resized) leaves it as it was.
@@ -834,14 +868,18 @@ BOOL SetWindowPos(HWND Window, HWND, int X, int Y, int Width, int Height, UINT F
         Record->Style |= WS_VISIBLE;
     if ((Flags & SWP_HIDEWINDOW) != 0)
         Record->Style &= ~WS_VISIBLE;
+    if ((Flags & (SWP_SHOWWINDOW | SWP_HIDEWINDOW)) != 0)
+        Record->bHiddenWithOwner = false;
     if (IsScreenWindow(Window))
     {
         const FUser32Backend* const Screen = LoadedBackend();
         if (std::memcmp(&Before, &Rect, sizeof(RECT)) != 0)
             Screen->SetBounds(ScreenId(Window), Rect.left, Rect.top, Rect.right - Rect.left,
                               Rect.bottom - Rect.top);
-        // SWP_FRAMECHANGED (a new style), or a size that may make a popup fullscreen.
-        if ((Flags & SWP_FRAMECHANGED) != 0 || (Flags & SWP_NOSIZE) == 0)
+        // SWP_FRAMECHANGED (a new style), or a size or position that may make a popup cover the
+        // desktop or stop covering it.
+        if ((Flags & SWP_FRAMECHANGED) != 0 || (Flags & SWP_NOSIZE) == 0 ||
+            (Flags & SWP_NOMOVE) == 0)
             ApplyFrame(Window, Record->Style, Rect);
         if ((Flags & SWP_SHOWWINDOW) != 0)
             Screen->Show(ScreenId(Window), SW_SHOW);
@@ -1138,8 +1176,16 @@ BOOL EnumDisplaySettingsA(LPCSTR, DWORD Mode, DEVMODEA* Settings)
     bool const bCurrent = Mode == ENUM_CURRENT_SETTINGS || Mode == ENUM_REGISTRY_SETTINGS;
     if (!bCurrent && Mode > static_cast<DWORD>(std::numeric_limits<int>::max()))
         return FALSE;
-    // The display's modes once the backend is loaded (by the first top-level window).
-    if (const FUser32Backend* const Screen = LoadedBackend())
+    // The display's modes once the screen has started (the first top-level window made on the
+    // main thread); before that, and in a program whose windows have no screen, the headless
+    // desktop's.
+    const FUser32Backend* const Screen = LoadedBackend();
+    int DesktopWidth = 0;
+    int DesktopHeight = 0;
+    int DesktopBits = 0;
+    int DesktopHz = 0;
+    if (Screen != nullptr &&
+        Screen->DisplayMode(-1, &DesktopWidth, &DesktopHeight, &DesktopBits, &DesktopHz))
     {
         if (!Screen->DisplayMode(bCurrent ? -1 : static_cast<int>(Mode), &Width, &Height, &Bits,
                                  &Hz))
@@ -1246,9 +1292,26 @@ namespace
 // The screen's events (FUser32Sink)
 // ---------------------------------------------------------------------------------------------
 
+// A mouse message brings the keyboard as of its event when it is taken (GetKeyState), as a key
+// message does: a click taken ahead of an earlier key message still sees that key.
 void SinkPost(std::uint32_t Window, unsigned Message, std::uintptr_t WParam, std::intptr_t LParam)
 {
-    PostMessageA(WindowOfId(Window), Message, WParam, LParam);
+    HWND const Target = WindowOfId(Window);
+    if (Message < WM_MOUSEFIRST || Message > WM_MOUSELAST)
+    {
+        PostMessageA(Target, Message, WParam, LParam);
+        return;
+    }
+    std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+    FWindow const* const Record = Find(Target);
+    if (Record == nullptr || Record->bDestroying)
+        return;
+    auto Snapshot = std::make_shared<std::array<SHORT, 256>>();
+    std::copy(std::begin(State().LiveKeys), std::end(State().LiveKeys), Snapshot->begin());
+    Enqueue(Record->Owner,
+            MSG{Target, Message, static_cast<WPARAM>(WParam), static_cast<LPARAM>(LParam), Ticks(),
+                State().CursorPos},
+            std::move(Snapshot));
 }
 
 void SinkSend(std::uint32_t Window, unsigned Message, std::uintptr_t WParam, std::intptr_t LParam)
@@ -1293,6 +1356,8 @@ UINT GenericModifier(UINT VirtualKey, UINT* OtherSide)
     }
 }
 
+void SinkReleaseKey(unsigned PhysicalKey);
+
 void SinkKey(std::uint32_t Window, unsigned PhysicalKey, bool bExtended, bool bDown, bool bRepeat)
 {
     if (PhysicalKey == 0 || PhysicalKey > 0xFF)
@@ -1302,24 +1367,33 @@ void SinkKey(std::uint32_t Window, unsigned PhysicalKey, bool bExtended, bool bD
     UINT OtherSide = 0;
     UINT const Generic = GenericModifier(PhysicalKey, &OtherSide);
     UINT const VirtualKey = Generic != 0 ? Generic : PhysicalKey;
-    bool bWasDown = false;
-    bool bAlt = false;
+    HWND const Target = WindowOfId(Window);
+    // The window checked, the key state changed and the message queued under one lock: a
+    // window that is gone takes no key press and gets no message, but a release still lets go
+    // of the key (and of the generic modifier when the other side is up).
+    std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+    SHORT* const Keys = State().LiveKeys;
+    // Gone, or its DestroyWindow under way (the screen may not have marked it yet): a release
+    // only lets go of the key.
+    FWindow const* const Record = Find(Target);
+    if (Record == nullptr || Record->bDestroying)
     {
-        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-        SHORT* const Keys = State().Keys;
-        bWasDown = (Keys[VirtualKey] & 0x8000) != 0;
-        if (Generic != 0)
-        {
-            SetKeyState(Keys[PhysicalKey], bDown, bRepeat);
-            bool const bEitherDown = bDown || (Keys[OtherSide] & 0x8000) != 0;
-            SHORT const Toggle = static_cast<SHORT>(Keys[Generic] & 1);
-            Keys[Generic] = static_cast<SHORT>((bEitherDown ? 0x8000 : 0) |
-                                               (bDown && !bRepeat ? Toggle ^ 1 : Toggle));
-        }
-        else
-            SetKeyState(Keys[VirtualKey], bDown, bRepeat);
-        bAlt = (Keys[VK_MENU] & 0x8000) != 0;
+        if (!bDown)
+            SinkReleaseKey(PhysicalKey);
+        return;
     }
+    bool const bWasDown = (Keys[VirtualKey] & 0x8000) != 0;
+    if (Generic != 0)
+    {
+        SetKeyState(Keys[PhysicalKey], bDown, bRepeat);
+        bool const bEitherDown = bDown || (Keys[OtherSide] & 0x8000) != 0;
+        SHORT const Toggle = static_cast<SHORT>(Keys[Generic] & 1);
+        Keys[Generic] = static_cast<SHORT>((bEitherDown ? 0x8000 : 0) |
+                                           (bDown && !bRepeat ? Toggle ^ 1 : Toggle));
+    }
+    else
+        SetKeyState(Keys[VirtualKey], bDown, bRepeat);
+    bool const bAlt = (Keys[VK_MENU] & 0x8000) != 0;
     UINT const Scan = MapVirtualKeyA(PhysicalKey, MAPVK_VK_TO_VSC);
     std::uint32_t LParam = 1u | ((Scan & 0xFFu) << 16);
     if (bExtended)
@@ -1333,8 +1407,14 @@ void SinkKey(std::uint32_t Window, unsigned PhysicalKey, bool bExtended, bool bD
     bool const bSystem = VirtualKey == VK_MENU || VirtualKey == VK_F10 || bAlt;
     UINT const Message =
         bDown ? (bSystem ? WM_SYSKEYDOWN : WM_KEYDOWN) : (bSystem ? WM_SYSKEYUP : WM_KEYUP);
-    HWND const Target = WindowOfId(Window);
-    PostMessageA(Target, Message, VirtualKey, static_cast<LPARAM>(LParam));
+    // The whole keyboard as of this key: the message brings it when it is taken, so any key
+    // message that survives (another window's may be dropped with it) sets every key right.
+    auto Snapshot = std::make_shared<std::array<SHORT, 256>>();
+    std::copy(std::begin(State().LiveKeys), std::end(State().LiveKeys), Snapshot->begin());
+    Enqueue(
+        Record->Owner,
+        MSG{Target, Message, VirtualKey, static_cast<LPARAM>(LParam), Ticks(), State().CursorPos},
+        std::move(Snapshot));
     if (bDown && !bSystem &&
         (VirtualKey == VK_RETURN || VirtualKey == VK_BACK || VirtualKey == VK_TAB ||
          VirtualKey == VK_ESCAPE))
@@ -1368,12 +1448,23 @@ void SinkMouseRaw(std::uint32_t Offset, std::uint32_t Data)
     PosixDirectInput::MouseEvent(Offset, Data);
 }
 
+// WM_SIZE's reason for a window's show state.
+WPARAM SizeReason(DWORD Style)
+{
+    if ((Style & WS_MINIMIZE) != 0)
+        return SIZE_MINIMIZED;
+    if ((Style & WS_MAXIMIZE) != 0)
+        return SIZE_MAXIMIZED;
+    return SIZE_RESTORED;
+}
+
 // A move or resize from the screen: the window's rectangle, then WM_MOVE / WM_SIZE.
 void SinkBounds(std::uint32_t Window, int X, int Y, int Width, int Height)
 {
     HWND const Target = WindowOfId(Window);
     bool bMoved = false;
     bool bResized = false;
+    WPARAM Reason = SIZE_RESTORED;
     {
         std::lock_guard<std::recursive_mutex> Guard(State().Lock);
         FWindow* const Record = Find(Target);
@@ -1383,30 +1474,165 @@ void SinkBounds(std::uint32_t Window, int X, int Y, int Width, int Height)
         bMoved = Rect.left != X || Rect.top != Y;
         bResized = Rect.right - Rect.left != Width || Rect.bottom - Rect.top != Height;
         Rect = {X, Y, X + Width, Y + Height};
+        Reason = SizeReason(Record->Style);
     }
     if (bMoved)
         SendMessageA(Target, WM_MOVE, 0, MAKELONG(X, Y));
+    // A minimized window reports an empty client area; its rectangle keeps the new bounds for
+    // when it is restored.
     if (bResized)
-        SendMessageA(Target, WM_SIZE, SIZE_RESTORED, MAKELONG(Width, Height));
+        SendMessageA(Target, WM_SIZE, Reason,
+                     Reason == SIZE_MINIMIZED ? 0 : MAKELONG(Width, Height));
 }
 
-// The application's focus: WM_ACTIVATEAPP and WM_ACTIVATE, then the keyboard focus.
+// WM_SHOWWINDOW's status for an owned window that follows its owner (SW_PARENTCLOSING,
+// SW_PARENTOPENING).
+constexpr LPARAM kParentClosing = 1;
+constexpr LPARAM kParentOpening = 3;
+
+// An owner minimized hides its visible owned popups, and restored shows the ones it hid, as
+// Windows does; a popup hidden before stays hidden.
+void FollowOwner(HWND Owner, bool bMinimized)
+{
+    std::vector<HWND> Changed;
+    {
+        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+        for (auto& [Number, Record] : State().Windows)
+        {
+            if (Record.Parent != Owner || (Record.Style & WS_CHILD) != 0)
+                continue;
+            HWND const Popup = reinterpret_cast<HWND>(Number);
+            if (bMinimized && (Record.Style & WS_VISIBLE) != 0)
+            {
+                Record.Style &= ~WS_VISIBLE;
+                Record.bHiddenWithOwner = true;
+                Changed.push_back(Popup);
+            }
+            else if (!bMinimized && Record.bHiddenWithOwner)
+            {
+                Record.Style |= WS_VISIBLE;
+                Record.bHiddenWithOwner = false;
+                Changed.push_back(Popup);
+            }
+        }
+    }
+    for (HWND const Popup : Changed)
+    {
+        // A handler of an earlier popup may have pumped a newer owner change that moved this
+        // one already: it is left as that change set it.
+        {
+            std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+            FWindow const* const Record = Find(Popup);
+            bool const bVisible = Record != nullptr && (Record->Style & WS_VISIBLE) != 0;
+            if (Record == nullptr || (bMinimized ? bVisible || !Record->bHiddenWithOwner
+                                                 : !bVisible || Record->bHiddenWithOwner))
+                continue;
+        }
+        if (IsScreenWindow(Popup))
+            LoadedBackend()->Show(ScreenId(Popup), bMinimized ? SW_HIDE : SW_SHOWNA);
+        SendMessageA(Popup, WM_SHOWWINDOW, bMinimized ? FALSE : TRUE,
+                     bMinimized ? kParentClosing : kParentOpening);
+    }
+}
+
+// Minimized, maximized or restored on screen (the window's own buttons, the system): the
+// window's WS_MINIMIZE / WS_MAXIMIZE, and WM_SIZE with the reason.
+void SinkShowState(std::uint32_t Window, int ShowState, int ClientWidth, int ClientHeight)
+{
+    HWND const Target = WindowOfId(Window);
+    RECT Rect = {};
+    WPARAM Reason = SIZE_RESTORED;
+    bool bWasMinimized = false;
+    {
+        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+        FWindow* const Record = Find(Target);
+        if (Record == nullptr)
+            return;
+        Record->Style &= ~(WS_MINIMIZE | WS_MAXIMIZE);
+        if (ShowState == 1)
+            Record->Style |= WS_MINIMIZE;
+        else if (ShowState == 2)
+            Record->Style |= WS_MAXIMIZE;
+        // Repeats are left out by the state last reported, not by the style: ShowWindow sets
+        // the style before the screen reports the change.
+        if (Record->ReportedShowState == ShowState)
+            return;
+        bWasMinimized = Record->ReportedShowState == 1;
+        Record->ReportedShowState = ShowState;
+        // Maximized or restored: the size the window has now, so that WM_SIZE carries it (the
+        // resize event after it then changes nothing).
+        if (ShowState != 1 && ClientWidth > 0 && ClientHeight > 0)
+        {
+            Record->Rect.right = Record->Rect.left + ClientWidth;
+            Record->Rect.bottom = Record->Rect.top + ClientHeight;
+        }
+        Rect = Record->Rect;
+        Reason = SizeReason(Record->Style);
+    }
+    // A minimized window's client area is empty, as Windows reports it.
+    int const Width = Reason == SIZE_MINIMIZED ? 0 : Rect.right - Rect.left;
+    int const Height = Reason == SIZE_MINIMIZED ? 0 : Rect.bottom - Rect.top;
+    SendMessageA(Target, WM_SIZE, Reason, MAKELONG(Width, Height));
+    // The owner's state as it is after WM_SIZE: a handler that pumps messages may have taken a
+    // newer show change (a restore inside a minimize), which has then moved the popups itself.
+    bool bMinimizedNow = ShowState == 1;
+    {
+        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+        if (FWindow const* const Record = Find(Target))
+            bMinimizedNow = Record->ReportedShowState == 1;
+    }
+    if (bMinimizedNow)
+        FollowOwner(Target, true);
+    else if (bWasMinimized)
+        FollowOwner(Target, false);
+}
+
+// A key released for a window that is gone: the live key state lets go of it (and of the
+// generic modifier when the other side is up), with no message.
+void SinkReleaseKey(unsigned PhysicalKey)
+{
+    if (PhysicalKey == 0 || PhysicalKey > 0xFF)
+        return;
+    UINT OtherSide = 0;
+    UINT const Generic = GenericModifier(PhysicalKey, &OtherSide);
+    std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+    SHORT* const Keys = State().LiveKeys;
+    Keys[PhysicalKey] = static_cast<SHORT>(Keys[PhysicalKey] & 1);
+    if (Generic != 0 && (Keys[OtherSide] & 0x8000) == 0)
+        Keys[Generic] = static_cast<SHORT>(Keys[Generic] & 1);
+}
+
+// The application's focus: WM_ACTIVATEAPP and WM_ACTIVATE, then the keyboard focus. A handler
+// that pumps the screen (a nested message loop) may take a newer focus change: the rest of this
+// one is then left out, so it cannot restore a stale focus.
 void SinkActivate(std::uint32_t Window, bool bActive)
 {
     HWND const Target = WindowOfId(Window);
+    std::uint64_t Transition = 0;
     {
         std::lock_guard<std::recursive_mutex> Guard(State().Lock);
         if (Find(Target) == nullptr)
             return;
         State().Active = bActive ? Target : nullptr;
+        Transition = ++State().Activations;
     }
+    auto const Current = [Transition]
+    {
+        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+        return State().Activations == Transition;
+    };
     SendMessageA(Target, WM_ACTIVATEAPP, bActive ? TRUE : FALSE, 0);
+    if (!Current())
+        return;
     SendMessageA(Target, WM_ACTIVATE, bActive ? WA_ACTIVE : WA_INACTIVE, 0);
+    if (!Current())
+        return;
     SetFocus(bActive ? Target : nullptr);
 }
 
-const FUser32Sink GSink = {&SinkPost,      &SinkSend,     &SinkKey,    &SinkChar,
-                           &SinkMouseMove, &SinkMouseRaw, &SinkBounds, &SinkActivate};
+const FUser32Sink GSink = {&SinkPost,      &SinkSend,      &SinkKey,    &SinkChar,
+                           &SinkMouseMove, &SinkMouseRaw,  &SinkBounds, &SinkActivate,
+                           &SinkShowState, &SinkReleaseKey};
 
 // Takes the screen's events, on the thread that made the screen's windows. A window procedure
 // the sink calls may pump again (a nested message loop): the backend then goes on with the
@@ -1466,12 +1692,22 @@ BOOL GetMessageA(LPMSG Message, HWND Window, UINT First, UINT Last)
                 return -1;
             if (!OnScreenThread())
             {
+                // Counted as blocked while the predicate sends it back to waiting: under the
+                // lock that the wait gives up atomically, so a thread that sees the count sees a
+                // waiter that is blocked.
                 bool bTaken = false;
+                bool bCounted = false;
                 State().Posted.wait(Guard,
                                     [&]
                                     {
                                         bTaken = TakeMessage(&Taken, Window, First, Last, true);
-                                        return bTaken || Gone();
+                                        bool const bDone = bTaken || Gone();
+                                        if (bDone == bCounted)
+                                        {
+                                            State().BlockedWaiters += bDone ? -1 : 1;
+                                            bCounted = !bDone;
+                                        }
+                                        return bDone;
                                     });
                 if (!bTaken)
                     return -1;
@@ -1497,6 +1733,14 @@ LRESULT DispatchMessageA(const MSG* Message)
     if (Message == nullptr || Message->hwnd == nullptr)
         return 0;
     return SendMessageA(Message->hwnd, Message->message, Message->wParam, Message->lParam);
+}
+
+// The threads blocked in GetMessageA's wait (not the screen's thread), for tests that must act
+// while one waits. PORT(macOS), not part of retail; declared where it is used.
+FL_USER32_API int PosixUser32BlockedWaiters()
+{
+    std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+    return State().BlockedWaiters;
 }
 
 // Whether the calling thread's queue holds input of the wake mask's classes that arrived since
@@ -1594,18 +1838,16 @@ HCURSOR GetCursor()
 }
 
 // The count crossing 0 shows or hides the screen's cursor.
+// The count's change and the screen's call in one step (under the lock), so that crossings from
+// different threads reach the screen in the order the count made them; the backend only queues
+// a call from another thread, never waits.
 int ShowCursor(BOOL Show)
 {
-    int Count = 0;
-    bool bCrossed = false;
-    {
-        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-        int const Before = State().CursorCount;
-        Count = State().CursorCount += Show ? 1 : -1;
-        bCrossed = (Before >= 0) != (Count >= 0);
-    }
-    if (bCrossed)
-        if (const FUser32Backend* const Screen = LoadedBackend())
+    std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+    int const Before = State().CursorCount;
+    int const Count = State().CursorCount += Show ? 1 : -1;
+    if ((Before >= 0) != (Count >= 0))
+        if (const FUser32Backend* const Screen = State().Backend)
             Screen->ShowCursor(Count >= 0);
     return Count;
 }
@@ -1682,9 +1924,11 @@ SHORT GetKeyState(int Key)
     return State().Keys[Key & 0xFF];
 }
 
+// The key as the screen has it now, not as of the last key message taken.
 SHORT GetAsyncKeyState(int Key)
 {
-    return static_cast<SHORT>(GetKeyState(Key) & 0x8000);
+    std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+    return static_cast<SHORT>(State().LiveKeys[Key & 0xFF] & 0x8000);
 }
 
 // MAPVK_VK_TO_VSC: a key's scan code (left and right modifiers by side, a generic one as its
@@ -1831,19 +2075,6 @@ int wsprintfW(LPWSTR Buffer, LPCWSTR Format, ...)
         return static_cast<int>(std::wcslen(Buffer));
     }
     return Length;
-}
-
-// String tables are in the Windows resource DLLs, which are not read here yet.
-int LoadStringW(HINSTANCE, UINT, LPWSTR Buffer, int Size)
-{
-    if (Buffer != nullptr && Size > 0)
-        Buffer[0] = 0;
-    return 0;
-}
-
-int FillRect(HDC, const RECT*, HBRUSH)
-{
-    return 0;
 }
 
 // Windows' defaults.

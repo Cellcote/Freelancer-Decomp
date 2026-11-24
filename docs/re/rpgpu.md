@@ -274,6 +274,18 @@ RPGPU keeps the transforms as RP8 does (`RpGpuState.cpp`, after `RP8.cpp`'s `Set
 - Exponential, squared exponential and linear, blending the colour (not alpha) towards
   `FOGCOLOR`. `SPECULARENABLE` adds the specular colour before fog.
 
+## Vertex copies
+
+`IRPVertexBuffer::CopyVertices` and `IVertexBufferManager::CopyVertexData` write a source-vertex
+descriptor's streams (`FRpVertexSrcDesc`: position, normal, diffuse and two texture sets, each
+with its stride, sequential or through per-vertex indices) into a buffer of a D3D8 vertex
+format, as RP8's FUN_06d1f040 does: `render/rp8_vertex_copy.h` has its dispatch, its generic
+converters and the jump tables' empty entries (a pre-transformed format, a specular colour
+without a diffuse one), with the same bytes written and the same bytes left alone. The VMesh
+groups (`CopyVertices` into a locked buffer, in place) and SphereMesh's planets
+(`LockVertexMemory`, then `CopyVertexData`) fill their vertices this way; `module_tests` checks
+the bytes.
+
 ## Static vertex and index buffers
 
 A vertex buffer that is not a ring (`CreateVb`'s buffers; the pools of `LockVertexMemory` are
@@ -286,7 +298,8 @@ base vertex in it, so their indices go up as they are and no vertices are copied
 - Only a buffer that has stayed as it is gets a block: while it is locked, and in any frame it
   was written in, it is drawn from the frame's vertices. So a draw never reads half-written
   vertices into a block, and a buffer rewritten every frame is not converted whole per draw.
-- Any write retires the buffer's blocks: `LockVb` (and `CopyVertices`, which locks),
+- Any write retires the buffer's blocks: `LockVb` (and `CopyVertices`, which locks or writes
+  into a lock),
   `ResizeVb`, `DestroyVb`. Retired blocks are released after the frame that last used them, as
   the texture versions are.
 - `CreateBuffers` retires every block and texture version, so a kept device does not hold on to
@@ -375,14 +388,19 @@ RPGPU records each frame and draws it at `SwapBuffers`, which is plan step 5.3.
 **The SDL backend's `Present`:**
 1. One copy pass uploads the pending textures and the frame's vertices and indices, through
    one transfer buffer.
-2. The commands replay on RPGPU's own colour target (B8G8R8A8, the swap chain's size) and a
-   depth buffer, in one render pass per clear. The first pass clears colour and depth. The
-   target is then blitted to the swap-chain image, pixel for pixel, so the last frame stays
-   readable for `PrintScreen`.
+2. The commands replay on RPGPU's own colour target (B8G8R8A8) and a depth buffer, in one render
+   pass per clear. The first pass clears colour and depth. The target is the back buffer: the
+   size `CreateBuffers` asks for, as RP8's back buffer is the mode's size windowed or not (a
+   dimension it asks for as 0 is the window's in pixels, each on its own). It is then blitted to the swap-chain image,
+   pixel for pixel when the sizes agree, otherwise stretched over the window with linear
+   filtering, as Direct3D 8 presents a windowed back buffer of another size. The target stays
+   readable for `PrintScreen`, at the back buffer's size.
 3. Pipelines are cached per `FRpGpuPipelineKey`, and samplers per `FRpGpuSamplerKey`.
    - `CULLMODE` culls by the winding on screen, pre-transformed triangles included, as Direct3D
      8 does. RP8's default is 1 (none).
    - `FILLMODE` 2 draws wireframe; points (1) draw solid.
+   - `SRCBLEND` `BOTHSRCALPHA` (12) and `BOTHINVSRCALPHA` (13), which SDL_GPU lacks, set both
+     factors, source alpha and its inverse (or the other way round), whatever `DESTBLEND` says.
    - `ZBIAS` has no unit in Direct3D 8: each driver picked its own. RPGPU moves depth by one
      16-bit depth step (1 / 65535 of the range) per `ZBIAS` step, towards the viewer.
 4. A draw whose texture has no GPU copy samples a 1x1 white texture with the texture flag
@@ -395,6 +413,30 @@ RPGPU records each frame and draws it at `SwapBuffers`, which is plan step 5.3.
 - the ring buffers (the vertex pools, the scratch index ring) and user-pointer draws copy their
   vertices and indices into each frame (the static buffers stay on the GPU, "Static vertex and
   index buffers");
-- the Direct3D blend factors SDL_GPU lacks (none of the 2D draws use them);
 - a border colour, so `BORDER` addressing clamps instead.
 
+## The menu scene
+
+The main menu's background is a scene of the Intro system: one of three base rooms
+(`intro1_cityscape`, `intro2_volcano`, `intro3_planetchunks`), each a THN script in
+`DATA/Scripts/Intro`, with star spheres, planets with atmospheres, stations, asteroids, ships,
+engine and exhaust effects and, in the third, EXP2 fog. What it asks of the render pipeline,
+and where RPGPU does it:
+
+| What | Used by | In RPGPU |
+|---|---|---|
+| DXT1, DXT3, DXT5 textures | most `.mat`/`.txm` files (`MIPS`) | BC1..BC3 when the device samples them (Metal on Apple GPUs does), else TexConvert decodes |
+| 8-bit palettized TGA mips (`MIP0`..`MIP8`) | most planet, station and star-sphere textures | Shading's format map turns them into a 16- or 32-bit format; TexConvert applies the palette |
+| R5G6B5 and other 16-bit DDS | planets | TexConvert |
+| a DDS cube map (`CUBE`) | `fx/envmapbasic.mat` (envmap stations) | `LoadCubemap`, a cube texture sampled with camera-space reflection vectors (`TEXCOORDINDEX` 0x30000) |
+| DcDt family, DetailMap family, Atmosphere, Nebula, Glass, Nomad, LightMap | Shading and flmaterials | stages MODULATE, MODULATE2X, ADD, SELECTARG1, DISABLE; texture transforms with `COUNT2` (detail tiling, animated UVs) |
+| blends SRCALPHA/INVSRCALPHA, SRCALPHA/ONE, ONE/ONE, DESTCOLOR/ZERO, ONE/INVSRCCOLOR, and whatever an `.ale` names | materials, alchemy, suns | every D3DBLEND, `BOTHSRCALPHA` and `BOTHINVSRCALPHA` included |
+| alpha test (LESS, GREATER), `ZBIAS`, `ZFUNC` ALWAYS for backdrops, culling both ways | two-pass materials, star spheres, shadows | yes |
+| `COUNT3 \| PROJECTED` on camera-space positions | ShadowMaterial | yes |
+| fog: vertex LINEAR or table, EXP2 from THN | nebulae, `Intro_planetchunks` | yes |
+| particles | alchemy: triangle lists from the pool vertex buffer and the scratch index ring (`IRPDraw::DrawIndexedPrimitive`), FVF 0x142 | yes |
+| point lists, point sprites, `D3DFVF_PSIZE`, three- or four-component texture sets, stencil, `BLENDOP` | nothing in the scene | not drawn (see the gaps) |
+
+`module_tests` draws what the scene relies on that the 2D draws do not show: a DXT1 texture, a
+P8 level with its palette, and the `BOTHSRCALPHA` blends, on the Null backend (the calls) and on
+Metal (the pixels).

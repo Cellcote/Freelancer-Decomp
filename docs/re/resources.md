@@ -33,7 +33,7 @@ not that the data is fully equivalent to retail.
 
 ## Modules
 
-- **Resource DLLs** (`src/Resources/<name>/CMakeLists.txt`, `fl_add_module(... RESOURCE_DLL RETAIL)`, `/NOENTRY`, Win32 only) → `bin\`: `resources`, `InfoCards`, `MiscText`, `NameResources`, `EquipResources`, `OfferBribeResources`, `MiscTextInfo2`, `serverresources`.
+- **Resource DLLs** (`src/Resources/<name>/CMakeLists.txt`, `fl_add_module(... RESOURCE_DLL RETAIL)`, `/NOENTRY`, Win32; x64 Windows builds none) → `bin\`: `resources`, `InfoCards`, `MiscText`, `NameResources`, `EquipResources`, `OfferBribeResources`, `MiscTextInfo2`, `serverresources`. On macOS and Linux, which have neither rc.exe nor link.exe, `fl_add_generated_resource_dll` builds the same names from the same scripts with `tools/build_resource_dll.py` (plain Python 3): a PE32 image with the string tables (in the script's languages), the files of type 23 and other numeric or named types as they are, and bitmaps. It skips DIALOG, MENU, ACCELERATORS, ICON, CURSOR and VERSIONINFO, which nothing reads there yet.
 - **Code:** DLLs + `Common.lib` + the exe. Code modules that had a dump have their own `.rc` (VERSIONINFO; Common also has a debug MENU/DIALOGEX, its VERSIONINFO is removed to avoid duplicating the exe's).
 - **freelancer** — the client exe; `resources/freelancer.rc` (ICON 103 + VERSIONINFO).
 

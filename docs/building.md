@@ -159,7 +159,9 @@ Windows. The other modules are being ported to macOS ([x64-client-plan.md](x64-c
 phase 6, M2): one that is in `FL_PROJECTS` without `PORTABLE` compiles against the stand-in
 `<windows.h>` of `src/include/posix` over the POSIX backend of `src/include/platform.h`
 ([platform.md](platform.md)). A DLL module is named as on Windows, without a `lib` prefix
-(`dacom.dylib`, `dacom.so`), so that `Platform::ModuleLoad("dacom.dll")` finds it.
+(`dacom.dylib`, `dacom.so`), so that `Platform::ModuleLoad("dacom.dll")` finds it. The
+resource-only DLLs (`src/Resources`) are made from their `.rc` scripts by
+`tools/build_resource_dll.py`, so the build needs Python 3 there ([re/resources.md](re/resources.md)).
 
 ## C++23 in this code
 

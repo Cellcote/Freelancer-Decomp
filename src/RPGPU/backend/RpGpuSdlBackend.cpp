@@ -35,6 +35,24 @@ namespace
         }
     }
 
+    // SRCBLEND and DESTBLEND as one pair of factors. Direct3D 8's BOTHSRCALPHA (12) and
+    // BOTHINVSRCALPHA (13) as the source blend set both: source alpha and its inverse, or the
+    // inverse and source alpha, whatever DESTBLEND says.
+    void BlendFactors(std::uint8_t D3dSrc, std::uint8_t D3dDst, SDL_GPUBlendFactor* Src,
+                      SDL_GPUBlendFactor* Dst)
+    {
+        if (D3dSrc == 12 || D3dSrc == 13)
+        {
+            *Src = D3dSrc == 12 ? SDL_GPU_BLENDFACTOR_SRC_ALPHA
+                                : SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+            *Dst = D3dSrc == 12 ? SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA
+                                : SDL_GPU_BLENDFACTOR_SRC_ALPHA;
+            return;
+        }
+        *Src = BlendFactor(D3dSrc);
+        *Dst = BlendFactor(D3dDst);
+    }
+
     SDL_GPUCompareOp CompareOp(std::uint8_t D3dCmp)
     {
         switch (D3dCmp)
@@ -165,8 +183,6 @@ FRpGpuSdlBackend::~FRpGpuSdlBackend()
 
 bool FRpGpuSdlBackend::Create(RpWindowHandle Hwnd, std::uint32_t Width, std::uint32_t Height, bool bVSync)
 {
-    (void)Width;
-    (void)Height;
     if (Hwnd == nullptr || bAbandoned_)
         return false;
     if (Device_ != nullptr && (Hwnd_ != Hwnd || bNeedsRebuild_))
@@ -252,13 +268,21 @@ bool FRpGpuSdlBackend::Create(RpWindowHandle Hwnd, std::uint32_t Width, std::uin
         return false;
     }
 
+    // The back buffer is the size asked for, as RP8's (BackBufferWidth / BackBufferHeight are the
+    // mode's, windowed or not); Present scales it to the window, as Direct3D 8's Present
+    // stretches a windowed back buffer over the client area. A dimension asked for as 0 is the
+    // window's, each on its own, as Direct3D 8 resolves them.
+    RequestedWidth_ = Width;
+    RequestedHeight_ = Height;
     int W = 0;
     int H = 0;
-    if (SDL_GetWindowSizeInPixels(Window_, &W, &H))
+    if ((Width == 0 || Height == 0) && !SDL_GetWindowSizeInPixels(Window_, &W, &H))
     {
-        Width_ = static_cast<std::uint32_t>(W);
-        Height_ = static_cast<std::uint32_t>(H);
+        W = 0;
+        H = 0;
     }
+    Width_ = Width != 0 ? Width : static_cast<std::uint32_t>(W);
+    Height_ = Height != 0 ? Height : static_cast<std::uint32_t>(H);
     return true;
 }
 
@@ -325,6 +349,8 @@ void FRpGpuSdlBackend::Destroy()
     Hwnd_ = nullptr;
     Width_ = 0;
     Height_ = 0;
+    RequestedWidth_ = 0;
+    RequestedHeight_ = 0;
 }
 
 bool FRpGpuSdlBackend::CreateShaders()
@@ -427,11 +453,14 @@ SDL_GPUGraphicsPipeline* FRpGpuSdlBackend::Pipeline(const FRpGpuPipelineKey& Key
     SDL_GPUColorTargetDescription Color = {};
     Color.format = kTargetFormat;
     Color.blend_state.enable_blend = Key.bBlend != 0;
-    Color.blend_state.src_color_blendfactor = BlendFactor(Key.SrcBlend);
-    Color.blend_state.dst_color_blendfactor = BlendFactor(Key.DstBlend);
+    SDL_GPUBlendFactor SrcFactor;
+    SDL_GPUBlendFactor DstFactor;
+    BlendFactors(Key.SrcBlend, Key.DstBlend, &SrcFactor, &DstFactor);
+    Color.blend_state.src_color_blendfactor = SrcFactor;
+    Color.blend_state.dst_color_blendfactor = DstFactor;
     Color.blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;
-    Color.blend_state.src_alpha_blendfactor = BlendFactor(Key.SrcBlend);
-    Color.blend_state.dst_alpha_blendfactor = BlendFactor(Key.DstBlend);
+    Color.blend_state.src_alpha_blendfactor = SrcFactor;
+    Color.blend_state.dst_alpha_blendfactor = DstFactor;
     Color.blend_state.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
     Color.blend_state.enable_color_write_mask = true;
     Color.blend_state.color_write_mask = static_cast<SDL_GPUColorComponentFlags>(
@@ -965,9 +994,14 @@ bool FRpGpuSdlBackend::Present(const FRpGpuFrameRecording& Frame)
     }
     if (Image != nullptr)
     {
-        Width_ = W;
-        Height_ = H;
-        bool bReady = CreateShaders() && EnsureTarget(W, H) && EnsureDepth(W, H) && UploadFrame(Commands, Frame);
+        // The swap-chain image is the window's size (W x H); the back buffer is the size asked
+        // for, or the window's.
+        Width_ = RequestedWidth_ != 0 ? RequestedWidth_ : W;
+        Height_ = RequestedHeight_ != 0 ? RequestedHeight_ : H;
+        const std::uint32_t BackW = Width_;
+        const std::uint32_t BackH = Height_;
+        bool bReady = CreateShaders() && EnsureTarget(BackW, BackH) && EnsureDepth(BackW, BackH) &&
+                      UploadFrame(Commands, Frame);
         // Every pipeline and sampler the frame needs, before any render pass starts: a draw that
         // cannot get one fails the frame rather than vanishing.
         for (std::size_t Index = 0; bReady && Index < Frame.Commands.size(); ++Index)
@@ -1018,8 +1052,10 @@ bool FRpGpuSdlBackend::Present(const FRpGpuFrameRecording& Frame)
             SDL_GPUViewport Viewport = {};
             Viewport.x = static_cast<float>(Command.Viewport[0]);
             Viewport.y = static_cast<float>(Command.Viewport[1]);
-            Viewport.w = static_cast<float>(Command.Viewport[2] > 0 ? Command.Viewport[2] : static_cast<int>(W));
-            Viewport.h = static_cast<float>(Command.Viewport[3] > 0 ? Command.Viewport[3] : static_cast<int>(H));
+            Viewport.w = static_cast<float>(Command.Viewport[2] > 0 ? Command.Viewport[2]
+                                                                    : static_cast<int>(BackW));
+            Viewport.h = static_cast<float>(Command.Viewport[3] > 0 ? Command.Viewport[3]
+                                                                    : static_cast<int>(BackH));
             Viewport.min_depth = Command.MinZ;
             Viewport.max_depth = Command.MaxZ;
             SDL_SetGPUViewport(Pass, &Viewport);
@@ -1122,17 +1158,18 @@ bool FRpGpuSdlBackend::Present(const FRpGpuFrameRecording& Frame)
         if (Pass != nullptr)
             SDL_EndGPURenderPass(Pass);
 
-        // The finished frame to the swap-chain image, one pixel to one pixel (the blit converts
-        // to the swap chain's format).
+        // The finished frame to the swap-chain image (the blit converts to the swap chain's
+        // format): pixel for pixel when the sizes agree, otherwise stretched over the whole
+        // window, filtered, as Direct3D 8 presents a windowed back buffer of another size.
         SDL_GPUBlitInfo Blit = {};
         Blit.source.texture = Target_.get();
-        Blit.source.w = W;
-        Blit.source.h = H;
+        Blit.source.w = BackW;
+        Blit.source.h = BackH;
         Blit.destination.texture = Image;
         Blit.destination.w = W;
         Blit.destination.h = H;
         Blit.load_op = SDL_GPU_LOADOP_DONT_CARE;
-        Blit.filter = SDL_GPU_FILTER_NEAREST;
+        Blit.filter = BackW == W && BackH == H ? SDL_GPU_FILTER_NEAREST : SDL_GPU_FILTER_LINEAR;
         SDL_BlitGPUTexture(Commands, &Blit);
     }
     if (!SDL_SubmitGPUCommandBuffer(Commands))

@@ -584,10 +584,59 @@ FL_USER32_API int GetKeyboardLayoutList(int Count, HKL* Layouts);
 FL_USER32_API LPWSTR CharUpperW(LPWSTR Text);
 FL_USER32_API LPWSTR CharLowerW(LPWSTR Text);
 FL_USER32_API int wsprintfW(LPWSTR Buffer, LPCWSTR Format, ...);
-FL_USER32_API int LoadStringW(HINSTANCE Instance, UINT Id, LPWSTR Buffer, int Size);
 
-// GDI's rectangle fill (no device context draws here).
-FL_USER32_API int FillRect(HDC Dc, const RECT* Rect, HBRUSH Brush);
+// LoadStringW: string Id of the module's string tables (a resource module's,
+// Platform::ResourceModuleLoad), as Windows' user32: at most Size - 1 characters and a
+// terminator (also when nothing fits), the count copied; 0 when the string is missing (Buffer
+// untouched) or empty. Size 0
+// stores a pointer to the string (not terminated) in *(LPWSTR*)Buffer and returns its length.
+// Inline over posix/kernel32.h's resource calls rather than in the user32 module: those keep
+// the resource modules in the platform layer's state, which dacom holds, and dacom links user32.
+inline int LoadStringW(HINSTANCE Instance, UINT Id, LPWSTR Buffer, int Size)
+{
+    if (Buffer == nullptr || Size < 0)
+        return 0;
+    HRSRC const Block =
+        FindResourceExA(Instance, RT_STRING, MAKEINTRESOURCEA(((Id & 0xFFFF) >> 4) + 1), 0);
+    WORD const* Cursor = Block != nullptr
+                             ? static_cast<WORD const*>(LockResource(LoadResource(Instance, Block)))
+                             : nullptr;
+    if (Cursor == nullptr)
+        return 0;
+    DWORD const Units = SizeofResource(Instance, Block) / 2;
+    DWORD Offset = 0;
+    for (UINT Skip = Id & 15; Skip != 0; --Skip)
+    {
+        if (Offset >= Units || Cursor[Offset] > Units - Offset - 1)
+            return 0;
+        Offset += Cursor[Offset] + 1u;
+    }
+    if (Offset >= Units || Cursor[Offset] > Units - Offset - 1)
+        return 0;
+    int const Length = Cursor[Offset];
+    if (Size == 0)
+    {
+        // An empty string has no units to convert (it may end the block, and the file).
+        static wchar_t const kEmpty[1] = {0};
+        if (Length == 0)
+        {
+            *reinterpret_cast<LPWSTR*>(Buffer) = const_cast<LPWSTR>(kEmpty);
+            return 0;
+        }
+        wchar_t const* const Text =
+            Platform::ResourceWideText(Cursor + Offset + 1, static_cast<std::size_t>(Length));
+        if (Text == nullptr)
+            return 0;
+        *reinterpret_cast<LPWSTR*>(Buffer) = const_cast<LPWSTR>(Text);
+        return Length;
+    }
+    int const Count = Length < Size - 1 ? Length : Size - 1;
+    for (int Index = 0; Index < Count; ++Index)
+        Buffer[Index] = Cursor[Offset + 1 + Index];
+    Buffer[Count] = 0;
+    return Count;
+}
+
 
 // The caret's blink and the double click's interval, in milliseconds (Windows' defaults).
 FL_USER32_API UINT GetCaretBlinkTime();
