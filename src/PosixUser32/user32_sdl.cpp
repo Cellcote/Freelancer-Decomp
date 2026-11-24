@@ -434,6 +434,22 @@ std::intptr_t PointParam(int X, int Y)
         static_cast<std::uint32_t>((X & 0xFFFF) | ((Y & 0xFFFF) << 16)));
 }
 
+// DirectInput's button for an SDL button: left, right, middle, then X1 and X2 as 3 and 4.
+std::uint32_t DirectInputButton(Uint8 Button)
+{
+    switch (Button)
+    {
+    case SDL_BUTTON_LEFT:
+        return 0;
+    case SDL_BUTTON_RIGHT:
+        return 1;
+    case SDL_BUTTON_MIDDLE:
+        return 2;
+    default:
+        return Button - 1u;
+    }
+}
+
 // The window an input event is for; 0 for other events.
 SDL_WindowID InputWindow(const SDL_Event& Event)
 {
@@ -480,7 +496,26 @@ void Deliver(const FPending& Pending, const FUser32Sink* Sink)
     // user32's: dropped before it changes the mouse, the modifiers or DirectInput.
     if (IsInput(Event) &&
         (GWindows.count(InputWindow(Event)) == 0 || IsDestroyed(InputWindow(Event))))
+    {
+        // A release still lets go of what it releases (the live key state, the buttons held,
+        // DirectInput's button), without a message: it starts nothing new.
+        if (Event.type == SDL_EVENT_KEY_UP)
+        {
+            GMods = Event.key.mod;
+            FKey const Key = KeyOf(Event.key.scancode);
+            if (Key.Vk != 0)
+                Sink->Key(Event.key.windowID, Key.Vk, Key.bExtended, false, false);
+        }
+        else if (Event.type == SDL_EVENT_MOUSE_BUTTON_UP)
+        {
+            if (Event.button.button >= 1 && Event.button.button <= 32)
+                GButtons &= ~SDL_BUTTON_MASK(Event.button.button);
+            std::uint32_t const Button = DirectInputButton(Event.button.button);
+            if (Button < 8)
+                Sink->MouseRaw(kDimofsButton0 + Button, 0u);
+        }
         return;
+    }
     if (Event.type >= SDL_EVENT_DISPLAY_FIRST && Event.type <= SDL_EVENT_DISPLAY_LAST)
     {
         ReadModes();

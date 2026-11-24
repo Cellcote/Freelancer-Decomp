@@ -662,6 +662,30 @@ int TestScreen()
             Check(Mouse->GetDeviceState(sizeof(MouseState), &MouseState) == DI_OK &&
                       MouseState.lX == 0,
                   "a destroyed window's queued motion does not reach DirectInput");
+            // A release queued for a window destroyed meanwhile still lets go of the key and of
+            // DirectInput's button.
+            HWND const Pressed = CreateWindowExA(0, "ScreenClass", "Pressed", 0x2CA0000, 0, 0, 320,
+                                                 240, nullptr, nullptr, nullptr, nullptr);
+            if (Pressed != nullptr && reinterpret_cast<std::uintptr_t>(Pressed) < 0x40000000)
+            {
+                ScreenProbe::PushKeyA(IdOf(Pressed), true);
+                ScreenProbe::PushButton(IdOf(Pressed), 1, true, 5.f, 5.f);
+                DrainScreen();
+                Check((GetAsyncKeyState('A') & 0x8000) != 0 &&
+                          Mouse->GetDeviceState(sizeof(MouseState), &MouseState) == DI_OK &&
+                          MouseState.rgbButtons[0] == 0x80,
+                      "a key and a button go down in a window");
+                GDestroyedOnClose = false;
+                GDestroyOnClose = Pressed;
+                ScreenProbe::PushCloseRequest(Id);
+                ScreenProbe::PushKeyA(IdOf(Pressed), false);
+                ScreenProbe::PushButton(IdOf(Pressed), 1, false, 5.f, 5.f);
+                DrainScreen();
+                Check(GDestroyedOnClose && (GetAsyncKeyState('A') & 0x8000) == 0 &&
+                          Mouse->GetDeviceState(sizeof(MouseState), &MouseState) == DI_OK &&
+                          MouseState.rgbButtons[0] == 0,
+                      "their releases, queued for the window destroyed meanwhile, let go of them");
+            }
         }
         Mouse->Release();
     }

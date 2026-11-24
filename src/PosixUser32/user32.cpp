@@ -1328,12 +1328,21 @@ void SinkKey(std::uint32_t Window, unsigned PhysicalKey, bool bExtended, bool bD
     UINT const VirtualKey = Generic != 0 ? Generic : PhysicalKey;
     HWND const Target = WindowOfId(Window);
     // The window checked, the key state changed and the message queued under one lock: a
-    // window that is gone takes no key and leaves the live state as it was.
+    // window that is gone takes no key press and gets no message, but a release still lets go
+    // of the key (and of the generic modifier when the other side is up).
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+    SHORT* const Keys = State().LiveKeys;
     FWindow const* const Record = Find(Target);
     if (Record == nullptr)
+    {
+        if (!bDown)
+        {
+            Keys[PhysicalKey] = static_cast<SHORT>(Keys[PhysicalKey] & 1);
+            if (Generic != 0 && (Keys[OtherSide] & 0x8000) == 0)
+                Keys[Generic] = static_cast<SHORT>(Keys[Generic] & 1);
+        }
         return;
-    SHORT* const Keys = State().LiveKeys;
+    }
     bool const bWasDown = (Keys[VirtualKey] & 0x8000) != 0;
     if (Generic != 0)
     {
