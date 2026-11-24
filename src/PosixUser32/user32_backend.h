@@ -45,6 +45,9 @@ struct FUser32Sink
     // The window was minimized (1), maximized (2) or restored (0) on screen (its own buttons,
     // the system), or SDL refused a forwarded show command; with its client size by now.
     void (*ShowState)(std::uint32_t Window, int State, int Width, int Height);
+    // A key released for a window that is gone (or going): the key state lets go of it, and no
+    // message is made.
+    void (*ReleaseKey)(unsigned VirtualKey);
 };
 
 // The backend's calls may come from any thread: SDL's windows belong to the main thread, so

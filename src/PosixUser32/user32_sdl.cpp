@@ -434,6 +434,32 @@ std::intptr_t PointParam(int X, int Y)
         static_cast<std::uint32_t>((X & 0xFFFF) | ((Y & 0xFFFF) << 16)));
 }
 
+// The modifier flag of a modifier key; none for other keys.
+SDL_Keymod ModifierOf(SDL_Scancode Code)
+{
+    switch (Code)
+    {
+    case SDL_SCANCODE_LSHIFT:
+        return SDL_KMOD_LSHIFT;
+    case SDL_SCANCODE_RSHIFT:
+        return SDL_KMOD_RSHIFT;
+    case SDL_SCANCODE_LCTRL:
+        return SDL_KMOD_LCTRL;
+    case SDL_SCANCODE_RCTRL:
+        return SDL_KMOD_RCTRL;
+    case SDL_SCANCODE_LALT:
+        return SDL_KMOD_LALT;
+    case SDL_SCANCODE_RALT:
+        return SDL_KMOD_RALT;
+    case SDL_SCANCODE_LGUI:
+        return SDL_KMOD_LGUI;
+    case SDL_SCANCODE_RGUI:
+        return SDL_KMOD_RGUI;
+    default:
+        return SDL_KMOD_NONE;
+    }
+}
+
 // DirectInput's button for an SDL button: left, right, middle, then X1 and X2 as 3 and 4.
 std::uint32_t DirectInputButton(Uint8 Button)
 {
@@ -501,10 +527,12 @@ void Deliver(const FPending& Pending, const FUser32Sink* Sink)
         // DirectInput's button), without a message: it starts nothing new.
         if (Event.type == SDL_EVENT_KEY_UP)
         {
-            GMods = Event.key.mod;
+            // Only the modifier this releases: the event's whole modifier state may hold
+            // presses that were dropped with the window.
+            GMods = static_cast<SDL_Keymod>(GMods & ~ModifierOf(Event.key.scancode));
             FKey const Key = KeyOf(Event.key.scancode);
             if (Key.Vk != 0)
-                Sink->Key(Event.key.windowID, Key.Vk, Key.bExtended, false, false);
+                Sink->ReleaseKey(Key.Vk);
         }
         else if (Event.type == SDL_EVENT_MOUSE_BUTTON_UP)
         {
@@ -571,15 +599,42 @@ void Deliver(const FPending& Pending, const FUser32Sink* Sink)
     case SDL_EVENT_WINDOW_RESTORED:
     {
         // The window's own minimize and maximize buttons, the system's restore, with the size
-        // the window has by now (SDL may queue the resize after this event): the resize that
-        // follows then changes nothing.
+        // of this transition: the resize SDL queued after it (before the window's next show
+        // change), else, if another show change of the window is queued, the size the events
+        // left (this one did not resize), else the size the window has now (SDL may report the
+        // resize later; the one after this then changes nothing).
         auto const Found = GWindows.find(Event.window.windowID);
         SDL_Window* const Window = WindowOf(Event.window.windowID);
         if (Found == GWindows.end() || Window == nullptr)
             break;
         FScreenWindow& State = Found->second;
         if (Event.type != SDL_EVENT_WINDOW_MINIMIZED)
-            SDL_GetWindowSize(Window, &State.Width, &State.Height);
+        {
+            bool bSized = false;
+            bool bLaterShowChange = false;
+            for (const FPending& Later : GPending)
+            {
+                SDL_EventType const Type = static_cast<SDL_EventType>(Later.Event.type);
+                bool const bResize = Type == SDL_EVENT_WINDOW_RESIZED;
+                bool const bShowChange = Type == SDL_EVENT_WINDOW_MINIMIZED ||
+                                         Type == SDL_EVENT_WINDOW_MAXIMIZED ||
+                                         Type == SDL_EVENT_WINDOW_RESTORED;
+                if ((!bResize && !bShowChange) ||
+                    Later.Event.window.windowID != Event.window.windowID)
+                    continue;
+                if (bResize)
+                {
+                    State.Width = Later.Event.window.data1;
+                    State.Height = Later.Event.window.data2;
+                    bSized = true;
+                }
+                else
+                    bLaterShowChange = true;
+                break;
+            }
+            if (!bSized && !bLaterShowChange)
+                SDL_GetWindowSize(Window, &State.Width, &State.Height);
+        }
         Sink->ShowState(Event.window.windowID,
                         Event.type == SDL_EVENT_WINDOW_MINIMIZED   ? 1
                         : Event.type == SDL_EVENT_WINDOW_MAXIMIZED ? 2
@@ -834,6 +889,10 @@ void SetFrame(std::uint32_t Id, bool bFramed, bool bResizable, bool bFullscreen)
 // to the environment's (or the default), and to a value set earlier at normal priority.
 bool ShowWithoutActivating(SDL_Window* Window)
 {
+    // Activation already off (the environment, or the application at any priority): shown as
+    // it is, the hint untouched.
+    if (!SDL_GetHintBoolean(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, true))
+        return SDL_ShowWindow(Window);
     const char* const Before = SDL_GetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
     bool const bHadValue = Before != nullptr;
     std::string const Saved = bHadValue ? Before : "";
@@ -841,10 +900,23 @@ bool ShowWithoutActivating(SDL_Window* Window)
         SDL_SetHintWithPriority(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, "0", SDL_HINT_OVERRIDE) &&
         !SDL_GetHintBoolean(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, true);
     bool const bShown = bSet && SDL_ShowWindow(Window);
+    // Back to the value from before at the lowest priority that holds it: the reset brings
+    // back the environment's (or none); a value the application set over it comes back at
+    // normal priority, or at override where the environment's would win (SDL has no way to
+    // read a hint's priority).
     SDL_ResetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
-    const char* const After = SDL_GetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
-    if (bHadValue && (After == nullptr || Saved != After))
+    auto const Holds = [&]
+    {
+        const char* const After = SDL_GetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
+        return bHadValue ? After != nullptr && Saved == After : After == nullptr;
+    };
+    if (bHadValue && !Holds())
+    {
         SDL_SetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, Saved.c_str());
+        if (!Holds())
+            SDL_SetHintWithPriority(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, Saved.c_str(),
+                                    SDL_HINT_OVERRIDE);
+    }
     return bShown;
 }
 

@@ -99,7 +99,7 @@ std::string ActivateHint(bool* bSet)
 
 void SetActivateHint(const char* Value)
 {
-    SDL_SetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, Value);
+    SDL_SetHintWithPriority(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, Value, SDL_HINT_OVERRIDE);
 }
 
 void ResetActivateHint()
@@ -114,9 +114,14 @@ void PushModifier(std::uint32_t Id, EModifier Key, bool bDown)
             bDown ? (bLeft ? SDL_KMOD_LSHIFT : SDL_KMOD_RSHIFT) : SDL_KMOD_NONE, bDown);
 }
 
-void PushKeyA(std::uint32_t Id, bool bDown)
+void PushKeyA(std::uint32_t Id, bool bDown, bool bCtrlHeld)
 {
-    PushKey(Id, SDL_SCANCODE_A, SDL_KMOD_NONE, bDown);
+    PushKey(Id, SDL_SCANCODE_A, bCtrlHeld ? SDL_KMOD_LCTRL : SDL_KMOD_NONE, bDown);
+}
+
+void PushCtrl(std::uint32_t Id, bool bDown)
+{
+    PushKey(Id, SDL_SCANCODE_LCTRL, bDown ? SDL_KMOD_LCTRL : SDL_KMOD_NONE, bDown);
 }
 
 void PushButton(std::uint32_t Id, int Button, bool bDown, float X, float Y)

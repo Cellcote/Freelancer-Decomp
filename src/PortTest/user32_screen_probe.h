@@ -21,8 +21,8 @@ bool IsFullscreen(std::uint32_t Id);
 bool IsResizable(std::uint32_t Id);
 bool IsMouseGrabbed(std::uint32_t Id);
 bool CursorVisible();
-// SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN: its value, and whether it is set at all; set at normal
-// priority; reset.
+// SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN: its value, and whether it is set at all; set at override
+// priority (over the environment); reset.
 std::string ActivateHint(bool* bSet);
 void SetActivateHint(const char* Value);
 void ResetActivateHint();
@@ -33,7 +33,9 @@ enum class EModifier
     RightShift,
 };
 void PushModifier(std::uint32_t Id, EModifier Key, bool bDown);
-void PushKeyA(std::uint32_t Id, bool bDown);
+// A, with Ctrl in the event's modifier state or not; the left Ctrl key.
+void PushKeyA(std::uint32_t Id, bool bDown, bool bCtrlHeld = false);
+void PushCtrl(std::uint32_t Id, bool bDown);
 // Button 1 is the left button.
 void PushButton(std::uint32_t Id, int Button, bool bDown, float X, float Y);
 void PushMotion(std::uint32_t Id, float X, float Y, float DeltaX, float DeltaY);

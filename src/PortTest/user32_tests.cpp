@@ -666,7 +666,12 @@ int TestScreen()
             // DirectInput's button.
             HWND const Pressed = CreateWindowExA(0, "ScreenClass", "Pressed", 0x2CA0000, 0, 0, 320,
                                                  240, nullptr, nullptr, nullptr, nullptr);
-            if (Pressed != nullptr && reinterpret_cast<std::uintptr_t>(Pressed) < 0x40000000)
+            bool const bPressedOnScreen =
+                Pressed != nullptr && reinterpret_cast<std::uintptr_t>(Pressed) < 0x40000000;
+            Check(bPressedOnScreen, "a third window gets a screen");
+            if (Pressed != nullptr && !bPressedOnScreen)
+                DestroyWindow(Pressed);
+            if (bPressedOnScreen)
             {
                 ScreenProbe::PushKeyA(IdOf(Pressed), true);
                 ScreenProbe::PushButton(IdOf(Pressed), 1, true, 5.f, 5.f);
@@ -678,13 +683,24 @@ int TestScreen()
                 GDestroyedOnClose = false;
                 GDestroyOnClose = Pressed;
                 ScreenProbe::PushCloseRequest(Id);
-                ScreenProbe::PushKeyA(IdOf(Pressed), false);
+                // A Ctrl press for the gone window is dropped; the A release after it carries
+                // Ctrl in its modifier state, which must not come back with it.
+                ScreenProbe::PushCtrl(IdOf(Pressed), true);
+                ScreenProbe::PushKeyA(IdOf(Pressed), false, true);
                 ScreenProbe::PushButton(IdOf(Pressed), 1, false, 5.f, 5.f);
                 DrainScreen();
                 Check(GDestroyedOnClose && (GetAsyncKeyState('A') & 0x8000) == 0 &&
                           Mouse->GetDeviceState(sizeof(MouseState), &MouseState) == DI_OK &&
                           MouseState.rgbButtons[0] == 0,
                       "their releases, queued for the window destroyed meanwhile, let go of them");
+                GScreenSeen.clear();
+                ScreenProbe::PushButton(Id, 1, true, 5.f, 5.f);
+                ScreenProbe::PushButton(Id, 1, false, 5.f, 5.f);
+                DrainScreen();
+                const FScreenMessage* const LiveClick = FindScreen(WM_LBUTTONDOWN);
+                Check(LiveClick != nullptr && (LiveClick->WParam & MK_CONTROL) == 0 &&
+                          (GetAsyncKeyState(VK_CONTROL) & 0x8000) == 0,
+                      "a dropped window's release brings back no modifier it never took");
             }
         }
         Mouse->Release();
@@ -781,11 +797,53 @@ int TestScreen()
     std::string const HintAfter = ScreenProbe::ActivateHint(&bHintAfter);
     Check(bHintBefore == bHintAfter && HintBefore == HintAfter,
           "SW_SHOWNA leaves SDL's activation hint as it was");
+    // An explicit 1 (at override priority, over the environment), checked before it is used.
     ScreenProbe::SetActivateHint("1");
+    bool bBaseline = false;
+    Check(ScreenProbe::ActivateHint(&bBaseline) == "1" && bBaseline,
+          "the activation hint is set to 1");
     ShowWindow(Window, SW_SHOWNA);
     Check(ScreenProbe::ActivateHint(&bHintAfter) == "1" && bHintAfter,
           "SW_SHOWNA leaves a hint set to 1 at 1");
     ScreenProbe::ResetActivateHint();
+
+    // Owned popups follow their owner's minimize and restore; a hidden one stays hidden.
+    HWND const Shown = CreateWindowExA(0, "ScreenClass", "Shown", WS_POPUP | WS_VISIBLE, 10, 10,
+                                       100, 50, Window, nullptr, nullptr, nullptr);
+    HWND const Hidden = CreateWindowExA(0, "ScreenClass", "Hidden", WS_POPUP, 10, 10, 100, 50,
+                                        Window, nullptr, nullptr, nullptr);
+    ScreenProbe::PushShowState(Id, 1);
+    DrainScreen();
+    Check(Shown != nullptr && Hidden != nullptr && !IsWindowVisible(Shown) &&
+              !IsWindowVisible(Hidden),
+          "an owner minimized hides its visible owned popups");
+    // A resize while minimized: WM_SIZE SIZE_MINIMIZED with an empty client area.
+    GScreenSeen.clear();
+    ScreenProbe::PushResized(Id, 500, 400);
+    DrainScreen();
+    const FScreenMessage* const MinimizedSize = FindScreen(WM_SIZE);
+    Check(MinimizedSize != nullptr && MinimizedSize->WParam == SIZE_MINIMIZED &&
+              MinimizedSize->LParam == 0,
+          "a resize while minimized reports SIZE_MINIMIZED with no client area");
+    ScreenProbe::PushShowState(Id, 0);
+    DrainScreen();
+    Check(IsWindowVisible(Shown) && !IsWindowVisible(Hidden),
+          "restored, it shows the popups it hid and leaves the hidden one");
+    DestroyWindow(Shown);
+    DestroyWindow(Hidden);
+    // ShowWindow sets WS_MINIMIZE before the screen reports the minimize: the report still
+    // sends WM_SIZE SIZE_MINIMIZED.
+    ShowWindow(Window, SW_MINIMIZE);
+    GScreenSeen.clear();
+    ScreenProbe::PushShowState(Id, 1);
+    DrainScreen();
+    const FScreenMessage* const Minimized = FindScreen(WM_SIZE);
+    Check(Minimized != nullptr && Minimized->WParam == SIZE_MINIMIZED,
+          "the screen's minimize after ShowWindow(SW_MINIMIZE) sends WM_SIZE SIZE_MINIMIZED");
+    ShowWindow(Window, SW_RESTORE);
+    ScreenProbe::PushShowState(Id, 0);
+    ScreenProbe::PushResized(Id, 640, 400);
+    DrainScreen();
 
     // A focus change taken by a nested loop inside WM_ACTIVATEAPP wins over the outer one.
     GNestOnActivate = true;
