@@ -35,6 +35,24 @@ namespace
         }
     }
 
+    // SRCBLEND and DESTBLEND as one pair of factors. Direct3D 8's BOTHSRCALPHA (12) and
+    // BOTHINVSRCALPHA (13) as the source blend set both: source alpha and its inverse, or the
+    // inverse and source alpha, whatever DESTBLEND says.
+    void BlendFactors(std::uint8_t D3dSrc, std::uint8_t D3dDst, SDL_GPUBlendFactor* Src,
+                      SDL_GPUBlendFactor* Dst)
+    {
+        if (D3dSrc == 12 || D3dSrc == 13)
+        {
+            *Src = D3dSrc == 12 ? SDL_GPU_BLENDFACTOR_SRC_ALPHA
+                                : SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+            *Dst = D3dSrc == 12 ? SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA
+                                : SDL_GPU_BLENDFACTOR_SRC_ALPHA;
+            return;
+        }
+        *Src = BlendFactor(D3dSrc);
+        *Dst = BlendFactor(D3dDst);
+    }
+
     SDL_GPUCompareOp CompareOp(std::uint8_t D3dCmp)
     {
         switch (D3dCmp)
@@ -427,11 +445,14 @@ SDL_GPUGraphicsPipeline* FRpGpuSdlBackend::Pipeline(const FRpGpuPipelineKey& Key
     SDL_GPUColorTargetDescription Color = {};
     Color.format = kTargetFormat;
     Color.blend_state.enable_blend = Key.bBlend != 0;
-    Color.blend_state.src_color_blendfactor = BlendFactor(Key.SrcBlend);
-    Color.blend_state.dst_color_blendfactor = BlendFactor(Key.DstBlend);
+    SDL_GPUBlendFactor SrcFactor;
+    SDL_GPUBlendFactor DstFactor;
+    BlendFactors(Key.SrcBlend, Key.DstBlend, &SrcFactor, &DstFactor);
+    Color.blend_state.src_color_blendfactor = SrcFactor;
+    Color.blend_state.dst_color_blendfactor = DstFactor;
     Color.blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;
-    Color.blend_state.src_alpha_blendfactor = BlendFactor(Key.SrcBlend);
-    Color.blend_state.dst_alpha_blendfactor = BlendFactor(Key.DstBlend);
+    Color.blend_state.src_alpha_blendfactor = SrcFactor;
+    Color.blend_state.dst_alpha_blendfactor = DstFactor;
     Color.blend_state.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
     Color.blend_state.enable_color_write_mask = true;
     Color.blend_state.color_write_mask = static_cast<SDL_GPUColorComponentFlags>(

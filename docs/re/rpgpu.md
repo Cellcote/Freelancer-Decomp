@@ -396,6 +396,8 @@ RPGPU records each frame and draws it at `SwapBuffers`, which is plan step 5.3.
    - `CULLMODE` culls by the winding on screen, pre-transformed triangles included, as Direct3D
      8 does. RP8's default is 1 (none).
    - `FILLMODE` 2 draws wireframe; points (1) draw solid.
+   - `SRCBLEND` `BOTHSRCALPHA` (12) and `BOTHINVSRCALPHA` (13), which SDL_GPU lacks, set both
+     factors, source alpha and its inverse (or the other way round), whatever `DESTBLEND` says.
    - `ZBIAS` has no unit in Direct3D 8: each driver picked its own. RPGPU moves depth by one
      16-bit depth step (1 / 65535 of the range) per `ZBIAS` step, towards the viewer.
 4. A draw whose texture has no GPU copy samples a 1x1 white texture with the texture flag
@@ -408,6 +410,30 @@ RPGPU records each frame and draws it at `SwapBuffers`, which is plan step 5.3.
 - the ring buffers (the vertex pools, the scratch index ring) and user-pointer draws copy their
   vertices and indices into each frame (the static buffers stay on the GPU, "Static vertex and
   index buffers");
-- the Direct3D blend factors SDL_GPU lacks (none of the 2D draws use them);
 - a border colour, so `BORDER` addressing clamps instead.
 
+## The menu scene
+
+The main menu's background is a scene of the Intro system: one of three base rooms
+(`intro1_cityscape`, `intro2_volcano`, `intro3_planetchunks`), each a THN script in
+`DATA/Scripts/Intro`, with star spheres, planets with atmospheres, stations, asteroids, ships,
+engine and exhaust effects and, in the third, EXP2 fog. What it asks of the render pipeline,
+and where RPGPU does it:
+
+| What | Used by | In RPGPU |
+|---|---|---|
+| DXT1, DXT3, DXT5 textures | most `.mat`/`.txm` files (`MIPS`) | BC1..BC3 when the device samples them (Metal on Apple GPUs does), else TexConvert decodes |
+| 8-bit palettized TGA mips (`MIP0`..`MIP8`) | most planet, station and star-sphere textures | Shading's format map turns them into a 16- or 32-bit format; TexConvert applies the palette |
+| R5G6B5 and other 16-bit DDS | planets | TexConvert |
+| a DDS cube map (`CUBE`) | `fx/envmapbasic.mat` (envmap stations) | `LoadCubemap`, a cube texture sampled with camera-space reflection vectors (`TEXCOORDINDEX` 0x30000) |
+| DcDt family, DetailMap family, Atmosphere, Nebula, Glass, Nomad, LightMap | Shading and flmaterials | stages MODULATE, MODULATE2X, ADD, SELECTARG1, DISABLE; texture transforms with `COUNT2` (detail tiling, animated UVs) |
+| blends SRCALPHA/INVSRCALPHA, SRCALPHA/ONE, ONE/ONE, DESTCOLOR/ZERO, ONE/INVSRCCOLOR, and whatever an `.ale` names | materials, alchemy, suns | every D3DBLEND, `BOTHSRCALPHA` and `BOTHINVSRCALPHA` included |
+| alpha test (LESS, GREATER), `ZBIAS`, `ZFUNC` ALWAYS for backdrops, culling both ways | two-pass materials, star spheres, shadows | yes |
+| `COUNT3 \| PROJECTED` on camera-space positions | ShadowMaterial | yes |
+| fog: vertex LINEAR or table, EXP2 from THN | nebulae, `Intro_planetchunks` | yes |
+| particles | alchemy: triangle lists from the pool vertex buffer and the scratch index ring (`IRPDraw::DrawIndexedPrimitive`), FVF 0x142 | yes |
+| point lists, point sprites, `D3DFVF_PSIZE`, three- or four-component texture sets, stencil, `BLENDOP` | nothing in the scene | not drawn (see the gaps) |
+
+`module_tests` draws what the scene relies on that the 2D draws do not show: a DXT1 texture, a
+P8 level with its palette, and the `BOTHSRCALPHA` blends, on the Null backend (the calls) and on
+Metal (the pixels).
