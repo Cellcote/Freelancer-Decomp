@@ -117,6 +117,7 @@ struct FFontSpec
         Full, // a format 12 map (U+1D49C too) recorded before the format 4 one
         BadFull, // a format 12 map whose groups run past the cmap, before the format 4 one
     } Cmap = Plain;
+    unsigned UnitsPerEm = 1000;
 };
 
 void PutSquare(std::vector<char>& Glyf)
@@ -180,7 +181,8 @@ std::vector<char> BuildFont(const FFontSpec& Spec)
     std::vector<char> Head(54, 0);
     Head[1] = 1; // version 1.0
     Head[12] = 0x5F, Head[13] = 0x0F, Head[14] = 0x3C, Head[15] = 0xF5; // magic
-    Head[18] = 1000 >> 8, Head[19] = static_cast<char>(1000 & 0xFF); // unitsPerEm
+    Head[18] = static_cast<char>(Spec.UnitsPerEm >> 8); // unitsPerEm
+    Head[19] = static_cast<char>(Spec.UnitsPerEm & 0xFF);
     std::vector<char> Hhea;
     Put32(Hhea, 0x00010000);
     Put16(Hhea, 800); // ascender
@@ -415,7 +417,7 @@ int main()
         Second + "/Full.ttf",    Third + "/Arial.ttf",  First + "/Swap.ttf",
         Second + "/Swap.ttf",    Second + "/Split.ttf", Second + "/Square.ttf",
         Second + "/Range.ttf",   Second + "/Near.ttf",  Second + "/Neighbour.ttf",
-        Second + "/BadFull.ttf", Second + "/Text.ttf"};
+        Second + "/BadFull.ttf", Second + "/Text.ttf",  Second + "/Huge.ttf"};
     // Each step of the setup must hold, or what the checks below find is not what they test.
     bool bSetUp =
         mkdir(First.c_str(), 0700) == 0 && mkdir(Second.c_str(), 0700) == 0 &&
@@ -440,7 +442,8 @@ int main()
         {Files[16], {"Gdi Test Near", 500, 1, 10}},
         {Files[17], {"Gdi Test Neighbour", 500, 0, 0, FFontSpec::Neighbour}},
         {Files[18], {"Gdi Test Bad Full", 500, 0, 0, FFontSpec::BadFull}},
-        {Files[19], {"Gdi Test Text", 800, 0, 0, FFontSpec::Ascii}}};
+        {Files[19], {"Gdi Test Text", 800, 0, 0, FFontSpec::Ascii}},
+        {Files[20], {"Gdi Test Huge", 500, 0, 0, FFontSpec::Plain, 1}}};
     for (const auto& Fixture : Fixtures)
     {
         std::vector<char> const Data = BuildFont(Fixture.second);
@@ -513,6 +516,13 @@ int main()
         DeleteObject(Few);
         DeleteObject(Range);
         DeleteObject(Near);
+        // One unit per em: at -16 the 500 x 700-unit square is 8000 x 11200 pixels, past the
+        // coverage one glyph may rasterize; it is drawn as nothing.
+        HFONT const Huge = MakeFont("Gdi Test Huge", -16);
+        FDrawn const HugeA = DrawA(Huge);
+        Check(HugeA.Face == "Gdi Test Huge" && HugeA.bDrawn && !HugeA.Lit(),
+              "a glyph past the coverage limit is not rasterized");
+        DeleteObject(Huge);
         HFONT const Short = MakeFont("Gdi Test Short", -100);
         HFONT const Neighbour = MakeFont("Gdi Test Neighbour", -100);
         Check(FaceOf(Short) != "Gdi Test Short",

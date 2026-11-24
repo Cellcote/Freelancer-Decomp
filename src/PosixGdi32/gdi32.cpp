@@ -1261,8 +1261,9 @@ void DrawGlyph(FBitmap& Bitmap, const FFont& Font, std::uint32_t Character, int 
           std::fabs(Bottom) < kFar) ||
         (Right - Left + 2) * (Bottom - Top + 2) > kMaxGlyphCoverage)
         return;
-    // Its pixels, with a pixel's rounding, the emboldening pass and a synthetic slant's shift.
-    double const Reach = 2 + (Bottom - Top) / 4;
+    // Its pixels, with a pixel's rounding, the emboldening pass and a synthetic slant's shift
+    // (a row moves by a quarter of its distance from the baseline).
+    double const Reach = 2 + std::max(std::fabs(Top), std::fabs(Bottom)) / 4 + 1;
     if (PenX + Right + Reach < Area.left || PenX + Left - Reach >= Area.right ||
         BaselineY + Bottom + 2 < Area.top || BaselineY + Top - 2 >= Area.bottom)
         return;
