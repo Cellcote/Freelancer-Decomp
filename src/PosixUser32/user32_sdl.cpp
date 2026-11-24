@@ -15,6 +15,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cstdio>
 #include <deque>
@@ -82,29 +83,69 @@ bool OnMainThread()
 #endif
 }
 
-// Runs Call on the main thread: at once there, else when the main thread next takes its events
-// (SDL_RunOnMainThread, not waited for, so that a thread the main thread waits on cannot
-// deadlock). Dropped before SDL is started: there is no window then.
-void OnMain(std::function<void()> Call)
+// Calls forwarded from other threads, in the order they were made, for the main thread.
+std::mutex GForwardedLock;
+std::deque<std::function<void()>> GForwarded;
+
+// Runs the forwarded calls (on the main thread), oldest first, including any one of them
+// forwards.
+void RunForwarded()
+{
+    for (;;)
+    {
+        std::function<void()> Next;
+        {
+            std::lock_guard<std::mutex> Guard(GForwardedLock);
+            if (GForwarded.empty())
+                return;
+            Next = std::move(GForwarded.front());
+            GForwarded.pop_front();
+        }
+        Next();
+    }
+}
+
+// Runs Call on the main thread, after every call forwarded before it: at once there, else
+// queued and run when the main thread next takes its events or makes a call of its own
+// (SDL_RunOnMainThread wakes it; not waited for, so that a thread the main thread waits on
+// cannot deadlock). False when it cannot be forwarded; dropped before SDL is started, when
+// there is no window.
+bool OnMain(std::function<void()> Call)
 {
     if (OnMainThread())
     {
+        RunForwarded();
         Call();
-        return;
+        return true;
     }
     if (!GReady)
-        return;
-    auto* const Pending = new std::function<void()>(std::move(Call));
-    if (!SDL_RunOnMainThread(
-            [](void* Data)
-            {
-                auto* const Forwarded = static_cast<std::function<void()>*>(Data);
-                (*Forwarded)();
-                delete Forwarded;
-            },
-            Pending, false))
-        delete Pending;
+        return false;
+    {
+        std::lock_guard<std::mutex> Guard(GForwardedLock);
+        GForwarded.push_back(std::move(Call));
+    }
+    if (!SDL_RunOnMainThread([](void*) { RunForwarded(); }, nullptr, false))
+    {
+        // Not queued with SDL: still run by the main thread's next Pump.
+        std::fprintf(stderr, "[user32_sdl] SDL_RunOnMainThread: %s\n", SDL_GetError());
+    }
+    return true;
 }
+
+// Windows user32 has destroyed, from any thread, before the main thread destroys their SDL
+// window: their buffered input is dropped from then on.
+std::mutex GDestroyedLock;
+std::vector<SDL_WindowID> GDestroyed;
+
+bool IsDestroyed(SDL_WindowID Id)
+{
+    std::lock_guard<std::mutex> Guard(GDestroyedLock);
+    return std::find(GDestroyed.begin(), GDestroyed.end(), Id) != GDestroyed.end();
+}
+
+// Windows whose forwarded show command SDL refused: their show state goes back to user32 as
+// SDL has it, at the next Pump (main thread only).
+std::vector<SDL_WindowID> GReconcile;
 
 // The display's modes, read on the main thread when SDL starts and when the displays change,
 // for DisplayMode from any thread.
@@ -437,7 +478,8 @@ void Deliver(const FPending& Pending, const FUser32Sink* Sink)
     SDL_Event const& Event = Pending.Event;
     // Input for a window that is gone (destroyed by an earlier event's handler) or not one of
     // user32's: dropped before it changes the mouse, the modifiers or DirectInput.
-    if (IsInput(Event) && GWindows.count(InputWindow(Event)) == 0)
+    if (IsInput(Event) &&
+        (GWindows.count(InputWindow(Event)) == 0 || IsDestroyed(InputWindow(Event))))
         return;
     if (Event.type >= SDL_EVENT_DISPLAY_FIRST && Event.type <= SDL_EVENT_DISPLAY_LAST)
     {
@@ -492,19 +534,33 @@ void Deliver(const FPending& Pending, const FUser32Sink* Sink)
     case SDL_EVENT_WINDOW_MINIMIZED:
     case SDL_EVENT_WINDOW_MAXIMIZED:
     case SDL_EVENT_WINDOW_RESTORED:
-        // The window's own minimize and maximize buttons, the system's restore.
-        if (GWindows.count(Event.window.windowID) != 0)
-            Sink->ShowState(Event.window.windowID, Event.type == SDL_EVENT_WINDOW_MINIMIZED   ? 1
-                                                   : Event.type == SDL_EVENT_WINDOW_MAXIMIZED ? 2
-                                                                                              : 0);
+    {
+        // The window's own minimize and maximize buttons, the system's restore, with the size
+        // the window has by now (SDL may queue the resize after this event): the resize that
+        // follows then changes nothing.
+        auto const Found = GWindows.find(Event.window.windowID);
+        SDL_Window* const Window = WindowOf(Event.window.windowID);
+        if (Found == GWindows.end() || Window == nullptr)
+            break;
+        FScreenWindow& State = Found->second;
+        if (Event.type != SDL_EVENT_WINDOW_MINIMIZED)
+            SDL_GetWindowSize(Window, &State.Width, &State.Height);
+        Sink->ShowState(Event.window.windowID,
+                        Event.type == SDL_EVENT_WINDOW_MINIMIZED   ? 1
+                        : Event.type == SDL_EVENT_WINDOW_MAXIMIZED ? 2
+                                                                   : 0,
+                        State.Width, State.Height);
         break;
+    }
     case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
     {
-        // The windowed bounds asked for while fullscreen, if SetFrame could not apply them.
+        // The windowed bounds asked for while fullscreen, if SetFrame could not apply them; not
+        // while the window is fullscreen again (a late event), which keeps them for its next
+        // exit.
         auto const Found = GWindows.find(Event.window.windowID);
-        if (Found == GWindows.end())
-            break;
-        if (SDL_Window* const Window = WindowOf(Event.window.windowID))
+        SDL_Window* const Window = WindowOf(Event.window.windowID);
+        if (Found != GWindows.end() && Window != nullptr &&
+            (SDL_GetWindowFlags(Window) & SDL_WINDOW_FULLSCREEN) == 0)
             ApplyWindowed(Window, Found->second);
         break;
     }
@@ -669,12 +725,20 @@ bool CreateWindow(const char* Title, int X, int Y, int Width, int Height, bool b
 
 void DestroyWindow(std::uint32_t Id)
 {
+    {
+        std::lock_guard<std::mutex> Guard(GDestroyedLock);
+        GDestroyed.push_back(Id);
+    }
     OnMain(
         [Id]
         {
             GWindows.erase(Id);
             if (SDL_Window* const Window = WindowOf(Id))
                 SDL_DestroyWindow(Window);
+            // Its buffered input is dropped by GWindows from now on (SDL's ids are not reused).
+            std::lock_guard<std::mutex> Guard(GDestroyedLock);
+            GDestroyed.erase(std::remove(GDestroyed.begin(), GDestroyed.end(), Id),
+                             GDestroyed.end());
         });
 }
 
@@ -730,16 +794,22 @@ void SetFrame(std::uint32_t Id, bool bFramed, bool bResizable, bool bFullscreen)
 
 // Shown without being activated (made key on macOS): SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN off
 // for the call, then as it was.
+// The hint is set at override priority, which wins over the environment's; if it still does
+// not take, the window is not shown rather than shown activated. Afterwards the hint is back
+// to the environment's (or the default), and to a value set earlier at normal priority.
 bool ShowWithoutActivating(SDL_Window* Window)
 {
     const char* const Before = SDL_GetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
-    std::string const Saved = Before != nullptr ? Before : "";
-    SDL_SetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, "0");
-    bool const bShown = SDL_ShowWindow(Window);
-    if (Before != nullptr)
+    bool const bHadValue = Before != nullptr;
+    std::string const Saved = bHadValue ? Before : "";
+    bool const bSet =
+        SDL_SetHintWithPriority(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, "0", SDL_HINT_OVERRIDE) &&
+        !SDL_GetHintBoolean(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, true);
+    bool const bShown = bSet && SDL_ShowWindow(Window);
+    SDL_ResetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
+    const char* const After = SDL_GetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
+    if (bHadValue && (After == nullptr || Saved != After))
         SDL_SetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, Saved.c_str());
-    else
-        SDL_ResetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
     return bShown;
 }
 
@@ -796,9 +866,19 @@ bool ShowOnMain(std::uint32_t Id, int Command)
 bool Show(std::uint32_t Id, int Command)
 {
     if (OnMainThread())
+    {
+        RunForwarded();
         return ShowOnMain(Id, Command);
-    OnMain([=] { ShowOnMain(Id, Command); });
-    return true;
+    }
+    // Forwarded: a command SDL then refuses sends the window's show state back to user32 as SDL
+    // has it (the next Pump), so a maximize recorded for it is undone.
+    return OnMain(
+        [=]
+        {
+            if (!ShowOnMain(Id, Command) &&
+                std::find(GReconcile.begin(), GReconcile.end(), Id) == GReconcile.end())
+                GReconcile.push_back(Id);
+        });
 }
 
 void SetTitle(std::uint32_t Id, const char* Title)
@@ -815,6 +895,23 @@ void Pump(const FUser32Sink* Sink)
 {
     if (!GReady || Sink == nullptr || !OnMainThread())
         return;
+    RunForwarded();
+    // Show states SDL kept against a forwarded command.
+    std::vector<SDL_WindowID> Reconcile;
+    Reconcile.swap(GReconcile);
+    for (SDL_WindowID const Id : Reconcile)
+    {
+        SDL_Window* const Window = WindowOf(Id);
+        auto const Found = GWindows.find(Id);
+        if (Window == nullptr || Found == GWindows.end())
+            continue;
+        SDL_WindowFlags const Flags = SDL_GetWindowFlags(Window);
+        Sink->ShowState(Id,
+                        (Flags & SDL_WINDOW_MINIMIZED) != 0   ? 1
+                        : (Flags & SDL_WINDOW_MAXIMIZED) != 0 ? 2
+                                                              : 0,
+                        Found->second.Width, Found->second.Height);
+    }
     FPending Pending;
     while (SDL_PollEvent(&Pending.Event))
     {
@@ -873,6 +970,13 @@ void ClipCursor(std::uint32_t Id, bool bClip)
         });
 }
 
+// SDL started (on the main thread only), so that the display's modes are known before the first
+// window is sized.
+bool Start()
+{
+    return OnMainThread() && Ready();
+}
+
 // From the modes read on the main thread, so any thread may ask; false before SDL is started.
 bool DisplayMode(int Index, int* Width, int* Height, int* Bits, int* RefreshHz)
 {
@@ -907,6 +1011,7 @@ const FUser32Backend GBackend = {
     &WarpMouse,
     &ClipCursor,
     &DisplayMode,
+    &Start,
 };
 } // namespace
 

@@ -90,9 +90,21 @@ bool CursorVisible()
     return SDL_CursorVisible();
 }
 
-bool ActivateHintSet()
+std::string ActivateHint(bool* bSet)
 {
-    return SDL_GetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN) != nullptr;
+    const char* const Value = SDL_GetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
+    *bSet = Value != nullptr;
+    return Value != nullptr ? Value : "";
+}
+
+void SetActivateHint(const char* Value)
+{
+    SDL_SetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN, Value);
+}
+
+void ResetActivateHint()
+{
+    SDL_ResetHint(SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN);
 }
 
 void PushModifier(std::uint32_t Id, EModifier Key, bool bDown)

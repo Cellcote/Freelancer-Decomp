@@ -42,9 +42,9 @@ struct FUser32Sink
     void (*Bounds)(std::uint32_t Window, int X, int Y, int Width, int Height);
     // The application's windows got or lost the focus.
     void (*Activate)(std::uint32_t Window, bool bActive);
-    // The window was minimized (1), maximized (2) or restored (0) on screen: its own buttons,
-    // or the system.
-    void (*ShowState)(std::uint32_t Window, int State);
+    // The window was minimized (1), maximized (2) or restored (0) on screen (its own buttons,
+    // the system), or SDL refused a forwarded show command; with its client size by now.
+    void (*ShowState)(std::uint32_t Window, int State, int Width, int Height);
 };
 
 // The backend's calls may come from any thread: SDL's windows belong to the main thread, so
@@ -85,6 +85,9 @@ struct FUser32Backend
     // The display's modes: Index -1 is the desktop's, then the fullscreen modes from the
     // largest. False past the last.
     bool (*DisplayMode)(int Index, int* Width, int* Height, int* Bits, int* RefreshHz);
+    // Starts the screen (on the main thread only; false elsewhere), so that DisplayMode has the
+    // display's modes before the first window is sized.
+    bool (*Start)();
 };
 
 inline constexpr int kUser32BackendVersion = 2;

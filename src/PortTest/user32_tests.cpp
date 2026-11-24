@@ -22,8 +22,10 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <cwchar>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -435,11 +437,21 @@ struct FScreenMessage
 std::vector<FScreenMessage> GScreenSeen;
 bool GNestOnClose = false;
 bool GNestOnActivate = false;
+HWND GDestroyOnClose = nullptr; // destroyed by another thread from the close handler
+bool GDestroyedOnClose = false;
 int GNestedKeys = 0;
 
 std::uint32_t IdOf(HWND Window)
 {
     return static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(Window));
+}
+
+// Takes the screen's events into the queue without taking a message (a filter no message
+// matches).
+void PumpOnly()
+{
+    MSG Message;
+    PeekMessageA(&Message, nullptr, WM_USER + 0x7000, WM_USER + 0x7000, PM_NOREMOVE);
 }
 
 // Takes what the screen has, dispatching it.
@@ -463,6 +475,14 @@ LRESULT CALLBACK ScreenProc(HWND Window, UINT Message, WPARAM WParam, LPARAM LPa
         for (int Pass = 0; Pass < 5; ++Pass)
             while (PeekMessageA(&Nested, nullptr, 0, 0, PM_REMOVE))
                 DispatchMessageA(&Nested);
+    }
+    if (Message == WM_SYSCOMMAND && (WParam & 0xFFF0) == SC_CLOSE && GDestroyOnClose != nullptr)
+    {
+        // Another window destroyed by a worker while the screen's events are being delivered.
+        HWND const Doomed = GDestroyOnClose;
+        GDestroyOnClose = nullptr;
+        std::thread([Doomed] { GDestroyedOnClose = DestroyWindow(Doomed) != FALSE; }).join();
+        return 0;
     }
     if (Message == WM_SYSCOMMAND && (WParam & 0xFFF0) == SC_CLOSE)
     {
@@ -617,17 +637,32 @@ int TestScreen()
         DrainScreen();
         Check(Mouse->GetDeviceState(sizeof(MouseState), &MouseState) == DI_OK && MouseState.lX == 1,
               "two half-unit motions reach DirectInput as one");
-        // Input queued for a window that is destroyed before it is taken is dropped.
+        // Input queued for a window that another thread destroys before it is taken is dropped
+        // (the SDL window goes later, on the main thread); the same window's input arrives while
+        // it lives.
         HWND const Doomed = CreateWindowExA(0, "ScreenClass", "Doomed", 0x2CA0000, 0, 0, 320, 240,
                                             nullptr, nullptr, nullptr, nullptr);
-        if (Doomed != nullptr)
+        bool const bDoomedOnScreen =
+            Doomed != nullptr && reinterpret_cast<std::uintptr_t>(Doomed) < 0x40000000;
+        Check(bDoomedOnScreen, "a second window gets a screen");
+        if (bDoomedOnScreen)
+        {
+            ScreenProbe::PushMotion(IdOf(Doomed), 1.f, 1.f, 2.f, 0.f);
+            DrainScreen();
+            Check(Mouse->GetDeviceState(sizeof(MouseState), &MouseState) == DI_OK &&
+                      MouseState.lX == 2,
+                  "a live window's motion reaches DirectInput");
+            // The close request's handler has a worker destroy Doomed; Doomed's motion is taken
+            // from SDL in the same pump, before the main thread removes its SDL window.
+            GDestroyOnClose = Doomed;
+            ScreenProbe::PushCloseRequest(Id);
             ScreenProbe::PushMotion(IdOf(Doomed), 1.f, 1.f, 3.f, 0.f);
-        DestroyWindow(Doomed);
-        DrainScreen();
-        Check(Doomed != nullptr &&
-                  Mouse->GetDeviceState(sizeof(MouseState), &MouseState) == DI_OK &&
-                  MouseState.lX == 0,
-              "a destroyed window's queued motion does not reach DirectInput");
+            DrainScreen();
+            Check(GDestroyedOnClose, "another thread destroys the window");
+            Check(Mouse->GetDeviceState(sizeof(MouseState), &MouseState) == DI_OK &&
+                      MouseState.lX == 0,
+                  "a destroyed window's queued motion does not reach DirectInput");
+        }
         Mouse->Release();
     }
     if (Input != nullptr)
@@ -656,6 +691,25 @@ int TestScreen()
           "while A's key-down is handled, GetKeyState has A down though the key is up again");
     DrainScreen();
     Check((GetKeyState('A') & 0x8000) == 0, "A's key-up message brings A up");
+    // Each key message brings the whole keyboard: Shift's key-up is dropped with its window,
+    // and A's next key-down still brings Shift up.
+    HWND const Other = CreateWindowExA(0, "ScreenClass", "Other", 0x2CA0000, 0, 0, 320, 240,
+                                       nullptr, nullptr, nullptr, nullptr);
+    if (Other != nullptr)
+    {
+        ScreenProbe::PushModifier(IdOf(Other), ScreenProbe::EModifier::LeftShift, true);
+        DrainScreen();
+        Check((GetKeyState(VK_SHIFT) & 0x8000) != 0, "Shift's key-down is taken");
+        ScreenProbe::PushModifier(IdOf(Other), ScreenProbe::EModifier::LeftShift, false);
+        // The key-up is queued for Other, which is then destroyed with it.
+        PumpOnly();
+        DestroyWindow(Other);
+        ScreenProbe::PushKeyA(Id, true);
+        ScreenProbe::PushKeyA(Id, false);
+        DrainScreen();
+        Check((GetKeyState(VK_SHIFT) & 0x8000) == 0,
+              "a later key message brings Shift up though Shift's key-up was dropped");
+    }
 
     // MSG.pt is the position of the event the message came from.
     ScreenProbe::PushWheel(Id, 1.f, 30.f, 40.f);
@@ -695,8 +749,19 @@ int TestScreen()
     Check((GetWindowLongA(Window, GWL_STYLE) & WS_MAXIMIZE) == 0 && Restored != nullptr &&
               Restored->WParam == SIZE_RESTORED,
           "a restore on screen clears it and sends WM_SIZE SIZE_RESTORED");
+    // SW_SHOWNA leaves SDL's activation hint as it found it, set or not.
+    bool bHintBefore = false;
+    std::string const HintBefore = ScreenProbe::ActivateHint(&bHintBefore);
     ShowWindow(Window, SW_SHOWNA);
-    Check(!ScreenProbe::ActivateHintSet(), "SW_SHOWNA leaves SDL's activation hint as it was");
+    bool bHintAfter = false;
+    std::string const HintAfter = ScreenProbe::ActivateHint(&bHintAfter);
+    Check(bHintBefore == bHintAfter && HintBefore == HintAfter,
+          "SW_SHOWNA leaves SDL's activation hint as it was");
+    ScreenProbe::SetActivateHint("1");
+    ShowWindow(Window, SW_SHOWNA);
+    Check(ScreenProbe::ActivateHint(&bHintAfter) == "1" && bHintAfter,
+          "SW_SHOWNA leaves a hint set to 1 at 1");
+    ScreenProbe::ResetActivateHint();
 
     // A focus change taken by a nested loop inside WM_ACTIVATEAPP wins over the outer one.
     GNestOnActivate = true;
@@ -763,9 +828,25 @@ int TestScreen()
     DrainScreen();
     Check(ScreenProbe::WindowTitle(Id) == "Forwarded",
           "a title set off the main thread reaches the screen through the main thread");
+    // A title forwarded earlier does not overwrite one the main thread sets after it.
+    std::thread([Window] { SetWindowTextA(Window, "Older"); }).join();
+    SetWindowTextA(Window, "Newer");
+    DrainScreen();
+    Check(ScreenProbe::WindowTitle(Id) == "Newer",
+          "a forwarded title is applied before the main thread's later one");
+    // A maximize forwarded from another thread that SDL refuses is undone in user32 too.
+    std::thread([Window] { ShowWindow(Window, SW_MAXIMIZE); }).join();
+    DrainScreen();
+    Check((GetWindowLongA(Window, GWL_STYLE) & WS_MAXIMIZE) == 0,
+          "a forwarded maximize the screen refuses leaves the window unmaximized");
 
     // A GetMessageA waiting for a window's messages returns -1 when another thread destroys it.
+    // The worker says it is about to wait; the main thread then checks that it is still waiting
+    // a while later (no message can end the wait: none is posted to the window) before it
+    // destroys the window. Without DestroyWindow's wake-up the waiter never returns, and the
+    // test process ends with the failure rather than leave the waiter with this frame's state.
     std::atomic<HWND> Waited = nullptr;
+    std::atomic<bool> bWaiting = false;
     std::atomic<int> WaitResult = 0;
     std::thread Waiter(
         [&]
@@ -773,19 +854,24 @@ int TestScreen()
             Waited = CreateWindowExA(0, "ScreenClass", "Waited", 0x2CA0000, 0, 0, 320, 240, nullptr,
                                      nullptr, nullptr, nullptr);
             MSG Taken;
+            bWaiting = true;
             WaitResult = GetMessageA(&Taken, Waited, 0, 0) == -1 ? 1 : 2;
         });
-    for (int Spin = 0; Spin < 200 && Waited.load() == nullptr; ++Spin)
+    for (int Spin = 0; Spin < 400 && !bWaiting.load(); ++Spin)
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    Check(bWaiting.load() && WaitResult.load() == 0, "the waiter is blocked in GetMessageA");
     DestroyWindow(Waited.load());
-    for (int Spin = 0; Spin < 200 && WaitResult.load() == 0; ++Spin)
+    for (int Spin = 0; Spin < 400 && WaitResult.load() == 0; ++Spin)
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     Check(WaitResult.load() == 1, "GetMessageA for a window destroyed meanwhile returns -1");
-    if (WaitResult.load() != 0)
-        Waiter.join();
-    else
-        Waiter.detach();
+    if (WaitResult.load() == 0)
+    {
+        std::printf("%d failure(s)\n", GFailures);
+        std::fflush(stdout);
+        std::_Exit(1);
+    }
+    Waiter.join();
     HWND const Full =
         CreateWindowExA(0, "ScreenClass", "Full", WS_POPUP | WS_VISIBLE, 0, 0, DesktopWidth,
                         DesktopHeight, nullptr, nullptr, nullptr, nullptr);

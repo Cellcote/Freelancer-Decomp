@@ -28,6 +28,7 @@
 #include "user32_backend.h"
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <condition_variable>
 #include <cstdarg>
@@ -39,6 +40,7 @@
 #include <deque>
 #include <limits>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <strings.h>
@@ -79,11 +81,9 @@ struct FQueued
 {
     MSG Message;
     std::uint64_t Sequence;
-    // A key message from the screen: the key state (GetKeyState) it brings when it is taken
-    // out of the queue, for up to two keys (a modifier's side and its generic key).
-    int KeyCount = 0;
-    std::uint8_t KeyIndex[2] = {};
-    SHORT KeyValue[2] = {};
+    // A key message from the screen: the whole key state (GetKeyState) as of that key, which
+    // it brings when it is taken out of the queue.
+    std::shared_ptr<const std::array<SHORT, 256>> Keys;
 };
 
 struct FThreadQueue
@@ -305,8 +305,8 @@ bool TakeMessage(LPMSG Out, HWND Window, UINT First, UINT Last, bool bRemove)
         if (bRemove)
         {
             // A key message brings its key state as it is taken out, as Windows' GetKeyState.
-            for (int Index = 0; Index < It->KeyCount; ++Index)
-                State().Keys[It->KeyIndex[Index]] = It->KeyValue[Index];
+            if (It->Keys != nullptr)
+                std::copy(It->Keys->begin(), It->Keys->end(), std::begin(State().Keys));
             Queue.Messages.erase(It);
         }
         return true;
@@ -328,20 +328,15 @@ DWORD InputClass(UINT Message)
 
 // Queues a message on a thread's queue; false when that thread has ended. The caller holds the
 // lock.
-bool Enqueue(std::uint64_t Thread, const MSG& Message, const FQueued* KeyState = nullptr)
+bool Enqueue(std::uint64_t Thread, const MSG& Message,
+             std::shared_ptr<const std::array<SHORT, 256>> Keys = nullptr)
 {
     FState& S = State();
     auto const Queue = S.Queues.find(Thread);
     if (Queue == S.Queues.end())
         return false;
-    FQueued Entry{Message, S.NextSequence++};
-    if (KeyState != nullptr)
-    {
-        Entry.KeyCount = KeyState->KeyCount;
-        std::copy(std::begin(KeyState->KeyIndex), std::end(KeyState->KeyIndex), Entry.KeyIndex);
-        std::copy(std::begin(KeyState->KeyValue), std::end(KeyState->KeyValue), Entry.KeyValue);
-    }
-    Queue->second.Messages.push_back(Entry);
+    FQueued Entry{Message, S.NextSequence++, std::move(Keys)};
+    Queue->second.Messages.push_back(std::move(Entry));
     S.Posted.notify_all();
     return true;
 }
@@ -632,6 +627,9 @@ HWND CreateWindowExA(DWORD ExStyle, LPCSTR ClassName, LPCSTR Title, DWORD Style,
         // the HWND.
         bool const bTopLevel = (Style & WS_CHILD) == 0;
         const FUser32Backend* const Screen = bTopLevel ? Backend() : nullptr;
+        // The screen started (on the main thread) before the default size is taken from it.
+        if (Screen != nullptr)
+            Screen->Start();
         if (X == CW_USEDEFAULT)
             X = Y = 0;
         if (Width == CW_USEDEFAULT)
@@ -1328,33 +1326,26 @@ void SinkKey(std::uint32_t Window, unsigned PhysicalKey, bool bExtended, bool bD
     UINT OtherSide = 0;
     UINT const Generic = GenericModifier(PhysicalKey, &OtherSide);
     UINT const VirtualKey = Generic != 0 ? Generic : PhysicalKey;
-    bool bWasDown = false;
-    bool bAlt = false;
-    // The key state this message brings when it is taken (the live state after it).
-    FQueued KeyState{};
+    HWND const Target = WindowOfId(Window);
+    // The window checked, the key state changed and the message queued under one lock: a
+    // window that is gone takes no key and leaves the live state as it was.
+    std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+    FWindow const* const Record = Find(Target);
+    if (Record == nullptr)
+        return;
+    SHORT* const Keys = State().LiveKeys;
+    bool const bWasDown = (Keys[VirtualKey] & 0x8000) != 0;
+    if (Generic != 0)
     {
-        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-        SHORT* const Keys = State().LiveKeys;
-        bWasDown = (Keys[VirtualKey] & 0x8000) != 0;
-        if (Generic != 0)
-        {
-            SetKeyState(Keys[PhysicalKey], bDown, bRepeat);
-            bool const bEitherDown = bDown || (Keys[OtherSide] & 0x8000) != 0;
-            SHORT const Toggle = static_cast<SHORT>(Keys[Generic] & 1);
-            Keys[Generic] = static_cast<SHORT>((bEitherDown ? 0x8000 : 0) |
-                                               (bDown && !bRepeat ? Toggle ^ 1 : Toggle));
-        }
-        else
-            SetKeyState(Keys[VirtualKey], bDown, bRepeat);
-        bAlt = (Keys[VK_MENU] & 0x8000) != 0;
-        KeyState.KeyIndex[KeyState.KeyCount] = static_cast<std::uint8_t>(VirtualKey);
-        KeyState.KeyValue[KeyState.KeyCount++] = Keys[VirtualKey];
-        if (Generic != 0)
-        {
-            KeyState.KeyIndex[KeyState.KeyCount] = static_cast<std::uint8_t>(PhysicalKey);
-            KeyState.KeyValue[KeyState.KeyCount++] = Keys[PhysicalKey];
-        }
+        SetKeyState(Keys[PhysicalKey], bDown, bRepeat);
+        bool const bEitherDown = bDown || (Keys[OtherSide] & 0x8000) != 0;
+        SHORT const Toggle = static_cast<SHORT>(Keys[Generic] & 1);
+        Keys[Generic] = static_cast<SHORT>((bEitherDown ? 0x8000 : 0) |
+                                           (bDown && !bRepeat ? Toggle ^ 1 : Toggle));
     }
+    else
+        SetKeyState(Keys[VirtualKey], bDown, bRepeat);
+    bool const bAlt = (Keys[VK_MENU] & 0x8000) != 0;
     UINT const Scan = MapVirtualKeyA(PhysicalKey, MAPVK_VK_TO_VSC);
     std::uint32_t LParam = 1u | ((Scan & 0xFFu) << 16);
     if (bExtended)
@@ -1368,17 +1359,14 @@ void SinkKey(std::uint32_t Window, unsigned PhysicalKey, bool bExtended, bool bD
     bool const bSystem = VirtualKey == VK_MENU || VirtualKey == VK_F10 || bAlt;
     UINT const Message =
         bDown ? (bSystem ? WM_SYSKEYDOWN : WM_KEYDOWN) : (bSystem ? WM_SYSKEYUP : WM_KEYUP);
-    HWND const Target = WindowOfId(Window);
-    {
-        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-        FWindow const* const Record = Find(Target);
-        if (Record == nullptr)
-            return;
-        Enqueue(Record->Owner,
-                MSG{Target, Message, VirtualKey, static_cast<LPARAM>(LParam), Ticks(),
-                    State().CursorPos},
-                &KeyState);
-    }
+    // The whole keyboard as of this key: the message brings it when it is taken, so any key
+    // message that survives (another window's may be dropped with it) sets every key right.
+    auto Snapshot = std::make_shared<std::array<SHORT, 256>>();
+    std::copy(std::begin(State().LiveKeys), std::end(State().LiveKeys), Snapshot->begin());
+    Enqueue(
+        Record->Owner,
+        MSG{Target, Message, VirtualKey, static_cast<LPARAM>(LParam), Ticks(), State().CursorPos},
+        std::move(Snapshot));
     if (bDown && !bSystem &&
         (VirtualKey == VK_RETURN || VirtualKey == VK_BACK || VirtualKey == VK_TAB ||
          VirtualKey == VK_ESCAPE))
@@ -1448,7 +1436,7 @@ void SinkBounds(std::uint32_t Window, int X, int Y, int Width, int Height)
 
 // Minimized, maximized or restored on screen (the window's own buttons, the system): the
 // window's WS_MINIMIZE / WS_MAXIMIZE, and WM_SIZE with the reason.
-void SinkShowState(std::uint32_t Window, int ShowState)
+void SinkShowState(std::uint32_t Window, int ShowState, int ClientWidth, int ClientHeight)
 {
     HWND const Target = WindowOfId(Window);
     RECT Rect = {};
@@ -1466,6 +1454,13 @@ void SinkShowState(std::uint32_t Window, int ShowState)
             Record->Style |= WS_MAXIMIZE;
         if (Record->Style == Before)
             return;
+        // Maximized or restored: the size the window has now, so that WM_SIZE carries it (the
+        // resize event after it then changes nothing).
+        if (ShowState != 1 && ClientWidth > 0 && ClientHeight > 0)
+        {
+            Record->Rect.right = Record->Rect.left + ClientWidth;
+            Record->Rect.bottom = Record->Rect.top + ClientHeight;
+        }
         Rect = Record->Rect;
         Reason = SizeReason(Record->Style);
     }

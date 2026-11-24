@@ -21,8 +21,11 @@ bool IsFullscreen(std::uint32_t Id);
 bool IsResizable(std::uint32_t Id);
 bool IsMouseGrabbed(std::uint32_t Id);
 bool CursorVisible();
-// Whether SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN is set at all.
-bool ActivateHintSet();
+// SDL_HINT_WINDOW_ACTIVATE_WHEN_SHOWN: its value, and whether it is set at all; set at normal
+// priority; reset.
+std::string ActivateHint(bool* bSet);
+void SetActivateHint(const char* Value);
+void ResetActivateHint();
 
 enum class EModifier
 {
