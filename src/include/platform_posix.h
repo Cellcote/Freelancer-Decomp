@@ -24,9 +24,9 @@
 //   next wait takes it and returns kWaitAbandoned.
 // - Not available here: ThreadTerminate (POSIX has no safe equivalent; it fails), objects
 //   shared between processes.
-// - Resource-only DLLs (ResourceModuleLoad) are Windows PE images (pe_resources.h), mapped
-//   read-only. Their handles are the mapping's address, which no dlopen handle can be: the
-//   module calls tell the two apart by the registry of mapped resource modules.
+// - Resource-only DLLs (ResourceModuleLoad) are Windows PE images (pe_resources.h), read into
+//   read-only memory of their own. Their handles are that memory's address, which no dlopen
+//   handle can be: the module calls tell the two apart by the registry of resource modules.
 
 #include "fl_layout.h" // FlULong / FlLong (also forced into every source)
 #include "pe_resources.h" // ResourceModuleLoad's images
@@ -1503,11 +1503,11 @@ namespace Platform
 
     // A resource-only DLL (LoadLibraryExA with LOAD_LIBRARY_AS_DATAFILE |
     // LOAD_LIBRARY_AS_IMAGE_RESOURCE, as the x64 Windows build loads them): a PE32 or PE32+
-    // image, mapped read-only for its resources (FindResourceExA, LoadStringW, ModuleFree,
-    // ModulePath; ModuleSymbol finds nothing). A bare name is looked for next to the
-    // executable first, then in the current directory, as Windows' search starts with the
-    // application's directory. Each load maps the file again, as Windows maps each data-file
-    // load. nullptr when the file is missing or is not a PE image.
+    // image, read into read-only memory of its own for its resources (FindResourceExA,
+    // LoadStringW, ModuleFree, ModulePath; ModuleSymbol finds nothing). A bare name is looked
+    // for next to the executable first, then in the current directory, as Windows' search
+    // starts with the application's directory. Each load reads the file again, as Windows maps
+    // each data-file load. nullptr when the file is missing or is not a PE image.
     inline Module ResourceModuleLoad(char const* Path)
     {
         if (Path == nullptr || Path[0] == 0)
@@ -1532,14 +1532,38 @@ namespace Platform
             int const Descriptor = open(Candidate.c_str(), O_RDONLY | O_CLOEXEC | O_NONBLOCK);
             if (Descriptor < 0)
                 continue;
+            // The file is read into pages of the module's own rather than mapped: Windows keeps a
+            // mapped image's file from being changed, POSIX does not, and a mapped file cut short
+            // by another process would fault the next read past its new end. The pages are
+            // read-only once filled, as the image's are.
             struct stat Info = {};
             void* Mapped = MAP_FAILED;
             std::size_t Size = 0;
             if (fstat(Descriptor, &Info) == 0 && S_ISREG(Info.st_mode) && Info.st_size > 0 &&
-                static_cast<std::uint64_t>(Info.st_size) <= SIZE_MAX)
+                static_cast<std::uint64_t>(Info.st_size) <= 0xFFFFFFFFu)
             {
                 Size = static_cast<std::size_t>(Info.st_size);
-                Mapped = mmap(nullptr, Size, PROT_READ, MAP_PRIVATE, Descriptor, 0);
+                Mapped = mmap(nullptr, Size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+            }
+            if (Mapped != MAP_FAILED)
+            {
+                std::size_t Done = 0;
+                while (Done < Size)
+                {
+                    ssize_t const Read =
+                        pread(Descriptor, static_cast<unsigned char*>(Mapped) + Done, Size - Done,
+                              static_cast<off_t>(Done));
+                    if (Read < 0 && errno == EINTR)
+                        continue;
+                    if (Read <= 0)
+                        break;
+                    Done += static_cast<std::size_t>(Read);
+                }
+                if (Done != Size || mprotect(Mapped, Size, PROT_READ) != 0)
+                {
+                    munmap(Mapped, Size);
+                    Mapped = MAP_FAILED;
+                }
             }
             close(Descriptor);
             if (Mapped == MAP_FAILED)

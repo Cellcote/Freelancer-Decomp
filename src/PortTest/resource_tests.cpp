@@ -350,6 +350,23 @@ void TestDamaged(std::string const& Fixture, std::string const& Scratch)
         }
     }
 
+    // A loaded module keeps its bytes when its file is cut short in place afterwards (the
+    // module reads the file into memory of its own; a mapped file would fault here).
+    {
+        HMODULE const Module = WriteAll(Scratch, Image.data(), Image.size())
+                                   ? Platform::ResourceModuleLoad(Scratch.c_str())
+                                   : nullptr;
+        Check(Module != nullptr && truncate(Scratch.c_str(), 0) == 0,
+              "a loaded module's file can be truncated");
+        wchar_t Text[64];
+        Check(Module != nullptr && LoadStringW(Module, 1, Text, 64) == 3 &&
+                  std::wcscmp(Text, L"One") == 0,
+              "a module reads on after its file is truncated");
+        if (Module != nullptr)
+            FreeLibrary(Module);
+        unlink(Scratch.c_str());
+    }
+
     Check(Platform::ResourceModuleLoad("/nonexistent/resources.dll") == nullptr,
           "a missing file does not load");
     static unsigned char const kText[] =

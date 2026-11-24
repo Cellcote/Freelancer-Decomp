@@ -106,7 +106,8 @@ inline bool RvaToOffset(FImage const& Image, std::uint32_t Rva, std::uint32_t Le
         std::uint32_t const Address = Read32(Image, Header + 12);
         std::uint32_t const RawSize = Read32(Image, Header + 16);
         std::uint32_t const RawOffset = Read32(Image, Header + 20);
-        if (Rva < Address || Rva - Address >= RawSize)
+        // The raw data's end is inside too: an empty resource may sit there.
+        if (Rva < Address || Rva - Address > RawSize)
             continue;
         std::uint32_t const Into = Rva - Address;
         if (Length > RawSize - Into || !Fits(Image, std::uint64_t(RawOffset) + Into, Length))
@@ -277,6 +278,9 @@ inline bool Open(unsigned char const* Data, std::size_t Size, FImage& Image)
     Image.Size = Size;
     using Detail::Read16;
     using Detail::Read32;
+    // File offsets are 32-bit here, as in the format: a larger file is not one of these images.
+    if (Size > 0xFFFFFFFFu)
+        return false;
     if (Data == nullptr || !Detail::Fits(Image, 0, 0x40) || Data[0] != 'M' || Data[1] != 'Z')
         return false;
     std::uint32_t const Pe = Read32(Image, 0x3C);
@@ -302,6 +306,9 @@ inline bool Open(unsigned char const* Data, std::size_t Size, FImage& Image)
     if (OptionalSize < Directories)
         return false;
     std::uint32_t const DirectoryCount = Read32(Image, Optional + Directories - 4);
+    // The Windows loader takes at most 96 sections; more would only lengthen every RVA lookup.
+    if (SectionCount > 96)
+        return false;
     Image.Sections = Optional + OptionalSize;
     if (!Detail::Fits(Image, Image.Sections, SectionCount * 40ull))
         return false;

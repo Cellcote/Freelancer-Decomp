@@ -379,9 +379,9 @@ without the Windows API. Milestones:
   US keyboard's scan codes and key names. It uses none of the platform layer's shared state,
   since dacom, which holds that, links it; `MsgWaitForMultipleObjects` waits in the header for
   that reason. Dialog templates wait for a dialog layer, so `DialogBoxParamA` fails. The
-  resource DLLs are read (M3, `src/include/pe_resources.h`): `Platform::ResourceModuleLoad` maps
-  a PE32 or PE32+ resource-only DLL read-only (retail's and mods' as they are), its handle the
-  mapping's address, which no dlopen handle can be; `FindResourceExA` (ids, `#n` and string
+  resource DLLs are read (M3, `src/include/pe_resources.h`): `Platform::ResourceModuleLoad` reads
+  a PE32 or PE32+ resource-only DLL into read-only memory (retail's and mods' as they are), its handle that
+  memory's address, which no dlopen handle can be; `FindResourceExA` (ids, `#n` and string
   names, Windows' language fallback), `SizeofResource`, `LoadResource`, `LockResource`,
   `FreeLibrary` and `LoadStringW` (an inline in `posix/winuser.h`, since the user32 module may
   not use the platform's state) work on it. The text is UTF-16LE while `wchar_t` is 4 bytes
