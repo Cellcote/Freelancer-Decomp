@@ -1055,8 +1055,9 @@ bool SetStateOnMain(std::uint32_t Id, int Command)
     case kSwMaximize:
         return SDL_MaximizeWindow(Window);
     default:
-        return (SDL_GetWindowFlags(Window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_MAXIMIZED)) == 0 ||
-               SDL_RestoreWindow(Window);
+        // Always: on a hidden window SDL keeps an earlier minimize or maximize as a deferred
+        // state (applied when it is shown) that the flags do not show, and a restore clears it.
+        return SDL_RestoreWindow(Window);
     }
 }
 

@@ -1304,7 +1304,7 @@ void SinkPost(std::uint32_t Window, unsigned Message, std::uintptr_t WParam, std
     }
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
     FWindow const* const Record = Find(Target);
-    if (Record == nullptr)
+    if (Record == nullptr || Record->bDestroying)
         return;
     auto Snapshot = std::make_shared<std::array<SHORT, 256>>();
     std::copy(std::begin(State().LiveKeys), std::end(State().LiveKeys), Snapshot->begin());
@@ -1373,8 +1373,10 @@ void SinkKey(std::uint32_t Window, unsigned PhysicalKey, bool bExtended, bool bD
     // of the key (and of the generic modifier when the other side is up).
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
     SHORT* const Keys = State().LiveKeys;
+    // Gone, or its DestroyWindow under way (the screen may not have marked it yet): a release
+    // only lets go of the key.
     FWindow const* const Record = Find(Target);
-    if (Record == nullptr)
+    if (Record == nullptr || Record->bDestroying)
     {
         if (!bDown)
             SinkReleaseKey(PhysicalKey);

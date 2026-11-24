@@ -441,6 +441,8 @@ std::vector<FScreenMessage> GScreenSeen;
 bool GNestOnClose = false;
 bool GNestOnActivate = false;
 bool GRestoreInMinimize = false; // the minimize's WM_SIZE handler takes a restore itself
+HWND GPumpOnDestroy = nullptr;    // its WM_DESTROY handler takes the screen's events
+int GKeyUpsWhileDestroying = 0;
 HWND GDestroyOnClose = nullptr; // destroyed by another thread from the close handler
 bool GDestroyedOnClose = false;
 int GNestedKeys = 0;
@@ -470,6 +472,17 @@ void DrainScreen()
 LRESULT CALLBACK ScreenProc(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
 {
     GScreenSeen.push_back({Message, WParam, LParam});
+    if (Message == WM_DESTROY && Window == GPumpOnDestroy)
+    {
+        // Inside DestroyWindow, before the screen has been told: input still queued for the
+        // window arrives now.
+        GPumpOnDestroy = nullptr;
+        MSG Nested;
+        for (int Pass = 0; Pass < 5; ++Pass)
+            while (PeekMessageA(&Nested, nullptr, 0, 0, PM_REMOVE))
+                if (Nested.message == WM_KEYUP && Nested.hwnd == Window)
+                    ++GKeyUpsWhileDestroying;
+    }
     if (Message == WM_SIZE && WParam == SIZE_MINIMIZED && GRestoreInMinimize)
     {
         GRestoreInMinimize = false;
@@ -1010,6 +1023,25 @@ int TestScreen()
           "SW_SHOW leaves a minimized window minimized");
     ShowWindow(Window, SW_RESTORE);
     DrainScreen();
+    // A key released for a window whose DestroyWindow is under way: the key is let go of, and
+    // no WM_KEYUP is made for the window.
+    HWND const Closing = CreateWindowExA(0, "ScreenClass", "Closing", 0x2CA0000, 0, 0, 320, 240,
+                                         nullptr, nullptr, nullptr, nullptr);
+    bool const bClosingOnScreen =
+        Closing != nullptr && reinterpret_cast<std::uintptr_t>(Closing) < 0x40000000;
+    Check(bClosingOnScreen, "the closing window gets a screen");
+    if (bClosingOnScreen)
+    {
+        ScreenProbe::PushKeyA(IdOf(Closing), true);
+        DrainScreen();
+        ScreenProbe::PushKeyA(IdOf(Closing), false);
+        GPumpOnDestroy = Closing;
+        DestroyWindow(Closing);
+        Check(GKeyUpsWhileDestroying == 0 && (GetAsyncKeyState('A') & 0x8000) == 0,
+              "a release for a window being destroyed lets go of the key without WM_KEYUP");
+    }
+    else if (Closing != nullptr)
+        DestroyWindow(Closing);
     // A command made after the refused one, before the next pump: the refusal does not undo it.
     std::thread([Window] { ShowWindow(Window, SW_MAXIMIZE); }).join();
     ShowWindow(Window, SW_MINIMIZE);
