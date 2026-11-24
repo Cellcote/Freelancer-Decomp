@@ -1526,7 +1526,15 @@ void SinkShowState(std::uint32_t Window, int ShowState, int ClientWidth, int Cli
     int const Width = Reason == SIZE_MINIMIZED ? 0 : Rect.right - Rect.left;
     int const Height = Reason == SIZE_MINIMIZED ? 0 : Rect.bottom - Rect.top;
     SendMessageA(Target, WM_SIZE, Reason, MAKELONG(Width, Height));
-    if (ShowState == 1)
+    // The owner's state as it is after WM_SIZE: a handler that pumps messages may have taken a
+    // newer show change (a restore inside a minimize), which has then moved the popups itself.
+    bool bMinimizedNow = ShowState == 1;
+    {
+        std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+        if (FWindow const* const Record = Find(Target))
+            bMinimizedNow = Record->ReportedShowState == 1;
+    }
+    if (bMinimizedNow)
         FollowOwner(Target, true);
     else if (bWasMinimized)
         FollowOwner(Target, false);

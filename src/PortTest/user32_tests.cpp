@@ -437,6 +437,7 @@ struct FScreenMessage
 std::vector<FScreenMessage> GScreenSeen;
 bool GNestOnClose = false;
 bool GNestOnActivate = false;
+bool GRestoreInMinimize = false; // the minimize's WM_SIZE handler takes a restore itself
 HWND GDestroyOnClose = nullptr; // destroyed by another thread from the close handler
 bool GDestroyedOnClose = false;
 int GNestedKeys = 0;
@@ -466,6 +467,15 @@ void DrainScreen()
 LRESULT CALLBACK ScreenProc(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam)
 {
     GScreenSeen.push_back({Message, WParam, LParam});
+    if (Message == WM_SIZE && WParam == SIZE_MINIMIZED && GRestoreInMinimize)
+    {
+        GRestoreInMinimize = false;
+        ScreenProbe::PushShowState(IdOf(Window), 0);
+        MSG Nested;
+        for (int Pass = 0; Pass < 5; ++Pass)
+            while (PeekMessageA(&Nested, nullptr, 0, 0, PM_REMOVE))
+                DispatchMessageA(&Nested);
+    }
     if (Message == WM_ACTIVATEAPP && WParam != FALSE && GNestOnActivate)
     {
         // The handler takes the screen's events itself, and the focus goes again.
@@ -789,6 +799,25 @@ int TestScreen()
     Check((GetWindowLongA(Window, GWL_STYLE) & WS_MAXIMIZE) == 0 && Restored != nullptr &&
               Restored->WParam == SIZE_RESTORED,
           "a restore on screen clears it and sends WM_SIZE SIZE_RESTORED");
+    // Maximize, its resize, restore and its resize taken in one pump: each show change reports
+    // the size of its own transition, and the resizes add no second WM_SIZE.
+    ScreenProbe::PushResized(Id, 640, 400);
+    DrainScreen();
+    GScreenSeen.clear();
+    ScreenProbe::PushShowState(Id, 2);
+    ScreenProbe::PushResized(Id, 900, 700);
+    ScreenProbe::PushShowState(Id, 0);
+    ScreenProbe::PushResized(Id, 640, 400);
+    DrainScreen();
+    std::vector<FScreenMessage> Sizes;
+    for (const FScreenMessage& Seen : GScreenSeen)
+        if (Seen.Message == WM_SIZE)
+            Sizes.push_back(Seen);
+    Check(Sizes.size() == 2 && Sizes[0].WParam == SIZE_MAXIMIZED &&
+              LOWORD(Sizes[0].LParam) == 900 && HIWORD(Sizes[0].LParam) == 700 &&
+              Sizes[1].WParam == SIZE_RESTORED && LOWORD(Sizes[1].LParam) == 640 &&
+              HIWORD(Sizes[1].LParam) == 400,
+          "maximize and restore in one pump each carry their own size, once");
     // SW_SHOWNA leaves SDL's activation hint as it found it, set or not.
     bool bHintBefore = false;
     std::string const HintBefore = ScreenProbe::ActivateHint(&bHintBefore);
@@ -829,6 +858,13 @@ int TestScreen()
     DrainScreen();
     Check(IsWindowVisible(Shown) && !IsWindowVisible(Hidden),
           "restored, it shows the popups it hid and leaves the hidden one");
+    // A restore taken inside the minimize's WM_SIZE handler leaves the popups shown.
+    GRestoreInMinimize = true;
+    ScreenProbe::PushShowState(Id, 1);
+    DrainScreen();
+    Check(IsWindowVisible(Shown) && !IsWindowVisible(Hidden) &&
+              (GetWindowLongA(Window, GWL_STYLE) & WS_MINIMIZE) == 0,
+          "a restore nested in the minimize's WM_SIZE leaves the owned popups shown");
     DestroyWindow(Shown);
     DestroyWindow(Hidden);
     // ShowWindow sets WS_MINIMIZE before the screen reports the minimize: the report still
