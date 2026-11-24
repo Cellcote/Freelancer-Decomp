@@ -232,26 +232,29 @@ inline void CopyGeneric(unsigned char* Origin, std::ptrdiff_t Skew, unsigned int
 
     for (unsigned int N = 0; N < Count; ++N)
     {
+        // The cursor is an offset into the vertex record: a pointer is formed only for bytes
+        // that are written, all inside the record (WritesPastRecord has checked the position,
+        // normal and diffuse bytes; a texture set is cut at the record's end).
         unsigned char* const VertexStart = Destination(Origin, Skew, StartVertex + N, DstStride);
-        unsigned char* Cursor = VertexStart;
-        std::memcpy(Cursor, Element(Src->Position, Src->Position.Stride, StartVertex, N, bIndexed),
-                    0xC);
-        Cursor += 0xC;
+        std::size_t Offset = 0;
+        std::memcpy(VertexStart,
+                    Element(Src->Position, Src->Position.Stride, StartVertex, N, bIndexed), 0xC);
+        Offset += 0xC;
         if (bDstNormal)
         {
             if (bSrcNormal)
-                std::memcpy(Cursor,
+                std::memcpy(VertexStart + Offset,
                             Element(Src->Normal, Src->Normal.Stride, StartVertex, N, bIndexed),
                             0xC);
-            Cursor += 0xC;
+            Offset += 0xC;
         }
         if (bDstDiffuse)
         {
             if (bSrcDiffuse)
-                std::memcpy(Cursor,
+                std::memcpy(VertexStart + Offset,
                             Element(Src->Diffuse, Src->Diffuse.Stride, StartVertex, N, bIndexed),
                             4);
-            Cursor += 4;
+            Offset += 4;
         }
         for (unsigned int Index = 0; Index < DstTexCount && Index < 8; ++Index)
         {
@@ -259,17 +262,17 @@ inline void CopyGeneric(unsigned char* Origin, std::ptrdiff_t Skew, unsigned int
             {
                 // Retail copies ByteSize bytes unchecked; a set wider than the rest of the
                 // vertex runs into the next one (or past the last), so the copy stops at the
-                // vertex's end. Within the vertex the bytes are retail's.
+                // vertex's end. Within the vertex the bytes are retail's. The offset can already
+                // be past the record (a format without XYZ: Rp8FvfStride counts no position,
+                // the copy writes 12 bytes of one), so Left saturates at 0.
                 const FRpVertexStream& Set = Src->Tex[Index];
-                // The cursor can already be past the record (a format without XYZ: Rp8FvfStride
-                // counts no position, the copy writes 12 bytes of one), so Left saturates at 0.
-                const std::size_t Used = static_cast<std::size_t>(Cursor - VertexStart);
-                const std::size_t Left = Used < DstStride ? DstStride - Used : 0;
+                const std::size_t Left = Offset < DstStride ? DstStride - Offset : 0;
                 const std::size_t Bytes = Set.ByteSize < Left ? Set.ByteSize : Left;
                 if (Bytes != 0)
-                    std::memcpy(Cursor, Element(Set, Set.Stride, StartVertex, N, bIndexed), Bytes);
+                    std::memcpy(VertexStart + Offset,
+                                Element(Set, Set.Stride, StartVertex, N, bIndexed), Bytes);
             }
-            Cursor += TexelBytes(DstFvf >> (Index * 2 + 0x10));
+            Offset += TexelBytes(DstFvf >> (Index * 2 + 0x10));
         }
     }
 }
