@@ -787,11 +787,18 @@ BOOL ShowWindow(HWND Window, int Command)
         bWasVisible = (Record->Style & WS_VISIBLE) != 0;
         bVisible = Command != SW_HIDE;
         Record->Style = bVisible ? (Record->Style | WS_VISIBLE) : (Record->Style & ~WS_VISIBLE);
-        Record->Style &= ~(WS_MINIMIZE | WS_MAXIMIZE);
-        if (Command == SW_MINIMIZE || Command == SW_SHOWMINIMIZED)
-            Record->Style |= WS_MINIMIZE;
-        else if (Command == SW_MAXIMIZE)
-            Record->Style |= WS_MAXIMIZE;
+        // SW_SHOW, SW_HIDE and SW_SHOWNA keep the window minimized or maximized as it is; the
+        // others set its state. An explicit command also ends an owner's hold on a popup.
+        if (Command != SW_SHOW && Command != SW_HIDE && Command != SW_SHOWNA)
+        {
+            Record->Style &= ~(WS_MINIMIZE | WS_MAXIMIZE);
+            if (Command == SW_MINIMIZE || Command == SW_SHOWMINIMIZED || Command == 7 ||
+                Command == 11) // SW_SHOWMINNOACTIVE, SW_FORCEMINIMIZE
+                Record->Style |= WS_MINIMIZE;
+            else if (Command == SW_MAXIMIZE)
+                Record->Style |= WS_MAXIMIZE;
+        }
+        Record->bHiddenWithOwner = false;
         Procedure = Record->Procedure;
     }
     // A maximize the screen refuses (a window that cannot be resized) leaves it as it was.
@@ -861,6 +868,8 @@ BOOL SetWindowPos(HWND Window, HWND, int X, int Y, int Width, int Height, UINT F
         Record->Style |= WS_VISIBLE;
     if ((Flags & SWP_HIDEWINDOW) != 0)
         Record->Style &= ~WS_VISIBLE;
+    if ((Flags & (SWP_SHOWWINDOW | SWP_HIDEWINDOW)) != 0)
+        Record->bHiddenWithOwner = false;
     if (IsScreenWindow(Window))
     {
         const FUser32Backend* const Screen = LoadedBackend();
@@ -1167,8 +1176,16 @@ BOOL EnumDisplaySettingsA(LPCSTR, DWORD Mode, DEVMODEA* Settings)
     bool const bCurrent = Mode == ENUM_CURRENT_SETTINGS || Mode == ENUM_REGISTRY_SETTINGS;
     if (!bCurrent && Mode > static_cast<DWORD>(std::numeric_limits<int>::max()))
         return FALSE;
-    // The display's modes once the backend is loaded (by the first top-level window).
-    if (const FUser32Backend* const Screen = LoadedBackend())
+    // The display's modes once the screen has started (the first top-level window made on the
+    // main thread); before that, and in a program whose windows have no screen, the headless
+    // desktop's.
+    const FUser32Backend* const Screen = LoadedBackend();
+    int DesktopWidth = 0;
+    int DesktopHeight = 0;
+    int DesktopBits = 0;
+    int DesktopHz = 0;
+    if (Screen != nullptr &&
+        Screen->DisplayMode(-1, &DesktopWidth, &DesktopHeight, &DesktopBits, &DesktopHz))
     {
         if (!Screen->DisplayMode(bCurrent ? -1 : static_cast<int>(Mode), &Width, &Height, &Bits,
                                  &Hz))
@@ -1275,9 +1292,26 @@ namespace
 // The screen's events (FUser32Sink)
 // ---------------------------------------------------------------------------------------------
 
+// A mouse message brings the keyboard as of its event when it is taken (GetKeyState), as a key
+// message does: a click taken ahead of an earlier key message still sees that key.
 void SinkPost(std::uint32_t Window, unsigned Message, std::uintptr_t WParam, std::intptr_t LParam)
 {
-    PostMessageA(WindowOfId(Window), Message, WParam, LParam);
+    HWND const Target = WindowOfId(Window);
+    if (Message < WM_MOUSEFIRST || Message > WM_MOUSELAST)
+    {
+        PostMessageA(Target, Message, WParam, LParam);
+        return;
+    }
+    std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+    FWindow const* const Record = Find(Target);
+    if (Record == nullptr)
+        return;
+    auto Snapshot = std::make_shared<std::array<SHORT, 256>>();
+    std::copy(std::begin(State().LiveKeys), std::end(State().LiveKeys), Snapshot->begin());
+    Enqueue(Record->Owner,
+            MSG{Target, Message, static_cast<WPARAM>(WParam), static_cast<LPARAM>(LParam), Ticks(),
+                State().CursorPos},
+            std::move(Snapshot));
 }
 
 void SinkSend(std::uint32_t Window, unsigned Message, std::uintptr_t WParam, std::intptr_t LParam)
@@ -1482,6 +1516,16 @@ void FollowOwner(HWND Owner, bool bMinimized)
     }
     for (HWND const Popup : Changed)
     {
+        // A handler of an earlier popup may have pumped a newer owner change that moved this
+        // one already: it is left as that change set it.
+        {
+            std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+            FWindow const* const Record = Find(Popup);
+            bool const bVisible = Record != nullptr && (Record->Style & WS_VISIBLE) != 0;
+            if (Record == nullptr || (bMinimized ? bVisible || !Record->bHiddenWithOwner
+                                                 : !bVisible || Record->bHiddenWithOwner))
+                continue;
+        }
         if (IsScreenWindow(Popup))
             LoadedBackend()->Show(ScreenId(Popup), bMinimized ? SW_HIDE : SW_SHOWNA);
         SendMessageA(Popup, WM_SHOWWINDOW, bMinimized ? FALSE : TRUE,

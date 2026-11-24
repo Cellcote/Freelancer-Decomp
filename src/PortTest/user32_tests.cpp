@@ -748,7 +748,12 @@ int TestScreen()
     // and A's next key-down still brings Shift up.
     HWND const Other = CreateWindowExA(0, "ScreenClass", "Other", 0x2CA0000, 0, 0, 320, 240,
                                        nullptr, nullptr, nullptr, nullptr);
-    if (Other != nullptr)
+    bool const bOtherOnScreen =
+        Other != nullptr && reinterpret_cast<std::uintptr_t>(Other) < 0x40000000;
+    Check(bOtherOnScreen, "the snapshot test's second window gets a screen");
+    if (Other != nullptr && !bOtherOnScreen)
+        DestroyWindow(Other);
+    if (bOtherOnScreen)
     {
         ScreenProbe::PushModifier(IdOf(Other), ScreenProbe::EModifier::LeftShift, true);
         DrainScreen();
@@ -763,6 +768,28 @@ int TestScreen()
         Check((GetKeyState(VK_SHIFT) & 0x8000) == 0,
               "a later key message brings Shift up though Shift's key-up was dropped");
     }
+    // A taken key whose SDL modifier mask holds Ctrl does not make clicks report MK_CONTROL:
+    // only the modifier keys taken change it.
+    ScreenProbe::PushKeyA(Id, true, true);
+    ScreenProbe::PushButton(Id, 1, true, 5.f, 5.f);
+    ScreenProbe::PushButton(Id, 1, false, 5.f, 5.f);
+    ScreenProbe::PushKeyA(Id, false);
+    GScreenSeen.clear();
+    DrainScreen();
+    const FScreenMessage* const PlainClick = FindScreen(WM_LBUTTONDOWN);
+    Check(PlainClick != nullptr && (PlainClick->WParam & MK_CONTROL) == 0,
+          "another key's modifier mask does not put MK_CONTROL on a click");
+    // A click taken ahead of the Ctrl key-down before it still sees Ctrl down (GetKeyState).
+    ScreenProbe::PushCtrl(Id, true);
+    ScreenProbe::PushButton(Id, 1, true, 5.f, 5.f);
+    PumpOnly();
+    MSG Click = {};
+    Check(PeekMessageA(&Click, nullptr, WM_LBUTTONDOWN, WM_LBUTTONDOWN, PM_REMOVE) &&
+              (Click.wParam & MK_CONTROL) != 0 && (GetKeyState(VK_CONTROL) & 0x8000) != 0,
+          "a click taken alone brings the keyboard of its event: Ctrl down");
+    ScreenProbe::PushButton(Id, 1, false, 5.f, 5.f);
+    ScreenProbe::PushCtrl(Id, false);
+    DrainScreen();
 
     // MSG.pt is the position of the event the message came from.
     ScreenProbe::PushWheel(Id, 1.f, 30.f, 40.f);
@@ -861,6 +888,14 @@ int TestScreen()
     DrainScreen();
     Check(IsWindowVisible(Shown) && !IsWindowVisible(Hidden),
           "restored, it shows the popups it hid and leaves the hidden one");
+    // A popup the application hides while its owner is minimized stays hidden on restore.
+    ScreenProbe::PushShowState(Id, 1);
+    DrainScreen();
+    ShowWindow(Shown, SW_HIDE);
+    ScreenProbe::PushShowState(Id, 0);
+    DrainScreen();
+    Check(!IsWindowVisible(Shown), "a popup hidden by the application stays hidden on restore");
+    ShowWindow(Shown, SW_SHOWNA);
     // A restore taken inside the minimize's WM_SIZE handler leaves the popups shown.
     GRestoreInMinimize = true;
     ScreenProbe::PushShowState(Id, 1);
@@ -960,6 +995,21 @@ int TestScreen()
     DrainScreen();
     Check((GetWindowLongA(Window, GWL_STYLE) & WS_MAXIMIZE) == 0,
           "a forwarded maximize the screen refuses leaves the window unmaximized");
+    // A show-only command after the refused maximize (SetWindowPos with SWP_SHOWWINDOW) does
+    // not stop the refusal from being undone.
+    std::thread([Window] { ShowWindow(Window, SW_MAXIMIZE); }).join();
+    SetWindowPos(Window, nullptr, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW);
+    DrainScreen();
+    Check((GetWindowLongA(Window, GWL_STYLE) & WS_MAXIMIZE) == 0,
+          "a refused maximize is undone across a show-only command");
+    // SW_SHOW keeps a minimized window minimized (it is not SW_SHOWNORMAL).
+    ShowWindow(Window, SW_MINIMIZE);
+    ShowWindow(Window, SW_SHOW);
+    Check((GetWindowLongA(Window, GWL_STYLE) & WS_MINIMIZE) != 0,
+          "SW_SHOW leaves a minimized window minimized");
+    ShowWindow(Window, SW_RESTORE);
+    DrainScreen();
     // A command made after the refused one, before the next pump: the refusal does not undo it.
     std::thread([Window] { ShowWindow(Window, SW_MAXIMIZE); }).join();
     ShowWindow(Window, SW_MINIMIZE);

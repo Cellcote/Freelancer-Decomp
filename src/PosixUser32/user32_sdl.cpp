@@ -60,6 +60,8 @@ constexpr int kSwMinimize = 6;
 constexpr int kSwShowMinNoActive = 7;
 constexpr int kSwShowNa = 8;
 constexpr int kSwRestore = 9;
+constexpr int kSwShow = 5;
+constexpr int kSwForceMinimize = 11;
 constexpr unsigned kVkLShift = 0xA0;
 constexpr unsigned kVkRShift = 0xA1;
 constexpr unsigned kVkLControl = 0xA2;
@@ -143,31 +145,54 @@ bool IsDestroyed(SDL_WindowID Id)
     return std::find(GDestroyed.begin(), GDestroyed.end(), Id) != GDestroyed.end();
 }
 
-// Windows whose forwarded show command SDL refused: their show state goes back to user32 as
-// SDL has it, at the next Pump (main thread only).
-// Each with the number of the command SDL refused: the window's show commands are numbered as
-// they are made, on any thread (GShowCommands), and a window that got a newer command since is
-// left to that command.
+// Windows whose forwarded state command SDL refused: their show state goes back to user32 as
+// SDL has it, at the next Pump (main thread only). Each with the refused command's state number
+// (GShowCommands, below): a window that got a newer state command since is left to that one.
 struct FReconcile
 {
     SDL_WindowID Id;
     std::uint64_t Command;
 };
 std::vector<FReconcile> GReconcile;
-std::mutex GShowCommandsLock;
-std::map<SDL_WindowID, std::uint64_t> GShowCommands;
-
-std::uint64_t NextShowCommand(SDL_WindowID Id)
+// Two numbers per window: every show command (a forwarded one that a newer command has
+// overtaken is not run), and the commands that set the window's state (minimize, maximize,
+// restore; not SW_SHOW, SW_HIDE or SW_SHOWNA, which only show or hide it): a refusal is
+// reconciled unless a newer state command has been made.
+struct FShowCommands
 {
-    std::lock_guard<std::mutex> Guard(GShowCommandsLock);
-    return ++GShowCommands[Id];
+    std::uint64_t Any = 0;
+    std::uint64_t State = 0;
+};
+std::mutex GShowCommandsLock;
+std::map<SDL_WindowID, FShowCommands> GShowCommands;
+
+bool SetsState(int Command)
+{
+    return Command != kSwHide && Command != kSwShow && Command != kSwShowNa;
 }
 
-bool IsLatestShowCommand(SDL_WindowID Id, std::uint64_t Command)
+FShowCommands NextShowCommand(SDL_WindowID Id, int Command)
+{
+    std::lock_guard<std::mutex> Guard(GShowCommandsLock);
+    FShowCommands& Numbers = GShowCommands[Id];
+    ++Numbers.Any;
+    if (SetsState(Command))
+        ++Numbers.State;
+    return Numbers;
+}
+
+bool IsLatestShowCommand(SDL_WindowID Id, std::uint64_t Any)
 {
     std::lock_guard<std::mutex> Guard(GShowCommandsLock);
     auto const Found = GShowCommands.find(Id);
-    return Found != GShowCommands.end() && Found->second == Command;
+    return Found != GShowCommands.end() && Found->second.Any == Any;
+}
+
+bool IsLatestStateCommand(SDL_WindowID Id, std::uint64_t State)
+{
+    std::lock_guard<std::mutex> Guard(GShowCommandsLock);
+    auto const Found = GShowCommands.find(Id);
+    return Found != GShowCommands.end() && Found->second.State == State;
 }
 
 // The display's modes, read on the main thread when SDL starts and when the displays change,
@@ -680,7 +705,10 @@ void Deliver(const FPending& Pending, const FUser32Sink* Sink)
     case SDL_EVENT_KEY_DOWN:
     case SDL_EVENT_KEY_UP:
     {
-        GMods = Event.key.mod;
+        // The modifiers the mouse messages report change with the modifier keys taken here, not
+        // with another key's whole SDL mask (which may hold a press dropped with its window).
+        SDL_Keymod const Modifier = ModifierOf(Event.key.scancode);
+        GMods = static_cast<SDL_Keymod>(Event.key.down ? GMods | Modifier : GMods & ~Modifier);
         FKey const Key = KeyOf(Event.key.scancode);
         if (Key.Vk != 0)
             Sink->Key(Event.key.windowID, Key.Vk, Key.bExtended, Event.key.down, Event.key.repeat);
@@ -957,6 +985,7 @@ bool ShowOnMain(std::uint32_t Id, int Command)
     case kSwHide:
         return SDL_HideWindow(Window);
     case kSwMinimize:
+    case kSwForceMinimize:
         return SDL_MinimizeWindow(Window);
     case kSwShowMinimized:
     {
@@ -980,12 +1009,26 @@ bool ShowOnMain(std::uint32_t Id, int Command)
         return SDL_RestoreWindow(Window) && bShown;
     }
     case kSwShowNoActivate:
+    {
+        // As SW_SHOWNORMAL (a minimized window restored), not activated nor raised.
+        bool const bShown = ShowWithoutActivating(Window);
+        if ((SDL_GetWindowFlags(Window) & SDL_WINDOW_MINIMIZED) != 0)
+            SDL_RestoreWindow(Window);
+        return bShown;
+    }
     case kSwShowNa:
-        // Shown, neither activated nor raised in front of the others.
+        // Shown as it is (minimized or maximized stays so), neither activated nor raised.
         return ShowWithoutActivating(Window);
+    case kSwShow:
+    {
+        // Shown as it is: a minimized window stays minimized (SW_SHOW is not SW_SHOWNORMAL).
+        bool const bShown = SDL_ShowWindow(Window);
+        SDL_RaiseWindow(Window);
+        return bShown;
+    }
     default:
     {
-        // SW_SHOW, SW_SHOWNORMAL: a minimized window is restored, as Windows shows it.
+        // SW_SHOWNORMAL, SW_SHOWDEFAULT: a minimized window is restored, as Windows shows it.
         bool const bShown = SDL_ShowWindow(Window);
         if ((SDL_GetWindowFlags(Window) & SDL_WINDOW_MINIMIZED) != 0)
             SDL_RestoreWindow(Window);
@@ -995,12 +1038,34 @@ bool ShowOnMain(std::uint32_t Id, int Command)
     }
 }
 
+// A state command's state alone (minimized, maximized, restored), the window shown or hidden as
+// it is; false when SDL refuses it.
+bool SetStateOnMain(std::uint32_t Id, int Command)
+{
+    SDL_Window* const Window = WindowOf(Id);
+    if (Window == nullptr)
+        return false;
+    switch (Command)
+    {
+    case kSwMinimize:
+    case kSwForceMinimize:
+    case kSwShowMinimized:
+    case kSwShowMinNoActive:
+        return SDL_MinimizeWindow(Window);
+    case kSwMaximize:
+        return SDL_MaximizeWindow(Window);
+    default:
+        return (SDL_GetWindowFlags(Window) & (SDL_WINDOW_MINIMIZED | SDL_WINDOW_MAXIMIZED)) == 0 ||
+               SDL_RestoreWindow(Window);
+    }
+}
+
 // False when SDL refuses the command (maximizing a window that cannot be resized); from another
 // thread the command is forwarded, and taken as done.
 bool Show(std::uint32_t Id, int Command)
 {
     // Numbered when it is made (user32 has recorded its style by then), on whatever thread.
-    std::uint64_t const Number = NextShowCommand(Id);
+    FShowCommands const Number = NextShowCommand(Id, Command);
     if (OnMainThread())
     {
         RunForwarded();
@@ -1012,8 +1077,19 @@ bool Show(std::uint32_t Id, int Command)
     return OnMain(
         [=]
         {
-            if (!ShowOnMain(Id, Command))
-                GReconcile.push_back({Id, Number});
+            // The latest command for the window: run. Overtaken (a newer command was made after
+            // this one was numbered, run or still queued behind it): a state command whose newer
+            // commands only showed or hid the window still sets its state, leaving the
+            // visibility to them; anything else is left to the newer command.
+            bool bDone = true;
+            if (IsLatestShowCommand(Id, Number.Any))
+                bDone = ShowOnMain(Id, Command);
+            else if (SetsState(Command) && IsLatestStateCommand(Id, Number.State))
+                bDone = SetStateOnMain(Id, Command);
+            else
+                return;
+            if (!bDone && SetsState(Command))
+                GReconcile.push_back({Id, Number.State});
         });
 }
 
@@ -1041,7 +1117,7 @@ void Pump(const FUser32Sink* Sink)
         SDL_Window* const Window = WindowOf(Id);
         auto const Found = GWindows.find(Id);
         if (Window == nullptr || Found == GWindows.end() ||
-            !IsLatestShowCommand(Id, Refused.Command))
+            !IsLatestStateCommand(Id, Refused.Command))
             continue;
         SDL_WindowFlags const Flags = SDL_GetWindowFlags(Window);
         Sink->ShowState(Id,
