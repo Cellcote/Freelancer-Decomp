@@ -145,7 +145,30 @@ bool IsDestroyed(SDL_WindowID Id)
 
 // Windows whose forwarded show command SDL refused: their show state goes back to user32 as
 // SDL has it, at the next Pump (main thread only).
-std::vector<SDL_WindowID> GReconcile;
+// Each with the number of the command SDL refused: the window's show commands are numbered as
+// they are made, on any thread (GShowCommands), and a window that got a newer command since is
+// left to that command.
+struct FReconcile
+{
+    SDL_WindowID Id;
+    std::uint64_t Command;
+};
+std::vector<FReconcile> GReconcile;
+std::mutex GShowCommandsLock;
+std::map<SDL_WindowID, std::uint64_t> GShowCommands;
+
+std::uint64_t NextShowCommand(SDL_WindowID Id)
+{
+    std::lock_guard<std::mutex> Guard(GShowCommandsLock);
+    return ++GShowCommands[Id];
+}
+
+bool IsLatestShowCommand(SDL_WindowID Id, std::uint64_t Command)
+{
+    std::lock_guard<std::mutex> Guard(GShowCommandsLock);
+    auto const Found = GShowCommands.find(Id);
+    return Found != GShowCommands.end() && Found->second == Command;
+}
 
 // The display's modes, read on the main thread when SDL starts and when the displays change,
 // for DisplayMode from any thread.
@@ -823,6 +846,10 @@ void DestroyWindow(std::uint32_t Id)
         [Id]
         {
             GWindows.erase(Id);
+            {
+                std::lock_guard<std::mutex> Guard(GShowCommandsLock);
+                GShowCommands.erase(Id);
+            }
             if (SDL_Window* const Window = WindowOf(Id))
                 SDL_DestroyWindow(Window);
             // Its buffered input is dropped by GWindows from now on (SDL's ids are not reused).
@@ -972,19 +999,21 @@ bool ShowOnMain(std::uint32_t Id, int Command)
 // thread the command is forwarded, and taken as done.
 bool Show(std::uint32_t Id, int Command)
 {
+    // Numbered when it is made (user32 has recorded its style by then), on whatever thread.
+    std::uint64_t const Number = NextShowCommand(Id);
     if (OnMainThread())
     {
         RunForwarded();
         return ShowOnMain(Id, Command);
     }
     // Forwarded: a command SDL then refuses sends the window's show state back to user32 as SDL
-    // has it (the next Pump), so a maximize recorded for it is undone.
+    // has it (the next Pump), so a maximize recorded for it is undone, unless a newer command
+    // for the window has been made by then.
     return OnMain(
         [=]
         {
-            if (!ShowOnMain(Id, Command) &&
-                std::find(GReconcile.begin(), GReconcile.end(), Id) == GReconcile.end())
-                GReconcile.push_back(Id);
+            if (!ShowOnMain(Id, Command))
+                GReconcile.push_back({Id, Number});
         });
 }
 
@@ -1004,13 +1033,15 @@ void Pump(const FUser32Sink* Sink)
         return;
     RunForwarded();
     // Show states SDL kept against a forwarded command.
-    std::vector<SDL_WindowID> Reconcile;
+    std::vector<FReconcile> Reconcile;
     Reconcile.swap(GReconcile);
-    for (SDL_WindowID const Id : Reconcile)
+    for (FReconcile const& Refused : Reconcile)
     {
+        SDL_WindowID const Id = Refused.Id;
         SDL_Window* const Window = WindowOf(Id);
         auto const Found = GWindows.find(Id);
-        if (Window == nullptr || Found == GWindows.end())
+        if (Window == nullptr || Found == GWindows.end() ||
+            !IsLatestShowCommand(Id, Refused.Command))
             continue;
         SDL_WindowFlags const Flags = SDL_GetWindowFlags(Window);
         Sink->ShowState(Id,

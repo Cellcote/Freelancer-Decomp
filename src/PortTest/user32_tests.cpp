@@ -960,6 +960,14 @@ int TestScreen()
     DrainScreen();
     Check((GetWindowLongA(Window, GWL_STYLE) & WS_MAXIMIZE) == 0,
           "a forwarded maximize the screen refuses leaves the window unmaximized");
+    // A command made after the refused one, before the next pump: the refusal does not undo it.
+    std::thread([Window] { ShowWindow(Window, SW_MAXIMIZE); }).join();
+    ShowWindow(Window, SW_MINIMIZE);
+    DrainScreen();
+    Check((GetWindowLongA(Window, GWL_STYLE) & WS_MINIMIZE) != 0,
+          "a refused forwarded maximize leaves a newer minimize as it is");
+    ShowWindow(Window, SW_RESTORE);
+    DrainScreen();
 
     // A GetMessageA waiting for a window's messages returns -1 when another thread destroys it.
     // The main thread destroys the window once user32 counts the worker as blocked in the wait
