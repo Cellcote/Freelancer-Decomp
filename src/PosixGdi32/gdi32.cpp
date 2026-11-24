@@ -749,15 +749,23 @@ bool HasFontExtension(const std::string& Name)
 
 // Adds a font file's faces to the catalogue, under their family names (the typographic
 // family, nameID 16, and the legacy one, 1, which GDI matches: "Arial Narrow").
+// The most faces catalogued from one file (system collections hold a few dozen).
+constexpr int kMaxFacesPerFile = 256;
+
 void CatalogFile(const std::string& Path)
 {
     FMapped const File = MapFile(Path);
     if (File.Data == nullptr)
         return;
     const unsigned char* const Data = static_cast<const unsigned char*>(File.Data);
-    int const Count = FacesInFile(Data, File.Size);
+    // A collection's indices may name one face directory more than once: each is read once (by
+    // its first index), and a file gives at most kMaxFacesPerFile faces.
+    int const Count = std::min(FacesInFile(Data, File.Size), kMaxFacesPerFile);
+    std::set<int> Seen;
     for (int Index = 0; Index < Count; ++Index)
     {
+        if (!Seen.insert(stbtt_GetFontOffsetForIndex(Data, Index)).second)
+            continue;
         stbtt_fontinfo Info;
         if (!InitFace(Info, Data, File.Size, Index))
             continue;
@@ -1046,8 +1054,23 @@ bool VdmxExtent(const FFace& Face, int Pixels, bool bCell, int* Ascent, int* Des
     return false;
 }
 
-// GDI's sizes for a LOGFONT on a face (see the top of the file).
-void SizeFont(FFont& Font)
+// The largest metric a font may have, in pixels: every TEXTMETRIC field, and sums of them the
+// drawing code makes, stay far inside a LONG.
+constexpr double kMaxFontMetric = 1 << 24;
+
+// A metric rounded to whole pixels, if it is within kMaxFontMetric.
+bool FontMetric(double Value, LONG* Out)
+{
+    double const Rounded = std::round(Value);
+    if (!(std::fabs(Rounded) <= kMaxFontMetric))
+        return false;
+    *Out = static_cast<LONG>(Rounded);
+    return true;
+}
+
+// GDI's sizes for a LOGFONT on a face (see the top of the file); false when one of them is past
+// kMaxFontMetric (a tall height on a face of few units per em, or a wide lfWidth).
+bool SizeFont(FFont& Font)
 {
     const FFace& Face = *Font.Face;
     int const Cell = std::max(1, Face.WinAscent + Face.WinDescent);
@@ -1060,8 +1083,10 @@ void SizeFont(FFont& Font)
         Font.Scale = static_cast<float>(Pixels) / static_cast<float>(Face.UnitsPerEm);
     else
         Font.Scale = static_cast<float>(Pixels) / static_cast<float>(Cell);
-    Font.Ascent = static_cast<LONG>(std::lround(Face.WinAscent * Font.Scale));
-    Font.Descent = static_cast<LONG>(std::lround(Face.WinDescent * Font.Scale));
+    double const Scale = Font.Scale;
+    if (!FontMetric(Face.WinAscent * Scale, &Font.Ascent) ||
+        !FontMetric(Face.WinDescent * Scale, &Font.Descent))
+        return false;
     int VdmxAscent = 0;
     int VdmxDescent = 0;
     int VdmxPpem = 0;
@@ -1076,21 +1101,26 @@ void SizeFont(FFont& Font)
     Font.ScaleX = Font.Scale;
     if (Font.Log.lfWidth > 0 && Face.AverageWidth > 0)
         Font.ScaleX = static_cast<float>(Font.Log.lfWidth) / static_cast<float>(Face.AverageWidth);
-    Font.Height = Font.Ascent + Font.Descent;
-    Font.InternalLeading = std::max<LONG>(
-        0, Font.Height - static_cast<LONG>(std::lround(Face.UnitsPerEm * Font.Scale)));
+    double const ScaleY = Font.Scale;
+    double const ScaleX = Font.ScaleX;
+    LONG Em = 0;
     int const HheaHeight = Face.HheaAscent + Face.HheaDescent + Face.HheaLineGap;
-    Font.ExternalLeading =
-        std::max<LONG>(0, static_cast<LONG>(std::lround((HheaHeight - Cell) * Font.Scale)));
-    Font.AveCharWidth =
-        std::max<LONG>(1, static_cast<LONG>(std::lround(Face.AverageWidth * Font.ScaleX)));
-    Font.MaxCharWidth =
-        std::max<LONG>(1, static_cast<LONG>(std::lround(Face.AdvanceMax * Font.ScaleX)));
+    if (!FontMetric(static_cast<double>(Font.Ascent) + Font.Descent, &Font.Height) ||
+        !FontMetric(Face.UnitsPerEm * ScaleY, &Em) ||
+        !FontMetric((HheaHeight - Cell) * ScaleY, &Font.ExternalLeading) ||
+        !FontMetric(Face.AverageWidth * ScaleX, &Font.AveCharWidth) ||
+        !FontMetric(Face.AdvanceMax * ScaleX, &Font.MaxCharWidth))
+        return false;
+    Font.InternalLeading = std::max<LONG>(0, Font.Height - Em);
+    Font.ExternalLeading = std::max<LONG>(0, Font.ExternalLeading);
+    Font.AveCharWidth = std::max<LONG>(1, Font.AveCharWidth);
+    Font.MaxCharWidth = std::max<LONG>(1, Font.MaxCharWidth);
     if (Font.bEmbolden)
     {
         ++Font.AveCharWidth;
         ++Font.MaxCharWidth;
     }
+    return true;
 }
 
 // The tallest font made: a height past it (INT_MIN's magnitude among them) is refused before any
@@ -1115,7 +1145,11 @@ FFont* MakeFont(const LOGFONTA& Log)
     Font->Log = Log;
     Font->Face = std::move(Face);
     Font->bEmbolden = bBold && !Font->Face->bBold;
-    SizeFont(*Font);
+    if (!SizeFont(*Font))
+    {
+        delete Font;
+        return nullptr;
+    }
     return Register(Font);
 }
 
@@ -1271,8 +1305,8 @@ std::uint32_t Blend(std::uint32_t Under, std::uint32_t Over, unsigned Alpha)
 constexpr double kMaxGlyphCoverage = 4096.0 * 4096.0;
 
 // One glyph with its pen at (PenX, BaselineY), coverage blended in Pixel, inside Area.
-void DrawGlyph(FBitmap& Bitmap, const FFont& Font, std::uint32_t Character, int PenX, int BaselineY,
-               std::uint32_t Pixel, const RECT& Area)
+void DrawGlyph(FBitmap& Bitmap, const FFont& Font, std::uint32_t Character, std::int64_t PenX,
+               std::int64_t BaselineY, std::uint32_t Pixel, const RECT& Area)
 {
     const stbtt_fontinfo& Info = Font.Face->Info;
     int const Glyph = GlyphOf(*Font.Face, Character);
@@ -1298,8 +1332,10 @@ void DrawGlyph(FBitmap& Bitmap, const FFont& Font, std::uint32_t Character, int 
     // Its pixels, with a pixel's rounding, the emboldening pass and a synthetic slant's shift
     // (a row moves by a quarter of its distance from the baseline).
     double const Reach = 2 + std::max(std::fabs(Top), std::fabs(Bottom)) / 4 + 1;
-    if (PenX + Right + Reach < Area.left || PenX + Left - Reach >= Area.right ||
-        BaselineY + Bottom + 2 < Area.top || BaselineY + Top - 2 >= Area.bottom)
+    double const Pen = static_cast<double>(PenX);
+    double const Baseline = static_cast<double>(BaselineY);
+    if (Pen + Right + Reach < Area.left || Pen + Left - Reach >= Area.right ||
+        Baseline + Bottom + 2 < Area.top || Baseline + Top - 2 >= Area.bottom)
         return;
     int X0 = 0;
     int Y0 = 0;
@@ -1319,20 +1355,21 @@ void DrawGlyph(FBitmap& Bitmap, const FFont& Font, std::uint32_t Character, int 
     for (int Pass = 0; Pass < (Font.bEmbolden ? 2 : 1); ++Pass)
         for (int Row = 0; Row < Height; ++Row)
         {
-            int const Y = BaselineY + Y0 + Row;
+            // Wide until inside the area (the glyph meets it, so these stay near it).
+            std::int64_t const Y = BaselineY + Y0 + Row;
             if (Y < Area.top || Y >= Area.bottom)
                 continue;
-            int const Slant = bSlant ? (BaselineY - Y) / 4 : 0;
+            std::int64_t const Slant = bSlant ? (BaselineY - Y) / 4 : 0;
             for (int Column = 0; Column < Width; ++Column)
             {
-                int const X = PenX + X0 + Column + Pass + Slant;
+                std::int64_t const X = PenX + X0 + Column + Pass + Slant;
                 if (X < Area.left || X >= Area.right)
                     continue;
                 unsigned const Alpha = Coverage[static_cast<std::size_t>(Row) * Width + Column];
                 if (Alpha == 0)
                     continue;
                 std::uint32_t& Target =
-                    Bitmap.Pixels[static_cast<std::size_t>(Y) * Bitmap.Width + X];
+                    Bitmap.Pixels[static_cast<std::size_t>(Y * Bitmap.Width + X)];
                 Target = Blend(Target, Pixel, Alpha);
             }
         }
@@ -1356,41 +1393,52 @@ BOOL DrawText(FDc& Dc, int X, int Y, UINT Options, const RECT* Rect,
     if (Rect != nullptr && (Options & ETO_CLIPPED) != 0)
         Area = Intersect(Area, *Rect);
 
+    // Positions are 64-bit until clipped: an origin near INT_MAX, or Dx entries whose sum passes
+    // an int, still place the text where GDI's arithmetic would (and draw nothing off the area).
     // Dx has an advance per string unit: a surrogate pair's character moves by both.
-    std::vector<int> Advances(Text.size());
-    int Extent = 0;
+    std::vector<std::int64_t> Advances(Text.size());
+    std::int64_t Extent = 0;
     std::size_t Unit = 0;
     for (std::size_t Index = 0; Index < Text.size(); ++Index)
     {
         if (Dx != nullptr)
-            Advances[Index] = Dx[Unit] + (Text[Index].Units == 2 ? Dx[Unit + 1] : 0);
+            Advances[Index] =
+                static_cast<std::int64_t>(Dx[Unit]) + (Text[Index].Units == 2 ? Dx[Unit + 1] : 0);
         else
             Advances[Index] = AdvanceOf(*Font, Text[Index].Code);
         Unit += static_cast<std::size_t>(Text[Index].Units);
         Extent += Advances[Index];
     }
+    std::int64_t Left = X;
     switch (Dc.Align & TA_CENTER)
     {
     case TA_RIGHT:
-        X -= Extent;
+        Left -= Extent;
         break;
     case TA_CENTER:
-        X -= Extent / 2;
+        Left -= Extent / 2;
         break;
     default:
         break;
     }
-    int Baseline = Y + Font->Ascent;
+    std::int64_t Baseline = static_cast<std::int64_t>(Y) + Font->Ascent;
     if ((Dc.Align & TA_BASELINE) == TA_BASELINE)
         Baseline = Y;
     else if ((Dc.Align & TA_BOTTOM) == TA_BOTTOM)
-        Baseline = Y - Font->Descent;
-    int const Top = Baseline - Font->Ascent;
+        Baseline = static_cast<std::int64_t>(Y) - Font->Descent;
+    std::int64_t const Top = Baseline - Font->Ascent;
     if (Dc.BkMode == OPAQUE)
-        FillPixels(Bitmap, Intersect(Area, RECT{X, Top, X + Extent, Top + Font->Height}),
-                   PixelOf(Dc.BkColor));
+    {
+        // The cell, clipped to the area before it becomes a RECT.
+        RECT const Cell = {
+            static_cast<LONG>(std::clamp<std::int64_t>(Left, Area.left, Area.right)),
+            static_cast<LONG>(std::clamp<std::int64_t>(Top, Area.top, Area.bottom)),
+            static_cast<LONG>(std::clamp<std::int64_t>(Left + Extent, Area.left, Area.right)),
+            static_cast<LONG>(std::clamp<std::int64_t>(Top + Font->Height, Area.top, Area.bottom))};
+        FillPixels(Bitmap, Intersect(Area, Cell), PixelOf(Dc.BkColor));
+    }
     std::uint32_t const Pixel = PixelOf(Dc.TextColor);
-    int Pen = X;
+    std::int64_t Pen = Left;
     for (std::size_t Index = 0; Index < Text.size(); ++Index)
     {
         DrawGlyph(Bitmap, *Font, Text[Index].Code, Pen, Baseline, Pixel, Area);
@@ -1881,13 +1929,24 @@ HBITMAP CreateCompatibleBitmap(HDC, int Width, int Height)
     if (Width <= 0 || Height <= 0 || Width > 0x4000 || Height > 0x4000)
         return nullptr;
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
-    return reinterpret_cast<HBITMAP>(Register(new FBitmap(Width, Height)));
+    // Owned until registered; memory that cannot be had makes no bitmap.
+    try
+    {
+        auto Bitmap = std::make_unique<FBitmap>(Width, Height);
+        State().Objects.insert(Bitmap.get());
+        return reinterpret_cast<HBITMAP>(Bitmap.release());
+    }
+    catch (const std::bad_alloc&)
+    {
+        return nullptr;
+    }
 }
 
 // GDI's rules: with Bits null and a zero bit count, the header describes the bitmap; with Bits
 // null otherwise, nothing is copied and the answer is nonzero. Otherwise Lines scan lines from
-// Start in the header's format (32, 24 or 16 bits; 16 is 5-5-5 for BI_RGB, the bmiColors masks
-// for BI_BITFIELDS), bottom-up for a positive biHeight. The lines copied, 0 on failure.
+// Start in the header's format (32, 24 or 16 bits; 16 is 5-5-5 for BI_RGB; 16 and 32 take the
+// bmiColors masks for BI_BITFIELDS), bottom-up for a positive biHeight. The lines copied, 0 on
+// failure.
 int GetDIBits(HDC, HBITMAP Handle, UINT Start, UINT Lines, LPVOID Bits, BITMAPINFO* Info, UINT)
 {
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
@@ -1928,7 +1987,11 @@ int GetDIBits(HDC, HBITMAP Handle, UINT Start, UINT Lines, LPVOID Bits, BITMAPIN
     bool const bTopDown = Header.biHeight < 0;
     std::size_t const Stride = ((static_cast<std::size_t>(DibWidth) * BitCount + 31) / 32) * 4;
     DWORD Masks[3] = {0x7C00, 0x03E0, 0x001F};
-    if (BitCount == 16 && Header.biCompression == BI_BITFIELDS)
+    // BI_BITFIELDS takes its masks from bmiColors, for 16 and 32 bits (24 has none).
+    bool const bMasked = Header.biCompression == BI_BITFIELDS;
+    if (bMasked && BitCount == 24)
+        return 0;
+    if (bMasked)
         std::memcpy(Masks, Info->bmiColors, sizeof(Masks));
     int Shifts[3];
     int Widths[3];
@@ -1953,7 +2016,16 @@ int GetDIBits(HDC, HBITMAP Handle, UINT Start, UINT Lines, LPVOID Bits, BITMAPIN
                 unsigned const Red = (Pixel >> 16) & 0xFF;
                 unsigned const Green = (Pixel >> 8) & 0xFF;
                 unsigned const Blue = Pixel & 0xFF;
-                if (BitCount == 32)
+                if (BitCount == 32 && bMasked)
+                {
+                    DWORD const Packed = PackChannel(Red, Shifts[0], Widths[0]) |
+                                         PackChannel(Green, Shifts[1], Widths[1]) |
+                                         PackChannel(Blue, Shifts[2], Widths[2]);
+                    unsigned char* const Target = Row + Column * 4;
+                    for (int Byte = 0; Byte < 4; ++Byte)
+                        Target[Byte] = static_cast<unsigned char>((Packed >> (8 * Byte)) & 0xFF);
+                }
+                else if (BitCount == 32)
                 {
                     unsigned char* const Target = Row + Column * 4;
                     Target[0] = static_cast<unsigned char>(Blue);
@@ -1990,6 +2062,7 @@ HBRUSH CreateSolidBrush(COLORREF Color)
 }
 
 // A brush, or a system colour index + 1 (COLOR_WINDOW + 1...), as window classes pass it.
+// A null brush (no colour index is 0) fills nothing and fails.
 int FillRect(HDC Handle, const RECT* Rect, HBRUSH BrushHandle)
 {
     std::lock_guard<std::recursive_mutex> Guard(State().Lock);
@@ -2003,7 +2076,7 @@ int FillRect(HDC Handle, const RECT* Rect, HBRUSH BrushHandle)
             return 1;
         Color = Brush->Color;
     }
-    else if (reinterpret_cast<std::uintptr_t>(BrushHandle) <= 31)
+    else if (BrushHandle != nullptr && reinterpret_cast<std::uintptr_t>(BrushHandle) <= 31)
         Color =
             reinterpret_cast<std::uintptr_t>(BrushHandle) == COLOR_WINDOW + 1 ? 0xFFFFFF : 0xC0C0C0;
     else

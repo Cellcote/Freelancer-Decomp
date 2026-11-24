@@ -1193,10 +1193,22 @@ static stbtt__buf stbtt__cff_get_index(stbtt__buf *b)
    start = b->cursor;
    count = stbtt__buf_get16(b);
    if (count) {
+      stbtt_uint32 last;
       offsize = stbtt__buf_get8(b);
-      STBTT_assert(offsize >= 1 && offsize <= 4);
+      // Freelancer Decomp: the offset size, the offset array and the last offset (1-based) are
+      // checked against what is left of the buffer before the cursor moves; a malformed INDEX is
+      // empty and leaves the cursor at the end.
+      if (offsize < 1 || offsize > 4 || offsize * count > b->size - b->cursor) {
+         b->cursor = b->size;
+         return stbtt__new_buf(NULL, 0);
+      }
       stbtt__buf_skip(b, offsize * count);
-      stbtt__buf_skip(b, stbtt__buf_get(b, offsize) - 1);
+      last = stbtt__buf_get(b, offsize);
+      if (last < 1 || last - 1 > (stbtt_uint32) (b->size - b->cursor)) {
+         b->cursor = b->size;
+         return stbtt__new_buf(NULL, 0);
+      }
+      stbtt__buf_skip(b, (int) (last - 1));
    }
    return stbtt__buf_range(b, start, b->cursor - start);
 }

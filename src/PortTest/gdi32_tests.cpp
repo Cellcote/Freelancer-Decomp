@@ -357,7 +357,8 @@ struct FDrawn
     }
 };
 
-FDrawn DrawA(HFONT Font)
+// With Align and Y, 'A' is drawn at (0, Y) aligned so (TA_TOP by default).
+FDrawn DrawA(HFONT Font, UINT Align = TA_LEFT | TA_TOP, int Y = 0)
 {
     FDrawn Out;
     HDC const Probe = CreateCompatibleDC(nullptr);
@@ -369,7 +370,8 @@ FDrawn DrawA(HFONT Font)
         Out.Face = Name;
     SetBkMode(Probe, TRANSPARENT);
     SetTextColor(Probe, RGB(255, 255, 255));
-    Out.bDrawn = ExtTextOutW(Probe, 0, 0, 0, nullptr, L"A", 1, nullptr) != FALSE;
+    SetTextAlign(Probe, Align);
+    Out.bDrawn = ExtTextOutW(Probe, 0, Y, 0, nullptr, L"A", 1, nullptr) != FALSE;
     Out.Image = Pixels(Probe, Target, 128, 128);
     SelectObject(Probe, PreviousFont);
     SelectObject(Probe, PreviousBitmap);
@@ -549,11 +551,17 @@ int main()
         Check(MakeFont("Gdi Test Text", INT_MIN) == nullptr &&
                   MakeFont("Gdi Test Text", (1 << 20) + 1) == nullptr,
               "a height past 2^20 pixels (INT_MIN among them) makes no font");
+        // Its baseline at y = 64, so the glyph covers the whole bitmap: only the coverage limit
+        // keeps it from being rasterized.
         HFONT const Huge = MakeFont("Gdi Test Huge", -16);
-        FDrawn const HugeA = DrawA(Huge);
+        FDrawn const HugeA = DrawA(Huge, TA_LEFT | TA_BASELINE, 64);
         Check(HugeA.Face == "Gdi Test Huge" && HugeA.bDrawn && !HugeA.Lit(),
               "a glyph past the coverage limit is not rasterized");
         DeleteObject(Huge);
+        // Metrics past 2^24 pixels make no font (one unit per em at 2^20 pixels: an ascent of
+        // 800 * 2^20).
+        Check(MakeFont("Gdi Test Huge", -(1 << 20)) == nullptr,
+              "a font whose metrics would pass 2^24 pixels is not made");
         HFONT const Short = MakeFont("Gdi Test Short", -100);
         HFONT const Neighbour = MakeFont("Gdi Test Neighbour", -100);
         Check(FaceOf(Short) != "Gdi Test Short",
@@ -701,12 +709,24 @@ int main()
     SetBkMode(Dc, OPAQUE);
     SetBkColor(Dc, RGB(0, 0, 255));
     SetTextAlign(Dc, TA_LEFT | TA_BASELINE);
-    ExtTextOutW(Dc, 4, 4 + Metrics.tmAscent, 0, nullptr, L"Hi", 2, nullptr);
+    Check(ExtTextOutW(Dc, 4, 4 + Metrics.tmAscent, 0, nullptr, L"Hi", 2, nullptr),
+          "ExtTextOutW draws, clipped");
     Image = Pixels(Dc, Bitmap, 128, 64);
     Check(AnyLit(Image, 128, RECT{4, 4, 10, 4 + Metrics.tmHeight}, true) &&
               !AnyLit(Image, 128, RECT{0, 0, 10, 64}, false),
           "the clip region keeps text and background inside it");
-    Check(Image[static_cast<std::size_t>(5) * 128 + 5] != 0,
+    {
+        // White glyph pixels (not only the blue cell) inside the clip.
+        bool bForeground = false;
+        for (int Y = 4; Y < 4 + Metrics.tmHeight; ++Y)
+            for (int X = 4; X < 10; ++X)
+                bForeground =
+                    bForeground || (Image[static_cast<std::size_t>(Y) * 128 + X] & 0xFFFF00) != 0;
+        Check(bForeground, "the clipped text's glyphs are drawn, not only its background");
+    }
+    // The cell's top row (the baseline less the ascent) is background: the glyph squares reach
+    // 11 of the ascent's 13 pixels.
+    Check((Image[static_cast<std::size_t>(4) * 128 + 5] & 0xFFFFFF) == 0x0000FF,
           "TA_BASELINE puts the cell's top at the baseline less the ascent");
     SelectClipRgn(Dc, nullptr);
 
@@ -725,9 +745,47 @@ int main()
     Check(GetDIBits(Dc, Bitmap, 0, 64, Short.data(), &Info16, DIB_RGB_COLORS) == 64 &&
               Short[0] == 0x7FFF,
           "GetDIBits writes 16-bit 5-5-5 pixels");
-    Info16.bmiHeader.biHeight = 64; // bottom-up: the top-left pixel is the last row's first
-    GetDIBits(Dc, Bitmap, 0, 64, Short.data(), &Info16, DIB_RGB_COLORS);
-    Check(Short[static_cast<std::size_t>(63) * 128] == 0x7FFF, "a positive height is bottom-up");
+    // Bottom-up: the top-left pixel is the last row's first, and row 10's red is row 53's.
+    HBRUSH const RedBrush = CreateSolidBrush(RGB(255, 0, 0));
+    RECT const Red = {0, 10, 1, 11};
+    FillRect(Dc, &Red, RedBrush);
+    DeleteObject(RedBrush);
+    Info16.bmiHeader.biHeight = 64;
+    Check(GetDIBits(Dc, Bitmap, 0, 64, Short.data(), &Info16, DIB_RGB_COLORS) == 64 &&
+              Short[static_cast<std::size_t>(63) * 128] == 0x7FFF &&
+              Short[static_cast<std::size_t>(53) * 128] == 0x7C00,
+          "a positive height is bottom-up, every row");
+    {
+        // 32 bits with BI_BITFIELDS: red in the low byte, as the masks ask.
+        struct
+        {
+            BITMAPINFOHEADER bmiHeader;
+            DWORD Masks[3];
+        } Masked = {};
+        Masked.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        Masked.bmiHeader.biWidth = 1;
+        Masked.bmiHeader.biHeight = -11; // top-down: scan line 10 is row 10, the red pixel's
+        Masked.bmiHeader.biPlanes = 1;
+        Masked.bmiHeader.biBitCount = 32;
+        Masked.bmiHeader.biCompression = BI_BITFIELDS;
+        Masked.Masks[0] = 0x000000FF;
+        Masked.Masks[1] = 0x0000FF00;
+        Masked.Masks[2] = 0x00FF0000;
+        unsigned Pixel = 0;
+        Check(GetDIBits(Dc, Bitmap, 10, 1, &Pixel, reinterpret_cast<BITMAPINFO*>(&Masked),
+                        DIB_RGB_COLORS) == 1 &&
+                  Pixel == 0x000000FF,
+              "GetDIBits packs 32-bit pixels with BI_BITFIELDS masks");
+    }
+    {
+        // Text placement stays wide: a baseline at INT_MAX, and Dx whose sum passes an int.
+        SetTextAlign(Dc, TA_LEFT | TA_BASELINE);
+        int const Far[] = {INT_MAX, INT_MAX};
+        Check(ExtTextOutW(Dc, 0, INT_MAX, 0, nullptr, L"Hi", 2, nullptr) &&
+                  ExtTextOutW(Dc, INT_MAX, 10, 0, nullptr, L"Hi", 2, Far),
+              "text placed past an int's range draws nothing and fails nothing");
+        SetTextAlign(Dc, TA_LEFT | TA_TOP);
+    }
 
     {
         // Blits within one 4x1 bitmap: red, green, blue, white.
@@ -775,12 +833,22 @@ int main()
         Check(!BitBlt(Strip, 0, 0, 4, 1, Strip, 0, 0, BLACKNESS) &&
                   Pixels(Strip, Four, 4, 1) == std::vector<unsigned>{R, G, B, W},
               "BitBlt refuses a raster operation it does not draw");
-        // Extents of INT_MIN, and a blit far wider than the bitmap, end at once.
-        StretchBlt(Strip, 0, 0, INT_MIN, INT_MIN, Strip, 0, 0, INT_MIN, INT_MIN, SRCCOPY);
-        StretchBlt(Strip, 0, 0, INT_MAX, 1, Strip, 0, 0, 1, 1, SRCCOPY);
-        Check(Pixels(Strip, Four, 4, 1) == std::vector<unsigned>{R, R, R, R},
-              "extreme blit extents are clipped to the bitmap");
+        // Extents of INT_MIN run left from their origins: column 3 takes column 0, the rest of
+        // the source being off the bitmap.
+        Check(StretchBlt(Strip, 3, 0, INT_MIN, INT_MIN, Strip, 0, 0, INT_MIN, INT_MIN, SRCCOPY) &&
+                  Pixels(Strip, Four, 4, 1) == std::vector<unsigned>{R, G, B, R},
+              "INT_MIN blit extents are clipped to the bitmap");
         Paint();
+        // A blit far wider than the bitmap ends at once.
+        Check(StretchBlt(Strip, 0, 0, INT_MAX, 1, Strip, 1, 0, 1, 1, SRCCOPY) &&
+                  Pixels(Strip, Four, 4, 1) == std::vector<unsigned>{G, G, G, G},
+              "an INT_MAX blit width is clipped to the bitmap");
+        Paint();
+        // A null brush is no system colour (those are an index + 1): it fills nothing.
+        RECT const First = {0, 0, 1, 1};
+        Check(FillRect(Strip, &First, nullptr) == 0 &&
+                  Pixels(Strip, Four, 4, 1) == std::vector<unsigned>{R, G, B, W},
+              "FillRect refuses a null brush");
         // A screen DC has no surface: it fills nothing and takes no bitmap.
         HDC const ScreenDc = GetDC(nullptr);
         RECT const Everything = {0, 0, 4, 1};

@@ -13,7 +13,8 @@ Local changes, each marked "Freelancer Decomp" in the source:
   taking the next contour's first point (or reading past the glyph's last).
 - A CFF glyph runs at most 65536 charstring operators, its subroutines' included; a CFF INDEX
   lookup checks its index and offset size at run time and keeps offsets unsigned until the object
-  lies inside its buffer.
+  lies inside its buffer; parsing a CFF INDEX checks its offset size, offset array and last offset
+  against the buffer before the cursor moves.
 - A failed allocation of CFF vertices or of the rasterizer's scanline draws nothing, and a failed
   second CFF pass frees its vertices.
 
