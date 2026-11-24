@@ -127,6 +127,7 @@ struct FState
     SHORT Keys[256] = {};
     SHORT LiveKeys[256] = {};
     std::uint64_t Activations = 0; // the screen's focus changes, to tell a superseded one
+    int BlockedWaiters = 0;        // threads blocked in GetMessageA's wait (off the screen)
     // The backend, once looked for; the thread that made the first screen window, the only one
     // that takes the screen's events (macOS has its windows on the main thread only).
     const FUser32Backend* Backend = nullptr;
@@ -1645,12 +1646,22 @@ BOOL GetMessageA(LPMSG Message, HWND Window, UINT First, UINT Last)
                 return -1;
             if (!OnScreenThread())
             {
+                // Counted as blocked while the predicate sends it back to waiting: under the
+                // lock that the wait gives up atomically, so a thread that sees the count sees a
+                // waiter that is blocked.
                 bool bTaken = false;
+                bool bCounted = false;
                 State().Posted.wait(Guard,
                                     [&]
                                     {
                                         bTaken = TakeMessage(&Taken, Window, First, Last, true);
-                                        return bTaken || Gone();
+                                        bool const bDone = bTaken || Gone();
+                                        if (bDone == bCounted)
+                                        {
+                                            State().BlockedWaiters += bDone ? -1 : 1;
+                                            bCounted = !bDone;
+                                        }
+                                        return bDone;
                                     });
                 if (!bTaken)
                     return -1;
@@ -1676,6 +1687,14 @@ LRESULT DispatchMessageA(const MSG* Message)
     if (Message == nullptr || Message->hwnd == nullptr)
         return 0;
     return SendMessageA(Message->hwnd, Message->message, Message->wParam, Message->lParam);
+}
+
+// The threads blocked in GetMessageA's wait (not the screen's thread), for tests that must act
+// while one waits. PORT(macOS), not part of retail; declared where it is used.
+FL_USER32_API int PosixUser32BlockedWaiters()
+{
+    std::lock_guard<std::recursive_mutex> Guard(State().Lock);
+    return State().BlockedWaiters;
 }
 
 // Whether the calling thread's queue holds input of the wake mask's classes that arrived since

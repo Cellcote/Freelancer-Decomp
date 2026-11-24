@@ -29,6 +29,9 @@
 #include <thread>
 #include <vector>
 
+// user32's count of threads blocked in GetMessageA's wait (src/PosixUser32/user32.cpp).
+FL_USER32_API int PosixUser32BlockedWaiters();
+
 namespace
 {
 int GFailures = 0;
@@ -959,10 +962,10 @@ int TestScreen()
           "a forwarded maximize the screen refuses leaves the window unmaximized");
 
     // A GetMessageA waiting for a window's messages returns -1 when another thread destroys it.
-    // The worker says it is about to wait; the main thread then checks that it is still waiting
-    // a while later (no message can end the wait: none is posted to the window) before it
-    // destroys the window. Without DestroyWindow's wake-up the waiter never returns, and the
-    // test process ends with the failure rather than leave the waiter with this frame's state.
+    // The main thread destroys the window once user32 counts the worker as blocked in the wait
+    // (PosixUser32BlockedWaiters). Without DestroyWindow's wake-up the waiter never returns,
+    // and the test process ends with the failure rather than leave the waiter with this frame's
+    // state.
     std::atomic<HWND> Waited = nullptr;
     std::atomic<bool> bWaiting = false;
     std::atomic<int> WaitResult = 0;
@@ -975,10 +978,10 @@ int TestScreen()
             bWaiting = true;
             WaitResult = GetMessageA(&Taken, Waited, 0, 0) == -1 ? 1 : 2;
         });
-    for (int Spin = 0; Spin < 400 && !bWaiting.load(); ++Spin)
+    for (int Spin = 0; Spin < 400 && PosixUser32BlockedWaiters() == 0; ++Spin)
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    Check(bWaiting.load() && WaitResult.load() == 0, "the waiter is blocked in GetMessageA");
+    Check(bWaiting.load() && WaitResult.load() == 0 && PosixUser32BlockedWaiters() == 1,
+          "the waiter is blocked in GetMessageA");
     DestroyWindow(Waited.load());
     for (int Spin = 0; Spin < 400 && WaitResult.load() == 0; ++Spin)
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
