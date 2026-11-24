@@ -324,6 +324,8 @@ bool FRpGpu::LockRing(FRpGpuBuffer* Buffer, unsigned int Count, unsigned int* Ou
     {
         if (Buffer->Fvf == 0)
             return false; // the scratch index buffer has a fixed size
+        if (Buffer->bLocked)
+            return false; // a lock's vertices do not move: no growth until it is unlocked
         unsigned int Grown = 0;
         if (!RoundToPoolStep(Count, &Grown) || !ResizeStorage(Buffer, Grown, Buffer->Stride))
             return false;
@@ -600,7 +602,11 @@ GENRESULT DACOM_API FRpGpu::CreateVb(unsigned int Fvf, unsigned int Count, unsig
     {
         // The shared pool, grown first when it is smaller than the request.
         Buffer = PoolBuffer(Fvf);
-        if (Buffer != nullptr && Count > Buffer->Count)
+        // A pool that is locked keeps its storage until it is unlocked: growing it would move
+        // the vertices the lock handed out. The request fails as an allocation failure does.
+        if (Buffer != nullptr && Count > Buffer->Count && Buffer->bLocked)
+            Buffer = nullptr;
+        else if (Buffer != nullptr && Count > Buffer->Count)
         {
             unsigned int Grown = 0;
             if (!RoundToPoolStep(Count, &Grown) || !ResizeStorage(Buffer, Grown, Buffer->Stride))
@@ -687,9 +693,10 @@ GENRESULT DACOM_API FRpGpu::CopyVertices(void* Handle, unsigned int* OutOffset, 
     const bool bWasLocked = Buffer->bLocked;
     if (bWasLocked)
     {
-        if (Buffer->LockStart > Buffer->Count || Offset > Buffer->Count - Buffer->LockStart ||
-            Count > Buffer->Count - Buffer->LockStart - Offset)
-            return kFail; // RP8 writes past the lock; here the copy is refused
+        // RP8 writes wherever Offset and Count say; here a copy must stay inside the lock. A
+        // refused copy leaves the lock as it was.
+        if (Offset > Buffer->LockCount || Count > Buffer->LockCount - Offset)
+            return kFail;
         Bits = Buffer->Data.data() +
                static_cast<std::size_t>(Buffer->LockStart + Offset) * Buffer->Stride;
     }
@@ -702,8 +709,9 @@ GENRESULT DACOM_API FRpGpu::CopyVertices(void* Handle, unsigned int* OutOffset, 
         Bits = static_cast<unsigned char*>(Locked);
     }
     GENRESULT Result = GR_OK;
+    // The bytes from Bits to the end of the locked vertices.
     const std::size_t Available =
-        Buffer->Data.size() - static_cast<std::size_t>(Bits - Buffer->Data.data());
+        static_cast<std::size_t>(bWasLocked ? Buffer->LockCount - Offset : Count) * Buffer->Stride;
     if (SrcData != nullptr &&
         !Rp8CopyVertexDataAt(Bits, Available, Buffer->Fvf, SrcData, StartVertex, Count))
         Result = kFail; // RP8 would write outside the buffer: nothing written
@@ -743,6 +751,7 @@ GENRESULT DACOM_API FRpGpu::LockVb(void* Handle, unsigned int* Offset, void** Ou
         *Offset = Start;
     Buffer->bLocked = true;
     Buffer->LockStart = Start;
+    Buffer->LockCount = Count;
     RetireBlocks(Buffer); // the caller may write any vertex it locked
     Buffer->LastWriteFrame = FrameNumber_;
     *Out = Buffer->Data.data() + static_cast<std::size_t>(Start) * Buffer->Stride;

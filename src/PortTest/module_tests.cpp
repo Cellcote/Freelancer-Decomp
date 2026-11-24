@@ -613,6 +613,9 @@ void TestRpGpuVertexCopy(IRenderPipeline* Pipeline)
     unsigned int InLock = 1;
     Check(Buffers->CopyVertices(Handle, &InLock, &Sphere, 1, 1) == GR_OK && InLock == 1,
           "CopyVertices writes into a lock in place, at a vertex of the lock");
+    unsigned int PastLock = 1;
+    Check(Buffers->CopyVertices(Handle, &PastLock, &Sphere, 0, 2) != GR_OK,
+          "a copy into a lock that would run past the locked vertices is refused");
     Buffers->UnlockVb(Handle);
     unsigned int Whole = 0;
     if (Buffers->LockVb(Handle, &Whole, &Bits, 6) == GR_OK && Bits != nullptr)
@@ -661,7 +664,10 @@ void TestRpGpuVertexCopy(IRenderPipeline* Pipeline)
 
     // Table A's entry for 0x112 is a fixed-layout converter: it reads the source at 12, 12 and
     // 8 bytes a vertex whatever the descriptor's strides say.
+    // The backing holds a 16-byte stride's second position too, with other values there.
+    float const PackedPositions[8] = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 9.0f, 9.0f};
     FRpVertexSrcDesc Padded = Sphere;
+    Padded.Position = Stream(PackedPositions, 0xC, nullptr);
     Padded.Position.Stride = 16;
     unsigned char Fixed[2][0x20] = {};
     Manager->CopyVertexData(Fixed, 0x112, &Padded, 0, 2);
@@ -670,21 +676,39 @@ void TestRpGpuVertexCopy(IRenderPipeline* Pipeline)
 
     // Indexed (Flags 4) into XYZ | NORMAL | DIFFUSE | TEX1 (0x152): the diffuse bytes the
     // source has no stream for are left alone.
+    FlULong const Identity[2] = {0, 1};
     FRpVertexSrcDesc Indexed = Sphere;
     Indexed.Flags = 4;
     Indexed.Position = Stream(Positions, 0xC, Order);
-    Indexed.Normal = Stream(Normals, 0xC, Order);
+    Indexed.Normal = Stream(Normals, 0xC, Identity); // an order of its own
     Indexed.Tex[0] = Stream(Texels, 8, Order);
     unsigned char Out[2][0x24];
     std::memset(Out, 0xAB, sizeof(Out));
     Manager->CopyVertexData(Out, 0x152, &Indexed, 0, 2);
     unsigned char const Untouched[4] = {0xAB, 0xAB, 0xAB, 0xAB};
-    Check(std::memcmp(Out[0], Positions[1], 0xC) == 0 &&
-              std::memcmp(Out[0] + 0xC, Normals[1], 0xC) == 0 &&
-              std::memcmp(Out[0] + 0x18, Untouched, 4) == 0 &&
-              std::memcmp(Out[0] + 0x1C, Texels[1], 8) == 0 &&
-              std::memcmp(Out[1], Positions[0], 0xC) == 0,
-          "an indexed copy follows each stream's indices and skips the diffuse colour");
+    bool bIndexedOk = true;
+    for (int Vertex = 0; Vertex < 2; ++Vertex)
+    {
+        int const Other = 1 - Vertex;
+        bIndexedOk = bIndexedOk && std::memcmp(Out[Vertex], Positions[Other], 0xC) == 0 &&
+                     std::memcmp(Out[Vertex] + 0xC, Normals[Vertex], 0xC) == 0 &&
+                     std::memcmp(Out[Vertex] + 0x18, Untouched, 4) == 0 &&
+                     std::memcmp(Out[Vertex] + 0x1C, Texels[Other], 8) == 0;
+    }
+    Check(bIndexedOk, "an indexed copy follows each stream's own indices and skips the diffuse "
+                      "colour");
+
+    // XYZ | NORMAL | TEX1 with a one-float set (0x30112, 0x1C bytes a vertex): table A's
+    // fixed layout writes 0x20 a vertex, past the vertices given; nothing is copied.
+    FRpVertexSrcDesc Narrow = Sphere;
+    Narrow.SrcFvf = 0x30112;
+    unsigned char Short[2][0x1C];
+    std::memset(Short, 0xAB, sizeof(Short));
+    Manager->CopyVertexData(Short, 0x30112, &Narrow, 0, 2);
+    bool bShortUntouched = true;
+    for (std::size_t Index = 0; Index < sizeof(Short); ++Index)
+        bShortUntouched = bShortUntouched && Short[Index / 0x1C][Index % 0x1C] == 0xAB;
+    Check(bShortUntouched, "a fixed layout wider than its format copies nothing");
 
     // XYZRHW | TEX1 (0x104) from separate streams of the same format: RP8's jump table has
     // the empty converter there.

@@ -30,7 +30,12 @@
 //
 // A fixed-layout converter (FRp8FixedLayout) has its own destination stride and offsets, and
 // reads the source at retail's literal strides whatever the descriptor says: 12 bytes a
-// position or normal, 4 a diffuse colour, 8 a texture set (8 bytes copied).
+// position or normal, 4 a diffuse colour, 8 a texture set (8 bytes copied). Retail picks it
+// by the jump index or the format pair alone, whatever the texture sets' sizes; so does this.
+//
+// Where retail writes outside the memory it was given, this does not: a fixed layout wider
+// than the format copies nothing, a generic texture copy stops at its vertex's end, and
+// Rp8CopyVertexDataAt refuses a copy that would leave the buffer.
 //
 // The descriptor has two texture streams; retail reads a source's third and later sets past
 // them (the descriptor's tail and beyond). Here a source set past the second copies nothing.
@@ -226,7 +231,8 @@ inline void CopyGeneric(unsigned char* Origin, std::ptrdiff_t Skew, unsigned int
 
     for (unsigned int N = 0; N < Count; ++N)
     {
-        unsigned char* Cursor = Destination(Origin, Skew, StartVertex + N, DstStride);
+        unsigned char* const VertexStart = Destination(Origin, Skew, StartVertex + N, DstStride);
+        unsigned char* Cursor = VertexStart;
         std::memcpy(Cursor, Element(Src->Position, Src->Position.Stride, StartVertex, N, bIndexed),
                     0xC);
         Cursor += 0xC;
@@ -250,9 +256,14 @@ inline void CopyGeneric(unsigned char* Origin, std::ptrdiff_t Skew, unsigned int
         {
             if (Index < SrcTexCount && Index < 2)
             {
+                // Retail copies ByteSize bytes unchecked; a set wider than the rest of the
+                // vertex runs into the next one (or past the last), so the copy stops at the
+                // vertex's end. Within the vertex the bytes are retail's.
                 const FRpVertexStream& Set = Src->Tex[Index];
-                std::memcpy(Cursor, Element(Set, Set.Stride, StartVertex, N, bIndexed),
-                            Set.ByteSize);
+                const std::size_t Left = static_cast<std::size_t>(DstStride) -
+                                         static_cast<std::size_t>(Cursor - VertexStart);
+                const std::size_t Bytes = Set.ByteSize < Left ? Set.ByteSize : Left;
+                std::memcpy(Cursor, Element(Set, Set.Stride, StartVertex, N, bIndexed), Bytes);
             }
             Cursor += TexelBytes(DstFvf >> (Index * 2 + 0x10));
         }
@@ -280,7 +291,14 @@ inline void Copy(unsigned char* Origin, std::ptrdiff_t Skew, unsigned int DstFvf
         return;
     const bool bIndexed = (Selector & 4) != 0;
     if (const FRp8FixedLayout* const Layout = FixedLayout(Selector, Src->SrcFvf, DstFvf))
+    {
+        // A table entry picked by the jump index alone can have a wider stride than the format
+        // (a one-float texture set: 0x30112 is 0x1C bytes, its entry writes 0x20). Retail then
+        // writes past the vertices it was given; here nothing is copied.
+        if (Layout->Stride > Rp8FvfStride(DstFvf))
+            return;
         CopyFixed(Origin, Skew, *Layout, Src, StartVertex, Count, bIndexed);
+    }
     else
         CopyGeneric(Origin, Skew, DstFvf, Src, StartVertex, Count, bIndexed);
 }
