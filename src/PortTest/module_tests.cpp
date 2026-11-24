@@ -712,6 +712,32 @@ void TestRpGpuVertexCopy(IRenderPipeline* Pipeline)
         bShortUntouched = bShortUntouched && Short[Index / 0x1C][Index % 0x1C] == 0xAB;
     Check(bShortUntouched, "a fixed layout wider than its format copies nothing");
 
+    // The generic converter (table A's entry for XYZ | TEX1, 0x102, 0x14 bytes a vertex) copies
+    // a 16-byte source texture set only up to its vertex's end: 8 bytes, the next vertex's
+    // bytes untouched. A destination without a position (0x10, a normal only: 0xC bytes, the
+    // copy would write 0x18) copies nothing.
+    float const WideTexels[4] = {0.5f, 0.25f, 7.0f, 7.0f};
+    FRpVertexSrcDesc Long = {};
+    Long.SrcFvf = 0x102;
+    Long.Position = Stream(Positions, 0xC, nullptr);
+    Long.Tex[0] = Stream(WideTexels, 16, nullptr);
+    unsigned char Pair[2][0x14];
+    std::memset(Pair, 0xAB, sizeof(Pair));
+    Manager->CopyVertexData(Pair, 0x102, &Long, 0, 1);
+    bool bPairOk = std::memcmp(Pair[0], Positions[0], 0xC) == 0 &&
+                   std::memcmp(Pair[0] + 0xC, WideTexels, 8) == 0;
+    for (std::size_t Index = 0; Index < 0x14; ++Index)
+        bPairOk = bPairOk && Pair[1][Index] == 0xAB;
+    Check(bPairOk, "a texture set wider than the rest of its vertex is cut at the vertex's end");
+    FRpVertexSrcDesc NormalOnly = Sphere;
+    NormalOnly.Flags = 0;
+    std::memset(Pair, 0xAB, sizeof(Pair));
+    Manager->CopyVertexData(Pair, 0x10, &NormalOnly, 0, 1);
+    bool bNormalOnlyUntouched = true;
+    for (std::size_t Index = 0; Index < sizeof(Pair); ++Index)
+        bNormalOnlyUntouched = bNormalOnlyUntouched && Pair[Index / 0x14][Index % 0x14] == 0xAB;
+    Check(bNormalOnlyUntouched, "a generic copy wider than its format copies nothing");
+
     // XYZRHW | TEX1 (0x104) from separate streams of the same format: RP8's jump table has
     // the empty converter there.
     FRpVertexSrcDesc Transformed = {};

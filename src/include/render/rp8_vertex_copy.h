@@ -33,8 +33,9 @@
 // position or normal, 4 a diffuse colour, 8 a texture set (8 bytes copied). Retail picks it
 // by the jump index or the format pair alone, whatever the texture sets' sizes; so does this.
 //
-// Where retail writes outside the memory it was given, this does not: a fixed layout wider
-// than the format copies nothing, a generic texture copy stops at its vertex's end, and
+// Where retail writes outside the memory it was given, this does not: a converter that would
+// write past a vertex record copies nothing (WritesPastRecord), a generic texture copy stops at
+// its vertex's end, and
 // Rp8CopyVertexDataAt refuses a copy that would leave the buffer.
 //
 // The descriptor has two texture streams; retail reads a source's third and later sets past
@@ -270,6 +271,27 @@ inline void CopyGeneric(unsigned char* Origin, std::ptrdiff_t Skew, unsigned int
     }
 }
 
+// Whether the converter RP8 picks would write past each destination vertex record: a fixed
+// layout wider than the format (a one-float texture set: 0x30112 is 0x1C bytes, its entry
+// writes 0x20), or a generic copy whose position, normal and diffuse bytes alone exceed the
+// format's stride (a destination without XYZ: 0x10 is 0xC bytes, the copy writes 0x18).
+// Retail writes them anyway; here such a copy writes nothing.
+inline bool WritesPastRecord(unsigned int DstFvf, const FRpVertexSrcDesc* Src)
+{
+    const unsigned int Selector =
+        static_cast<unsigned int>(Src->SrcFvf == DstFvf) | (Src->Flags & 6u);
+    if (Selector == 3 || Selector == 6)
+        return false;
+    if ((Selector == 1 || Selector == 5) && TableCopiesNothing(TableIndex(DstFvf)))
+        return false;
+    const unsigned int FormatStride = Rp8FvfStride(DstFvf);
+    if (const FRp8FixedLayout* const Layout = FixedLayout(Selector, Src->SrcFvf, DstFvf))
+        return Layout->Stride > FormatStride;
+    const unsigned int Mandatory =
+        0xC + ((DstFvf & 0x10) != 0 ? 0xC : 0) + ((DstFvf & 0x40) != 0 ? 4 : 0);
+    return Mandatory > FormatStride;
+}
+
 // FUN_06d1f040 with the destination's vertex V at Origin + V * stride + Skew.
 inline void Copy(unsigned char* Origin, std::ptrdiff_t Skew, unsigned int DstFvf,
                  const FRpVertexSrcDesc* Src, unsigned int StartVertex, unsigned int Count)
@@ -289,16 +311,11 @@ inline void Copy(unsigned char* Origin, std::ptrdiff_t Skew, unsigned int DstFvf
         return;
     if ((Selector == 1 || Selector == 5) && TableCopiesNothing(TableIndex(DstFvf)))
         return;
+    if (WritesPastRecord(DstFvf, Src))
+        return;
     const bool bIndexed = (Selector & 4) != 0;
     if (const FRp8FixedLayout* const Layout = FixedLayout(Selector, Src->SrcFvf, DstFvf))
-    {
-        // A table entry picked by the jump index alone can have a wider stride than the format
-        // (a one-float texture set: 0x30112 is 0x1C bytes, its entry writes 0x20). Retail then
-        // writes past the vertices it was given; here nothing is copied.
-        if (Layout->Stride > Rp8FvfStride(DstFvf))
-            return;
         CopyFixed(Origin, Skew, *Layout, Src, StartVertex, Count, bIndexed);
-    }
     else
         CopyGeneric(Origin, Skew, DstFvf, Src, StartVertex, Count, bIndexed);
 }
@@ -335,6 +352,8 @@ inline bool Rp8CopyVertexDataAt(void* Bits, std::size_t Available, unsigned int 
                                 const FRpVertexSrcDesc* Src, unsigned int StartVertex,
                                 unsigned int Count)
 {
+    if (Rp8VertexCopyDetail::WritesPastRecord(DstFvf, Src))
+        return false;
     const unsigned long long FormatStride = Rp8FvfStride(DstFvf);
     const unsigned long long WriteStride = Rp8VertexCopyDetail::WriteStride(DstFvf, Src);
     if (Count != 0)

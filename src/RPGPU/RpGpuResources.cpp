@@ -660,6 +660,10 @@ GENRESULT DACOM_API FRpGpu::ResizeVb(void* Handle, unsigned int Fvf, unsigned in
     FRpGpuBuffer* const Buffer = static_cast<FRpGpuBuffer*>(Handle);
     if (VertexBuffers_.count(Buffer) != 0)
     {
+        // A locked buffer keeps its storage and its format until it is unlocked: the lock's
+        // vertices (and CopyVertices' bounds) stay valid. Refused as a failed allocation is.
+        if (Buffer->bLocked)
+            return GR_OUT_OF_MEMORY;
         if (!ResizeStorage(Buffer, std::max(1u, Count), std::max(1u, Rp8FvfStride(Fvf))))
             return GR_OUT_OF_MEMORY;
         Buffer->Fvf = Fvf;
