@@ -805,7 +805,8 @@ struct FRpGpuBmp
     std::uint32_t Pixel(std::uint32_t X, std::uint32_t Y) const
     {
         const unsigned char* const P = &Bgr[(static_cast<std::size_t>(Y) * Width + X) * 3];
-        return static_cast<std::uint32_t>(P[2]) << 16 | static_cast<std::uint32_t>(P[1]) << 8 | P[0];
+        return static_cast<std::uint32_t>(P[2]) << 16 | static_cast<std::uint32_t>(P[1]) << 8 |
+               P[0];
     }
 };
 
@@ -835,8 +836,8 @@ bool ReadRpGpuBmp(const std::string& Path, FRpGpuBmp* Out)
     Out->Height = H;
     Out->Bgr.resize(static_cast<std::size_t>(W) * H * 3);
     for (std::uint32_t Y = 0; Y < H; ++Y) // bottom-up in the file
-        std::memcpy(&Out->Bgr[static_cast<std::size_t>(Y) * W * 3], &File[54 + (H - 1 - Y) * RowBytes],
-                    static_cast<std::size_t>(W) * 3);
+        std::memcpy(&Out->Bgr[static_cast<std::size_t>(Y) * W * 3],
+                    &File[54 + (H - 1 - Y) * RowBytes], static_cast<std::size_t>(W) * 3);
     return true;
 }
 
@@ -856,8 +857,8 @@ bool NearColour(std::uint32_t Rgb, std::uint32_t Want, int Tolerance)
 // frame of its own: cleared to blue, one pre-transformed quad over the whole target, then read
 // back. On the Null backend the frame is only the clear, so the checks are that every call
 // succeeds; with a device (bPixels) the centre pixel is the colour Direct3D 8 draws.
-void TestRpGpuDraws(IRenderPipeline* Pipeline, RpWindow Window, bool bPixels, const std::string& Root,
-                    const char* Backend)
+void TestRpGpuDraws(IRenderPipeline* Pipeline, RpWindow Window, bool bPixels,
+                    const std::string& Root, const char* Backend)
 {
     int Mode[10] = {};
     Mode[2] = 64;
@@ -871,7 +872,8 @@ void TestRpGpuDraws(IRenderPipeline* Pipeline, RpWindow Window, bool bPixels, co
         return;
     }
     IRPTexture* Texture = nullptr;
-    if (Pipeline->QueryInterface(Iids::RPTexture, (void**)(&Texture)) != GR_OK || Texture == nullptr)
+    if (Pipeline->QueryInterface(Iids::RPTexture, (void**)(&Texture)) != GR_OK ||
+        Texture == nullptr)
     {
         Check(false, "RPGPU answers IRPTexture");
         Pipeline->DestroyGpuResources();
@@ -890,8 +892,8 @@ void TestRpGpuDraws(IRenderPipeline* Pipeline, RpWindow Window, bool bPixels, co
         std::uint32_t Diffuse;
         float U, V;
     };
-    auto const Frame = [&](const char* What, std::uint32_t Diffuse, auto&& Setup, std::uint32_t Want,
-                           int Tolerance)
+    auto const Frame = [&](const char* What, std::uint32_t Diffuse, auto&& Setup,
+                           std::uint32_t Want, int Tolerance)
     {
         std::string Message = std::string("RPGPU (") + Backend + "): " + What;
         Pipeline->ResetRenderStatesToDefaults();
@@ -930,11 +932,13 @@ void TestRpGpuDraws(IRenderPipeline* Pipeline, RpWindow Window, bool bPixels, co
     };
 
     // D3DBLEND_BOTHSRCALPHA as SRCBLEND: source alpha and its inverse, DESTBLEND (ONE) ignored.
-    Frame("SRCBLEND BOTHSRCALPHA blends by source alpha", 0x80FF0000u,
-          [&] { return Rs(27, 1) && Rs(19, 12) && Rs(20, 2); }, 0x80007F, 2);
+    Frame(
+        "SRCBLEND BOTHSRCALPHA blends by source alpha", 0x80FF0000u,
+        [&] { return Rs(27, 1) && Rs(19, 12) && Rs(20, 2); }, 0x80007F, 2);
     // ... and BOTHINVSRCALPHA, the other way round: alpha 0x40 keeps 0.75 of the source.
-    Frame("SRCBLEND BOTHINVSRCALPHA blends by inverse source alpha", 0x40FF0000u,
-          [&] { return Rs(27, 1) && Rs(19, 13) && Rs(20, 2); }, 0xBF0040, 2);
+    Frame(
+        "SRCBLEND BOTHINVSRCALPHA blends by inverse source alpha", 0x40FF0000u,
+        [&] { return Rs(27, 1) && Rs(19, 13) && Rs(20, 2); }, 0xBF0040, 2);
 
     // A DXT1 texture (BC1 on the GPU where the device samples it): one 4x4 block, every texel
     // colour 0, pure red in R5G6B5.
@@ -943,13 +947,15 @@ void TestRpGpuDraws(IRenderPipeline* Pipeline, RpWindow Window, bool bPixels, co
     const unsigned char Block[8] = {0x00, 0xF8, 0x00, 0x00, 0, 0, 0, 0};
     unsigned int SourceFormat = 10;
     bool bDxt1 = Pipeline->CreateTexture(4, 4, &Format, 1, 0, &Dxt1) == GR_OK &&
-                 Pipeline->SetTextureLevelData(Dxt1, 0, 4, 4, 8, &SourceFormat, Block, nullptr, nullptr) == GR_OK;
+                 Pipeline->SetTextureLevelData(Dxt1, 0, 4, 4, 8, &SourceFormat, Block, nullptr,
+                                               nullptr) == GR_OK;
     Check(bDxt1, "RPGPU makes and fills a DXT1 texture");
     if (bDxt1)
     {
-        Frame("a DXT1 texture samples its block's colour", 0xFFFFFFFFu,
-              [&] { return Pipeline->SetTextureStageTexture(0, Dxt1) == GR_OK && Tss(0, 2, 2); },
-              0xFF0000, 0);
+        Frame(
+            "a DXT1 texture samples its block's colour", 0xFFFFFFFFu,
+            [&] { return Pipeline->SetTextureStageTexture(0, Dxt1) == GR_OK && Tss(0, 2, 2); },
+            0xFF0000, 0);
     }
     if (Dxt1 != nullptr)
         Pipeline->DestroyTexture(Dxt1);
@@ -966,13 +972,15 @@ void TestRpGpuDraws(IRenderPipeline* Pipeline, RpWindow Window, bool bPixels, co
     Palette[5] = 0x60;
     SourceFormat = 1; // P8
     bool bP8 = Pipeline->CreateTexture(4, 4, &Format, 1, 0, &Paletted) == GR_OK &&
-               Pipeline->SetTextureLevelData(Paletted, 0, 4, 4, 4, &SourceFormat, Indices, nullptr, Palette) == GR_OK;
+               Pipeline->SetTextureLevelData(Paletted, 0, 4, 4, 4, &SourceFormat, Indices, nullptr,
+                                             Palette) == GR_OK;
     Check(bP8, "RPGPU loads a P8 level with its palette");
     if (bP8)
     {
-        Frame("a P8 level's palette colours its texels", 0xFFFFFFFFu,
-              [&] { return Pipeline->SetTextureStageTexture(0, Paletted) == GR_OK && Tss(0, 2, 2); },
-              0x20C060, 0);
+        Frame(
+            "a P8 level's palette colours its texels", 0xFFFFFFFFu,
+            [&] { return Pipeline->SetTextureStageTexture(0, Paletted) == GR_OK && Tss(0, 2, 2); },
+            0x20C060, 0);
     }
     if (Paletted != nullptr)
         Pipeline->DestroyTexture(Paletted);
