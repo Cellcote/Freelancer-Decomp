@@ -9,8 +9,8 @@
 // Arial metrics run on macOS, on a copy of its Arial (a known face, with VDMX); the others hold
 // for whichever face the fallbacks find.
 
-#include <windows.h>
-
+// The C++ library first: the stand-in <windows.h> defines the C library's names (fopen...) as
+// macros, which a newer <fstream> must not see.
 #include <algorithm>
 #include <climits>
 #include <cstddef>
@@ -25,6 +25,8 @@
 
 #include <sys/stat.h>
 #include <unistd.h>
+
+#include <windows.h>
 
 // Windows' TEXTMETRICW: 16-bit characters, so tmItalic at byte 52 and 60 bytes in all.
 static_assert(offsetof(TEXTMETRICW, tmFirstChar) == 44 && offsetof(TEXTMETRICW, tmItalic) == 52 &&
