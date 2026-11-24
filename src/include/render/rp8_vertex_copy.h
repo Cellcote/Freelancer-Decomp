@@ -284,6 +284,17 @@ inline void Copy(unsigned char* Origin, std::ptrdiff_t Skew, unsigned int DstFvf
     else
         CopyGeneric(Origin, Skew, DstFvf, Src, StartVertex, Count, bIndexed);
 }
+
+// The destination stride the converter Copy picks writes with: a fixed layout's own, else
+// the format's.
+inline unsigned int WriteStride(unsigned int DstFvf, const FRpVertexSrcDesc* Src)
+{
+    const unsigned int Selector =
+        static_cast<unsigned int>(Src->SrcFvf == DstFvf) | (Src->Flags & 6u);
+    const FRp8FixedLayout* const Layout =
+        Selector == 3 || Selector == 6 ? nullptr : FixedLayout(Selector, Src->SrcFvf, DstFvf);
+    return Layout != nullptr ? Layout->Stride : Rp8FvfStride(DstFvf);
+}
 } // namespace Rp8VertexCopyDetail
 
 // FUN_06d1f040: Src's vertices StartVertex .. StartVertex + Count - 1 into Destination, a
@@ -297,12 +308,28 @@ inline void Rp8CopyVertexData(void* Destination, unsigned int DstFvf, const FRpV
 
 // RP8's CopyVertices call (FUN_06d1228c): FUN_06d1f040 on Bits - FvfStride(DstFvf) *
 // StartVertex, so the source's vertex StartVertex lands at Bits. The same, with the offset
-// applied per vertex instead of to a pointer before Bits.
-inline void Rp8CopyVertexDataAt(void* Bits, unsigned int DstFvf, const FRpVertexSrcDesc* Src,
-                                unsigned int StartVertex, unsigned int Count)
+// applied per vertex instead of to a pointer before Bits. Available is the bytes from Bits to
+// the end of the buffer. Where a fixed layout's stride is not the format's (a texture set of
+// another size), retail's writes start before Bits or run past the vertices locked; here a
+// copy that would write outside Bits .. Bits + Available is refused (false) and writes
+// nothing.
+inline bool Rp8CopyVertexDataAt(void* Bits, std::size_t Available, unsigned int DstFvf,
+                                const FRpVertexSrcDesc* Src, unsigned int StartVertex,
+                                unsigned int Count)
 {
-    const std::ptrdiff_t Skew =
-        -static_cast<std::ptrdiff_t>(static_cast<std::size_t>(Rp8FvfStride(DstFvf)) * StartVertex);
+    const unsigned long long FormatStride = Rp8FvfStride(DstFvf);
+    const unsigned long long WriteStride = Rp8VertexCopyDetail::WriteStride(DstFvf, Src);
+    if (Count != 0)
+    {
+        // First and one-past-last byte written, relative to Bits.
+        const long long First = static_cast<long long>(WriteStride * StartVertex) -
+                                static_cast<long long>(FormatStride * StartVertex);
+        const long long End = First + static_cast<long long>(WriteStride * Count);
+        if (First < 0 || End < First || static_cast<unsigned long long>(End) > Available)
+            return false;
+    }
+    const std::ptrdiff_t Skew = -static_cast<std::ptrdiff_t>(FormatStride * StartVertex);
     Rp8VertexCopyDetail::Copy(static_cast<unsigned char*>(Bits), Skew, DstFvf, Src, StartVertex,
                               Count);
+    return true;
 }

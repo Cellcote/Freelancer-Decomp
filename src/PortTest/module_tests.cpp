@@ -628,6 +628,24 @@ void TestRpGpuVertexCopy(IRenderPipeline* Pipeline)
         Check(false, "the vertex buffer locks whole");
     Buffers->DestroyVb((void**)(&Handle));
 
+    // XYZ | NORMAL | TEX1 with a three-float set (0x10112, 0x24 bytes a vertex) takes table A's
+    // 0x20-byte fixed layout: RP8 would start the source's vertex 1 four bytes before the lock.
+    // RPGPU refuses that copy and writes nothing.
+    FRpVertexSrcDesc Wide = Sphere;
+    Wide.SrcFvf = 0x10112;
+    Check(Buffers->CreateVb(0x10112, 2, &Handle, 0) == GR_OK && Handle != nullptr,
+          "RPGPU makes a vertex buffer of a three-float texture set");
+    unsigned int AtStart = 0;
+    Check(Buffers->CopyVertices(Handle, &AtStart, &Wide, 1, 1) != GR_OK,
+          "a copy RP8 would start before the buffer is refused");
+    unsigned int WideAt = 0;
+    if (Buffers->LockVb(Handle, &WideAt, &Bits, 2) == GR_OK && Bits != nullptr)
+    {
+        Check(Zero(static_cast<const unsigned char*>(Bits), 0x48), "a refused copy writes nothing");
+        Buffers->UnlockVb(Handle);
+    }
+    Buffers->DestroyVb((void**)(&Handle));
+
     // The pool through the manager, as SphereMesh draws: LockVertexMemory, CopyVertexData.
     FVertexMemoryLock Lock = {};
     if (Manager->LockVertexMemory(0x112, 2, &Lock) == GR_OK && Lock.Vertices != nullptr)

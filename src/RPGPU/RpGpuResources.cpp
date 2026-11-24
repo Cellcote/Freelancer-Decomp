@@ -701,11 +701,18 @@ GENRESULT DACOM_API FRpGpu::CopyVertices(void* Handle, unsigned int* OutOffset, 
             return Result;
         Bits = static_cast<unsigned char*>(Locked);
     }
-    if (SrcData != nullptr)
-        Rp8CopyVertexDataAt(Bits, Buffer->Fvf, SrcData, StartVertex, Count);
     GENRESULT Result = GR_OK;
+    const std::size_t Available =
+        Buffer->Data.size() - static_cast<std::size_t>(Bits - Buffer->Data.data());
+    if (SrcData != nullptr &&
+        !Rp8CopyVertexDataAt(Bits, Available, Buffer->Fvf, SrcData, StartVertex, Count))
+        Result = kFail; // RP8 would write outside the buffer: nothing written
     if (!bWasLocked)
-        Result = UnlockVb(Target);
+    {
+        const GENRESULT Unlocked = UnlockVb(Target);
+        if (Result == GR_OK)
+            Result = Unlocked;
+    }
     if (OutOffset != nullptr)
         *OutOffset = Offset;
     return Result;
