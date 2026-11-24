@@ -11,13 +11,11 @@
 //                       <resource_test.dll>
 
 // The C++ library first: the stand-in <windows.h> defines MSVC's CRT names as macros (fopen
-// among them, posix/msvc_crt.h), which <fstream> must not see.
+// among them, posix/msvc_crt.h), which the library's headers must not see.
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <cwchar>
-#include <fstream>
-#include <iterator>
 #include <string>
 #include <vector>
 
@@ -40,18 +38,28 @@ void Check(bool bOk, const char* What)
     }
 }
 
+// Files through <cstdio> (iostreams would tie the test to one C++ library's streams).
 std::vector<unsigned char> ReadAll(std::string const& Path)
 {
-    std::ifstream In(Path, std::ios::binary);
-    return std::vector<unsigned char>(std::istreambuf_iterator<char>(In), {});
+    std::vector<unsigned char> Data;
+    if (std::FILE* const In = fopen(Path.c_str(), "rb"))
+    {
+        unsigned char Buffer[4096];
+        std::size_t Read = 0;
+        while ((Read = std::fread(Buffer, 1, sizeof(Buffer), In)) != 0)
+            Data.insert(Data.end(), Buffer, Buffer + Read);
+        std::fclose(In);
+    }
+    return Data;
 }
 
 bool WriteAll(std::string const& Path, unsigned char const* Data, std::size_t Size)
 {
-    std::ofstream Out(Path, std::ios::binary | std::ios::trunc);
-    Out.write(reinterpret_cast<char const*>(Data), static_cast<std::streamsize>(Size));
-    Out.close();
-    return !Out.fail();
+    std::FILE* const Out = fopen(Path.c_str(), "wb");
+    if (Out == nullptr)
+        return false;
+    bool const bWritten = Size == 0 || std::fwrite(Data, 1, Size, Out) == Size;
+    return std::fclose(Out) == 0 && bWritten;
 }
 
     // The resource's bytes, or empty.
