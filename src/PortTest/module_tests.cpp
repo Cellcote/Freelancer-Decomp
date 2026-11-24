@@ -647,6 +647,8 @@ void TestRpGpuVertexCopy(IRenderPipeline* Pipeline)
         Check(Zero(static_cast<const unsigned char*>(Bits), 0x48), "a refused copy writes nothing");
         Buffers->UnlockVb(Handle);
     }
+    else
+        Check(false, "the three-float buffer locks after the refused copy");
     Buffers->DestroyVb((void**)(&Handle));
 
     // The pool through the manager, as SphereMesh draws: LockVertexMemory, CopyVertexData.
