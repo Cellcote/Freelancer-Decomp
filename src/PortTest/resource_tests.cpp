@@ -10,10 +10,8 @@
 // Usage: resource_tests <bin dir with resources.dll / InfoCards.dll> <src/Resources>
 //                       <resource_test.dll>
 
-#include <windows.h>
-
-#include "resource_text.h"
-
+// The C++ library first: the stand-in <windows.h> defines MSVC's CRT names as macros (fopen
+// among them, posix/msvc_crt.h), which <fstream> must not see.
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -24,6 +22,10 @@
 #include <vector>
 
 #include <unistd.h>
+
+#include <windows.h>
+
+#include "resource_text.h"
 
 namespace
 {
