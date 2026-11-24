@@ -106,8 +106,9 @@ inline bool RvaToOffset(FImage const& Image, std::uint32_t Rva, std::uint32_t Le
         std::uint32_t const Address = Read32(Image, Header + 12);
         std::uint32_t const RawSize = Read32(Image, Header + 16);
         std::uint32_t const RawOffset = Read32(Image, Header + 20);
-        // The raw data's end is inside too: an empty resource may sit there.
-        if (Rva < Address || Rva - Address > RawSize)
+        // The raw data's end is inside for an empty read only (an empty resource may sit
+        // there); anything longer there starts in the section that follows.
+        if (Rva < Address || Rva - Address > RawSize || (Rva - Address == RawSize && Length != 0))
             continue;
         std::uint32_t const Into = Rva - Address;
         if (Length > RawSize - Into || !Fits(Image, std::uint64_t(RawOffset) + Into, Length))

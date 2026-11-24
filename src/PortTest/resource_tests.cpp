@@ -16,6 +16,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <cwchar>
+#include <algorithm>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -346,6 +348,48 @@ void TestDamaged(std::string const& Fixture, std::string const& Scratch)
                   "nor is its string");
             if (Damaged != nullptr)
                 FreeLibrary(Damaged);
+            unlink(Scratch.c_str());
+        }
+    }
+
+    // Two adjacent sections: A's raw data ends exactly where B, which holds the resources,
+    // starts. The resource directory's RVA is A's end, and must be found in B.
+    {
+        std::vector<unsigned char> Two = Image;
+        std::size_t const Table = 0x40 + 24 + 0xF0; // PE32+: the section table (one entry)
+        auto Read32 = [&](std::size_t At)
+        {
+            return static_cast<std::uint32_t>(Two[At] | (Two[At + 1] << 8) | (Two[At + 2] << 16) |
+                                              (static_cast<std::uint32_t>(Two[At + 3]) << 24));
+        };
+        auto Write32 = [&](std::size_t At, std::uint32_t Value)
+        {
+            for (int Byte = 0; Byte < 4; ++Byte)
+                Two[At + Byte] = static_cast<unsigned char>(Value >> (Byte * 8));
+        };
+        bool const bRoom = Two.size() > Table + 80 && Read32(Table + 40) == 0;
+        Check(bRoom, "the fixture's headers have room for a second section");
+        if (bRoom)
+        {
+            std::copy(Two.begin() + Table, Two.begin() + Table + 40, Two.begin() + Table + 40);
+            std::uint32_t const Address = Read32(Table + 40 + 12);
+            std::uint32_t const RawOffset = Read32(Table + 40 + 20);
+            std::fill(Two.begin() + Table, Two.begin() + Table + 40, 0);
+            Two[Table] = 'A';
+            Write32(Table + 8, 0x800);            // VirtualSize
+            Write32(Table + 12, Address - 0x800); // VirtualAddress: ends at B's start
+            Write32(Table + 16, 0x800);           // SizeOfRawData
+            Write32(Table + 20, RawOffset);       // PointerToRawData
+            Two[0x40 + 6] = 2;                    // NumberOfSections
+            HMODULE const Module = WriteAll(Scratch, Two.data(), Two.size())
+                                       ? Platform::ResourceModuleLoad(Scratch.c_str())
+                                       : nullptr;
+            wchar_t Text[64];
+            Check(Module != nullptr && LoadStringW(Module, 1, Text, 64) == 3 &&
+                      std::wcscmp(Text, L"One") == 0,
+                  "an RVA at one section's raw end is read from the section that starts there");
+            if (Module != nullptr)
+                FreeLibrary(Module);
             unlink(Scratch.c_str());
         }
     }
