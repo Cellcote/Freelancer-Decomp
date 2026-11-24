@@ -1091,10 +1091,21 @@ void TestRpGpu(ICOManager* Manager, const std::string& Folder)
                     ClearPresentReadBack(Gpu, Hwnd, 64, 32, 0xFF336699u, Root + "/sdl.bmp", &W, &H);
                 Check(bOk, "RPGPU's SDL backend presents a clear on the client's SDL window and "
                            "reads it back");
+                // The back buffer is the size CreateBuffers asks for, as RP8's, whatever the
+                // window's size in pixels (twice its size on a Retina display); Present stretches
+                // it over the window. A smaller one on the same window, then 0: the window's size.
+                std::uint32_t SmallW = 0, SmallH = 0;
+                Check(!bOk || ClearPresentReadBack(Gpu, Hwnd, 32, 16, 0xFF996633u,
+                                                   Root + "/small.bmp", &SmallW, &SmallH),
+                      "RPGPU's SDL back buffer is the size asked for, not the window's");
                 int PixelW = 0, PixelH = 0;
                 SDL_GetWindowSizeInPixels(Window, &PixelW, &PixelH);
-                Check(!bOk || (W == std::uint32_t(PixelW) && H == std::uint32_t(PixelH)),
-                      "RPGPU's SDL frame is the window's size in pixels");
+                std::uint32_t WindowW = 0, WindowH = 0;
+                Check(!bOk ||
+                          (ClearPresentReadBack(Gpu, Hwnd, 0, 0, 0xFF336699u, Root + "/window.bmp",
+                                                &WindowW, &WindowH) &&
+                           WindowW == std::uint32_t(PixelW) && WindowH == std::uint32_t(PixelH)),
+                      "RPGPU's SDL back buffer asked for at 0 x 0 is the window's size in pixels");
                 if (bOk)
                     TestRpGpuDraws(Gpu, Hwnd, true, Root, Driver != nullptr ? Driver : "SDL_GPU");
                 if (bOk)

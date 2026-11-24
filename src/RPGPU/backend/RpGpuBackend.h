@@ -319,8 +319,10 @@ public:
     virtual ~IRpGpuBackend() = default;
 
     // Brings the device and swap chain up on Hwnd, the client's window. Width and Height are the
-    // size the client asked for; a backend with a real window uses the window's own size. A
-    // second call with the same window keeps the device and only applies VSync.
+    // back buffer's size, as the client asked for it (RP8's back buffer is the mode's size); 0
+    // asks for the window's size. A backend with a real window stretches the back buffer over
+    // the window when it presents. A second call with the same window keeps the device, takes
+    // the new size and applies VSync.
     virtual bool Create(RpWindowHandle Hwnd, std::uint32_t Width, std::uint32_t Height, bool bVSync) = 0;
     virtual void Destroy() = 0;
     virtual bool IsReady() const = 0;

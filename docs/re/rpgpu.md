@@ -388,10 +388,13 @@ RPGPU records each frame and draws it at `SwapBuffers`, which is plan step 5.3.
 **The SDL backend's `Present`:**
 1. One copy pass uploads the pending textures and the frame's vertices and indices, through
    one transfer buffer.
-2. The commands replay on RPGPU's own colour target (B8G8R8A8, the swap chain's size) and a
-   depth buffer, in one render pass per clear. The first pass clears colour and depth. The
-   target is then blitted to the swap-chain image, pixel for pixel, so the last frame stays
-   readable for `PrintScreen`.
+2. The commands replay on RPGPU's own colour target (B8G8R8A8) and a depth buffer, in one render
+   pass per clear. The first pass clears colour and depth. The target is the back buffer: the
+   size `CreateBuffers` asks for, as RP8's back buffer is the mode's size windowed or not (the
+   window's size in pixels when it asks for 0). It is then blitted to the swap-chain image,
+   pixel for pixel when the sizes agree, otherwise stretched over the window with linear
+   filtering, as Direct3D 8 presents a windowed back buffer of another size. The target stays
+   readable for `PrintScreen`, at the back buffer's size.
 3. Pipelines are cached per `FRpGpuPipelineKey`, and samplers per `FRpGpuSamplerKey`.
    - `CULLMODE` culls by the winding on screen, pre-transformed triangles included, as Direct3D
      8 does. RP8's default is 1 (none).
