@@ -616,6 +616,10 @@ void TestRpGpuVertexCopy(IRenderPipeline* Pipeline)
     unsigned int PastLock = 1;
     Check(Buffers->CopyVertices(Handle, &PastLock, &Sphere, 0, 2) != GR_OK,
           "a copy into a lock that would run past the locked vertices is refused");
+    unsigned int StillLocked = 1;
+    Check(Buffers->CopyVertices(Handle, &StillLocked, &Sphere, 1, 1) == GR_OK,
+          "the lock stays open after a refused copy: an in-range copy goes in");
+    Check(Buffers->ResizeVb(Handle, 0x112, 8) != GR_OK, "a locked buffer is not resized");
     Buffers->UnlockVb(Handle);
     unsigned int Whole = 0;
     if (Buffers->LockVb(Handle, &Whole, &Bits, 6) == GR_OK && Bits != nullptr)
@@ -650,6 +654,25 @@ void TestRpGpuVertexCopy(IRenderPipeline* Pipeline)
     else
         Check(false, "the three-float buffer locks after the refused copy");
     Buffers->DestroyVb((void**)(&Handle));
+
+    // A locked pool does not grow (its lock's vertices would move); unlocked, it does.
+    unsigned int* Pool = nullptr;
+    unsigned int PoolFvf = 0, PoolCount = 0;
+    if (Buffers->CreateVb(0x112, 1, &Pool, 1) == GR_OK && Pool != nullptr &&
+        Buffers->GetVbInfo(Pool, &PoolFvf, &PoolCount) == GR_OK)
+    {
+        unsigned int PoolAt = 0;
+        void* PoolBits = nullptr;
+        unsigned int* Grown = nullptr;
+        Check(Buffers->LockVb(Pool, &PoolAt, &PoolBits, 1) == GR_OK &&
+                  Buffers->CreateVb(0x112, PoolCount + 1, &Grown, 1) != GR_OK,
+              "a locked pool is not grown");
+        Buffers->UnlockVb(Pool);
+        Check(Buffers->CreateVb(0x112, PoolCount + 1, &Grown, 1) == GR_OK && Grown == Pool,
+              "an unlocked pool grows");
+    }
+    else
+        Check(false, "RPGPU hands out its 0x112 pool");
 
     // The pool through the manager, as SphereMesh draws: LockVertexMemory, CopyVertexData.
     FVertexMemoryLock Lock = {};
@@ -737,6 +760,22 @@ void TestRpGpuVertexCopy(IRenderPipeline* Pipeline)
     for (std::size_t Index = 0; Index < sizeof(Pair); ++Index)
         bNormalOnlyUntouched = bNormalOnlyUntouched && Pair[Index / 0x14][Index % 0x14] == 0xAB;
     Check(bNormalOnlyUntouched, "a generic copy wider than its format copies nothing");
+
+    // Two texture sets and no position (0x200, 0x10 bytes a vertex): the 12 position bytes
+    // leave 4 for set 0 and none for set 1, whose copy would start past the record.
+    FRpVertexSrcDesc NoPosition = {};
+    NoPosition.SrcFvf = 0x200;
+    NoPosition.Position = Stream(Positions, 0xC, nullptr);
+    NoPosition.Tex[0] = Stream(Texels, 8, nullptr);
+    NoPosition.Tex[1] = Stream(Texels, 8, nullptr);
+    unsigned char Bare[2][0x10];
+    std::memset(Bare, 0xAB, sizeof(Bare));
+    Manager->CopyVertexData(Bare, 0x200, &NoPosition, 0, 1);
+    bool bBareOk = std::memcmp(Bare[0], Positions[0], 0xC) == 0 &&
+                   std::memcmp(Bare[0] + 0xC, Texels[0], 4) == 0;
+    for (std::size_t Index = 0; Index < 0x10; ++Index)
+        bBareOk = bBareOk && Bare[1][Index] == 0xAB;
+    Check(bBareOk, "a texture set whose copy would start past its vertex writes nothing");
 
     // XYZRHW | TEX1 (0x104) from separate streams of the same format: RP8's jump table has
     // the empty converter there.

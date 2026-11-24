@@ -261,10 +261,13 @@ inline void CopyGeneric(unsigned char* Origin, std::ptrdiff_t Skew, unsigned int
                 // vertex runs into the next one (or past the last), so the copy stops at the
                 // vertex's end. Within the vertex the bytes are retail's.
                 const FRpVertexStream& Set = Src->Tex[Index];
-                const std::size_t Left = static_cast<std::size_t>(DstStride) -
-                                         static_cast<std::size_t>(Cursor - VertexStart);
+                // The cursor can already be past the record (a format without XYZ: Rp8FvfStride
+                // counts no position, the copy writes 12 bytes of one), so Left saturates at 0.
+                const std::size_t Used = static_cast<std::size_t>(Cursor - VertexStart);
+                const std::size_t Left = Used < DstStride ? DstStride - Used : 0;
                 const std::size_t Bytes = Set.ByteSize < Left ? Set.ByteSize : Left;
-                std::memcpy(Cursor, Element(Set, Set.Stride, StartVertex, N, bIndexed), Bytes);
+                if (Bytes != 0)
+                    std::memcpy(Cursor, Element(Set, Set.Stride, StartVertex, N, bIndexed), Bytes);
             }
             Cursor += TexelBytes(DstFvf >> (Index * 2 + 0x10));
         }
